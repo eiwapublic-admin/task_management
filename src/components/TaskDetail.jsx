@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { STATUS_LIST } from '../lib/status'
-import { formatDate } from '../lib/format'
+import { formatDate, formatDateTime } from '../lib/format'
 
 export default function TaskDetail({ task, onClose, onStatusChange }) {
   const modalRef = useRef(null)
@@ -71,12 +71,20 @@ export default function TaskDetail({ task, onClose, onStatusChange }) {
           <dd>{task.status}</dd>
           <dt>期限</dt>
           <dd>{formatDate(task.due_date) ?? '未設定'}</dd>
+          <dt>受信日時</dt>
+          <dd>{formatDateTime(task.received_at) ?? '不明'}</dd>
           <dt>送信者</dt>
           <dd>{task.sender}</dd>
           <dt>件名</dt>
           <dd>{task.subject}</dd>
           <dt>本文プレビュー</dt>
           <dd className="task-detail-body">{task.body_preview}</dd>
+          {task.classification_note && (
+            <>
+              <dt>AI判定の理由</dt>
+              <dd className="task-detail-note">{task.classification_note}</dd>
+            </>
+          )}
         </dl>
 
         <div className="task-detail-status" role="group" aria-label="ステータスを変更">

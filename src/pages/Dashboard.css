@@ -34,6 +34,58 @@
   color: var(--text-muted);
 }
 
+.dashboard-lastfetch {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dashboard-header-right button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 通知・エラーバナー */
+.dashboard-banner {
+  margin: var(--space-3) var(--space-5) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.dashboard-notice {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-surface));
+  border: 1px solid var(--color-primary);
+  color: var(--text-strong);
+}
+
+.dashboard-error {
+  background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
+  border: 1px solid var(--due-overdue);
+  color: var(--due-overdue);
+}
+
+.dashboard-loading {
+  padding: var(--space-5);
+  color: var(--text-muted);
+}
+
+.dashboard-empty {
+  margin: var(--space-5);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-base);
+}
+
+.dashboard-empty-hint {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .dashboard-header-right button {
   border: 1px solid var(--border-strong);
   background: var(--bg-surface);

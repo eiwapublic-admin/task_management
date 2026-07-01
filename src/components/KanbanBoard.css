@@ -321,6 +321,13 @@
   line-height: 1.6;
 }
 
+.task-detail-note {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .task-detail-status {
   display: flex;
   gap: var(--space-2);

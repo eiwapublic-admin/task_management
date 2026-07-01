@@ -5,6 +5,7 @@ export default function SettingsPanel({ settings, onSave }) {
   const [fetchInterval, setFetchInterval] = useState(settings.fetch_interval_minutes)
   const [assignees, setAssignees] = useState(settings.assignees)
   const [businessKeywords, setBusinessKeywords] = useState(settings.business_keywords)
+  const [orgContext, setOrgContext] = useState(settings.org_context ?? '')
 
   function handleAssigneeChange(index, value) {
     setAssignees((prev) => prev.map((a, i) => (i === index ? value : a)))
@@ -16,6 +17,7 @@ export default function SettingsPanel({ settings, onSave }) {
       fetch_interval_minutes: Number(fetchInterval),
       assignees,
       business_keywords: businessKeywords,
+      org_context: orgContext,
     })
   }
 
@@ -50,6 +52,20 @@ export default function SettingsPanel({ settings, onSave }) {
             <input value={name} onChange={(e) => handleAssigneeChange(i, e.target.value)} />
           </label>
         ))}
+      </section>
+
+      <section>
+        <h2>業務の背景・振り分けルール</h2>
+        <p className="settings-hint">
+          会社・担当者・取引先・振り分けの前提を記述します。ここに書いた内容がメール分類（Claude）に
+          そのまま渡されます。実際の振り分け結果を見ながら、ルールを追記・調整してください。
+        </p>
+        <textarea
+          value={orgContext}
+          onChange={(e) => setOrgContext(e.target.value)}
+          placeholder="例: 「リニューアルプレート」「ダウンライト」「調光器」に関する問い合わせは岡田が担当。プロモーション/広告メールは業務タスクではない。"
+          rows={10}
+        />
       </section>
 
       <section>

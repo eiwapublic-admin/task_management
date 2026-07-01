@@ -1,22 +1,50 @@
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import SettingsPanel from '../components/SettingsPanel'
+import { fetchSettings } from '../lib/tasks'
+import { saveSettings } from '../lib/api'
 import './Dashboard.css'
 
-const MOCK_SETTINGS = {
-  fetch_interval_minutes: 30,
-  assignees: ['担当者A', '担当者B', '担当者C'],
-  business_keywords: '',
+const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
+
+function parseAssignees(raw) {
+  if (!raw) return DEFAULT_ASSIGNEES
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) && arr.length > 0 ? arr : DEFAULT_ASSIGNEES
+  } catch {
+    return DEFAULT_ASSIGNEES
+  }
 }
 
 export default function Settings() {
   const navigate = useNavigate()
-  const [saved, setSaved] = useState(false)
+  const [settings, setSettings] = useState(null)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
 
-  function handleSave(values) {
-    // Phase 1: ダミー実装。Supabase settings テーブルへの保存は Phase 2/3 で接続する。
-    console.log('settings saved (mock):', values)
-    setSaved(true)
+  useEffect(() => {
+    fetchSettings()
+      .then((s) =>
+        setSettings({
+          fetch_interval_minutes: Number(s.fetch_interval_minutes) || 30,
+          assignees: parseAssignees(s.assignees),
+          business_keywords: s.business_keywords || '',
+          org_context: s.org_context || '',
+        })
+      )
+      .catch((err) => setError(err.message))
+  }, [])
+
+  async function handleSave(values) {
+    setStatus('')
+    setError('')
+    try {
+      await saveSettings(values)
+      setStatus('保存しました')
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
@@ -28,9 +56,18 @@ export default function Settings() {
         </div>
       </header>
       <div className="settings-container">
-        <SettingsPanel settings={MOCK_SETTINGS} onSave={handleSave} />
+        {error && (
+          <p className="dashboard-banner dashboard-error" role="alert">
+            {error}
+          </p>
+        )}
+        {settings ? (
+          <SettingsPanel settings={settings} onSave={handleSave} />
+        ) : (
+          !error && <p className="dashboard-loading">読み込み中…</p>
+        )}
         <p className="settings-saved" role="status" aria-live="polite">
-          {saved ? '保存しました（ダミー）' : ''}
+          {status}
         </p>
       </div>
     </div>

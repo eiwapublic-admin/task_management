@@ -16,10 +16,14 @@ create table if not exists tasks (
   sender           text not null,
   subject          text not null,
   body_preview     text,
+  classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
 );
+
+-- 既存テーブルへの後方互換の追加（Phase 2 で導入）
+alter table tasks add column if not exists classification_note text;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);
@@ -32,9 +36,10 @@ create table if not exists settings (
 
 insert into settings (key, value) values
   ('fetch_interval_minutes', '30'),
-  ('assignees', '["担当者A","担当者B","担当者C"]'),
+  ('assignees', '["橋口","西川","岡田"]'),
   ('business_keywords', ''),
-  ('shared_gmail', 'shared@example.com'),
+  ('org_context', ''),
+  ('shared_gmail', 'eiwa.public@gmail.com'),
   ('last_fetch_at', null)
 on conflict (key) do nothing;
 
@@ -85,8 +90,8 @@ drop policy if exists "tasks_update_status" on tasks;
 create policy "tasks_update_status" on tasks
   for update using (true) with check (true);
 
-revoke update on tasks from anon;
-grant update (status) on tasks to anon;
+revoke insert, update, delete on tasks from anon, authenticated;
+grant update (status) on tasks to anon, authenticated;
 
 drop policy if exists "settings_select_all" on settings;
 create policy "settings_select_all" on settings
