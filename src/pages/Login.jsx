@@ -6,6 +6,7 @@ import './Login.css'
 export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -41,16 +42,31 @@ export default function Login() {
         />
 
         <label htmlFor="password">パスワード</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          required
-        />
+        <div className="login-password-field">
+          <input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+          <button
+            type="button"
+            className="login-password-toggle"
+            aria-pressed={showPassword}
+            aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+            onClick={() => setShowPassword((v) => !v)}
+          >
+            {showPassword ? '隠す' : '表示'}
+          </button>
+        </div>
 
-        {error && <p className="login-error">{error}</p>}
+        {error && (
+          <p className="login-error" role="alert">
+            {error}
+          </p>
+        )}
 
         <button type="submit" disabled={loading}>
           {loading ? 'ログイン中...' : 'ログイン'}

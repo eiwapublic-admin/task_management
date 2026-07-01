@@ -13,7 +13,7 @@ export default function SettingsPanel({ settings, onSave }) {
   function handleSubmit(e) {
     e.preventDefault()
     onSave({
-      fetch_interval_minutes: fetchInterval,
+      fetch_interval_minutes: Number(fetchInterval),
       assignees,
       business_keywords: businessKeywords,
     })
@@ -24,15 +24,22 @@ export default function SettingsPanel({ settings, onSave }) {
       <section>
         <h2>更新頻度</h2>
         <label>
-          何分ごとにメールを取得するか（5〜120分）
+          何分ごとにメールを取得するか
           <input
             type="number"
             min={5}
             max={120}
+            step={1}
             value={fetchInterval}
-            onChange={(e) => setFetchInterval(Number(e.target.value))}
+            onChange={(e) => setFetchInterval(e.target.value)}
+            onBlur={(e) => {
+              // 範囲外・非整数の入力を 5〜120 に丸める
+              const n = Math.round(Number(e.target.value))
+              setFetchInterval(Number.isFinite(n) ? Math.min(120, Math.max(5, n)) : 30)
+            }}
           />
         </label>
+        <p className="settings-hint">5〜120分の範囲で指定できます（デフォルト: 30分）。</p>
       </section>
 
       <section>

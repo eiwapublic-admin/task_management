@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import KanbanColumn from './KanbanColumn'
 import FilterBar from './FilterBar'
 import TaskDetail from './TaskDetail'
-import { STATUS_LIST } from '../lib/mockTasks'
+import { STATUS_LIST } from '../lib/status'
 import './KanbanBoard.css'
 
 export default function KanbanBoard({ tasks, assignees, onStatusChange }) {

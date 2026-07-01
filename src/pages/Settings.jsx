@@ -27,9 +27,11 @@ export default function Settings() {
           <button onClick={() => navigate('/')}>カンバンに戻る</button>
         </div>
       </header>
-      <div style={{ padding: '16px 24px', maxWidth: 480 }}>
+      <div className="settings-container">
         <SettingsPanel settings={MOCK_SETTINGS} onSave={handleSave} />
-        {saved && <p style={{ color: '#2563eb', fontSize: 13 }}>保存しました（ダミー）</p>}
+        <p className="settings-saved" role="status" aria-live="polite">
+          {saved ? '保存しました（ダミー）' : ''}
+        </p>
       </div>
     </div>
   )

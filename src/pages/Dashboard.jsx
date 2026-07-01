@@ -26,7 +26,7 @@ export default function Dashboard() {
       <header className="dashboard-header">
         <h1>タスク管理システム</h1>
         <div className="dashboard-header-right">
-          {user && <span>{user.display_name} さん</span>}
+          {user && <span className="dashboard-user">{user.display_name} さん</span>}
           <button onClick={() => navigate('/settings')}>設定</button>
           <button onClick={handleLogout}>ログアウト</button>
         </div>

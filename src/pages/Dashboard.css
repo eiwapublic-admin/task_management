@@ -1,35 +1,76 @@
 .dashboard-page {
   min-height: 100vh;
-  background: #fafafa;
+  background: var(--bg-subtle);
 }
 
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e5e5e5;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .dashboard-header h1 {
   font-size: 18px;
   margin: 0;
+  color: var(--text-strong);
 }
 
 .dashboard-header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   font-size: 13px;
-  color: #444;
+  color: var(--text-base);
+}
+
+.dashboard-user {
+  color: var(--text-muted);
 }
 
 .dashboard-header-right button {
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 6px;
-  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
   font-size: 13px;
+  color: var(--text-base);
   cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.dashboard-header-right button:hover {
+  background: var(--bg-subtle);
+  border-color: var(--color-primary);
+}
+
+/* 設定ページの本文コンテナ */
+.settings-container {
+  padding: var(--space-4) var(--space-5);
+  max-width: 520px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: var(--space-3) var(--space-3);
+  }
+
+  .dashboard-header h1 {
+    font-size: 15px;
+  }
+
+  .dashboard-header-right {
+    gap: var(--space-2);
+  }
+
+  /* 画面が狭いときは表示名を隠してボタンを優先する */
+  .dashboard-user {
+    display: none;
+  }
 }

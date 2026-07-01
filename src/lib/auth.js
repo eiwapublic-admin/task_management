@@ -31,9 +31,33 @@ export function getToken() {
 
 export function getCurrentUser() {
   const raw = localStorage.getItem(USER_KEY)
-  return raw ? JSON.parse(raw) : null
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+// JWTのペイロードをデコードして有効期限(exp)を取り出す。
+// ※これはクライアント側の利便性チェック（期限切れなら自動ログアウト）であり、
+//   セキュリティ上の検証ではない。署名検証は必ずサーバー側で行うこと。
+function tokenExpiry(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
 }
 
 export function isAuthenticated() {
-  return Boolean(getToken())
+  const token = getToken()
+  if (!token) return false
+  const expiresAt = tokenExpiry(token)
+  if (expiresAt !== null && Date.now() >= expiresAt) {
+    logout()
+    return false
+  }
+  return true
 }

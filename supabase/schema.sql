@@ -77,9 +77,16 @@ drop policy if exists "tasks_select_all" on tasks;
 create policy "tasks_select_all" on tasks
   for select using (true);
 
+-- フロントエンド（anon key）はカンバンのステータス変更のみ行える。
+-- RLSの with check だけでは「どの列を更新できるか」を制限できないため、
+-- 列レベルのGRANTで status 列のみ更新可能にする。
+-- INSERT / DELETE / その他の列の更新は service role（Netlify Functions）経由に限定される。
 drop policy if exists "tasks_update_status" on tasks;
 create policy "tasks_update_status" on tasks
   for update using (true) with check (true);
+
+revoke update on tasks from anon;
+grant update (status) on tasks to anon;
 
 drop policy if exists "settings_select_all" on settings;
 create policy "settings_select_all" on settings

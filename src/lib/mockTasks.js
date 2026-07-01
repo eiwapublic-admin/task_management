@@ -1,5 +1,3 @@
-export const STATUS_LIST = ['未処理', '返信済み', '対応中', '完了']
-
 export const mockTasks = [
   {
     id: '1',
