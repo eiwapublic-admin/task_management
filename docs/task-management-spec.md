@@ -291,33 +291,37 @@ SHARED_GMAIL_ADDRESS=shared@example.com
 
 ## 7. 実装の優先順位（フェーズ分け）
 
-### Phase 1：基盤構築（最初に実装）
+> 進捗は 2026-07-01 時点。詳細な実装状況は「12. 実装状況・アーキテクチャ（as-built）」を参照。
 
-- [ ] Supabase テーブル作成
-- [ ] Netlify プロジェクト作成・デプロイ
-- [ ] ログイン画面（ユーザー/パスワード認証）
-- [ ] ダミーデータでのカンバン画面表示確認
+### Phase 1：基盤構築（最初に実装）— ✅ 完了
 
-### Phase 2：メール連携（コア機能）
+- [x] Supabase テーブル作成
+- [x] Netlify プロジェクト作成・デプロイ
+- [x] ログイン画面（ユーザー/パスワード認証）
+- [x] ダミーデータでのカンバン画面表示確認
+- [x] （追加）UI/UXレビューに基づく改善（デザイントークン、a11y、レスポンシブ、セキュリティ堅牢化）
 
-- [ ] Gmail API 接続テスト（トークン取得・メール一覧取得）
-- [ ] Claude API 接続テスト（業務判定・担当者振り分け）
-- [ ] Netlify Scheduled Function 実装（fetch-emails.js）
-- [ ] 取得したメールのDB保存
+### Phase 2：メール連携（コア機能）— ✅ 実装完了（本番での実データ通し確認は保留）
 
-### Phase 3：UI完成
+- [x] Gmail API 接続（OAuthリフレッシュトークン方式、fetch直呼び）
+- [x] Claude API 接続（業務判定・担当者振り分け・期限抽出・理由付与）
+- [x] Netlify Scheduled Function 実装（fetch-emails.js、5分毎起動・settingsの間隔でゲート）＋手動実行（run-fetch.js）
+- [x] 取得したメールのDB保存（業務メールのみ tasks へ INSERT）
 
-- [ ] カンバンのステータス移動（ドラッグ＆ドロップ or ボタン）
-- [ ] 担当者フィルター
-- [ ] タスク詳細モーダル（元メール本文の確認）
-- [ ] 設定画面（更新頻度・担当者名変更）
+### Phase 3：UI完成 — ✅ 完了
 
-### Phase 4：自動化・仕上げ
+- [x] カンバンのステータス移動（ドラッグ＆ドロップ＋詳細モーダルのボタン、Supabaseへ永続化）
+- [x] 担当者フィルター
+- [x] タスク詳細モーダル（元メール本文＋AI判定の理由）
+- [x] 設定画面（更新頻度・担当者名・業務背景/振り分けルール、Supabaseへ実保存）
 
-- [ ] 返信自動検知ロジック実装
-- [ ] 更新頻度の設定反映
-- [ ] テスト・動作確認
-- [ ] 本番環境（会社アカウント）への移管
+### Phase 4：自動化・仕上げ — 🔶 一部完了
+
+- [x] 返信自動検知ロジック実装（共有アドレス発の最新メールで「返信済み」へ自動遷移）
+- [x] 更新頻度の設定反映（pipeline内で間隔ゲート）
+- [x] （追加）APIクレジット不足の警告バナー＋今月の利用額表示
+- [ ] 本番での実データ通し確認（Netlify無料枠リセット待ち＝2026-08-01）
+- [ ] 本番環境（会社アカウント）への移管（下記「8. 移管手順」）
 
 ---
 
@@ -345,6 +349,8 @@ SHARED_GMAIL_ADDRESS=shared@example.com
 | Claude API (Haiku) | 従量課金のみ | **月数百円程度**（1日50通×20日=1000通、1通あたり約0.3円想定） |
 
 → **実質的なランニングコストはClaude APIのみ（月数百円〜千円程度）**
+
+> ⚠️ 2026-07 追記：Netlifyは「クレジット制」に移行しており、Free枠は **300 credits/月**（本番デプロイ≈15/回、AI inference等も消費）。**アプリ稼働分の消費は極小**だが、Netlify上でAIエージェント（Agent Runners）を回すと大きく消費する。詳細は「12. 実装状況・アーキテクチャ」を参照。
 
 ---
 
@@ -378,4 +384,35 @@ SHARED_GMAIL_ADDRESS=shared@example.com
 ---
 
 *作成日：2026年7月1日*
-*次のアクション：Claude Codeで上記「11. 作業開始指示」を実行し、Phase 1の実装を開始する」
+
+---
+
+## 12. 実装状況・アーキテクチャ（as-built / 2026-07-01 更新）
+
+> 本節は「当初仕様」に対する**実装の実態**をまとめたもの。新セッションへの詳細な引き継ぎは `docs/HANDOFF.md` を参照。
+
+### 12-1. 実装済みの全体像
+- **フロント（React + Vite）**: ログイン／カンバン（ダッシュボード）／設定。ダッシュボードはSupabaseから実データを取得し、ステータス変更を永続化。「今すぐ取得」ボタンで手動のメール取得を実行。設定画面で担当者・更新頻度・**業務背景/振り分けルール（org_context）**を編集し実保存。**今月のAPI利用状況（推定コスト）**を表示。
+- **バックエンド（Netlify Functions, ESM v2）**:
+  - `login.js`（POST `/api/login`）: bcrypt照合＋JWT発行。
+  - `run-fetch.js`（POST `/api/run-fetch`, JWT保護）: 手動でパイプラインを即時実行。
+  - `settings.js`（PUT `/api/settings`, JWT保護）: 許可キーのみ設定保存。
+  - `fetch-emails.js`（Scheduled, `*/5 * * * *`）: settings の更新間隔でゲートしてパイプライン実行。
+  - `lib/`: `gmail.js`（OAuth＋取得・本文抽出・スレッド最新From取得）、`anthropic.js`（分類＋usage返却＋残高不足検知）、`pipeline.js`（取得→分類→INSERT→返信検知→利用量加算→クレジット警告設定→last_fetch更新）、`supabase-admin.js`、`http.js`（JWT検証・JSON応答）。
+- **DB（Supabase）**: `tasks`（`classification_note`列を追加）／`settings`（キー: fetch_interval_minutes, assignees, business_keywords, org_context, shared_gmail, api_credit_alert, last_fetch_at）／`users`／`api_usage`（月次トークン集計、`add_api_usage`関数）。RLSは「参照は許可、書き込みは service role 経由」。フロントの `tasks` 更新は**status列のみ**にGRANT制限。
+- **分類ロジック**: `settings.org_context`（会社/担当者/取引先/BKB/本社/製品振り分け等の業務背景）をClaudeのシステムプロンプトに注入。**再デプロイ不要で設定画面から調整可能**。判定理由を `classification_note` に保存。
+- **モデル**: `claude-haiku-4-5`（env `CLAUDE_MODEL` で上書き可）。
+
+### 12-2. ホスティング・課金の実態
+- **本番デプロイ対象ブランチ = `claude/task-management-system-ae752m`**（Netlifyの本番ブランチ設定）。ここにマージ＝本番URL `https://task-management-eiwa.netlify.app` に反映。開発作業ブランチは `claude/design-dev-review-0uerru`。
+- **Netlify Free = 300 credits/月**（本番デプロイ≈15/回）。**アプリ稼働分の消費は極小**。2026-07は初期構築時のAI inference消費で枠を使い切り、**本番デプロイは 2026-08-01 の枠リセットまで停止**。ホスティング移行は不要と判断（Cloudflare/Supabase中心が予備案）。
+- **Anthropic API**: Claude.aiサブスクとは**別会計**。$5チャージ済み。残高不足時はアプリが検知して警告バナー＋支払い画面リンクを表示。将来はオートリロードも選択肢。
+
+### 12-3. 現在のブロッカー / 次にやること
+1. **2026-08-01 のNetlify枠リセット後**に本番反映（自動デプロイ or Trigger deploy）→ 30分毎の自動取得が有効化。
+2. メールを溜めてから「今すぐ取得」→ データを増やして**別の社員にも評価**してもらう。必要なら `users` に評価用アカウントを追加。
+3. 実データでの通し確認（ログイン→取得→分類→返信検知）。分類結果を見て `org_context` を調整。
+4. 会社アカウントへの移管（§8）。
+5. **資格情報のローテーション**（初期引き継ぎ資料に平文の秘密情報が含まれていたため推奨）。
+
+*次のアクション：`docs/HANDOFF.md` を読み、2026-08-01のNetlify枠リセット後に本番反映と実データ評価を行う。*
