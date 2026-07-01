@@ -49,12 +49,15 @@ create table if not exists users (
 
 -- updated_at 自動更新
 create or replace function set_updated_at()
-returns trigger as $$
+returns trigger
+language plpgsql
+set search_path = public
+as $$
 begin
   new.updated_at = now();
   return new;
 end;
-$$ language plpgsql;
+$$;
 
 drop trigger if exists trg_tasks_updated_at on tasks;
 create trigger trg_tasks_updated_at
