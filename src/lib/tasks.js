@@ -25,3 +25,14 @@ export async function fetchSettings() {
   for (const row of data || []) map[row.key] = row.value
   return map
 }
+
+// 指定月（'YYYY-MM'）のAPI利用量を返す。無ければ null。
+export async function fetchUsage(month) {
+  const { data, error } = await supabase
+    .from('api_usage')
+    .select('month, input_tokens, output_tokens, calls, updated_at')
+    .eq('month', month)
+    .maybeSingle()
+  if (error) throw new Error(`利用量の取得に失敗しました: ${error.message}`)
+  return data
+}

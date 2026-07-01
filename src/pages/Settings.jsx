@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import SettingsPanel from '../components/SettingsPanel'
+import UsagePanel from '../components/UsagePanel'
 import { fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
 import './Dashboard.css'
@@ -69,6 +70,7 @@ export default function Settings() {
         <p className="settings-saved" role="status" aria-live="polite">
           {status}
         </p>
+        <UsagePanel />
       </div>
     </div>
   )

@@ -5,7 +5,19 @@ import { getCurrentUser, logout } from '../lib/auth'
 import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { runFetch } from '../lib/api'
 import { formatDateTime } from '../lib/format'
+import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
+
+// settings.api_credit_alert（JSON文字列 or 空）を解釈してメッセージを返す
+function parseCreditAlert(raw) {
+  if (!raw) return null
+  try {
+    const obj = JSON.parse(raw)
+    return obj.message || 'APIクレジットが不足している可能性があります。'
+  } catch {
+    return String(raw)
+  }
+}
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 
@@ -27,6 +39,7 @@ export default function Dashboard() {
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [creditAlert, setCreditAlert] = useState(null)
   const navigate = useNavigate()
   const user = getCurrentUser()
 
@@ -37,6 +50,7 @@ export default function Dashboard() {
       setTasks(taskList)
       setAssignees(parseAssignees(settings.assignees))
       setLastFetchAt(settings.last_fetch_at || null)
+      setCreditAlert(parseCreditAlert(settings.api_credit_alert))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -106,6 +120,21 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {creditAlert && (
+        <div className="dashboard-banner dashboard-credit-alert" role="alert">
+          <span>
+            ⚠️ APIクレジットが不足し、メールの自動分類が停止しています。チャージ後に「今すぐ取得」で再開できます。
+          </span>
+          <a
+            className="dashboard-credit-button"
+            href={BILLING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            APIクレジットをチャージ
+          </a>
+        </div>
+      )}
       {notice && (
         <p className="dashboard-banner dashboard-notice" role="status" aria-live="polite">
           {notice}

@@ -84,7 +84,12 @@ export async function classifyEmail(email, context) {
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Claude API エラー (${res.status}): ${text}`)
+    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
+    // クレジット残高不足の検知（残高ゼロ時は 400 で "credit balance is too low" 等が返る）
+    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
+      err.isBillingError = true
+    }
+    throw err
   }
 
   const data = await res.json()
@@ -93,5 +98,9 @@ export async function classifyEmail(email, context) {
   if (!parsed) {
     throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
   }
-  return parsed
+  const usage = {
+    input_tokens: data.usage?.input_tokens || 0,
+    output_tokens: data.usage?.output_tokens || 0,
+  }
+  return { classification: parsed, usage }
 }

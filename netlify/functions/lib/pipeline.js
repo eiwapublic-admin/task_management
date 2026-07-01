@@ -54,7 +54,13 @@ export async function runPipeline({ force = false } = {}) {
     }
   }
 
-  const summary = { fetched: 0, created: 0, replied: 0, nonBusiness: 0, errors: [] }
+  const summary = { fetched: 0, created: 0, replied: 0, nonBusiness: 0, errors: [], creditAlert: null }
+
+  // Claude 利用量の集計とクレジット不足の検知
+  let usageInput = 0
+  let usageOutput = 0
+  let classifyCalls = 0
+  let billingError = null
 
   const accessToken = await getAccessToken()
 
@@ -85,7 +91,10 @@ export async function runPipeline({ force = false } = {}) {
       if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
       processedThreads.add(email.threadId)
 
-      const result = await classifyEmail(email, context)
+      const { classification: result, usage } = await classifyEmail(email, context)
+      usageInput += usage.input_tokens
+      usageOutput += usage.output_tokens
+      classifyCalls += 1
 
       if (!result.is_business_task) {
         summary.nonBusiness += 1
@@ -127,6 +136,11 @@ export async function runPipeline({ force = false } = {}) {
       }
     } catch (err) {
       summary.errors.push(String(err.message || err))
+      // クレジット不足なら以降の分類も必ず失敗するので打ち切る
+      if (err.isBillingError) {
+        billingError = String(err.message || err)
+        break
+      }
     }
   }
 
@@ -153,7 +167,36 @@ export async function runPipeline({ force = false } = {}) {
     }
   }
 
-  // 4) last_fetch_at を更新
+  // 4) Claude 利用量を月次で加算（推定コスト表示用）
+  if (classifyCalls > 0) {
+    const month = todayJST().slice(0, 7) // YYYY-MM
+    const { error: usageError } = await supabase.rpc('add_api_usage', {
+      p_month: month,
+      p_input: usageInput,
+      p_output: usageOutput,
+      p_calls: classifyCalls,
+    })
+    if (usageError) summary.errors.push(`usage: ${usageError.message}`)
+  }
+
+  // 5) クレジット不足アラートの設定／解除
+  if (billingError) {
+    summary.creditAlert = billingError
+    await supabase.from('settings').upsert(
+      { key: 'api_credit_alert', value: JSON.stringify({ message: billingError, at: new Date().toISOString() }) },
+      { onConflict: 'key' }
+    )
+  } else if (classifyCalls > 0) {
+    // 正常に分類できたのでアラートを解除
+    await supabase.from('settings').upsert(
+      { key: 'api_credit_alert', value: '' },
+      { onConflict: 'key' }
+    )
+  }
+
+  summary.usage = { input_tokens: usageInput, output_tokens: usageOutput, calls: classifyCalls }
+
+  // 6) last_fetch_at を更新
   await supabase
     .from('settings')
     .update({ value: new Date().toISOString() })

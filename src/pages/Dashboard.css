@@ -65,9 +65,87 @@
   color: var(--due-overdue);
 }
 
+/* クレジット不足の警告（チャージ導線付き） */
+.dashboard-credit-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--due-overdue) 12%, var(--bg-surface));
+  border: 1px solid var(--due-overdue);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.dashboard-credit-button {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  background: var(--due-overdue);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-credit-button:hover {
+  filter: brightness(0.94);
+}
+
 .dashboard-loading {
   padding: var(--space-5);
   color: var(--text-muted);
+}
+
+/* 利用状況パネル（設定ページ） */
+.usage-panel {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.usage-panel h2 {
+  font-size: 15px;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2);
+}
+
+.usage-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.usage-fields dt {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.usage-fields dd {
+  margin: 0;
+  color: var(--text-base);
+}
+
+.usage-cost {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.usage-jpy {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.usage-billing-link {
+  display: inline-block;
+  margin-top: var(--space-2);
+  color: var(--color-primary);
+  font-size: 13px;
 }
 
 .dashboard-empty {
