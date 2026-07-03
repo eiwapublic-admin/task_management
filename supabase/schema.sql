@@ -16,6 +16,7 @@ create table if not exists tasks (
   sender           text not null,
   subject          text not null,
   body_preview     text,
+  contact          text,           -- 発信元の会社・担当者名（問い合わせフォームは本文から抽出）
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
@@ -24,6 +25,7 @@ create table if not exists tasks (
 
 -- 既存テーブルへの後方互換の追加（Phase 2 で導入）
 alter table tasks add column if not exists classification_note text;
+alter table tasks add column if not exists contact text;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);

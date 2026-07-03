@@ -160,6 +160,32 @@
   line-height: 1.4;
 }
 
+.task-card-contact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.task-card-contact-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-faint);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.task-card-contact-value {
+  color: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .task-card-meta {
   display: flex;
   justify-content: space-between;

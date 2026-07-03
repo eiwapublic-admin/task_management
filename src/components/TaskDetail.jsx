@@ -73,6 +73,12 @@ export default function TaskDetail({ task, onClose, onStatusChange }) {
           <dd>{formatDate(task.due_date) ?? '未設定'}</dd>
           <dt>受信日時</dt>
           <dd>{formatDateTime(task.received_at) ?? '不明'}</dd>
+          {task.contact && (
+            <>
+              <dt>発信元</dt>
+              <dd>{task.contact}</dd>
+            </>
+          )}
           <dt>送信者</dt>
           <dd>{task.sender}</dd>
           <dt>件名</dt>

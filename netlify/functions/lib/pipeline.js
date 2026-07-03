@@ -111,6 +111,11 @@ export async function runPipeline({ force = false } = {}) {
 
       const title = (result.title || email.subject || '（件名なし）').slice(0, 120)
 
+      // 発信元の会社・担当者名。分類器が抽出できなければ差出人(From)を使う。
+      const contact = (typeof result.contact === 'string' && result.contact.trim())
+        ? result.contact.trim().slice(0, 200)
+        : (email.from || null)
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
@@ -119,6 +124,7 @@ export async function runPipeline({ force = false } = {}) {
         status: '未処理',
         due_date: dueDate,
         sender: email.from || '（不明）',
+        contact,
         subject: email.subject || '（件名なし）',
         body_preview: (email.body || '').slice(0, 500),
         received_at: email.receivedAt || new Date().toISOString(),

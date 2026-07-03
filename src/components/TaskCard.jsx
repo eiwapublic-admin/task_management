@@ -26,6 +26,13 @@ export default function TaskCard({ task, onDragStart, onClick }) {
     >
       <div className="task-card-title">{task.title}</div>
 
+      {(task.contact || task.sender) && (
+        <div className="task-card-contact" title={task.sender || undefined}>
+          <span className="task-card-contact-label">発信元</span>
+          <span className="task-card-contact-value">{task.contact || task.sender}</span>
+        </div>
+      )}
+
       <div className="task-card-meta">
         <span className="task-card-assignee">
           <span className="avatar" style={{ background: assigneeColor(task.assignee) }} aria-hidden="true">
