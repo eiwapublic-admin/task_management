@@ -1,6 +1,6 @@
 # タスク管理システム 引き継ぎ文書（新セッション用）
 
-最終更新: 2026-07-01 / 対象リポジトリ: `eiwapublic-admin/task_management`
+最終更新: 2026-07-03 / 対象リポジトリ: `eiwapublic-admin/task_management`
 
 > この文書はリポジトリ内に置かれた「正」の引き継ぎです。新しいセッションは本リポジトリを取得し、
 > `docs/task-management-spec.md`（仕様・as-built）と本ファイルを最初に読んでください。
@@ -15,11 +15,18 @@
 
 ---
 
-## 1. 現状サマリー（2026-07-01）
-- **Phase 1（基盤）・Phase 2（メール連携）・Phase 3（UI）実装完了**。Phase 4（自動化・仕上げ）は返信検知・利用額表示まで完了、**実データ通し確認は保留**。
+## 1. 現状サマリー（2026-07-03）
+- **Phase 1（基盤）・Phase 2（メール連携）・Phase 3（UI）実装完了**。Phase 4（自動化・仕上げ）は返信検知・利用額表示まで完了、**本番での通し確認は保留**。
 - **ブロッカー**: Netlify無料枠を使い切り、**本番デプロイが 2026-08-01 の枠リセットまで停止**。コード・DB・設定はすべて反映済みで、枠回復後に本番反映すれば動く状態。
 - **Anthropic API**: $5チャージ済み（Claude.aiサブスクとは別会計）。
 - 会社の業務背景（栄和／担当者3名／取引先 小泉産業 等）は `settings.org_context` に投入済みで、分類プロンプトへ注入される。
+- **2026-07-03 の追加分**:
+  - **発信元表示**を実装（`tasks.contact` 列／分類での抽出／カード＋詳細モーダルに表示）。開発ブランチにコミット・push済み（`901d5b7`）。
+  - `org_context` に「**實守紙業の数量報告は西川担当**」ルールを追記。
+  - **当社（栄和）発信が起点のスレッドは 返信済み/対応中/完了 で登録**する方針を確定（※現状コード未実装＝手動運用。§6・spec §12-1b/12-3 参照）。
+  - **共有アドレスの前提が判明**（重要・§9-b）：取得対象は `eiwa.public@gmail.com` に届いたメールのみ。個人アドレス宛だけの業務メール（テミス様・真砂住宅機器様・小泉産業岡本様 等）は載らない。→ 業務メールは共有アドレス経由にする運用が必要。
+  - **現在の実データ = 5件**（6/22以降。§DB末尾参照）。評価アカウント `hyoka` 作成済み（パスワードは本書に載せない）。
+- ⚠️ **本番パイプラインはこのサンドボックスでは動かせない**（Netlify env のシークレット無し・本番停止中）。当面の実データ投入・検証は **Gmail MCP＋Supabase MCP でパイプライン相当を手動再現**して実施している（Claude自身が分類するため `api_usage` は増えない）。UIは `src/lib/tasks.js` を一時フィクスチャに差し替えてローカルビルド→スクショで確認（検証後 `git checkout` で戻す）。
 
 ## 2. アーキテクチャ
 - フロント: React 19 + Vite（`/`=カンバン, `/login`, `/settings`）。`RequireAuth` が `isAuthenticated()`（localStorageのJWT有効期限）でガード。
@@ -66,7 +73,8 @@ src/
 - 本番URL: `https://task-management-eiwa.netlify.app` / ブランチデプロイ: `https://<branch-slug>--task-management-eiwa.netlify.app`
 
 ## 5. DBスキーマ要点（Supabase project: `pfiogfdnbctunkhslmcp`）
-- `tasks`: gmail_thread_id(unique)/gmail_message_id/title/assignee/status(未処理|返信済み|対応中|完了)/due_date/sender/subject/body_preview/**classification_note**/received_at。
+- `tasks`: gmail_thread_id(unique)/gmail_message_id/title/assignee/status(未処理|返信済み|対応中|完了)/due_date/sender/subject/body_preview/**classification_note**/**contact（発信元の会社・担当者名。2026-07-03追加）**/received_at。
+- 現在の `tasks` 実データ（2026-07-03・MCP経由で手動投入した5件）: ①實守紙業 数量報告6/23=西川/未処理 ②實守紙業 数量報告6/30=西川/未処理 ③請求書送付(淀川勤労者厚生協会・ホログラム㈱宛)=橋口/**完了**(当社発信) ④関電来訪の対応=岡田/**対応中**(西川発の社内依頼) ⑤ニッケルセンサー価格問い合わせ=橋口/未処理(顧客発)。
 - `settings`(key,value): `fetch_interval_minutes`,`assignees`(JSON配列),`business_keywords`,`org_context`,`shared_gmail`,`api_credit_alert`,`last_fetch_at`。
 - `users`: username/password_hash(bcrypt)/display_name。フロントからは一切アクセス不可（service roleのみ）。
 - `api_usage`(month PK, input_tokens, output_tokens, calls): 月次トークン集計。関数 `add_api_usage(month,input,output,calls)` で原子的に加算（service roleがrpc）。
@@ -77,11 +85,12 @@ src/
 1. `settings` 読込（間隔・担当者・org_context・shared_gmail・last_fetch_at）。
 2. 更新間隔ゲート（手動実行=force時は無視）。
 3. Gmail: `in:inbox after:<last_fetch epoch>`（初回は `newer_than:1d`）で新着取得、最大40件。既存スレッドIDはスキップ。
-4. 各メールを Claude で分類 → `is_business_task=true` のみ tasks へ INSERT（担当者が不明/範囲外なら先頭の担当者に既定割当、due_dateはYYYY-MM-DD検証）。
+4. 各メールを Claude で分類 → `is_business_task=true` のみ tasks へ INSERT（担当者が不明/範囲外なら先頭の担当者に既定割当、due_dateはYYYY-MM-DD検証、`contact`=発信元も保存）。
 5. 返信検知: status='未処理' のタスクのスレッド最新Fromが `shared_gmail` を含めば '返信済み' に更新。
 6. 利用量を `add_api_usage` で月次加算。クレジット不足検知時は `settings.api_credit_alert` を設定、正常分類時は解除。
 7. `last_fetch_at` 更新。
 - クレジット不足はフロントのダッシュボードで赤バナー＋支払い画面リンク（`console.anthropic.com/settings/billing`）として表示。
+- ⚠️ **未実装の方針**: 「当社（栄和）発信が起点のスレッドは 返信済み/対応中/完了 で登録」。現状 `pipeline.js` は常に `status='未処理'` でINSERTする。実装するには `anthropic.js` の出力JSONに `status` を追加し（当社発信の判定＋状況推定）、`pipeline.js` のINSERTで反映する。当面は手動運用（MCP経由の手動抽出時に付与）。
 
 ## 7. 環境変数（Netlifyに設定済み・値は載せない）
 `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SESSION_SECRET`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`(任意), `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`。
@@ -99,6 +108,13 @@ src/
 - **Anthropic**: 1通あたり約0.5〜0.8円（Haiku）。返信検知はGmailのみでAPI不使用。残高ゼロだと分類失敗（警告バナー）。
 - 会社負担化: APIキー発行元を会社のAnthropic組織へ、Netlifyも会社アカウントへ（§8移管手順）。個人のClaude.aiサブスクは運用に不要（解約可）。
 
+## 9-b. 共有アドレスの前提と運用ルール（2026-07-03 の重要な学び）
+- 本システムが拾えるのは **`eiwa.public@gmail.com`（共有アドレス）に届いたメールのみ**。共有アドレスへの転送設定は 2026-07-01 前後に設定されたばかり。
+- そのため **担当者の個人アドレス宛だけの業務メールはシステムに載らない**。実例: テミス様・真砂住宅機器様・小泉産業 岡本様とのやりとりは個人宛で共有アドレスを経由しておらず、全期間検索で `eiwa.public@gmail.com` に0件だった。
+- **運用ルール（要周知）**: 業務メールは共有アドレスを経由させる。 (1) 宛先/CCに共有アドレスを含める、または (2) 個人アドレス/特定相手からのメールを共有アドレスへ自動転送する。転送を追加すれば以後は自動取得・分類される。
+- 共有アドレスに実在する主な業務メール: 實守紙業「数量報告」(毎週・2025〜)、問い合わせフォーム(`if@eiwa-up.jp`経由)、Secom設備点検、当社発の請求書送付。小泉産業は福井・禿・中島の**古い(2023〜24)**メールのみ、岡本のアドレスは無い。
+- 新セッションで「テミス/真砂/岡本 のメールが無い」と言われたら、まず本節を案内すること（欠落ではなく共有アドレス未経由が原因）。
+
 ## 10. 開発・検証の進め方
 - ローカル表示検証: `npm run build && npx vite preview --port 4173` → Playwright(`playwright-core`, chromium `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`)でスクショ。protectedページは localStorage にダミーJWTを注入して描画。実データ表示は `src/lib/tasks.js`/`api.js` を一時モックに差し替え、検証後 `git checkout -- ...` で戻す（コミットしない）。
 - ビルド/静的検査: `npm run build` / `npm run lint`(oxlint)。
@@ -106,10 +122,12 @@ src/
 
 ## 11. 次にやること（優先順）
 1. **2026-08-01 Netlify枠リセット後**に本番反映（自動 or Trigger deploy）→ 自動取得(30分毎)有効化。
-2. メールを溜めて「今すぐ取得」→ データ増加 → **別の社員にも評価**（必要なら `users` に評価用アカウント追加）。
-3. 分類結果を見て `settings.org_context`（振り分けルール）を調整。
-4. （任意）オートリロード or 月予算しきい値での事前警告。
-5. 会社アカウントへ移管、資格情報ローテーション。
+2. **「当社発信→ステータス自動判定」を実装**（§6の未実装方針）：`anthropic.js` 出力に `status` を追加し `pipeline.js` で反映。
+3. メールを溜めて「今すぐ取得」→ データ増加 → **別の社員にも評価**（評価アカウント `hyoka` 作成済み）。
+4. 分類結果を見て `settings.org_context`（振り分けルール）を調整。
+5. **業務メールを共有アドレス経由にする運用の徹底**（§9-b）。個人宛のみの取引先は転送設定を追加。
+6. （任意）オートリロード or 月予算しきい値での事前警告。
+7. 会社アカウントへ移管、資格情報ローテーション。
 
 ## 12. 制約・約束事
 - 秘密情報はリポジトリ/コミット/PR/コメントに書かない。
