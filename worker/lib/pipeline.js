@@ -40,9 +40,13 @@ function extractEmail(str) {
   return m ? m[0] : null
 }
 
+// 操作ログの保持期間（日）。古いログはパイプライン実行時に削除する
+const LOG_RETENTION_DAYS = 60
+
 // runPipeline: 取得〜分類〜保存〜返信検知〜last_fetch更新までを一括実行する。
 // force=true のときは更新間隔ゲートを無視して即時実行する（手動実行用）。
-export async function runPipeline({ force = false } = {}) {
+// actor は操作ログに記録する実行者（手動実行時はログインユーザーの表示名）。
+export async function runPipeline({ force = false, actor = 'システム（自動）' } = {}) {
   const supabase = getAdminClient()
   const settings = await loadSettings(supabase)
 
@@ -82,6 +86,7 @@ export async function runPipeline({ force = false } = {}) {
   }
 
   const summary = { fetched: 0, created: 0, replied: 0, nonBusiness: 0, errors: [], creditAlert: null }
+  const logRows = []
 
   // Claude 利用量の集計とクレジット不足の検知
   let usageInput = 0
@@ -188,7 +193,7 @@ export async function runPipeline({ force = false } = {}) {
   if (sharedGmail) {
     const { data: openTasks } = await supabase
       .from('tasks')
-      .select('id, gmail_thread_id')
+      .select('id, gmail_thread_id, title')
       .eq('status', '未処理')
     for (const task of openTasks || []) {
       try {
@@ -199,7 +204,15 @@ export async function runPipeline({ force = false } = {}) {
             .update({ status: '返信済み' })
             .eq('id', task.id)
             .eq('status', '未処理')
-          if (!error) summary.replied += 1
+          if (!error) {
+            summary.replied += 1
+            logRows.push({
+              log_type: 'status_change',
+              actor: 'システム（自動）',
+              message: `「${task.title}」のステータスを 未処理 → 返信済み に変更（返信を検知）`,
+              detail: { task_id: task.id },
+            })
+          }
         }
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
@@ -236,7 +249,20 @@ export async function runPipeline({ force = false } = {}) {
 
   summary.usage = { input_tokens: usageInput, output_tokens: usageOutput, calls: classifyCalls }
 
-  // 6) last_fetch_at を更新
+  // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
+  const fetchMessage =
+    `メール取得: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
+    `返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件` +
+    (summary.errors.length > 0 ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
+  logRows.unshift({ log_type: 'fetch', actor, message: fetchMessage, detail: summary })
+  const { error: logError } = await supabase.from('activity_logs').insert(logRows)
+  if (logError) console.error('操作ログの書き込みに失敗:', logError.message)
+  await supabase
+    .from('activity_logs')
+    .delete()
+    .lt('created_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
+
+  // 7) last_fetch_at を更新
   await supabase
     .from('settings')
     .update({ value: new Date().toISOString() })

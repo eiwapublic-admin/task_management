@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import { getCurrentUser, logout } from '../lib/auth'
-import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
+import { fetchTasks, fetchSettings, updateTaskStatus, logStatusChange } from '../lib/tasks'
 import { runFetch } from '../lib/api'
 import { formatDateTime } from '../lib/format'
 import { BILLING_URL } from '../lib/pricing'
@@ -70,6 +70,8 @@ export default function Dashboard() {
     setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, status } : t)))
     try {
       await updateTaskStatus(task.id, status)
+      // ログの記録失敗はステータス変更自体には影響させない
+      logStatusChange(task, task.status, status, user?.display_name).catch(() => {})
     } catch (err) {
       setTasks(prev)
       setError(err.message)
@@ -119,6 +121,7 @@ export default function Dashboard() {
           <button onClick={handleRunFetch} disabled={fetching}>
             {fetching ? '取得中…' : '今すぐ取得'}
           </button>
+          <button onClick={() => navigate('/logs')}>ログ</button>
           <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
           <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
         </div>

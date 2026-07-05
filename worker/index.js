@@ -59,11 +59,12 @@ async function handleLogin(req) {
 
 // POST /api/run-fetch — 手動即時実行（「今すぐ取得」ボタン）。ログイン必須。
 async function handleRunFetch(req) {
-  if (!(await verifyRequestAuth(req))) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) {
     return json({ error: '認証が必要です' }, 401)
   }
   try {
-    const summary = await runPipeline({ force: true })
+    const summary = await runPipeline({ force: true, actor: auth.display_name || auth.username || '不明なユーザー' })
     return json(summary)
   } catch (err) {
     console.error('run-fetch 失敗:', err)

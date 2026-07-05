@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
+import Logs from './pages/Logs'
 import { isAuthenticated } from './lib/auth'
 
 function RequireAuth({ children }) {
@@ -18,6 +19,14 @@ function App() {
           element={
             <RequireAuth>
               <Dashboard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/logs"
+          element={
+            <RequireAuth>
+              <Logs />
             </RequireAuth>
           }
         />
