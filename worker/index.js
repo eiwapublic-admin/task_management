@@ -76,6 +76,8 @@ async function handleRunFetch(req) {
 // （RLS で参照は許可済み）。書き込みだけ service role 経由に限定する。
 const ALLOWED_SETTING_KEYS = new Set([
   'fetch_interval_minutes',
+  'active_hours_start',
+  'active_hours_end',
   'assignees',
   'business_keywords',
   'org_context',

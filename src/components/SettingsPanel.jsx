@@ -3,6 +3,8 @@ import './SettingsPanel.css'
 
 export default function SettingsPanel({ settings, onSave }) {
   const [fetchInterval, setFetchInterval] = useState(settings.fetch_interval_minutes)
+  const [activeStart, setActiveStart] = useState(settings.active_hours_start ?? 8)
+  const [activeEnd, setActiveEnd] = useState(settings.active_hours_end ?? 18)
   const [assignees, setAssignees] = useState(settings.assignees)
   const [businessKeywords, setBusinessKeywords] = useState(settings.business_keywords)
   const [orgContext, setOrgContext] = useState(settings.org_context ?? '')
@@ -15,6 +17,8 @@ export default function SettingsPanel({ settings, onSave }) {
     e.preventDefault()
     onSave({
       fetch_interval_minutes: Number(fetchInterval),
+      active_hours_start: Number(activeStart),
+      active_hours_end: Number(activeEnd),
       assignees,
       business_keywords: businessKeywords,
       org_context: orgContext,
@@ -42,6 +46,46 @@ export default function SettingsPanel({ settings, onSave }) {
           />
         </label>
         <p className="settings-hint">5〜120分の範囲で指定できます（デフォルト: 30分）。</p>
+      </section>
+
+      <section>
+        <h2>稼働時間帯</h2>
+        <div className="settings-hours">
+          <label>
+            開始（時）
+            <input
+              type="number"
+              min={0}
+              max={23}
+              step={1}
+              value={activeStart}
+              onChange={(e) => setActiveStart(e.target.value)}
+              onBlur={(e) => {
+                const n = Math.round(Number(e.target.value))
+                setActiveStart(Number.isFinite(n) ? Math.min(23, Math.max(0, n)) : 8)
+              }}
+            />
+          </label>
+          <label>
+            終了（時）
+            <input
+              type="number"
+              min={1}
+              max={24}
+              step={1}
+              value={activeEnd}
+              onChange={(e) => setActiveEnd(e.target.value)}
+              onBlur={(e) => {
+                const n = Math.round(Number(e.target.value))
+                setActiveEnd(Number.isFinite(n) ? Math.min(24, Math.max(1, n)) : 18)
+              }}
+            />
+          </label>
+        </div>
+        <p className="settings-hint">
+          この時間帯（JST）だけ自動取得を行います（デフォルト: 8〜18時）。時間外は処理をスキップします。
+          「今すぐ取得」は時間外でも実行できます。
+        </p>
       </section>
 
       <section>
