@@ -103,6 +103,7 @@ export async function getMessage(accessToken, id) {
     id: msg.id,
     threadId: msg.threadId,
     from: header(payload, 'From'),
+    replyTo: header(payload, 'Reply-To'),
     to: header(payload, 'To'),
     subject: header(payload, 'Subject'),
     date: header(payload, 'Date'),

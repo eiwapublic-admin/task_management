@@ -53,14 +53,6 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
-/* ログイン中ユーザー名（ヘッダー下・ボディ右上） */
-.dashboard-user {
-  margin: var(--space-2) var(--space-5) 0;
-  text-align: right;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
 .dashboard-lastfetch {
   color: rgba(255, 255, 255, 0.75);
   font-size: 12px;
@@ -300,10 +292,5 @@
 
   .dashboard-header-right {
     gap: var(--space-2);
-  }
-
-  /* 画面が狭いときは表示名を隠してボタンを優先する */
-  .dashboard-user {
-    display: none;
   }
 }

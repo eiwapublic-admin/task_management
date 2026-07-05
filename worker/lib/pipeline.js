@@ -32,6 +32,13 @@ function parseAssignees(raw) {
 }
 
 const DUE_RE = /^\d{4}-\d{2}-\d{2}$/
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
+
+// 文字列から最初のメールアドレスを取り出す（"名前 <a@b.jp>" 形式にも対応）
+function extractEmail(str) {
+  const m = typeof str === 'string' ? str.match(EMAIL_RE) : null
+  return m ? m[0] : null
+}
 
 // runPipeline: 取得〜分類〜保存〜返信検知〜last_fetch更新までを一括実行する。
 // force=true のときは更新間隔ゲートを無視して即時実行する（手動実行用）。
@@ -137,6 +144,11 @@ export async function runPipeline({ force = false } = {}) {
           ? result.sender_display.trim().slice(0, 120)
           : null
 
+      // 返信先アドレス: Claude の抽出（フォーム経由は本文のアドレス）を優先し、
+      // 無ければ Reply-To → From の順にフォールバック
+      const senderEmail =
+        extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
@@ -146,6 +158,7 @@ export async function runPipeline({ force = false } = {}) {
         due_date: dueDate,
         sender: email.from || '（不明）',
         sender_display: senderDisplay,
+        sender_email: senderEmail,
         subject: email.subject || '（件名なし）',
         body_preview: (email.body || '').slice(0, 500),
         received_at: email.receivedAt || new Date().toISOString(),
