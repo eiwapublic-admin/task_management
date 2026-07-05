@@ -4,8 +4,9 @@ Gmail から業務メールを自動取得し、Claude API で担当者振り分
 
 技術スタック: React (Vite) / Supabase (PostgreSQL) / **Cloudflare Workers**（静的ホスティング + API + Cron Triggers）/ Gmail API / Claude API
 
-- 詳細仕様: [`docs/task-management-spec.md`](./docs/task-management-spec.md)（※ホスティングは Netlify → Cloudflare に変更済み）
-- セットアップ・引き継ぎ手順: [`docs/HANDOFF.md`](./docs/HANDOFF.md)
+- 設計書（現行・Cloudflare 版）: [`docs/task-management-spec-cloudflare.md`](./docs/task-management-spec-cloudflare.md)
+- 引き継ぎ書: [`docs/HANDOFF.md`](./docs/HANDOFF.md)
+- 旧設計書（Netlify 版・初期計画の記録）: [`docs/task-management-spec.md`](./docs/task-management-spec.md)
 
 ## 実装状況
 
