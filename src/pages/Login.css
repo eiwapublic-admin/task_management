@@ -1,0 +1,100 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-app);
+  padding: var(--space-4);
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 340px;
+  max-width: 100%;
+  padding: var(--space-6);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.login-card h1 {
+  font-size: 20px;
+  margin: 0;
+  text-align: center;
+  color: var(--text-strong);
+}
+
+.login-subtitle {
+  margin: 0 0 var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.login-card label {
+  font-size: 13px;
+  color: var(--text-base);
+  margin-top: var(--space-2);
+}
+
+.login-card input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-strong);
+}
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-weak);
+}
+
+.login-password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-password-toggle {
+  position: absolute;
+  right: var(--space-2);
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.login-card button[type='submit'] {
+  margin-top: var(--space-5);
+  padding: var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.login-card button[type='submit']:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.login-card button[type='submit']:disabled {
+  background: var(--color-primary-disabled);
+  cursor: not-allowed;
+}
+
+.login-error {
+  color: var(--due-overdue);
+  font-size: 13px;
+  margin: var(--space-1) 0 0;
+}

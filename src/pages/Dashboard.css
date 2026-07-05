@@ -1,0 +1,206 @@
+.dashboard-page {
+  min-height: 100vh;
+  background: var(--bg-subtle);
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dashboard-header h1 {
+  font-size: 18px;
+  margin: 0;
+  color: var(--text-strong);
+}
+
+.dashboard-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+  color: var(--text-base);
+}
+
+.dashboard-user {
+  color: var(--text-muted);
+}
+
+.dashboard-lastfetch {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dashboard-header-right button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 通知・エラーバナー */
+.dashboard-banner {
+  margin: var(--space-3) var(--space-5) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.dashboard-notice {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-surface));
+  border: 1px solid var(--color-primary);
+  color: var(--text-strong);
+}
+
+.dashboard-error {
+  background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
+  border: 1px solid var(--due-overdue);
+  color: var(--due-overdue);
+}
+
+/* クレジット不足の警告（チャージ導線付き） */
+.dashboard-credit-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--due-overdue) 12%, var(--bg-surface));
+  border: 1px solid var(--due-overdue);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.dashboard-credit-button {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  background: var(--due-overdue);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-credit-button:hover {
+  filter: brightness(0.94);
+}
+
+.dashboard-loading {
+  padding: var(--space-5);
+  color: var(--text-muted);
+}
+
+/* 利用状況パネル（設定ページ） */
+.usage-panel {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.usage-panel h2 {
+  font-size: 15px;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2);
+}
+
+.usage-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.usage-fields dt {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.usage-fields dd {
+  margin: 0;
+  color: var(--text-base);
+}
+
+.usage-cost {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.usage-jpy {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.usage-billing-link {
+  display: inline-block;
+  margin-top: var(--space-2);
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+.dashboard-empty {
+  margin: var(--space-5);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-base);
+}
+
+.dashboard-empty-hint {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.dashboard-header-right button {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--text-base);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.dashboard-header-right button:hover {
+  background: var(--bg-subtle);
+  border-color: var(--color-primary);
+}
+
+/* 設定ページの本文コンテナ */
+.settings-container {
+  padding: var(--space-4) var(--space-5);
+  max-width: 520px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: var(--space-3) var(--space-3);
+  }
+
+  .dashboard-header h1 {
+    font-size: 15px;
+  }
+
+  .dashboard-header-right {
+    gap: var(--space-2);
+  }
+
+  /* 画面が狭いときは表示名を隠してボタンを優先する */
+  .dashboard-user {
+    display: none;
+  }
+}
