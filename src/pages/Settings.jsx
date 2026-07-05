@@ -4,6 +4,7 @@ import SettingsPanel from '../components/SettingsPanel'
 import UsagePanel from '../components/UsagePanel'
 import { fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
+import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
@@ -58,6 +59,22 @@ export default function Settings() {
           </button>
           <h1>設定</h1>
         </div>
+        <div className="dashboard-header-right">
+          <span className="settings-saved" role="status" aria-live="polite">
+            {status}
+          </span>
+          <a
+            className="usage-billing-link"
+            href={BILLING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Anthropic支払い設定
+          </a>
+          <button className="btn-save" type="submit" form="settings-form">
+            保存
+          </button>
+        </div>
       </header>
       <div className="settings-container">
         {error && (
@@ -70,9 +87,6 @@ export default function Settings() {
         ) : (
           !error && <p className="dashboard-loading">読み込み中…</p>
         )}
-        <p className="settings-saved" role="status" aria-live="polite">
-          {status}
-        </p>
         <UsagePanel />
       </div>
     </div>
