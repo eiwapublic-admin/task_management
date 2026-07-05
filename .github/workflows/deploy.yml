@@ -39,11 +39,22 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Deploy Worker (and sync secrets)
+      # デプロイを先に実行する（wrangler-action はシークレット同期をコマンドより
+      # 先に行うため、1ステップにまとめると「未デプロイの新バージョンが残った」
+      # 状態(error 10215)から自己復旧できなくなる）
+      - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      - name: Sync secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: whoami
           secrets: |
             SUPABASE_URL
             SUPABASE_SERVICE_KEY
