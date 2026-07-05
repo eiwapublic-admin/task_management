@@ -13,9 +13,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# デプロイ途中でのキャンセルは Worker のバージョン/シークレット不整合
+# （error 10215）を起こすため、キャンセルせず順番に実行する
 concurrency:
   group: deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
