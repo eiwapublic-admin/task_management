@@ -53,10 +53,6 @@ export default function Settings() {
     <div className="dashboard-page">
       <header className="dashboard-header">
         <div className="dashboard-header-left">
-          <button className="btn-back" onClick={() => navigate('/')}>
-            <span className="btn-back-icon" aria-hidden="true">＜</span>
-            カンバンに戻る
-          </button>
           <h1>設定</h1>
         </div>
         <div className="dashboard-header-right">
@@ -69,10 +65,19 @@ export default function Settings() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Anthropic支払い設定
+            Anthropic API 支払設定
           </a>
           <button className="btn-save" type="submit" form="settings-form">
             保存
+          </button>
+          <button
+            className="btn-cancel"
+            type="button"
+            aria-label="保存せずにカンバンへ戻る"
+            title="保存せずにカンバンへ戻る"
+            onClick={() => navigate('/')}
+          >
+            ×
           </button>
         </div>
       </header>

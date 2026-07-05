@@ -53,8 +53,12 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+/* ログイン中ユーザー名（ヘッダー下・ボディ右上） */
 .dashboard-user {
-  color: rgba(255, 255, 255, 0.85);
+  margin: var(--space-2) var(--space-5) 0;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .dashboard-lastfetch {
@@ -211,11 +215,17 @@
   color: var(--text-muted);
 }
 
-.dashboard-header-right button {
+/* ヘッダー内のボタン・リンクは高さと縦位置を統一する */
+.dashboard-header-right button,
+.dashboard-header-right .usage-billing-link {
+  box-sizing: border-box;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid transparent;
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
+  padding: 0 var(--space-3);
   font-size: 13px;
   color: var(--text-base);
   cursor: pointer;
@@ -237,30 +247,23 @@
   color: #fff;
 }
 
-/* 設定画面: 左上の「＜ 戻る」ボタン */
-.btn-back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: none;
-  background: #fff;
-  color: #33604d;
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-4);
-  font-size: 14px;
+/* 設定画面: 保存せずに閉じる「×」ボタン */
+.dashboard-header-right .btn-cancel {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+  font-size: 18px;
   font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: filter var(--transition);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 
-.btn-back:hover {
-  filter: brightness(0.92);
-}
-
-.btn-back-icon {
-  font-size: 16px;
-  line-height: 1;
+/* ヘッダー内の「Anthropic API 支払設定」（赤で目立たせる） */
+.dashboard-header-right a.usage-billing-link {
+  background: #c81021;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 /* 設定画面ヘッダーの「保存」ボタン */

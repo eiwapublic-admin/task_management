@@ -117,11 +117,12 @@ export default function Dashboard() {
           <button onClick={handleRunFetch} disabled={fetching}>
             {fetching ? '取得中…' : '今すぐ取得'}
           </button>
-          {user && <span className="dashboard-user">{user.display_name} さん</span>}
           <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
           <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
         </div>
       </header>
+
+      {user && <p className="dashboard-user">{user.display_name} さん</p>}
 
       {creditAlert && (
         <div className="dashboard-banner dashboard-credit-alert" role="alert">
