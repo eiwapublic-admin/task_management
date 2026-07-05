@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { STATUS_LIST } from '../lib/status'
 import { formatDate, formatDateTime } from '../lib/format'
+import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
 
-export default function TaskDetail({ task, onClose, onStatusChange }) {
+export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail }) {
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
 
@@ -50,6 +51,9 @@ export default function TaskDetail({ task, onClose, onStatusChange }) {
 
   if (!task) return null
 
+  const mailUrl = gmailMessageUrl(task, sharedGmail)
+  const replyHref = buildReplyMailto(task)
+
   return (
     <div className="task-detail-overlay" onClick={onClose}>
       <div
@@ -89,17 +93,32 @@ export default function TaskDetail({ task, onClose, onStatusChange }) {
           )}
         </dl>
 
-        <div className="task-detail-status" role="group" aria-label="ステータスを変更">
-          {STATUS_LIST.map((status) => (
-            <button
-              key={status}
-              className={status === task.status ? 'status-btn active' : 'status-btn'}
-              aria-pressed={status === task.status}
-              onClick={() => onStatusChange(task, status)}
-            >
-              {status}
-            </button>
-          ))}
+        <div className="task-detail-footer">
+          <span className="task-detail-footer-label">ステータス</span>
+          <div className="task-detail-status" role="group" aria-label="ステータスを変更">
+            {STATUS_LIST.map((status) => (
+              <button
+                key={status}
+                className={status === task.status ? 'status-btn active' : 'status-btn'}
+                aria-pressed={status === task.status}
+                onClick={() => onStatusChange(task, status)}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+          <div className="task-detail-actions">
+            {mailUrl && (
+              <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
+                メール参照
+              </a>
+            )}
+            {replyHref && (
+              <a className="task-action-btn task-action-reply" href={replyHref}>
+                返信
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

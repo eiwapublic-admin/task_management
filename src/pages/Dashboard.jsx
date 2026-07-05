@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [creditAlert, setCreditAlert] = useState(null)
+  const [sharedGmail, setSharedGmail] = useState('')
   const navigate = useNavigate()
   const user = getCurrentUser()
 
@@ -51,6 +52,7 @@ export default function Dashboard() {
       setAssignees(parseAssignees(settings.assignees))
       setLastFetchAt(settings.last_fetch_at || null)
       setCreditAlert(parseCreditAlert(settings.api_credit_alert))
+      setSharedGmail(settings.shared_gmail || '')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -122,8 +124,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {user && <p className="dashboard-user">{user.display_name} さん</p>}
-
       {creditAlert && (
         <div className="dashboard-banner dashboard-credit-alert" role="alert">
           <span>
@@ -161,7 +161,13 @@ export default function Dashboard() {
           </p>
         </div>
       ) : (
-        <KanbanBoard tasks={tasks} assignees={assignees} onStatusChange={handleStatusChange} />
+        <KanbanBoard
+          tasks={tasks}
+          assignees={assignees}
+          onStatusChange={handleStatusChange}
+          userName={user?.display_name}
+          sharedGmail={sharedGmail}
+        />
       )}
     </div>
   )

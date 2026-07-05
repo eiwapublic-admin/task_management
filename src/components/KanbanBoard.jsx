@@ -5,7 +5,7 @@ import TaskDetail from './TaskDetail'
 import { STATUS_LIST } from '../lib/status'
 import './KanbanBoard.css'
 
-export default function KanbanBoard({ tasks, assignees, onStatusChange }) {
+export default function KanbanBoard({ tasks, assignees, onStatusChange, userName, sharedGmail }) {
   const [selectedAssignee, setSelectedAssignee] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
 
@@ -33,11 +33,14 @@ export default function KanbanBoard({ tasks, assignees, onStatusChange }) {
 
   return (
     <div className="kanban-board">
-      <FilterBar
-        assignees={assignees}
-        selectedAssignee={selectedAssignee}
-        onChange={setSelectedAssignee}
-      />
+      <div className="kanban-toolbar">
+        <FilterBar
+          assignees={assignees}
+          selectedAssignee={selectedAssignee}
+          onChange={setSelectedAssignee}
+        />
+        {userName && <span className="kanban-user">{userName} さん</span>}
+      </div>
       <div className="kanban-columns">
         {STATUS_LIST.map((status) => (
           <KanbanColumn
@@ -54,6 +57,7 @@ export default function KanbanBoard({ tasks, assignees, onStatusChange }) {
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
         onStatusChange={handleStatusChange}
+        sharedGmail={sharedGmail}
       />
     </div>
   )
