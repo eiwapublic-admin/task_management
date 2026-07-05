@@ -75,6 +75,18 @@ as $$
     updated_at    = now();
 $$;
 
+-- activity_logs: 操作ログ（メール取得の実行結果、タスクのステータス変更）
+create table if not exists activity_logs (
+  id         uuid primary key default gen_random_uuid(),
+  log_type   text not null check (log_type in ('fetch', 'status_change')),
+  actor      text not null,          -- 実行者（担当者の表示名、または「システム（自動）」）
+  message    text not null,          -- 画面表示用の内容
+  detail     jsonb,                  -- 取得サマリー等の生データ
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
+
 -- users: 認証用（カスタム認証。パスワードはbcryptハッシュ）
 create table if not exists users (
   id            uuid primary key default gen_random_uuid(),
@@ -110,6 +122,7 @@ alter table tasks enable row level security;
 alter table settings enable row level security;
 alter table users enable row level security;
 alter table api_usage enable row level security;
+alter table activity_logs enable row level security;
 
 drop policy if exists "tasks_select_all" on tasks;
 create policy "tasks_select_all" on tasks
@@ -137,6 +150,18 @@ create policy "api_usage_select_all" on api_usage
 
 grant select on api_usage to anon, authenticated;
 revoke insert, update, delete on api_usage from anon, authenticated;
+
+-- activity_logs はフロントエンドから参照と追記のみ許可（改変・削除は service role のみ）。
+drop policy if exists "activity_logs_select_all" on activity_logs;
+create policy "activity_logs_select_all" on activity_logs
+  for select using (true);
+
+drop policy if exists "activity_logs_insert_all" on activity_logs;
+create policy "activity_logs_insert_all" on activity_logs
+  for insert with check (true);
+
+grant select, insert on activity_logs to anon, authenticated;
+revoke update, delete on activity_logs from anon, authenticated;
 
 revoke all on function add_api_usage(text, bigint, bigint, integer) from public, anon, authenticated;
 grant execute on function add_api_usage(text, bigint, bigint, integer) to service_role;

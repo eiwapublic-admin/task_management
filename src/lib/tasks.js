@@ -17,6 +17,28 @@ export async function updateTaskStatus(id, status) {
   if (error) throw new Error(`ステータスの更新に失敗しました: ${error.message}`)
 }
 
+// ステータス変更の操作ログを残す（失敗しても本処理は妨げない前提で呼び出し側が catch する）
+export async function logStatusChange(task, fromStatus, toStatus, actor) {
+  const { error } = await supabase.from('activity_logs').insert({
+    log_type: 'status_change',
+    actor: actor || '不明なユーザー',
+    message: `「${task.title}」のステータスを ${fromStatus} → ${toStatus} に変更`,
+    detail: { task_id: task.id },
+  })
+  if (error) throw new Error(`ログの記録に失敗しました: ${error.message}`)
+}
+
+// 操作ログを新しい順に取得する。
+export async function fetchLogs(limit = 200) {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select('id, log_type, actor, message, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(`ログの取得に失敗しました: ${error.message}`)
+  return data || []
+}
+
 // settings テーブルを { key: value } に整形して返す。
 export async function fetchSettings() {
   const { data, error } = await supabase.from('settings').select('key, value')

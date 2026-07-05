@@ -130,6 +130,11 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
   - **返信**: `mailto:` でメーラーの返信画面を開く。TO=タスクの返信先アドレス（フォーム経由は本文記載のアドレス）、CC=`if@eiwa-up.jp`（固定。同アドレス宛は共有 Gmail にも配信されるため返信検知の対象になる）、本文に元メールを引用
 - クレジット不足時は警告バナー＋「APIクレジットをチャージ」ボタン
 
+**操作ログ画面（/logs）**:
+- ヘッダー「操作ログ」+「×」（カンバンへ戻る）。ヘッダーの「ログ」ボタン（メイン画面）から遷移
+- 直近200件を表形式で表示: 日時 / 種別（メール取得・ステータス変更）/ 実行者 / 内容
+- 実行者は担当者の表示名（手動操作）または「システム（自動）」（Cron 実行・返信自動検知）
+
 **設定画面**:
 - ヘッダー右: 保存メッセージ /「Anthropic API 支払設定」（赤）/「保存」（青）/「×」（保存せずカンバンへ戻る）
 - 2カラム。左: 「更新頻度と時間帯」（開始時・終了時・頻度分を1行）/ 担当者名3名 / 業務判定キーワード。右: 業務背景・振り分けルール（org_context、大きな入力欄）
@@ -178,8 +183,21 @@ id / username(unique) / password_hash(bcrypt) / display_name / created_at。**an
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算
 
+### activity_logs（操作ログ）
+| 列 | 型 | 備考 |
+|---|---|---|
+| id | uuid PK | |
+| log_type | text | `fetch`（メール取得の実行結果） / `status_change`（ステータス変更） |
+| actor | text | 実行者。担当者の表示名、または「システム（自動）」 |
+| message | text | 画面表示用の内容 |
+| detail | jsonb | 取得サマリー等の生データ |
+| created_at | timestamptz | |
+
+書き込み元: パイプライン（取得結果 + 返信検知の自動ステータス変更 = service role）、フロントエンド（担当者の手動ステータス変更 = anon INSERT）。60日より古いログはパイプライン実行時に自動削除。画面 `/logs`（操作ログ）で直近200件を参照。
+
 ### RLS / 権限設計
 - tasks・settings・api_usage: anon は SELECT 可。tasks は **status 列のみ** anon が UPDATE 可（列レベル GRANT）
+- activity_logs: anon は SELECT / INSERT 可（UPDATE / DELETE は service role のみ）
 - INSERT / DELETE / その他の列更新・users への操作は service role（Worker）経由に限定
 
 ---

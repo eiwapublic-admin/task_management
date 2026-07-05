@@ -80,6 +80,7 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 | OAuth 認可時「このアプリは Google で確認されていません」 | 未審査アプリの標準警告 | 「詳細」→「（安全でないページ）に移動」で続行してよい（自社アプリ） |
 
 ### ログの見方
+- **アプリ内の操作ログ**: メイン画面ヘッダーの「ログ」→ 操作ログ画面。メール取得の実行結果とタスクのステータス変更履歴を実行者（担当者名 or システム（自動））付きで確認できる。直近200件表示・60日で自動削除
 - Worker の実行ログ: Cloudflare ダッシュボード → Workers & Pages → task-management → Logs（observability 有効化済み）
 - デプロイログ: GitHub Actions の各 run
 - スケジュール実行の結果は `scheduled fetch 完了: {...}` として JSON サマリーが出る（skipped の理由も記録される）
