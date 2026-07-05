@@ -30,6 +30,12 @@ export default function Settings() {
       .then((s) =>
         setSettings({
           fetch_interval_minutes: Number(s.fetch_interval_minutes) || 30,
+          active_hours_start: Number.isFinite(Number(s.active_hours_start))
+            ? Number(s.active_hours_start)
+            : 8,
+          active_hours_end: Number.isFinite(Number(s.active_hours_end))
+            ? Number(s.active_hours_end)
+            : 18,
           assignees: parseAssignees(s.assignees),
           business_keywords: s.business_keywords || '',
           org_context: s.org_context || '',

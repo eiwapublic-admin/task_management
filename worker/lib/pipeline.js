@@ -46,6 +46,26 @@ export async function runPipeline({ force = false } = {}) {
   const businessKeywords = settings.business_keywords || ''
   const sharedGmail = (settings.shared_gmail || '').toLowerCase()
 
+  // 稼働時間帯ゲート: 業務時間外はスケジュール実行をスキップする（手動実行は対象外）
+  if (!force) {
+    const startHour = Number.isFinite(Number(settings.active_hours_start))
+      ? Number(settings.active_hours_start)
+      : 8
+    const endHour = Number.isFinite(Number(settings.active_hours_end))
+      ? Number(settings.active_hours_end)
+      : 18
+    const hourJST = Number(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hour12: false })
+    )
+    if (hourJST < startHour || hourJST >= endHour) {
+      return {
+        skipped: true,
+        reason: `稼働時間外（現在${hourJST}時 / 稼働 ${startHour}〜${endHour}時）`,
+        created: 0,
+      }
+    }
+  }
+
   // 更新間隔ゲート（スケジュール実行時のコスト抑制）
   if (!force && lastFetchAt) {
     const elapsedMin = (Date.now() - lastFetchAt.getTime()) / 60000
@@ -111,6 +131,12 @@ export async function runPipeline({ force = false } = {}) {
 
       const title = (result.title || email.subject || '（件名なし）').slice(0, 120)
 
+      // 送信元の会社・氏名（Claude が件名/本文から抽出。フォーム経由は本文優先）
+      const senderDisplay =
+        typeof result.sender_display === 'string' && result.sender_display.trim()
+          ? result.sender_display.trim().slice(0, 120)
+          : null
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
@@ -119,6 +145,7 @@ export async function runPipeline({ force = false } = {}) {
         status: '未処理',
         due_date: dueDate,
         sender: email.from || '（不明）',
+        sender_display: senderDisplay,
         subject: email.subject || '（件名なし）',
         body_preview: (email.body || '').slice(0, 500),
         received_at: email.receivedAt || new Date().toISOString(),

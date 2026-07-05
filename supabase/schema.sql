@@ -17,6 +17,7 @@ create table if not exists tasks (
   subject          text not null,
   body_preview     text,
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
+  sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -24,6 +25,7 @@ create table if not exists tasks (
 
 -- 既存テーブルへの後方互換の追加（Phase 2 で導入）
 alter table tasks add column if not exists classification_note text;
+alter table tasks add column if not exists sender_display text;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);
@@ -36,6 +38,8 @@ create table if not exists settings (
 
 insert into settings (key, value) values
   ('fetch_interval_minutes', '30'),
+  ('active_hours_start', '8'),      -- 稼働開始時刻（JST・時）
+  ('active_hours_end', '18'),       -- 稼働終了時刻（JST・時、この時刻以降は停止）
   ('assignees', '["橋口","西川","岡田"]'),
   ('business_keywords', ''),
   ('org_context', ''),

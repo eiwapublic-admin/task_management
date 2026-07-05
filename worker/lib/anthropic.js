@@ -42,6 +42,7 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
     `  "assignee": ${assignees.map((a) => `"${a}"`).join(' / ')} のいずれか。業務メールでないときは null,`,
     '  "due_date": "YYYY-MM-DD" 期限が読み取れないときは null,',
     '  "title": "タスクの内容がひと目で分かる簡潔な日本語タイトル（30字以内）",',
+    '  "sender_display": "株式会社サンプル 山田太郎" のように送信元の会社名と氏名。問い合わせフォーム経由のメールは本文に記載された会社名・氏名を優先して読み取る。一方しか分からなければ分かる方だけ。どちらも不明なら null,',
     '  "reason": "業務/非業務の判断根拠と、担当者を選んだ理由を1〜2文で簡潔に"',
     '}',
     '',

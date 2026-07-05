@@ -161,6 +161,21 @@
   line-height: 1.4;
 }
 
+/* 送信元の会社・氏名 */
+.task-card-sender {
+  font-size: 12px;
+  color: var(--text-base);
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.task-card-sender::before {
+  content: '👤';
+  font-size: 11px;
+}
+
 .task-card-meta {
   display: flex;
   justify-content: space-between;
