@@ -106,7 +106,10 @@ export default function Dashboard() {
   return (
     <div className="dashboard-page">
       <header className="dashboard-header">
-        <h1>タスク管理システム</h1>
+        <div className="dashboard-header-left">
+          <img className="dashboard-logo" src="/logo.svg" alt="栄和ロゴ" />
+          <h1>栄和　タスク管理システム</h1>
+        </div>
         <div className="dashboard-header-right">
           {lastFetchAt && (
             <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
@@ -115,8 +118,8 @@ export default function Dashboard() {
             {fetching ? '取得中…' : '今すぐ取得'}
           </button>
           {user && <span className="dashboard-user">{user.display_name} さん</span>}
-          <button onClick={() => navigate('/settings')}>設定</button>
-          <button onClick={handleLogout}>ログアウト</button>
+          <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
+          <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
         </div>
       </header>
 

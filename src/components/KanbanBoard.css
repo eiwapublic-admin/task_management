@@ -14,7 +14,7 @@
 }
 
 .filter-bar-label {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
   margin-right: var(--space-1);
 }
@@ -27,7 +27,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-base);
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), color var(--transition);
@@ -61,7 +61,8 @@
 }
 
 .kanban-column {
-  background: var(--bg-app);
+  /* ステータス色を薄く混ぜた濃いめの背景で列ごとのメリハリを付ける */
+  background: color-mix(in srgb, var(--column-accent, #64748b) 12%, #e3e8ee);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   min-height: 400px;
@@ -83,7 +84,7 @@
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   padding: var(--space-1) var(--space-1) var(--space-2);
   border-bottom: 2px solid var(--column-accent, var(--border-strong));
 }

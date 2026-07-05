@@ -3,23 +3,46 @@
   background: var(--bg-subtle);
 }
 
+/* ヘッダー: 落ち着いたグリーン */
 .dashboard-header {
+  --header-bg: #33604d;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--header-bg) 80%, #000);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
+.dashboard-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.dashboard-logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  /* 濃い緑の上でも映えるよう白い円形の台座に載せる */
+  background: #fff;
+  border-radius: 50%;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
 .dashboard-header h1 {
-  font-size: 18px;
+  font-size: 22px;
   margin: 0;
-  color: var(--text-strong);
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-header-right {
@@ -27,15 +50,15 @@
   align-items: center;
   gap: var(--space-3);
   font-size: 13px;
-  color: var(--text-base);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .dashboard-user {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .dashboard-lastfetch {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -141,11 +164,22 @@
   font-size: 13px;
 }
 
+/* Anthropic の残高・支払い設定へ（赤いボタンで目立たせる） */
 .usage-billing-link {
   display: inline-block;
   margin-top: var(--space-2);
-  color: var(--color-primary);
+  padding: var(--space-2) var(--space-4);
+  background: #c81021;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
   font-size: 13px;
+  font-weight: 600;
+  transition: filter var(--transition);
+}
+
+.usage-billing-link:hover {
+  filter: brightness(0.9);
 }
 
 .dashboard-empty {
@@ -165,25 +199,61 @@
 }
 
 .dashboard-header-right button {
-  border: 1px solid var(--border-strong);
+  border: 1px solid transparent;
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   font-size: 13px;
   color: var(--text-base);
   cursor: pointer;
-  transition: background var(--transition), border-color var(--transition);
+  transition: filter var(--transition);
 }
 
 .dashboard-header-right button:hover {
-  background: var(--bg-subtle);
-  border-color: var(--color-primary);
+  filter: brightness(0.92);
 }
 
-/* 設定ページの本文コンテナ */
+/* 「設定」= ブルー / 「ログアウト」= 黒 */
+.dashboard-header-right .btn-settings {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.dashboard-header-right .btn-logout {
+  background: #1f2937;
+  color: #fff;
+}
+
+/* 設定画面: 左上の「＜ 戻る」ボタン */
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: none;
+  background: #fff;
+  color: #33604d;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: filter var(--transition);
+}
+
+.btn-back:hover {
+  filter: brightness(0.92);
+}
+
+.btn-back-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* 設定ページの本文コンテナ（横に広く使い、縦スクロールを減らす） */
 .settings-container {
   padding: var(--space-4) var(--space-5);
-  max-width: 520px;
+  max-width: 1240px;
 }
 
 @media (max-width: 768px) {
@@ -192,7 +262,7 @@
   }
 
   .dashboard-header h1 {
-    font-size: 15px;
+    font-size: 17px;
   }
 
   .dashboard-header-right {
