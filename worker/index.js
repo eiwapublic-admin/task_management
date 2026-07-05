@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth } from './lib/http.js'
@@ -19,15 +18,13 @@ async function handleLogin(req) {
     }
 
     // 必須の環境変数が欠けている場合は明確に落とす（fail closed）
-    const { SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET } = process.env
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SESSION_SECRET) {
+    const { SUPABASE_SERVICE_KEY, SESSION_SECRET } = process.env
+    if (!SUPABASE_SERVICE_KEY || !SESSION_SECRET) {
       console.error('login: 必要な環境変数が設定されていません')
       return json({ error: 'サーバー設定エラーが発生しました' }, 500)
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    const supabaseAdmin = getAdminClient()
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
