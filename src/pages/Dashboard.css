@@ -136,21 +136,34 @@
   margin: 0 0 var(--space-2);
 }
 
+/* 利用状況を1行に横並びで表示 */
 .usage-fields {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-2) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
   margin: var(--space-3) 0;
+}
+
+.usage-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
 }
 
 .usage-fields dt {
   color: var(--text-muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .usage-fields dd {
   margin: 0;
   color: var(--text-base);
+  white-space: nowrap;
+}
+
+.usage-note {
+  margin-top: var(--space-3);
 }
 
 .usage-cost {
@@ -248,6 +261,23 @@
 .btn-back-icon {
   font-size: 16px;
   line-height: 1;
+}
+
+/* 設定画面ヘッダーの「保存」ボタン */
+.dashboard-header-right .btn-save {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  padding: var(--space-2) var(--space-5);
+}
+
+/* ヘッダー上の保存完了メッセージ（緑背景に載るため白系で） */
+.dashboard-header .settings-saved {
+  color: #d9f4e3;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  min-height: 0;
 }
 
 /* 設定ページの本文コンテナ（横に広く使い、縦スクロールを減らす） */

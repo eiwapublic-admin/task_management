@@ -22,7 +22,7 @@ export default function SettingsPanel({ settings, onSave }) {
   }
 
   return (
-    <form className="settings-panel" onSubmit={handleSubmit}>
+    <form id="settings-form" className="settings-panel" onSubmit={handleSubmit}>
       <section>
         <h2>更新頻度</h2>
         <label>
@@ -79,7 +79,6 @@ export default function SettingsPanel({ settings, onSave }) {
         />
       </section>
 
-      <button type="submit">保存</button>
     </form>
   )
 }
