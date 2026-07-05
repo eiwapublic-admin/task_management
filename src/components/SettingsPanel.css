@@ -1,11 +1,45 @@
+/* 2カラム構成: 左に基本設定、右に「業務背景」を大きく確保して縦スクロールを減らす */
 .settings-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  grid-auto-rows: min-content;
+  gap: var(--space-4) var(--space-6);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+}
+
+.settings-panel .settings-org {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-org-textarea {
+  flex: 1;
+  min-height: 420px;
+  resize: vertical;
+}
+
+.settings-panel button[type='submit'] {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .settings-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel .settings-org {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .settings-org-textarea {
+    min-height: 260px;
+  }
 }
 
 .settings-panel section h2 {

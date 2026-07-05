@@ -51,9 +51,12 @@ export default function Settings() {
   return (
     <div className="dashboard-page">
       <header className="dashboard-header">
-        <h1>設定</h1>
-        <div className="dashboard-header-right">
-          <button onClick={() => navigate('/')}>カンバンに戻る</button>
+        <div className="dashboard-header-left">
+          <button className="btn-back" onClick={() => navigate('/')}>
+            <span className="btn-back-icon" aria-hidden="true">＜</span>
+            カンバンに戻る
+          </button>
+          <h1>設定</h1>
         </div>
       </header>
       <div className="settings-container">

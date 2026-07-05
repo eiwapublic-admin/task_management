@@ -28,7 +28,8 @@ export default function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>タスク管理システム</h1>
+        <img className="login-logo" src="/logo.svg" alt="栄和ロゴ" />
+        <h1>栄和　タスク管理システム</h1>
         <p className="login-subtitle">ログイン</p>
 
         <label htmlFor="username">ユーザー名</label>
