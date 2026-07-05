@@ -28,28 +28,7 @@ export default function SettingsPanel({ settings, onSave }) {
   return (
     <form id="settings-form" className="settings-panel" onSubmit={handleSubmit}>
       <section>
-        <h2>更新頻度</h2>
-        <label>
-          何分ごとにメールを取得するか
-          <input
-            type="number"
-            min={5}
-            max={120}
-            step={1}
-            value={fetchInterval}
-            onChange={(e) => setFetchInterval(e.target.value)}
-            onBlur={(e) => {
-              // 範囲外・非整数の入力を 5〜120 に丸める
-              const n = Math.round(Number(e.target.value))
-              setFetchInterval(Number.isFinite(n) ? Math.min(120, Math.max(5, n)) : 30)
-            }}
-          />
-        </label>
-        <p className="settings-hint">5〜120分の範囲で指定できます（デフォルト: 30分）。</p>
-      </section>
-
-      <section>
-        <h2>稼働時間帯</h2>
+        <h2>更新頻度と時間帯</h2>
         <div className="settings-hours">
           <label>
             開始（時）
@@ -81,11 +60,24 @@ export default function SettingsPanel({ settings, onSave }) {
               }}
             />
           </label>
+          <label>
+            頻度（分）
+            <input
+              type="number"
+              min={5}
+              max={120}
+              step={1}
+              value={fetchInterval}
+              onChange={(e) => setFetchInterval(e.target.value)}
+              onBlur={(e) => {
+                // 範囲外・非整数の入力を 5〜120 に丸める
+                const n = Math.round(Number(e.target.value))
+                setFetchInterval(Number.isFinite(n) ? Math.min(120, Math.max(5, n)) : 30)
+              }}
+            />
+          </label>
         </div>
-        <p className="settings-hint">
-          この時間帯（JST）だけ自動取得を行います（デフォルト: 8〜18時）。時間外は処理をスキップします。
-          「今すぐ取得」は時間外でも実行できます。
-        </p>
+        <p className="settings-hint">指定した時間帯で指定した頻度でメールを自動取得します。</p>
       </section>
 
       <section>

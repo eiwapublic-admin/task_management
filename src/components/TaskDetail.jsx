@@ -60,10 +60,12 @@ export default function TaskDetail({ task, onClose, onStatusChange }) {
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <button className="task-detail-close" onClick={onClose} aria-label="閉じる">
-          ×
-        </button>
-        <h2 id="task-detail-title">{task.title}</h2>
+        <div className="task-detail-header">
+          <h2 id="task-detail-title">{task.title}</h2>
+          <button className="task-detail-close" onClick={onClose} aria-label="閉じる">
+            ×
+          </button>
+        </div>
         <dl className="task-detail-fields">
           <dt>担当者</dt>
           <dd>{task.assignee}</dd>
