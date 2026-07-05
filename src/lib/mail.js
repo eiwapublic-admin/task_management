@@ -15,11 +15,12 @@ export function extractEmail(str) {
 }
 
 // Gmail のウェブ画面で該当メールを開く URL。
-// /u/<アドレス> 形式で共有アカウントを指定する（別アカウントでログイン中でも切替を促せる）。
+// パスに /u/<アドレス> を埋め込む形式は 404（Temporary Error）になることがあるため、
+// authuser クエリで共有アカウントを指定する。
 export function gmailMessageUrl(task, sharedGmail) {
   if (!task?.gmail_message_id) return null
   const account = sharedGmail || DEFAULT_SHARED_GMAIL
-  return `https://mail.google.com/mail/u/${encodeURIComponent(account)}/#all/${task.gmail_message_id}`
+  return `https://mail.google.com/mail/?authuser=${encodeURIComponent(account)}#all/${task.gmail_message_id}`
 }
 
 // mailto: リンクを組み立てる。
