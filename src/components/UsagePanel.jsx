@@ -26,7 +26,7 @@ export default function UsagePanel() {
 
   return (
     <section className="usage-panel">
-      <h2>今月のAPI利用状況</h2>
+      <h2>今月のAnthropic API 利用状況</h2>
       {error ? (
         <p className="dashboard-error dashboard-banner" role="alert">
           {error}
