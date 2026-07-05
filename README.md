@@ -2,62 +2,44 @@
 
 Gmail から業務メールを自動取得し、Claude API で担当者振り分け・期限抽出を行い、カンバン形式で進捗管理する社内Webアプリ。
 
-技術スタック: React (Vite) / Supabase (PostgreSQL) / Netlify (Hosting + Scheduled Functions) / Gmail API / Claude API
+技術スタック: React (Vite) / Supabase (PostgreSQL) / **Cloudflare Workers**（静的ホスティング + API + Cron Triggers）/ Gmail API / Claude API
 
-詳細仕様は [`docs/task-management-spec.md`](./docs/task-management-spec.md) を参照してください。
+- 詳細仕様: [`docs/task-management-spec.md`](./docs/task-management-spec.md)（※ホスティングは Netlify → Cloudflare に変更済み）
+- セットアップ・引き継ぎ手順: [`docs/HANDOFF.md`](./docs/HANDOFF.md)
 
-## 現在の実装状況（Phase 1）
+## 実装状況
 
-- [x] Vite + React プロジェクト初期化
-- [x] Supabase クライアント設定（`src/lib/supabase.js`）
-- [x] ログイン画面（`src/pages/Login.jsx` + `netlify/functions/login.js`）
-- [x] ダミーデータでのカンバン画面（`src/components/KanbanBoard.jsx` ほか）
-- [ ] Gmail API 連携（Phase 2）
-- [ ] Claude API 連携（Phase 2）
-- [ ] 返信自動検知・設定反映（Phase 4）
+- [x] Vite + React プロジェクト初期化・ログイン画面・カンバン画面
+- [x] Gmail API 連携（取得・返信検知）
+- [x] Claude API 連携（業務判定・担当者振り分け・期限抽出）
+- [x] 定期実行（Cloudflare Cron Triggers、5分ごと起動 + settings の間隔でゲート）
+- [x] Cloudflare Workers への自動デプロイ（GitHub Actions）
+- [ ] 本番運用開始・会社アカウントへの移管
 
-## セットアップ
+## 構成
 
-### 1. 依存関係のインストール
+```
+worker/index.js       Cloudflare Worker（/api/* ルート + scheduled ハンドラ）
+worker/lib/           Gmail / Claude / Supabase / パイプライン処理
+src/                  React フロントエンド（Vite）
+supabase/schema.sql   DB スキーマ（Supabase SQL Editor で実行）
+wrangler.jsonc        Worker 設定（静的アセット・Cron・SPAフォールバック）
+.github/workflows/deploy.yml  main への push で自動デプロイ
+```
+
+## ローカル開発
 
 ```bash
 npm install
+cp .env.example .env       # フロントエンド用の値を設定
+cp .env.example .dev.vars  # wrangler dev 用（非公開値を設定。git管理外）
+npm run build              # フロントエンドをビルド（dist/）
+npm run dev:worker         # API 込みの動作確認（http://localhost:8787）
 ```
 
-### 2. 環境変数の設定
+フロントエンドのみを触る場合は `npm run dev`（Vite。/api は使えません）。
 
-`.env.example` を `.env` にコピーし、値を埋めてください（`.env` は git 管理外）。
+## デプロイ
 
-```bash
-cp .env.example .env
-```
-
-| 変数名 | 用途 |
-|---|---|
-| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | フロントエンドから Supabase に接続（公開可） |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | Netlify Functions から admin 権限で接続（非公開・サーバー専用） |
-| `SESSION_SECRET` | ログインセッション用トークンの署名鍵（ランダムな長い文字列） |
-| `ANTHROPIC_API_KEY` / `GMAIL_*` | Phase 2 で使用 |
-
-### 3. Supabase プロジェクトの準備
-
-`supabase/schema.sql` を Supabase の SQL Editor で実行し、`tasks` / `settings` / `users` テーブルを作成してください。
-`users` テーブルへの初期ユーザー登録は、`password_hash` に bcrypt ハッシュを設定して行ってください。
-
-### 4. ローカル開発
-
-```bash
-npm run dev
-```
-
-Netlify Functions（ログインAPIなど）も含めて動かす場合は [Netlify CLI](https://docs.netlify.com/cli/get-started/) を使用してください。
-
-```bash
-npx netlify dev
-```
-
-### 5. Netlify へのデプロイ
-
-1. このリポジトリを Netlify サイトに接続
-2. Build command: `npm run build` / Publish directory: `dist`（`netlify.toml` に設定済み）
-3. Site settings → Environment variables に `.env.example` の非公開値（`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SESSION_SECRET` など）を設定
+`main` に push すると GitHub Actions が自動でビルド・デプロイします（手動作業なし）。
+初回のみ GitHub Secrets の設定が必要です → [`docs/HANDOFF.md`](./docs/HANDOFF.md) 参照。

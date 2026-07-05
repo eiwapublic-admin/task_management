@@ -1,6 +1,6 @@
 import { getToken } from './auth'
 
-// Netlify Functions（/api/*）への認証付きリクエスト用ヘルパー。
+// Worker の API（/api/*）への認証付きリクエスト用ヘルパー。
 async function authFetch(path, options = {}) {
   const token = getToken()
   const res = await fetch(path, {

@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "task-management",
+  "main": "worker/index.js",
+  // nodejs_compat + 2025-04-01 以降の日付で process.env / Buffer が使える
+  // （既存のパイプラインコードを書き換えずに流用するため）
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "triggers": {
+    // 5分ごとに起動。実際の取得間隔は settings.fetch_interval_minutes でゲート
+    "crons": ["*/5 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+  // シークレット（SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET,
+  // ANTHROPIC_API_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN）は
+  // `npx wrangler secret put <NAME>` または CI（deploy.yml）経由で設定する
+}
