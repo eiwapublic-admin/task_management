@@ -1,5 +1,6 @@
 import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken, listMessageIds, getMessage, getThreadLatest } from './gmail.js'
+import { findCalendarId, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
@@ -52,6 +53,25 @@ function compactBody(text) {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{2,}/g, '\n')
     .trim()
+}
+
+// HTML を含みうる文字列からタグを除いてテキスト化する
+function stripHtml(text) {
+  return (text || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}
+
+// イベント詳細から「担当：〜」の担当者名を取り出す（全角/半角コロン対応）
+function extractCalendarAssignee(text) {
+  const m = (text || '').match(/担当(?:者)?\s*[：:]\s*([^\s、,，\n]+)/)
+  return m ? m[1].trim() : null
 }
 
 // 件名から Re:/Fwd: 等の接頭辞を除いて比較用に正規化する
@@ -156,6 +176,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     .from('tasks')
     .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
     .eq('status', '未処理')
+    .eq('source', 'email')
   const openBySubject = new Map()
   for (const t of openTaskRows || []) openBySubject.set(normalizeSubject(t.subject), t)
 
@@ -286,6 +307,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       .from('tasks')
       .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
       .eq('status', '未処理')
+      .eq('source', 'email')
     for (const task of openTasks || []) {
       try {
         const latest = await getThreadLatest(accessToken, task.gmail_thread_id)
@@ -307,6 +329,56 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
       }
+    }
+  }
+
+  // 3.5) Google カレンダー「栄和共通」の当日イベントをタスク化（未処理に登録）
+  summary.calendarCreated = 0
+  const calendarName = (settings.calendar_name || '栄和共通').trim()
+  if (calendarName) {
+    try {
+      const calendarId = await findCalendarId(accessToken, calendarName)
+      if (!calendarId) {
+        summary.errors.push(`calendar: カレンダー「${calendarName}」が見つかりません`)
+      } else {
+        const events = await listTodayEvents(accessToken, calendarId)
+        for (const ev of events) {
+          const key = `cal:${ev.id}`
+          if (existingThreads.has(key)) continue
+          const desc = compactBody(stripHtml(ev.description))
+          // 詳細に「担当：〜」があれば担当者に採用。無ければ既定担当（先頭）
+          const assignee = extractCalendarAssignee(desc) || assignees[0]
+          const { error: calErr } = await supabase.from('tasks').insert({
+            gmail_thread_id: key,
+            gmail_message_id: ev.id,
+            source: 'calendar',
+            title: (ev.title || '（無題の予定）').slice(0, 120),
+            assignee,
+            status: '未処理',
+            due_date: ev.startDate || todayJST(),
+            sender: `Googleカレンダー「${calendarName}」`,
+            sender_display: null,
+            sender_email: null,
+            subject: ev.title || '（無題の予定）',
+            body_preview: desc.slice(0, 500),
+            received_at: ev.start || new Date().toISOString(),
+            classification_note: `Googleカレンダー「${calendarName}」の当日イベントから自動登録。`,
+          })
+          if (calErr) {
+            if (!/duplicate key|unique/i.test(calErr.message)) {
+              summary.errors.push(`calendar-insert: ${calErr.message}`)
+            }
+          } else {
+            summary.calendarCreated += 1
+            existingThreads.add(key)
+          }
+        }
+      }
+    } catch (err) {
+      const msg = err.isScopeError
+        ? `calendar: カレンダー参照の権限がありません（OAuth トークンに calendar スコープの再付与が必要）: ${err.message}`
+        : `calendar: ${String(err.message || err)}`
+      summary.errors.push(msg)
     }
   }
 
@@ -342,7 +414,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
   const fetchMessage =
     `メール取得: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
-    `返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件` +
+    `返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
+    `カレンダー登録 ${summary.calendarCreated} 件` +
     (summary.errors.length > 0 ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
   logRows.unshift({ log_type: 'fetch', actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)

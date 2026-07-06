@@ -84,6 +84,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'org_context',
   'shared_gmail',
   'company_domains',
+  'calendar_name',
 ])
 
 async function handleSettings(req) {

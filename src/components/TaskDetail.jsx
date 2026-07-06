@@ -51,8 +51,10 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail 
 
   if (!task) return null
 
-  const mailUrl = gmailMessageUrl(task, sharedGmail)
-  const replyHref = buildReplyMailto(task)
+  // カレンダー由来のタスクにはメール参照・返信は無い
+  const isEmail = task.source !== 'calendar'
+  const mailUrl = isEmail ? gmailMessageUrl(task, sharedGmail) : null
+  const replyHref = isEmail ? buildReplyMailto(task) : null
 
   return (
     <div className="task-detail-overlay" onClick={onClose}>

@@ -14,6 +14,14 @@
 - **Supabase**: プロジェクト `Eiwapublic Project`（ref: `pfiogfdnbctunkhslmcp`, region: ap-southeast-2）。スキーマ・マイグレーション適用済み
 - **Anthropic**: $5 クレジット購入済みのアカウントの API キーで稼働（モデル: claude-haiku-4-5）
 
+### Google カレンダー連携（要・OAuth 再認可）
+- Gmail と同じ Google アカウントの「栄和共通」カレンダーの当日イベントを、毎回の取得時にタスク化（未処理）する。イベント詳細に「担当：〜」があればその担当者を割り当てる
+- **重要**: この機能には OAuth トークンに `calendar.readonly` スコープが必要。Gmail だけで発行した既存トークンのままだと、取得時に「calendar: 参照の権限がありません」というエラーが操作ログに出て**カレンダー分だけ登録されない**（Gmail 取得は正常に続く）。有効化するには OAuth Playground でトークンを再発行する:
+  1. OAuth Playground の Step 1 で `https://www.googleapis.com/auth/gmail.readonly` と `https://www.googleapis.com/auth/calendar.readonly` の**両方**を選択して認可
+  2. Step 2 で取得したリフレッシュトークンを GitHub Secret `GMAIL_REFRESH_TOKEN` に更新
+  3. Actions から Deploy を1回実行して同期
+- 取得対象のカレンダー名は settings の `calendar_name`（既定「栄和共通」）で変更可
+
 ### 経緯の要約
 
 1. 当初 Netlify で構築予定 → Netlify 側 AI 機能で無料枠を消費し中断

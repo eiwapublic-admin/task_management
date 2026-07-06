@@ -19,6 +19,7 @@ create table if not exists tasks (
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
+  source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -28,6 +29,7 @@ create table if not exists tasks (
 alter table tasks add column if not exists classification_note text;
 alter table tasks add column if not exists sender_display text;
 alter table tasks add column if not exists sender_email text;
+alter table tasks add column if not exists source text not null default 'email';
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);
@@ -47,6 +49,7 @@ insert into settings (key, value) values
   ('org_context', ''),
   ('shared_gmail', 'eiwa.public@gmail.com'),
   ('company_domains', 'eiwa-up.jp'),  -- 自社ドメイン（カンマ区切り）。このドメイン発のメールは「自社からの返信」とみなす
+  ('calendar_name', '栄和共通'),      -- 取得対象の Google カレンダー名（当日イベントをタスク化）
   ('api_credit_alert', ''),      -- クレジット不足アラート（pipeline が設定/解除）
   ('last_fetch_at', null)
 on conflict (key) do nothing;
