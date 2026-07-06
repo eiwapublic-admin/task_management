@@ -88,7 +88,7 @@ export default function Dashboard() {
         setNotice(`スキップ: ${summary.reason}`)
       } else {
         setNotice(
-          `取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / 返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件`
+          `取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / 返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件 / カレンダー登録 ${summary.calendarCreated ?? 0} 件`
         )
         if (summary.errors && summary.errors.length > 0) {
           setError(`一部の処理でエラーが発生しました（${summary.errors.length}件）: ${summary.errors[0]}`)
