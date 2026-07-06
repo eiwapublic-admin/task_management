@@ -102,6 +102,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - **誤検知ガード**: タスク登録の元になったメッセージ自体、および元の差出人と同じアドレスからの追加送信は返信とみなさない（社内発・問い合わせフォームシステム発のメールは From が自社ドメインのため、このガードが無いと返信ゼロでも誤検知する）
    - 返信検知時は、タスクの本文プレビューを**返信の本文全体で置き換える**（元のメールは返信内の引用として残る想定）。あわせて「AI判定の理由」に返信検知の記録を追記する
    - 本文はタスクへの保存時に無駄な空行を除去する（連続改行を1つに圧縮）
+6.5. **Google カレンダー取込**: `calendar_name`（既定「栄和共通」）のカレンダーの**当日イベント**を取得し、未登録のものをタスク化（source='calendar'、ステータス「未処理」）。イベントのタイトル・詳細をそのまま登録し、詳細に「担当：〜」があればその担当者を割り当てる（無ければ既定担当）。カレンダー由来タスクは返信検知の対象外。Gmail と同じ OAuth トークンを使うため、トークンに `calendar.readonly` スコープが必要
 7. **利用量集計**: Claude のトークン使用量を api_usage に月次加算（推定コスト表示用）
 8. **クレジット監視**: Claude API が残高不足エラーを返したら `api_credit_alert` を設定（正常分類で自動解除）。ダッシュボードに警告バナー＋チャージ導線を表示
 9. `last_fetch_at` を現在時刻に更新
@@ -154,7 +155,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert（service role 経由） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
-settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`
+settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`
 
 ---
 
@@ -175,6 +176,7 @@ settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `activ
 | sender | text | From ヘッダー |
 | sender_display | text | AI 抽出の会社名・氏名（フォーム経由は本文優先） |
 | sender_email | text | 返信先アドレス（フォーム経由は本文記載を優先） |
+| source | text | 取得元。`email`（Gmail）/ `calendar`（Google カレンダー）。既定 email |
 | subject / body_preview | text | body_preview は先頭500字 |
 | classification_note | text | AI の判定理由 |
 | received_at / created_at / updated_at | timestamptz | updated_at はトリガーで自動更新 |
