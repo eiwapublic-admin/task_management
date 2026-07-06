@@ -154,7 +154,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 元スレッドに紐付かないことがあるため、件名の一致でも返信を検知する。
   const { data: openTaskRows } = await supabase
     .from('tasks')
-    .select('id, gmail_thread_id, title, subject, sender, sender_email, classification_note')
+    .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
     .eq('status', '未処理')
   const openBySubject = new Map()
   for (const t of openTaskRows || []) openBySubject.set(normalizeSubject(t.subject), t)
@@ -199,7 +199,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 送られたものであれば、そのタスクへの返信とみなす（Claude 分類はスキップ）
       const fromEmail = (extractEmail(email.from) || '').toLowerCase()
       const openTask = openBySubject.get(normalizeSubject(email.subject))
-      if (openTask) {
+      if (openTask && email.id !== openTask.gmail_message_id) {
         const counterpart = (openTask.sender_email || extractEmail(openTask.sender) || '').toLowerCase()
         const sentToCounterpart = counterpart && (email.to || '').toLowerCase().includes(counterpart)
         const isOurReply =
@@ -284,12 +284,22 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   {
     const { data: openTasks } = await supabase
       .from('tasks')
-      .select('id, gmail_thread_id, title, subject, classification_note')
+      .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
       .eq('status', '未処理')
     for (const task of openTasks || []) {
       try {
         const latest = await getThreadLatest(accessToken, task.gmail_thread_id)
-        if (latest && isCompanyAddress(extractEmail(latest.from))) {
+        // タスク登録の元になったメール自体や、元の差出人による追加送信は「返信」ではない
+        // （社内発・フォームシステム発のメールは From が自社ドメインのため、
+        //   このガードが無いと返信ゼロでも誤検知する）
+        const latestFrom = (extractEmail(latest?.from) || '').toLowerCase()
+        const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
+        if (
+          latest &&
+          latest.id !== task.gmail_message_id &&
+          latestFrom !== originalFrom &&
+          isCompanyAddress(latestFrom)
+        ) {
           // 返信の本文でタスク詳細を置き換えるため、最新メッセージ全体を取得する
           const replyEmail = await getMessage(accessToken, latest.id)
           await markReplied(task, 'スレッドで返信を検知', replyEmail)
