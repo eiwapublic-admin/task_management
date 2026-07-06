@@ -96,7 +96,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - `sender_email`: 返信先メールアドレス（フォーム経由は本文記載のアドレスを優先。取れない場合は Reply-To → From にフォールバック）
    - `reason`: 判定理由（振り分けルール調整の参考用に保存）
 5. 業務メールのみ tasks に INSERT（ステータス「未処理」）
-6. **返信検知**: 「未処理」タスクのスレッド最新メールの From が共有アドレスなら「返信済み」へ自動遷移
+6. **返信検知**（2方式。いずれも「未処理」→「返信済み」へ自動遷移）:
+   - **件名ベース**: 受信メールの件名（Re: 等を除去して正規化）が未処理タスクと一致し、差出人が自社側（共有アドレス or `company_domains` のドメイン）または宛先が元の送信者なら返信とみなす（Claude 分類はスキップ＝コスト節約）。担当者が自分のメーラーから返信し CC の社内 ML 経由で共有アドレスに配信されたケースを拾う
+   - **スレッドベース**: タスクのスレッド最新メールの差出人が自社側なら返信とみなす
 7. **利用量集計**: Claude のトークン使用量を api_usage に月次加算（推定コスト表示用）
 8. **クレジット監視**: Claude API が残高不足エラーを返したら `api_credit_alert` を設定（正常分類で自動解除）。ダッシュボードに警告バナー＋チャージ導線を表示
 9. `last_fetch_at` を現在時刻に更新
@@ -149,7 +151,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert（service role 経由） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
-settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`
+settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`
 
 ---
 
@@ -175,7 +177,7 @@ settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `activ
 | received_at / created_at / updated_at | timestamptz | updated_at はトリガーで自動更新 |
 
 ### settings（key/value）
-`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `api_credit_alert`, `last_fetch_at`
+`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `api_credit_alert`, `last_fetch_at`
 
 ### users
 id / username(unique) / password_hash(bcrypt) / display_name / created_at。**anon からは一切アクセス不可（service role のみ）**

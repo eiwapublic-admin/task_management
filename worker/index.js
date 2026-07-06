@@ -83,6 +83,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'business_keywords',
   'org_context',
   'shared_gmail',
+  'company_domains',
 ])
 
 async function handleSettings(req) {

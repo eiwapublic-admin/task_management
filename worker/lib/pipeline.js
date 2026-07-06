@@ -40,6 +40,22 @@ function extractEmail(str) {
   return m ? m[0] : null
 }
 
+function emailDomain(addr) {
+  const at = typeof addr === 'string' ? addr.lastIndexOf('@') : -1
+  return at > 0 ? addr.slice(at + 1).toLowerCase() : null
+}
+
+// 件名から Re:/Fwd: 等の接頭辞を除いて比較用に正規化する
+function normalizeSubject(subject) {
+  let t = (subject || '').trim()
+  for (;;) {
+    const next = t.replace(/^(re|fwd?|返信)\s*[:：]\s*/i, '')
+    if (next === t) break
+    t = next.trim()
+  }
+  return t.toLowerCase()
+}
+
 // 操作ログの保持期間（日）。古いログはパイプライン実行時に削除する
 const LOG_RETENTION_DAYS = 60
 
@@ -56,6 +72,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const orgContext = settings.org_context || ''
   const businessKeywords = settings.business_keywords || ''
   const sharedGmail = (settings.shared_gmail || '').toLowerCase()
+  // 自社ドメイン。担当者が自分のメーラーから返信（CC: 社内ML経由で共有アドレスに配信）した場合の返信検知に使う
+  const companyDomains = (settings.company_domains || 'eiwa-up.jp')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const isCompanyAddress = (addr) => {
+    const a = (addr || '').toLowerCase()
+    return Boolean(a) && (a === sharedGmail || companyDomains.includes(emailDomain(a)))
+  }
 
   // 稼働時間帯ゲート: 業務時間外はスケジュール実行をスキップする（手動実行は対象外）
   if (!force) {
@@ -115,11 +140,57 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   const context = { assignees, orgContext, businessKeywords, today: todayJST() }
 
+  // 未処理タスクの一覧（件名ベースの返信検知用）。
+  // 担当者が自分のメーラーから返信すると References ヘッダーが付かず
+  // 元スレッドに紐付かないことがあるため、件名の一致でも返信を検知する。
+  const { data: openTaskRows } = await supabase
+    .from('tasks')
+    .select('id, gmail_thread_id, title, subject, sender, sender_email')
+    .eq('status', '未処理')
+  const openBySubject = new Map()
+  for (const t of openTaskRows || []) openBySubject.set(normalizeSubject(t.subject), t)
+
+  // タスクを「返信済み」にし、操作ログを積む（返信検知の共通処理）
+  async function markReplied(task, via) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: '返信済み' })
+      .eq('id', task.id)
+      .eq('status', '未処理')
+    if (error) return false
+    summary.replied += 1
+    openBySubject.delete(normalizeSubject(task.subject))
+    logRows.push({
+      log_type: 'status_change',
+      actor: 'システム（自動）',
+      message: `「${task.title}」のステータスを 未処理 → 返信済み に変更（${via}）`,
+      detail: { task_id: task.id },
+    })
+    return true
+  }
+
   // 2) 新規メッセージを分類してタスク化
   for (const ref of messageRefs) {
     try {
       const email = await getMessage(accessToken, ref.id)
       if (!email.threadId) continue
+
+      // 件名ベースの返信検知: 未処理タスクと同じ件名（Re: 等を除く）のメールが
+      // 自社側（共有アドレス・自社ドメイン）から届いた、または元の送信者宛てに
+      // 送られたものであれば、そのタスクへの返信とみなす（Claude 分類はスキップ）
+      const fromEmail = (extractEmail(email.from) || '').toLowerCase()
+      const openTask = openBySubject.get(normalizeSubject(email.subject))
+      if (openTask) {
+        const counterpart = (openTask.sender_email || extractEmail(openTask.sender) || '').toLowerCase()
+        const sentToCounterpart = counterpart && (email.to || '').toLowerCase().includes(counterpart)
+        const isOurReply =
+          fromEmail && fromEmail !== counterpart && (isCompanyAddress(fromEmail) || sentToCounterpart)
+        if (isOurReply) {
+          await markReplied(openTask, '返信を検知')
+          continue
+        }
+      }
+
       if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
       processedThreads.add(email.threadId)
 
@@ -189,30 +260,18 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     }
   }
 
-  // 3) 返信検知: 未処理タスクのスレッド最新メールが共有アドレス発なら「返信済み」に
-  if (sharedGmail) {
+  // 3) スレッドベースの返信検知: 未処理タスクのスレッド最新メールが
+  //    自社側（共有アドレス or 自社ドメイン）発なら「返信済み」に
+  {
     const { data: openTasks } = await supabase
       .from('tasks')
-      .select('id, gmail_thread_id, title')
+      .select('id, gmail_thread_id, title, subject')
       .eq('status', '未処理')
     for (const task of openTasks || []) {
       try {
         const latestFrom = await getThreadLatestFrom(accessToken, task.gmail_thread_id)
-        if (latestFrom && latestFrom.toLowerCase().includes(sharedGmail)) {
-          const { error } = await supabase
-            .from('tasks')
-            .update({ status: '返信済み' })
-            .eq('id', task.id)
-            .eq('status', '未処理')
-          if (!error) {
-            summary.replied += 1
-            logRows.push({
-              log_type: 'status_change',
-              actor: 'システム（自動）',
-              message: `「${task.title}」のステータスを 未処理 → 返信済み に変更（返信を検知）`,
-              detail: { task_id: task.id },
-            })
-          }
+        if (isCompanyAddress(extractEmail(latestFrom))) {
+          await markReplied(task, 'スレッドで返信を検知')
         }
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
