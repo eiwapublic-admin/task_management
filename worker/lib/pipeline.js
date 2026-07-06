@@ -1,6 +1,6 @@
 import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken, listMessageIds, getMessage, getThreadLatest } from './gmail.js'
-import { findCalendarId, listTodayEvents } from './calendar.js'
+import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
@@ -337,9 +337,13 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const calendarName = (settings.calendar_name || '栄和共通').trim()
   if (calendarName) {
     try {
-      const calendarId = await findCalendarId(accessToken, calendarName)
+      const { id: calendarId, available } = await resolveCalendar(accessToken, calendarName)
       if (!calendarId) {
-        summary.errors.push(`calendar: カレンダー「${calendarName}」が見つかりません`)
+        summary.errors.push(
+          `calendar: カレンダー「${calendarName}」が見つかりません。利用可能なカレンダー: ${
+            available.length ? available.join(' / ') : '（なし）'
+          }`
+        )
       } else {
         const events = await listTodayEvents(accessToken, calendarId)
         for (const ev of events) {
