@@ -9,6 +9,11 @@ const TYPE_LABELS = {
   status_change: 'ステータス変更',
 }
 
+// タイムスタンプを JST の 'YYYY-MM-DD' にする（日の切り替わり判定用）
+function jstDate(value) {
+  return new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
 export default function Logs() {
   const navigate = useNavigate()
   const [logs, setLogs] = useState(null)
@@ -59,8 +64,12 @@ export default function Logs() {
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
-                <tr key={log.id}>
+              {logs.map((log, i) => {
+                // JST の日付が前の行と変わる位置に太い区切りを入れる（新しい順のため隣接比較）
+                const day = jstDate(log.created_at)
+                const isDayBoundary = i === 0 || day !== jstDate(logs[i - 1].created_at)
+                return (
+                <tr key={log.id} className={isDayBoundary ? 'logs-day-boundary' : undefined}>
                   <td className="logs-time">{formatDateTime(log.created_at)}</td>
                   <td>
                     <span className={`logs-type logs-type-${log.log_type}`}>
@@ -70,7 +79,8 @@ export default function Logs() {
                   <td className="logs-actor">{log.actor}</td>
                   <td className="logs-message">{log.message}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         )}

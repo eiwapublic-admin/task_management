@@ -348,6 +348,15 @@
   color: var(--text-muted);
 }
 
+/* 日付が切り替わる行に太い区切り線を入れて日の境界を目立たせる */
+.logs-table tbody tr.logs-day-boundary td {
+  border-top: 3px solid var(--text-strong);
+}
+
+.logs-table tbody tr.logs-day-boundary:first-child td {
+  border-top: none;
+}
+
 @media (max-width: 768px) {
   .dashboard-header {
     padding: var(--space-3) var(--space-3);
