@@ -14,13 +14,14 @@
 - **Supabase**: プロジェクト `Eiwapublic Project`（ref: `pfiogfdnbctunkhslmcp`, region: ap-southeast-2）。スキーマ・マイグレーション適用済み
 - **Anthropic**: $5 クレジット購入済みのアカウントの API キーで稼働（モデル: claude-haiku-4-5）
 
-### Google カレンダー連携（要・OAuth 再認可）
-- Gmail と同じ Google アカウントの「栄和共通」カレンダーの当日イベントを、毎回の取得時にタスク化（未処理）する。イベント詳細に「担当：〜」があればその担当者を割り当てる
-- **重要**: この機能には OAuth トークンに `calendar.readonly` スコープが必要。Gmail だけで発行した既存トークンのままだと、取得時に「calendar: 参照の権限がありません」というエラーが操作ログに出て**カレンダー分だけ登録されない**（Gmail 取得は正常に続く）。有効化するには OAuth Playground でトークンを再発行する:
-  1. OAuth Playground の Step 1 で `https://www.googleapis.com/auth/gmail.readonly` と `https://www.googleapis.com/auth/calendar.readonly` の**両方**を選択して認可
-  2. Step 2 で取得したリフレッシュトークンを GitHub Secret `GMAIL_REFRESH_TOKEN` に更新
-  3. Actions から Deploy を1回実行して同期
-- 取得対象のカレンダー名は settings の `calendar_name`（既定「栄和共通」）で変更可
+### Google カレンダー連携（開通済み）
+- Gmail と同じ Google アカウント（eiwa.public@gmail.com）の「栄和共通」カレンダー（＝このアカウントのメインカレンダー）の**当日イベント**を、毎回の取得時にタスク化（未処理）する。イベントのタイトル・詳細をそのまま登録し、詳細に「担当：〜」（「担当者：」も可）があればその担当者を割り当てる。ステータス進行は手動
+- 取得対象は settings の `calendar_name`。現在は**カレンダーID `eiwa.public@gmail.com` を直接指定**している（`@` を含む値は ID として直接使う。表示名でも指定可だが下記の経緯によりID指定が確実）
+- **設定に必要だった前提（再構築時の参考）**:
+  1. **OAuth スコープ**: リフレッシュトークンに `calendar.readonly` が必要。OAuth Playground で「Use your own OAuth credentials」に自社の Client ID/Secret を入れ、gmail.readonly と calendar.readonly の両方を選んで認可 → 発行された Refresh token（`1//`始まり）を `GMAIL_REFRESH_TOKEN` に更新 → Deploy
+  2. **Google Cloud プロジェクトで Calendar API を有効化**（Gmail API とは別に有効化が必要）
+  3. **カレンダーIDの特定**: 「栄和共通」は副カレンダーではなくメインカレンダーの表示名だったため、ID はメールアドレス `eiwa.public@gmail.com`。表示名「栄和共通」では calendarList から解決できず、ID 直接指定で解決した。カレンダーIDはカレンダー設定の「カレンダーの統合」で確認できる
+- カレンダーが見つからない場合、操作ログに「利用可能なカレンダー: …」と購読中カレンダー名の一覧が出るので、名前の食い違い/未共有の切り分けに使える
 
 ### 経緯の要約
 
@@ -95,6 +96,9 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 | 担当者がメーラーから返信したのに「返信済み」にならない | 旧検知は共有アドレス発の返信のみ対象だった | 対応済み: 件名ベース検知 + 自社ドメイン（company_domains）発の検知を追加（PR #16） |
 | 返信していないタスクが「返信済み」になる（誤検知） | 社内発・フォームシステム発のメールは From が自社ドメインのため、返信ゼロのスレッドでも「最新=自社発」に合致 | 対応済み: 元メッセージ自体と元差出人の追加送信を除外（PR #18）。誤遷移したタスクは手動で 未処理 に戻し、操作ログに補正を記録する |
 | 「メール参照」で Gmail が Temporary Error (404) | URL パスに `/u/<アドレス>` を埋め込む形式が原因 | 対応済み: `?authuser=` クエリ形式に変更（PR #14） |
+| カレンダー取得が「参照の権限がありません（Insufficient Permission）」 | トークンに calendar スコープが無い | OAuth Playground で gmail+calendar 両スコープで再発行 → Secret 更新 → Deploy |
+| カレンダー取得が 403「Calendar API has not been used / disabled」 | Google Cloud プロジェクトで Calendar API 未有効化 | Cloud Console で Google Calendar API を有効化し数分待つ |
+| カレンダー取得が「カレンダー『〜』が見つかりません」 | 表示名で解決できない（メインカレンダーはメール名で返る等） | 操作ログの「利用可能なカレンダー」一覧を確認し、`calendar_name` にカレンダーID（メールアドレス or `〜@group.calendar.google.com`）を直接設定する |
 
 ### ログの見方
 - **アプリ内の操作ログ**: メイン画面ヘッダーの「ログ」→ 操作ログ画面。メール取得の実行結果とタスクのステータス変更履歴を実行者（担当者名 or システム（自動））付きで確認できる。直近200件表示・60日で自動削除
