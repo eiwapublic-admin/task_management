@@ -113,11 +113,11 @@ export async function getMessage(accessToken, id) {
   }
 }
 
-// スレッドの最新メッセージの From を返す（返信検知用）。
-export async function getThreadLatestFrom(accessToken, threadId) {
+// スレッドの最新メッセージの ID と From を返す（返信検知用）。
+export async function getThreadLatest(accessToken, threadId) {
   const thread = await apiGet(accessToken, `/threads/${threadId}?format=metadata&metadataHeaders=From`)
   const messages = thread.messages || []
   if (messages.length === 0) return null
   const last = messages[messages.length - 1]
-  return header(last.payload || {}, 'From')
+  return { id: last.id, from: header(last.payload || {}, 'From') }
 }

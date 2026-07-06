@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, listMessageIds, getMessage, getThreadLatestFrom } from './gmail.js'
+import { getAccessToken, listMessageIds, getMessage, getThreadLatest } from './gmail.js'
 import { classifyEmail } from './anthropic.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
@@ -43,6 +43,15 @@ function extractEmail(str) {
 function emailDomain(addr) {
   const at = typeof addr === 'string' ? addr.lastIndexOf('@') : -1
   return at > 0 ? addr.slice(at + 1).toLowerCase() : null
+}
+
+// 本文の無駄な空行を除去する（行末の空白 → 連続改行を1つに圧縮）
+function compactBody(text) {
+  return (text || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
 }
 
 // 件名から Re:/Fwd: 等の接頭辞を除いて比較用に正規化する
@@ -145,16 +154,26 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 元スレッドに紐付かないことがあるため、件名の一致でも返信を検知する。
   const { data: openTaskRows } = await supabase
     .from('tasks')
-    .select('id, gmail_thread_id, title, subject, sender, sender_email')
+    .select('id, gmail_thread_id, title, subject, sender, sender_email, classification_note')
     .eq('status', '未処理')
   const openBySubject = new Map()
   for (const t of openTaskRows || []) openBySubject.set(normalizeSubject(t.subject), t)
 
-  // タスクを「返信済み」にし、操作ログを積む（返信検知の共通処理）
-  async function markReplied(task, via) {
+  // タスクを「返信済み」にし、操作ログを積む（返信検知の共通処理）。
+  // reply（返信メール）が渡された場合は、タスクの詳細内容を返信の本文全体で
+  // 置き換える（元のメール内容は返信内の引用として残っている想定）。
+  async function markReplied(task, via, reply = null) {
+    const fields = { status: '返信済み' }
+    if (reply && reply.body) {
+      fields.body_preview = compactBody(reply.body).slice(0, 500)
+      const note = `【返信検知】${via}（差出人: ${reply.from || '不明'}）。本文を返信の内容に置き換えました。元のメールは返信内の引用を参照。`
+      fields.classification_note = task.classification_note
+        ? `${task.classification_note}\n${note}`
+        : note
+    }
     const { error } = await supabase
       .from('tasks')
-      .update({ status: '返信済み' })
+      .update(fields)
       .eq('id', task.id)
       .eq('status', '未処理')
     if (error) return false
@@ -186,7 +205,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         const isOurReply =
           fromEmail && fromEmail !== counterpart && (isCompanyAddress(fromEmail) || sentToCounterpart)
         if (isOurReply) {
-          await markReplied(openTask, '返信を検知')
+          await markReplied(openTask, '返信を検知', email)
           continue
         }
       }
@@ -236,7 +255,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         sender_display: senderDisplay,
         sender_email: senderEmail,
         subject: email.subject || '（件名なし）',
-        body_preview: (email.body || '').slice(0, 500),
+        body_preview: compactBody(email.body).slice(0, 500),
         received_at: email.receivedAt || new Date().toISOString(),
         classification_note: result.reason || null,
       })
@@ -265,13 +284,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   {
     const { data: openTasks } = await supabase
       .from('tasks')
-      .select('id, gmail_thread_id, title, subject')
+      .select('id, gmail_thread_id, title, subject, classification_note')
       .eq('status', '未処理')
     for (const task of openTasks || []) {
       try {
-        const latestFrom = await getThreadLatestFrom(accessToken, task.gmail_thread_id)
-        if (isCompanyAddress(extractEmail(latestFrom))) {
-          await markReplied(task, 'スレッドで返信を検知')
+        const latest = await getThreadLatest(accessToken, task.gmail_thread_id)
+        if (latest && isCompanyAddress(extractEmail(latest.from))) {
+          // 返信の本文でタスク詳細を置き換えるため、最新メッセージ全体を取得する
+          const replyEmail = await getMessage(accessToken, latest.id)
+          await markReplied(task, 'スレッドで返信を検知', replyEmail)
         }
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
