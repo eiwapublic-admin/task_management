@@ -299,7 +299,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   padding: 0 var(--space-5);
-  width: 560px;
+  width: 680px;
   max-width: 100%;
   max-height: 85vh;
   overflow-y: auto;
@@ -451,10 +451,11 @@
   border-color: var(--color-primary);
 }
 
+/* 現在のステータスは緑で示す（ヘッダーの配色に合わせる） */
 .status-btn.active {
-  background: var(--color-primary);
+  background: #33604d;
   color: #fff;
-  border-color: var(--color-primary);
+  border-color: #33604d;
 }
 
 /* ---------- レスポンシブ: 狭い画面は横スクロール ---------- */
