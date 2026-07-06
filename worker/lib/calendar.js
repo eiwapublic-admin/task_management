@@ -17,14 +17,28 @@ async function apiGet(accessToken, path) {
   return res.json()
 }
 
-// カレンダー名（summary）から calendarId を引く。見つからなければ null。
-export async function findCalendarId(accessToken, name) {
+// アクセストークンの持ち主が購読している全カレンダーを返す。
+export async function listCalendars(accessToken) {
   const data = await apiGet(accessToken, '/users/me/calendarList?maxResults=250')
-  const items = data.items || []
-  const hit =
-    items.find((c) => c.summary === name) ||
-    items.find((c) => (c.summaryOverride || '') === name)
-  return hit ? hit.id : null
+  return (data.items || []).map((c) => ({
+    id: c.id,
+    summary: c.summary || '',
+    summaryOverride: c.summaryOverride || '',
+  }))
+}
+
+// カレンダー名から calendarId を引く（前後空白は無視し、summaryOverride も対象）。
+// 見つからなければ { id: null, available: [...カレンダー名] } を返す。
+export async function resolveCalendar(accessToken, name) {
+  const target = (name || '').trim()
+  const cals = await listCalendars(accessToken)
+  const hit = cals.find(
+    (c) => c.summary.trim() === target || c.summaryOverride.trim() === target
+  )
+  return {
+    id: hit ? hit.id : null,
+    available: cals.map((c) => c.summaryOverride || c.summary).filter(Boolean),
+  }
 }
 
 // JST の当日 [00:00, 翌00:00) を RFC3339（+09:00）で返す。
