@@ -61,7 +61,7 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
 
-※ `VITE_SUPABASE_URL` / `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`src/lib/supabase.js` / `worker/lib/supabase-admin.js`）。Secrets を正しい値に直すのが望ましい。
+※ `VITE_SUPABASE_URL` / `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`src/lib/supabase.js` / `worker/lib/supabase-admin.js`）。Secrets は 2026-07-06 に正しい値へ修正済み（フォールバックは保険として残置）。
 
 ### ローカル開発
 ```bash
@@ -110,7 +110,7 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 
 ## 6. 残タスク・改善候補
 
-- [ ] GitHub Secrets の `VITE_SUPABASE_URL` / `SUPABASE_URL` を正しい URL に修正（動作はフォールバックで問題なし）
+- [x] GitHub Secrets の `VITE_SUPABASE_URL` / `SUPABASE_URL` を正しい URL に修正（2026-07-06 対応済み）
 - [ ] 実運用での振り分け精度を見ながら org_context を調整
 - [ ] 返信検知の精度を実運用で観察（誤検知・検知漏れがあれば操作ログとタスクの「AI判定の理由」を手がかりに調整）
 - [ ] 会社アカウントへの移管（上記 5 章）
