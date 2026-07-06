@@ -337,7 +337,18 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const calendarName = (settings.calendar_name || '栄和共通').trim()
   if (calendarName) {
     try {
-      const { id: calendarId, available } = await resolveCalendar(accessToken, calendarName)
+      // calendar_name に '@' が含まれる場合はカレンダーID直接指定とみなす
+      // （calendarList に出ないカレンダーでも、公開カレンダーなら ID で読める）。
+      // それ以外は表示名で calendarList から解決する。
+      let calendarId = null
+      let available = []
+      if (calendarName.includes('@')) {
+        calendarId = calendarName
+      } else {
+        const resolved = await resolveCalendar(accessToken, calendarName)
+        calendarId = resolved.id
+        available = resolved.available
+      }
       if (!calendarId) {
         summary.errors.push(
           `calendar: カレンダー「${calendarName}」が見つかりません。利用可能なカレンダー: ${
@@ -360,7 +371,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
             assignee,
             status: '未処理',
             due_date: ev.startDate || todayJST(),
-            sender: `Googleカレンダー「${calendarName}」`,
+            sender: calendarName.includes('@') ? 'Googleカレンダー' : `Googleカレンダー「${calendarName}」`,
             sender_display: null,
             sender_email: null,
             subject: ev.title || '（無題の予定）',

@@ -49,7 +49,7 @@ insert into settings (key, value) values
   ('org_context', ''),
   ('shared_gmail', 'eiwa.public@gmail.com'),
   ('company_domains', 'eiwa-up.jp'),  -- 自社ドメイン（カンマ区切り）。このドメイン発のメールは「自社からの返信」とみなす
-  ('calendar_name', '栄和共通'),      -- 取得対象の Google カレンダー名（当日イベントをタスク化）
+  ('calendar_name', '栄和共通'),      -- 取得対象の Google カレンダー名 または カレンダーID（@を含む場合はID直接指定）
   ('api_credit_alert', ''),      -- クレジット不足アラート（pipeline が設定/解除）
   ('last_fetch_at', null)
 on conflict (key) do nothing;
