@@ -2,6 +2,7 @@
 
 最終更新: 2026-07-06
 対象システム: タスク管理システム（Cloudflare 版）。設計は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md)、運用は [`HANDOFF.md`](./HANDOFF.md) を参照。
+継続作業の引き継ぎは [`video-handoff.md`](./video-handoff.md)、素材の再生成ソースは リポジトリ `video/` を参照。
 
 ---
 

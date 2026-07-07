@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Noto Sans CJK JP", "Hiragino Sans", sans-serif; }
+  .slide { width: 1920px; height: 1080px; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* ---- C1 タイトル ---- */
+  #c1 { background: linear-gradient(160deg, #33604d 0%, #244638 100%); color: #fff; }
+  #c1 .logo-row { display: flex; align-items: center; gap: 36px; margin-bottom: 60px; }
+  #c1 .logo-badge { width: 150px; height: 150px; background: #fff; border-radius: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  #c1 .logo-badge img { width: 100px; }
+  #c1 .brand { font-size: 64px; font-weight: 700; letter-spacing: .08em; }
+  #c1 h1 { font-size: 110px; font-weight: 800; letter-spacing: .04em; margin-bottom: 44px; text-shadow: 0 4px 24px rgba(0,0,0,.25); }
+  #c1 .sub { font-size: 46px; font-weight: 500; color: #cfe6da; letter-spacing: .1em; }
+  .accent { color: #ffd166; }
+
+  /* ---- C3 図解 ---- */
+  #c3 { background: #f4f5f7; padding: 70px 90px; justify-content: flex-start; align-items: stretch; }
+  #c3 h2 { font-size: 56px; font-weight: 800; color: #111827; text-align: center; margin-bottom: 26px; }
+  #c3 h2 .chip { display: inline-block; background: #33604d; color: #fff; border-radius: 16px; padding: 6px 28px; }
+  .flow { flex: 1; display: flex; align-items: center; justify-content: center; gap: 30px; }
+  .node { background: #fff; border-radius: 24px; box-shadow: 0 8px 28px rgba(17,24,39,.10); padding: 40px 34px; text-align: center; width: 380px; }
+  .node .icon { font-size: 84px; line-height: 1; margin-bottom: 22px; }
+  .node .t { font-size: 38px; font-weight: 800; color: #111827; margin-bottom: 14px; }
+  .node .d { font-size: 27px; color: #374151; line-height: 1.55; }
+  .node .addr { font-size: 23px; font-weight: 700; color: #2563eb; white-space: nowrap; }
+  .arrow { font-size: 64px; color: #33604d; font-weight: 800; }
+  .node.ai { background: #33604d; }
+  .node.ai .t, .node.ai .d { color: #fff; }
+  .node.ai .d { color: #cfe6da; }
+  .banner { margin-top: 26px; background: #fff7e0; border: 4px solid #ffd166; border-radius: 20px; padding: 26px 40px; text-align: center; }
+  .banner .b1 { font-size: 42px; font-weight: 800; color: #92600a; margin-bottom: 8px; }
+  .banner .b2 { font-size: 30px; color: #6b7280; }
+  .banner .mail { color: #2563eb; font-weight: 800; }
+  .cal-note { position: absolute; right: 90px; top: 96px; background: #eaf4ef; border-radius: 16px; padding: 14px 22px; font-size: 26px; color: #33604d; font-weight: 700; }
+
+  /* ---- C9 締め ---- */
+  #c9 { background: linear-gradient(160deg, #33604d 0%, #244638 100%); color: #fff; }
+  #c9 h2 { font-size: 96px; font-weight: 800; margin-bottom: 48px; text-shadow: 0 4px 24px rgba(0,0,0,.25); }
+  #c9 .points { display: flex; gap: 40px; margin-bottom: 70px; }
+  #c9 .pt { background: rgba(255,255,255,.12); border-radius: 22px; padding: 30px 44px; font-size: 38px; font-weight: 700; }
+  #c9 .credit { position: absolute; bottom: 40px; right: 56px; font-size: 26px; color: #a7c4b5; }
+</style>
+</head>
+<body>
+
+<div class="slide" id="c1">
+  <div class="logo-row">
+    <div class="logo-badge"><img src="logo.svg" alt=""></div>
+    <div class="brand">栄和</div>
+  </div>
+  <h1>タスク管理システム</h1>
+  <div class="sub">メールの仕分けと担当割り当てを、<span class="accent">AI が自動で。</span></div>
+</div>
+
+<div class="slide" id="c3">
+  <h2>しくみは <span class="chip">シンプル</span></h2>
+  <div class="cal-note">📅 カレンダーの当日予定も自動でタスク化</div>
+  <div class="flow">
+    <div class="node">
+      <div class="icon">✉️</div>
+      <div class="t">メールが届く</div>
+      <div class="addr">if@eiwa-up.jp</div>
+      <div class="d">お客様からのメールや<br>社内のやり取り</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node">
+      <div class="icon">📮</div>
+      <div class="t">共有 Gmail へ転送</div>
+      <div class="addr">eiwa.public@gmail.com</div>
+      <div class="d">カレンダーの予定も<br>ここから取得</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node ai">
+      <div class="icon">🤖</div>
+      <div class="t">AI が自動判定</div>
+      <div class="d">タスクにする？<br>担当は誰？<br>期限はいつ？</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node">
+      <div class="icon">📋</div>
+      <div class="t">カンバンに登録</div>
+      <div class="d">担当者ごとに整理されて、<br>一覧に並ぶ</div>
+    </div>
+  </div>
+  <div class="banner">
+    <div class="b1">お願いはひとつだけ：仕事のメールは CC に <span class="mail">if@eiwa-up.jp</span> を入れる</div>
+    <div class="b2">それだけで、あとはシステムが自動で拾ってくれます</div>
+  </div>
+</div>
+
+<div class="slide" id="c9">
+  <h2>毎朝見るのは、カンバンだけ。</h2>
+  <div class="points">
+    <div class="pt">✅ 取りこぼしゼロ</div>
+    <div class="pt">👀 みんなの状況が見える</div>
+    <div class="pt">🤖 仕分けはAIにおまかせ</div>
+  </div>
+  <div class="sub" style="font-size:40px;color:#cfe6da;">メールの CC に <b style="color:#ffd166">if@eiwa-up.jp</b> — 今日から始めましょう</div>
+  <div class="credit">音声: VOICEVOX:No.7</div>
+</div>
+
+</body>
+</html>
