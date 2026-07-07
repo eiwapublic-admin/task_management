@@ -105,6 +105,7 @@ export async function getMessage(accessToken, id) {
     from: header(payload, 'From'),
     replyTo: header(payload, 'Reply-To'),
     to: header(payload, 'To'),
+    cc: header(payload, 'Cc'),
     subject: header(payload, 'Subject'),
     date: header(payload, 'Date'),
     snippet: msg.snippet || '',

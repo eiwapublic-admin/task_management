@@ -46,10 +46,17 @@ function emailDomain(addr) {
   return at > 0 ? addr.slice(at + 1).toLowerCase() : null
 }
 
-// 本文の無駄な空行を除去する（行末の空白 → 連続改行を1つに圧縮）
+// 本文を整形する。改行の正規化に加えて、
+// - 返信/転送メールの行頭引用マーク（"> " や全角 "＞"、ネストした ">> " 等）を除去
+// - BOM・ゼロ幅スペース等の不可視文字を除去
+// し、行末の空白と連続改行を1つに圧縮する。
 function compactBody(text) {
   return (text || '')
     .replace(/\r\n?/g, '\n')
+    // 不可視文字（ゼロ幅スペース類・BOM）を除去
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, '')
+    // 各行頭の引用マークを除去（半角 ">"・全角 "＞"、前後の空白やネストにも対応）
+    .replace(/^[ \t　]*(?:[>＞]+[ \t　]*)+/gm, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{2,}/g, '\n')
     .trim()
@@ -216,15 +223,22 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       if (!email.threadId) continue
 
       // 件名ベースの返信検知: 未処理タスクと同じ件名（Re: 等を除く）のメールが
-      // 自社側（共有アドレス・自社ドメイン）から届いた、または元の送信者宛てに
-      // 送られたものであれば、そのタスクへの返信とみなす（Claude 分類はスキップ）
+      // 自社側（共有アドレス・自社ドメイン）から、かつ元の送信者（顧客）宛てに
+      // 送られたものであれば、そのタスクへの返信とみなす（Claude 分類はスキップ）。
+      //
+      // 「顧客宛てに送られている」ことを必須にするのが重要。問い合わせフォーム由来の
+      // メールは件名が定型（例:「ホームページからのお問い合わせ」）で共通し、From も
+      // 自社ドメイン（if@eiwa-up.jp 等）になるため、From が自社という条件だけだと
+      // 別顧客の新規フォーム送信を既存タスクへの「返信」と誤検知してしまう。
+      // 正当な返信は必ず顧客（counterpart）を宛先に含むので、その一致を要件に加える。
       const fromEmail = (extractEmail(email.from) || '').toLowerCase()
       const openTask = openBySubject.get(normalizeSubject(email.subject))
       if (openTask && email.id !== openTask.gmail_message_id) {
         const counterpart = (openTask.sender_email || extractEmail(openTask.sender) || '').toLowerCase()
-        const sentToCounterpart = counterpart && (email.to || '').toLowerCase().includes(counterpart)
+        const recipients = `${email.to || ''} ${email.cc || ''}`.toLowerCase()
+        const sentToCounterpart = counterpart && recipients.includes(counterpart)
         const isOurReply =
-          fromEmail && fromEmail !== counterpart && (isCompanyAddress(fromEmail) || sentToCounterpart)
+          fromEmail && fromEmail !== counterpart && isCompanyAddress(fromEmail) && sentToCounterpart
         if (isOurReply) {
           await markReplied(openTask, '返信を検知', email)
           continue
