@@ -19,7 +19,8 @@ create table if not exists tasks (
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
-  source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー）
+  remarks          text,           -- 留意事項（担当者が詳細画面で自由入力するメモ）
+  source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー） / 'manual'（手動登録）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -29,6 +30,7 @@ create table if not exists tasks (
 alter table tasks add column if not exists classification_note text;
 alter table tasks add column if not exists sender_display text;
 alter table tasks add column if not exists sender_email text;
+alter table tasks add column if not exists remarks text;
 alter table tasks add column if not exists source text not null default 'email';
 
 create index if not exists idx_tasks_status on tasks (status);

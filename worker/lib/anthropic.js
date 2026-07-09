@@ -39,7 +39,7 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
     '【出力JSONの形式】',
     '{',
     '  "is_business_task": true か false（広告・ニュースレター・自動通知・営業/プロモーションは false）,',
-    `  "assignee": ${assignees.map((a) => `"${a}"`).join(' / ')} のいずれか。業務メールでないときは null,`,
+    `  "assignee": ${assignees.map((a) => `"${a}"`).join(' / ')} のいずれか。業務メールでないとき、または担当者を特定できないときは null,`,
     '  "due_date": "YYYY-MM-DD" 期限が読み取れないときは null,',
     '  "title": "タスクの内容がひと目で分かる簡潔な日本語タイトル（30字以内）",',
     '  "sender_display": "株式会社サンプル 山田太郎" のように送信元の会社名と氏名。問い合わせフォーム経由のメールは本文に記載された会社名・氏名を優先して読み取る。一方しか分からなければ分かる方だけ。どちらも不明なら null,',
@@ -47,7 +47,7 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
     '  "reason": "業務/非業務の判断根拠と、担当者を選んだ理由を1〜2文で簡潔に"',
     '}',
     '',
-    '判断できない一般的な業務メールは、既定担当として先頭の担当者に割り当ててください。',
+    '担当者を明確に特定できない場合は、無理に割り当てず assignee を null にしてください（後で担当者が手動で設定します）。',
     '必ず有効なJSONのみを返してください。',
   ].join('\n')
 }

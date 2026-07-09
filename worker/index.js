@@ -120,6 +120,126 @@ async function handleSettings(req) {
   }
 }
 
+// タスクの手動登録・編集で使う定数
+const VALID_STATUSES = new Set(['未処理', '返信済み', '対応中', '完了'])
+const UNASSIGNED = '（担当未設定）'
+const DUE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+// due_date の入力を正規化する（空文字/未指定は null、YYYY-MM-DD のみ許可）
+function normalizeDueDate(value) {
+  if (value === undefined) return undefined // 未指定（更新時は変更しない）
+  if (value === null || value === '') return null
+  if (typeof value === 'string' && DUE_RE.test(value.trim())) return value.trim()
+  return undefined // 不正な形式は無視
+}
+
+// POST /api/tasks — タスクの手動登録。ログイン必須。
+async function handleTaskCreate(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const payload = await req.json().catch(() => null)
+    if (!payload || typeof payload !== 'object') {
+      return json({ error: 'JSON ボディが必要です' }, 400)
+    }
+    const title = typeof payload.title === 'string' ? payload.title.trim() : ''
+    if (!title) return json({ error: 'タイトルは必須です' }, 400)
+
+    const status = VALID_STATUSES.has(payload.status) ? payload.status : '未処理'
+    const assignee =
+      typeof payload.assignee === 'string' && payload.assignee.trim()
+        ? payload.assignee.trim()
+        : UNASSIGNED
+    const dueDate = normalizeDueDate(payload.due_date) ?? null
+    const remarks =
+      typeof payload.remarks === 'string' && payload.remarks.trim() ? payload.remarks.trim() : null
+
+    // 手動登録は Gmail スレッドを持たないため、一意な合成 ID を割り当てる
+    const syntheticId = `manual:${crypto.randomUUID()}`
+    const now = new Date().toISOString()
+
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        gmail_thread_id: syntheticId,
+        gmail_message_id: syntheticId,
+        source: 'manual',
+        title: title.slice(0, 120),
+        assignee,
+        status,
+        due_date: dueDate,
+        sender: '手動登録',
+        subject: title.slice(0, 120),
+        remarks,
+        received_at: now,
+        classification_note: `${auth.display_name || auth.username || '不明なユーザー'} が手動で登録しました。`,
+      })
+      .select()
+      .single()
+    if (error) return json({ error: `登録に失敗しました: ${error.message}` }, 500)
+
+    // 操作ログ
+    await supabase.from('activity_logs').insert({
+      log_type: 'status_change',
+      actor: auth.display_name || auth.username || '不明なユーザー',
+      message: `タスク「${title.slice(0, 120)}」を手動で登録`,
+      detail: { task_id: data.id },
+    })
+    return json({ ok: true, task: data })
+  } catch (err) {
+    console.error('task-create 失敗:', err)
+    return json({ error: String(err.message || err) }, 500)
+  }
+}
+
+// PATCH /api/tasks — タスクの担当者・期限・留意事項・タイトルの編集。ログイン必須。
+// フロントの anon キーは status 列しか更新できないため、その他の列は service role 経由で更新する。
+async function handleTaskUpdate(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const payload = await req.json().catch(() => null)
+    if (!payload || typeof payload !== 'object') {
+      return json({ error: 'JSON ボディが必要です' }, 400)
+    }
+    const id = typeof payload.id === 'string' ? payload.id : ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const fields = {}
+    if (typeof payload.assignee === 'string' && payload.assignee.trim()) {
+      fields.assignee = payload.assignee.trim()
+    }
+    if (typeof payload.title === 'string' && payload.title.trim()) {
+      fields.title = payload.title.trim().slice(0, 120)
+    }
+    if ('remarks' in payload) {
+      fields.remarks =
+        typeof payload.remarks === 'string' && payload.remarks.trim() ? payload.remarks.trim() : null
+    }
+    if ('due_date' in payload) {
+      const d = normalizeDueDate(payload.due_date)
+      if (d !== undefined) fields.due_date = d
+    }
+    if (Object.keys(fields).length === 0) {
+      return json({ error: '更新できる項目がありません' }, 400)
+    }
+
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) return json({ error: `更新に失敗しました: ${error.message}` }, 500)
+    return json({ ok: true, task: data })
+  } catch (err) {
+    console.error('task-update 失敗:', err)
+    return json({ error: String(err.message || err) }, 500)
+  }
+}
+
 export default {
   async fetch(req, env) {
     const { pathname } = new URL(req.url)
@@ -134,6 +254,11 @@ export default {
       return req.method === 'PUT' || req.method === 'POST'
         ? handleSettings(req)
         : json({ error: 'Method Not Allowed' }, 405)
+    }
+    if (pathname === '/api/tasks') {
+      if (req.method === 'POST') return handleTaskCreate(req)
+      if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
+      return json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname.startsWith('/api/')) {
       return json({ error: 'Not Found' }, 404)

@@ -89,8 +89,43 @@
   transition: background var(--transition), border-color var(--transition);
 }
 
+/* 「対応中」列は既定の混色だと暗くなるため、視認性の高い薄い黄色にする */
+.kanban-column[data-status='対応中'] {
+  background: #fdf6cf;
+}
+
 /* ドラッグ中のカードが列に重なったときのフィードバック */
 .kanban-column.is-over {
+  background: var(--color-primary-weak);
+  border-color: var(--color-primary);
+}
+
+/* 列ヘッダー右側（＋ボタンと件数） */
+.kanban-column-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 未処理列の「＋」（タスク手動登録）ボタン */
+.kanban-column-add {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.kanban-column-add:hover {
   background: var(--color-primary-weak);
   border-color: var(--color-primary);
 }
@@ -206,6 +241,12 @@
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+}
+
+/* 担当者が未設定のタスクはオレンジで警告表示する */
+.task-card-assignee.is-unassigned {
+  color: var(--due-soon);
+  font-weight: 700;
 }
 
 .avatar {
@@ -456,6 +497,119 @@
   background: #33604d;
   color: #fff;
   border-color: #33604d;
+}
+
+/* ---------- 詳細画面の編集フォーム（担当者・期限・留意事項） ---------- */
+.task-detail-input {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-surface);
+  max-width: 100%;
+}
+
+.task-detail-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* 未設定の担当者セレクトはオレンジで警告 */
+select.task-detail-input.is-unassigned {
+  border-color: var(--due-soon);
+  color: var(--due-soon);
+  font-weight: 700;
+}
+
+.task-detail-warn {
+  margin-left: var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--due-soon);
+  white-space: nowrap;
+}
+
+.task-detail-remarks {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.task-detail-edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.task-detail-save-error {
+  font-size: 13px;
+  color: var(--due-overdue);
+}
+
+.task-detail-save-ok {
+  font-size: 13px;
+  color: var(--status-done);
+  font-weight: 600;
+}
+
+/* ---------- タスク手動登録フォーム ---------- */
+.task-form-modal {
+  padding-bottom: var(--space-5);
+}
+
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.task-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.task-form-field input,
+.task-form-field select,
+.task-form-field textarea {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  width: 100%;
+}
+
+.task-form-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.task-form-field input:focus,
+.task-form-field select:focus,
+.task-form-field textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.task-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 /* ---------- レスポンシブ: 狭い画面は横スクロール ---------- */

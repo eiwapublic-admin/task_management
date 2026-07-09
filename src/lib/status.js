@@ -3,6 +3,10 @@
 
 export const STATUS_LIST = ['未処理', '返信済み', '対応中', '完了']
 
+// 担当者を特定できないタスクに設定するプレースホルダー。
+// この値のタスクは画面上でオレンジの警告表示にする。
+export const UNASSIGNED = '（担当未設定）'
+
 export const STATUS_META = {
   未処理: { color: 'var(--status-todo)', description: '新規に登録された未対応のタスク' },
   返信済み: { color: 'var(--status-replied)', description: '共有アドレスから返信済み' },
