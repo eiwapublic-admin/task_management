@@ -2,7 +2,7 @@ import { useState } from 'react'
 import TaskCard from './TaskCard'
 import { STATUS_META } from '../lib/status'
 
-export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCardClick }) {
+export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCardClick, onAdd }) {
   const [isOver, setIsOver] = useState(false)
   const accent = STATUS_META[status]?.color
 
@@ -15,6 +15,7 @@ export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCar
     <section
       className={`kanban-column${isOver ? ' is-over' : ''}`}
       style={{ '--column-accent': accent }}
+      data-status={status}
       aria-label={`${status}（${tasks.length}件）`}
       onDragOver={(e) => {
         e.preventDefault()
@@ -31,7 +32,20 @@ export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCar
           <span className="kanban-column-dot" style={{ background: accent }} aria-hidden="true" />
           {status}
         </span>
-        <span className="kanban-column-count">{tasks.length}</span>
+        <span className="kanban-column-header-right">
+          {onAdd && (
+            <button
+              type="button"
+              className="kanban-column-add"
+              onClick={onAdd}
+              aria-label="タスクを手動で追加"
+              title="タスクを手動で追加"
+            >
+              ＋
+            </button>
+          )}
+          <span className="kanban-column-count">{tasks.length}</span>
+        </span>
       </div>
       <div className="kanban-column-body">
         {tasks.map((task) => (

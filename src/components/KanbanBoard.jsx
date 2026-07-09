@@ -2,12 +2,22 @@ import { useMemo, useState } from 'react'
 import KanbanColumn from './KanbanColumn'
 import FilterBar from './FilterBar'
 import TaskDetail from './TaskDetail'
+import TaskForm from './TaskForm'
 import { STATUS_LIST } from '../lib/status'
 import './KanbanBoard.css'
 
-export default function KanbanBoard({ tasks, assignees, onStatusChange, userName, sharedGmail }) {
+export default function KanbanBoard({
+  tasks,
+  assignees,
+  onStatusChange,
+  onCreateTask,
+  onUpdateTask,
+  userName,
+  sharedGmail,
+}) {
   const [selectedAssignee, setSelectedAssignee] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
+  const [showForm, setShowForm] = useState(false)
 
   const filteredTasks = useMemo(() => {
     if (!selectedAssignee) return tasks
@@ -31,6 +41,14 @@ export default function KanbanBoard({ tasks, assignees, onStatusChange, userName
     setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, status } : prev))
   }
 
+  // 詳細画面での編集保存。保存後は最新のタスク内容でモーダル表示も更新する。
+  async function handleUpdateTask(id, values) {
+    const updated = await onUpdateTask(id, values)
+    if (updated) {
+      setSelectedTask((prev) => (prev && prev.id === id ? { ...prev, ...updated } : prev))
+    }
+  }
+
   return (
     <div className="kanban-board">
       <div className="kanban-toolbar">
@@ -50,6 +68,7 @@ export default function KanbanBoard({ tasks, assignees, onStatusChange, userName
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onCardClick={setSelectedTask}
+            onAdd={status === '未処理' && onCreateTask ? () => setShowForm(true) : undefined}
           />
         ))}
       </div>
@@ -58,7 +77,16 @@ export default function KanbanBoard({ tasks, assignees, onStatusChange, userName
         onClose={() => setSelectedTask(null)}
         onStatusChange={handleStatusChange}
         sharedGmail={sharedGmail}
+        assignees={assignees}
+        onUpdateTask={onUpdateTask ? handleUpdateTask : undefined}
       />
+      {showForm && (
+        <TaskForm
+          assignees={assignees}
+          onClose={() => setShowForm(false)}
+          onCreate={onCreateTask}
+        />
+      )}
     </div>
   )
 }

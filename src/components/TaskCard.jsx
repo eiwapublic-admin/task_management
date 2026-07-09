@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
+import { UNASSIGNED } from '../lib/status'
 
 // カードに表示する送信元。Claude が抽出した会社名・氏名（sender_display）を優先し、
 // 無い場合は From ヘッダーの表示名（"名前 <mail@...>" の名前部分）にフォールバックする。
@@ -13,6 +14,7 @@ function senderLabel(task) {
 export default function TaskCard({ task, onDragStart, onClick }) {
   const [subjectOpen, setSubjectOpen] = useState(false)
   const due = dueStatus(task.due_date)
+  const isUnassigned = task.assignee === UNASSIGNED
 
   function handleKeyDown(e) {
     // カード全体をキーボードで開けるようにする（Enter / Space）
@@ -38,9 +40,13 @@ export default function TaskCard({ task, onDragStart, onClick }) {
       {senderLabel(task) && <div className="task-card-sender">{senderLabel(task)}</div>}
 
       <div className="task-card-meta">
-        <span className="task-card-assignee">
-          <span className="avatar" style={{ background: assigneeColor(task.assignee) }} aria-hidden="true">
-            {assigneeInitial(task.assignee)}
+        <span className={`task-card-assignee${isUnassigned ? ' is-unassigned' : ''}`}>
+          <span
+            className="avatar"
+            style={{ background: isUnassigned ? 'var(--due-soon)' : assigneeColor(task.assignee) }}
+            aria-hidden="true"
+          >
+            {isUnassigned ? '!' : assigneeInitial(task.assignee)}
           </span>
           {task.assignee}
         </span>

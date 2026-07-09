@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import { getCurrentUser, logout } from '../lib/auth'
 import { fetchTasks, fetchSettings, updateTaskStatus, logStatusChange } from '../lib/tasks'
-import { runFetch } from '../lib/api'
+import { runFetch, createTask, updateTask } from '../lib/api'
 import { formatDateTime } from '../lib/format'
 import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
+
+// バックエンドの取り込み処理を画面に反映するための自動更新間隔（ミリ秒）。
+// 取得処理の完了を正確に検知するのは難しいため、一定間隔での再取得と
+// タブ復帰時の再取得で最新状態に追従する。
+const AUTO_REFRESH_MS = 5 * 60 * 1000
 
 // settings.api_credit_alert（JSON文字列 or 空）を解釈してメッセージを返す
 function parseCreditAlert(raw) {
@@ -43,9 +48,13 @@ export default function Dashboard() {
   const [sharedGmail, setSharedGmail] = useState('')
   const navigate = useNavigate()
   const user = getCurrentUser()
+  // 楽観的更新中のステータス書き込み件数。0 より大きい間は自動更新をスキップし、
+  // 未確定の変更が背景の再取得で巻き戻されるのを防ぐ。
+  const pendingWrites = useRef(0)
 
-  const load = useCallback(async () => {
-    setError('')
+  const load = useCallback(async ({ silent = false } = {}) => {
+    // 手動反映（silent=false）以外ではエラー表示をクリアしない
+    if (!silent) setError('')
     try {
       const [taskList, settings] = await Promise.all([fetchTasks(), fetchSettings()])
       setTasks(taskList)
@@ -54,7 +63,7 @@ export default function Dashboard() {
       setCreditAlert(parseCreditAlert(settings.api_credit_alert))
       setSharedGmail(settings.shared_gmail || '')
     } catch (err) {
-      setError(err.message)
+      if (!silent) setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -64,10 +73,30 @@ export default function Dashboard() {
     load()
   }, [load])
 
+  // 自動更新: 一定間隔での再取得 + タブ復帰時の再取得（C2）。
+  // 未確定のステータス変更がある間や手動取得中はスキップする。
+  useEffect(() => {
+    function silentRefresh() {
+      if (pendingWrites.current > 0) return
+      if (document.hidden) return
+      load({ silent: true })
+    }
+    const timer = setInterval(silentRefresh, AUTO_REFRESH_MS)
+    function onVisible() {
+      if (!document.hidden) silentRefresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [load])
+
   async function handleStatusChange(task, status) {
     const prev = tasks
     // 楽観的更新: 先に画面を更新し、失敗したら戻す
     setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, status } : t)))
+    pendingWrites.current += 1
     try {
       await updateTaskStatus(task.id, status)
       // ログの記録失敗はステータス変更自体には影響させない
@@ -75,7 +104,27 @@ export default function Dashboard() {
     } catch (err) {
       setTasks(prev)
       setError(err.message)
+    } finally {
+      pendingWrites.current -= 1
     }
+  }
+
+  // タスクの手動登録（未処理列の「＋」から）。登録後に一覧を再取得する。
+  async function handleCreateTask(values) {
+    const res = await createTask(values)
+    await load()
+    return res.task
+  }
+
+  // 詳細画面での担当者・期限・留意事項の編集保存。更新後のタスクを返す。
+  async function handleUpdateTask(id, values) {
+    const res = await updateTask(id, values)
+    // 楽観的にローカルへ反映しつつ、確定値で一覧を再取得する
+    if (res.task) {
+      setTasks((list) => list.map((t) => (t.id === id ? { ...t, ...res.task } : t)))
+    }
+    load({ silent: true })
+    return res.task
   }
 
   async function handleRunFetch() {
@@ -168,6 +217,8 @@ export default function Dashboard() {
           tasks={tasks}
           assignees={assignees}
           onStatusChange={handleStatusChange}
+          onCreateTask={handleCreateTask}
+          onUpdateTask={handleUpdateTask}
           userName={user?.display_name}
           sharedGmail={sharedGmail}
         />

@@ -27,3 +27,13 @@ export function runFetch() {
 export function saveSettings(values) {
   return authFetch('/api/settings', { method: 'PUT', body: JSON.stringify(values) })
 }
+
+// タスクを手動で新規登録する（/api/tasks）。作成したタスクを返す。
+export function createTask(values) {
+  return authFetch('/api/tasks', { method: 'POST', body: JSON.stringify(values) })
+}
+
+// タスクの担当者・期限・留意事項などを更新する（/api/tasks）。更新後のタスクを返す。
+export function updateTask(id, values) {
+  return authFetch('/api/tasks', { method: 'PATCH', body: JSON.stringify({ id, ...values }) })
+}

@@ -32,6 +32,8 @@
 5. タスク詳細に「メール参照」（Gmail を開く）「返信」（mailto、TO=返信先 / CC=if@eiwa-up.jp 固定・元メール引用付き）を追加
 6. 操作ログ（activity_logs テーブル + /logs 画面）を追加。メール取得結果とステータス変更を実行者付きで記録
 7. 返信検知を2方式に拡張（件名ベース + スレッドベース、自社ドメイン `company_domains` 発も検知）。返信検知時はタスク本文を返信内容で置き換え、判定理由に追記。誤検知ガード（元メッセージ自体・元差出人の追加送信は除外）も導入済み
+8. UI・運用の改善（2026-07-09）: 「対応中」列を薄い黄色に / 画面の自動更新（5分間隔 + タブ復帰時。バックエンド取り込み後の再読込を明示操作なしで反映）/ 自社→社外への新規送信メールは初めから「返信済み」で登録 / 担当者を特定できない場合は先頭担当者ではなく「（担当未設定）」にしてオレンジ警告表示
+9. 機能追加（2026-07-09）: タスクの手動登録（未処理列の「＋」ボタン）/ 自動登録分を含む担当者・期限の編集（詳細画面）/ 「留意事項」フィールド（`tasks.remarks`）を詳細画面で入力可能に
 
 ---
 
@@ -82,6 +84,13 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 
 ### DB スキーマ変更
 `supabase/schema.sql` を更新（IaC として正を維持）し、同じ SQL を Supabase の SQL Editor か MCP の migration で適用する。
+- 直近の追加列: `tasks.remarks`（留意事項。詳細画面で手動入力。マイグレーション `add_remarks_to_tasks` 適用済み）
+
+### タスクの手動登録・編集 API（Worker）
+- フロントの anon キーは RLS で **status 列の更新のみ**許可。担当者・期限・留意事項の編集や手動登録は Worker の `/api/tasks`（service role）経由で行う。
+  - `POST /api/tasks`: 手動登録（未処理列の「＋」）。`gmail_thread_id`/`gmail_message_id` は `manual:<uuid>`、`source='manual'`
+  - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` を更新
+- いずれもログイン必須（JWT）。
 
 ---
 

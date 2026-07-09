@@ -8,6 +8,11 @@ const MAX_MESSAGES = 40
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 
+// 担当者を特定できないときに設定する既定値。
+// 以前は先頭の担当者（橋口）を既定にしていたが、未判定であることを
+// 画面上で警告表示できるよう、専用のプレースホルダーに変更した。
+const UNASSIGNED = '（担当未設定）'
+
 function todayJST() {
   // en-CA ロケールは YYYY-MM-DD 形式を返す
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
@@ -34,11 +39,18 @@ function parseAssignees(raw) {
 
 const DUE_RE = /^\d{4}-\d{2}-\d{2}$/
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
+const EMAIL_RE_G = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
 
 // 文字列から最初のメールアドレスを取り出す（"名前 <a@b.jp>" 形式にも対応）
 function extractEmail(str) {
   const m = typeof str === 'string' ? str.match(EMAIL_RE) : null
   return m ? m[0] : null
+}
+
+// 文字列に含まれるメールアドレスをすべて小文字で取り出す（To/Cc の複数宛先用）
+function extractEmails(str) {
+  const m = typeof str === 'string' ? str.match(EMAIL_RE_G) : null
+  return m ? m.map((s) => s.toLowerCase()) : []
 }
 
 function emailDomain(addr) {
@@ -258,15 +270,25 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         continue
       }
 
-      // 担当者の正規化（不明・範囲外は既定担当=先頭の担当者に）
+      // 担当者の正規化（不明・範囲外は「（担当未設定）」にして画面で警告表示させる）
       let assignee = result.assignee
-      if (!assignee || !assignees.includes(assignee)) assignee = assignees[0]
+      if (!assignee || !assignees.includes(assignee)) assignee = UNASSIGNED
 
       const dueDate = typeof result.due_date === 'string' && DUE_RE.test(result.due_date)
         ? result.due_date
         : null
 
       const title = (result.title || email.subject || '（件名なし）').slice(0, 120)
+
+      // 自社の社員が社外の宛先へ新規に送ったメールは、こちらから既に連絡済みのため
+      // 初めから「返信済み」で登録する。差出人が自社（共有アドレス/自社ドメイン）かつ
+      // 宛先(To/Cc)に社外アドレスを含むものが該当する。
+      // フォーム経由の問い合わせ（差出人は自社ドメインだが宛先は共有アドレス=社内）は
+      // 社外宛先を含まないため対象外になる。
+      const recipientEmails = extractEmails(`${email.to || ''} ${email.cc || ''}`)
+      const isOutbound =
+        isCompanyAddress(fromEmail) && recipientEmails.some((a) => !isCompanyAddress(a))
+      const initialStatus = isOutbound ? '返信済み' : '未処理'
 
       // 送信元の会社・氏名（Claude が件名/本文から抽出。フォーム経由は本文優先）
       const senderDisplay =
@@ -279,12 +301,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const senderEmail =
         extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
 
+      const outboundNote = isOutbound
+        ? '自社から社外への新規送信メールのため、初めから「返信済み」で登録しました。'
+        : null
+      const classificationNote = [result.reason || null, outboundNote].filter(Boolean).join('\n') || null
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
         title,
         assignee,
-        status: '未処理',
+        status: initialStatus,
         due_date: dueDate,
         sender: email.from || '（不明）',
         sender_display: senderDisplay,
@@ -292,7 +319,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         subject: email.subject || '（件名なし）',
         body_preview: compactBody(email.body).slice(0, 500),
         received_at: email.receivedAt || new Date().toISOString(),
-        classification_note: result.reason || null,
+        classification_note: classificationNote,
       })
 
       if (insertError) {
@@ -375,8 +402,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
           const key = `cal:${ev.id}`
           if (existingThreads.has(key)) continue
           const desc = compactBody(stripHtml(ev.description))
-          // 詳細に「担当：〜」があれば担当者に採用。無ければ既定担当（先頭）
-          const assignee = extractCalendarAssignee(desc) || assignees[0]
+          // 詳細に「担当：〜」があれば担当者に採用。無ければ「（担当未設定）」
+          const assignee = extractCalendarAssignee(desc) || UNASSIGNED
           const { error: calErr } = await supabase.from('tasks').insert({
             gmail_thread_id: key,
             gmail_message_id: ev.id,
