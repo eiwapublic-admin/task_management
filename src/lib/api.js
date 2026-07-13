@@ -1,4 +1,4 @@
-import { getToken } from './auth'
+import { getToken, logout } from './auth'
 
 // Worker の API（/api/*）への認証付きリクエスト用ヘルパー。
 async function authFetch(path, options = {}) {
@@ -11,6 +11,17 @@ async function authFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   })
+
+  // 認証切れ（トークン期限切れ等）。UI 上はログイン中でもサーバー側で 401 になる。
+  // 混乱を招く「認証が必要です」で行き止まりにせず、セッションを破棄してログイン画面へ誘導する。
+  if (res.status === 401) {
+    logout()
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login?expired=1')
+    }
+    throw new Error('セッションの有効期限が切れました。再度ログインしてください。')
+  }
+
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     throw new Error(data.error || `リクエストに失敗しました (${res.status})`)
