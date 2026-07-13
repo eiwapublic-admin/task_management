@@ -119,9 +119,11 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 
 ---
 
-## 5. 会社アカウントへの移管手順（未実施）
+## 5. 会社アカウントへの移管（完了）
 
-コード変更は不要。以下の載せ替えのみ。
+2026-07-13 完了。運用は会社の各アカウント（GitHub `eiwapublic-admin` / Cloudflare / Supabase `Eiwapublic Project` / Gmail `eiwa.public@gmail.com` / Anthropic）で稼働しており、開発・運用に用いる Claude アカウントも同日に会社アカウント（`eiwa.public@gmail.com`）へ乗り換え済み。以降、外部アカウントへの載せ替え作業は不要。
+
+（参考）別アカウントへ改めて載せ替える場合の手順。コード変更は不要で、以下の差し替えのみ。
 
 1. **GitHub**: リポジトリを会社 org へ移管（Actions の Secrets は移管先で再登録）
 2. **Cloudflare**: 会社アカウントで API トークン/アカウント ID を発行し Secrets を差し替え → Deploy 実行（新アカウント側に Worker が作られる。URL のサブドメインが変わる点に注意）
@@ -136,5 +138,5 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - [x] GitHub Secrets の `VITE_SUPABASE_URL` / `SUPABASE_URL` を正しい URL に修正（2026-07-06 対応済み）
 - [ ] 実運用での振り分け精度を見ながら org_context を調整
 - [ ] 返信検知の精度を実運用で観察（誤検知・検知漏れがあれば操作ログとタスクの「AI判定の理由」を手がかりに調整）
-- [ ] 会社アカウントへの移管（上記 5 章）
+- [x] 会社アカウントへの移管（2026-07-13 完了。上記 5 章）
 - [ ] （任意）ロゴを原本の配色で使いたい場合は `public/logo.svg` を差し替え（原本の枠線版は `public/logo_black.svg` に保管済み）
