@@ -27,8 +27,9 @@ async function importKey(secret) {
   )
 }
 
-// payload に iat / exp（秒）を付与して署名する。expiresInSeconds 既定は7日。
-export async function signJwt(payload, secret, expiresInSeconds = 7 * 24 * 60 * 60) {
+// payload に iat / exp（秒）を付与して署名する。expiresInSeconds 既定は30日。
+// 社内の放置運用ツールのため、頻繁な再ログインを避ける狙いで長めに取る。
+export async function signJwt(payload, secret, expiresInSeconds = 30 * 24 * 60 * 60) {
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'HS256', typ: 'JWT' }
   const body = { ...payload, iat: now, exp: now + expiresInSeconds }

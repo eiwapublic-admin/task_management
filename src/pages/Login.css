@@ -105,3 +105,12 @@
   font-size: 13px;
   margin: var(--space-1) 0 0;
 }
+
+.login-notice {
+  color: var(--color-text-muted, #555);
+  background: var(--color-surface-muted, #f1f5f9);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2);
+}

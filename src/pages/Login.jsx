@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { login } from '../lib/auth'
 import './Login.css'
 
@@ -10,6 +10,9 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // セッション期限切れで authFetch から誘導された場合の案内。
+  const expired = searchParams.get('expired') === '1'
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -31,6 +34,12 @@ export default function Login() {
         <img className="login-logo" src="/logo.svg" alt="栄和ロゴ" />
         <h1>栄和　タスク管理システム</h1>
         <p className="login-subtitle">ログイン</p>
+
+        {expired && (
+          <p className="login-notice" role="status">
+            セッションの有効期限が切れました。再度ログインしてください。
+          </p>
+        )}
 
         <label htmlFor="username">ユーザー名</label>
         <input
