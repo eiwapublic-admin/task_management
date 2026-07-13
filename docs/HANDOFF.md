@@ -1,9 +1,29 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-07-06
+最終更新: 2026-07-13
 設計の詳細は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md) を参照。
 
 ---
+
+## 0. 新しい Claude.ai アカウントで作業を引き継ぐには
+
+**前提**: GitHub / Cloudflare / Supabase / Anthropic / Gmail のアカウントとインフラは**そのまま流用**し、Claude.ai（作業する側）だけ新しいアカウントに切り替えるケース。コードもシークレットも既存のまま動き続けるので、**コード変更・インフラ再構築は不要**。
+
+新アカウントの Claude が会話記憶を引き継ぐことはない。**このリポジトリに書かれた内容だけが引き継ぎの手段**なので、再開時は次の順に進める。
+
+1. **MCP コネクターを再連携する**（claude.ai のコネクター設定で Authorize）
+   - **GitHub** … リポジトリ `eiwapublic-admin/task_management` へアクセスするため（必須）
+   - **Cloudflare** … Worker `task-management` の確認・運用のため
+   - **Supabase** … プロジェクト `Eiwapublic Project`（ref `pfiogfdnbctunkhslmcp`）の DB 参照・マイグレーションのため
+   - （任意）**Google Calendar** … カレンダー連携を触る場合のみ
+2. **最初に読むドキュメント**（この順で読めば全体像を把握できる）
+   - 本書 `docs/HANDOFF.md`（現在地・運用・デプロイ・障害知見）
+   - `docs/task-management-spec-cloudflare.md`（設計の詳細）
+3. **ローカル clone のリモートを確認する**: `git remote -v` が `eiwapublic-admin/task_management` を指していること。別アカウントを指していたら繋ぎ直す。
+4. **開発ブランチ運用**: `main` へ直接コミットせず、`claude/<作業名>` ブランチで開発 → PR → **main へマージすると GitHub Actions が本番へ自動デプロイ**（ビルド → wrangler deploy → シークレット同期。§3参照）。
+5. **シークレットの実体は見えない/見なくてよい**: Gmail トークン・API キー等は GitHub Actions Secrets と Worker Secrets に保管済みで、そのまま動く。新 Claude から値を読む必要はない（必要なのは「どの Secret が要るか」の一覧＝§3の表だけ）。
+
+> 参考: インフラ自体を別アカウントへ**移管**したい場合は本書 §5（会社アカウントへの移管手順）を参照。本節（§0）とは別シナリオ。
 
 ## 1. 現在の状態
 
