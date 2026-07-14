@@ -15,7 +15,10 @@ export function ReloadPrompt({
   position = 'top',
 } = {}) {
   const [needRefresh, setNeedRefresh] = useState(false)
+  // クリックを即座に認知できるよう「更新中…」表示に切り替えるための状態
+  const [updating, setUpdating] = useState(false)
   const waitingRef = useRef(null)
+  const updatingRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
@@ -58,6 +61,9 @@ export function ReloadPrompt({
     // 初掌握)では hadController=false のため誤リロードしない。
     const onControllerChange = () => {
       if (reloaded || !hadController) return
+      // 手動更新中は handleUpdate 側でリロードするので、ここでは先走らない
+      // （「更新中…」表示を一瞬でも見せてから遷移するため）
+      if (updatingRef.current) return
       reloaded = true
       window.location.reload()
     }
@@ -75,6 +81,22 @@ export function ReloadPrompt({
     position === 'top'
       ? { top: 0, paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }
       : { bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }
+
+  const handleUpdate = () => {
+    if (updatingRef.current) return
+    // クリックを即座に認知できるよう、まず「更新中…」表示に切り替える。
+    updatingRef.current = true
+    setUpdating(true)
+    // 待機中の新 SW に SKIP_WAITING を投げる(ベストエフォート)
+    try {
+      waitingRef.current?.postMessage({ type: 'SKIP_WAITING' })
+    } catch {
+      /* 失敗してもリロードする */
+    }
+    // 「更新中…」を一瞬描画させてからリロードする（同期リロードだと無反応に見えるため）。
+    // この SW はキャッシュしないので、リロード＝最新版取得。
+    window.setTimeout(() => window.location.reload(), 250)
+  }
 
   return (
     <div
@@ -106,41 +128,38 @@ export function ReloadPrompt({
         <span>{message}</span>
         <button
           type="button"
-          onClick={() => {
-            // iOS Safari(standalone)では controllerchange や非同期処理が確実に動かない
-            // ことがあるため、最小限かつ同期的に処理する:
-            //   1) 待機中の新 SW に SKIP_WAITING を投げる(ベストエフォート)
-            //   2) 直ちにリロード。この SW はキャッシュしないので、リロード＝最新版取得。
-            try {
-              waitingRef.current?.postMessage({ type: 'SKIP_WAITING' })
-            } catch {
-              /* 失敗してもリロードする */
-            }
-            window.location.reload()
-          }}
+          onClick={handleUpdate}
+          disabled={updating}
+          aria-busy={updating}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
             borderRadius: 8,
             border: 'none',
-            background: accentColor,
-            color: '#fff',
+            // 押下直後に「更新中…」＝濃い色＋少し沈んだ見た目にして、クリックを明確に認知させる
+            background: updating ? '#0f2a20' : accentColor,
+            color: updating ? 'rgba(255,255,255,0.85)' : '#fff',
             padding: '10px 18px',
             minHeight: 40,
+            minWidth: 96,
+            justifyContent: 'center',
             fontSize: 15,
             fontWeight: 700,
-            cursor: 'pointer',
+            cursor: updating ? 'default' : 'pointer',
+            transform: updating ? 'scale(0.96)' : 'none',
+            transition: 'transform 90ms ease, background 90ms ease',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'rgba(255,255,255,0.3)',
           }}
         >
-          {buttonLabel}
+          {updating ? '更新中…' : buttonLabel}
         </button>
         <button
           type="button"
           onClick={() => setNeedRefresh(false)}
           aria-label="閉じる"
+          disabled={updating}
           style={{
             border: 'none',
             background: 'transparent',
@@ -149,7 +168,8 @@ export function ReloadPrompt({
             minHeight: 40,
             fontSize: 18,
             lineHeight: 1,
-            cursor: 'pointer',
+            cursor: updating ? 'default' : 'pointer',
+            opacity: updating ? 0.4 : 1,
             touchAction: 'manipulation',
           }}
         >
