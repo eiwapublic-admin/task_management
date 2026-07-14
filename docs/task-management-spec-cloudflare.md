@@ -1,6 +1,6 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-06
+最終更新: 2026-07-14
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
 
 > 旧設計書 `task-management-spec.md`（Netlify 版）は初期計画の記録として残す。
@@ -33,7 +33,8 @@
 | 定期実行 | Cloudflare Cron Triggers | `*/5 * * * *`（5分ごとに起動、実処理は設定でゲート） |
 | メール取得 | Gmail API (OAuth 2.0 リフレッシュトークン) | scope: gmail.readonly |
 | AI 処理 | Claude API (`claude-haiku-4-5`) | 環境変数 `CLAUDE_MODEL` で変更可 |
-| 認証 | カスタム認証（bcrypt + HS256 JWT） | JWT は Web Crypto による自前実装 |
+| 認証 | カスタム認証（bcrypt + HS256 JWT） | JWT は Web Crypto による自前実装。有効期限30日 |
+| PWA | 自前の最小 Service Worker（キャッシュなし） | 更新通知バナー・ロゴタップ最新化。ビルド時に `public/sw.js` を生成 |
 | CI/CD | GitHub Actions + wrangler-action | main への push で自動デプロイ |
 
 ### Netlify 版からの主な変更点
@@ -55,19 +56,26 @@ worker/
 ├── index.js            Worker 本体（fetch: /api/* ルーティング＋静的配信 / scheduled: Cron）
 └── lib/
     ├── pipeline.js     取得〜分類〜保存〜返信検知〜利用量集計の一括パイプライン
-    ├── gmail.js        Gmail API 軽量クライアント（fetch 直叩き・依存なし）
+    ├── gmail.js        Gmail API 軽量クライアント（fetch 直叩き・依存なし。添付一覧/取得を含む）
+    ├── calendar.js     Google カレンダー API クライアント（当日イベント取得）
     ├── anthropic.js    Claude API クライアント（分類プロンプト・JSON抽出・課金エラー検知）
     ├── supabase-admin.js  service role クライアント（URL不正時はフォールバック）
     ├── jwt.js          HS256 JWT の署名・検証（Web Crypto）
     └── http.js         JSONレスポンス・Bearer トークン検証ヘルパー
 src/
-├── pages/              Login / Dashboard（カンバン）/ Settings
+├── pages/              Login / Dashboard（カンバン）/ Settings / Logs
 ├── components/         KanbanBoard, KanbanColumn, TaskCard, TaskDetail,
-│                       FilterBar, SettingsPanel, UsagePanel
-└── lib/                supabase(anon), auth, api, tasks, format, status, pricing
+│                       TaskForm, FilterBar, SettingsPanel, UsagePanel
+├── pwa/                ReloadPrompt.jsx（更新バナー）, reloadApp.js（ロゴタップ最新化）
+└── lib/                supabase(anon), auth, api, tasks, format, status, pricing,
+                        mail, version（ビルド時刻表示）
+scripts/
+└── generate-sw.mjs     ビルド時に public/sw.js を生成（SW_VERSION=git SHA を刻印）
 public/
 ├── logo.svg            栄和ロゴ（原本 logo_black.svg を赤 #c81021 で塗ったもの）
-└── logo_black.svg      ロゴ原本（枠線のみ）
+├── logo_black.svg      ロゴ原本（枠線のみ）
+├── manifest.webmanifest  PWA マニフェスト
+└── sw.js               ★ビルド生成物（gitignore）。最小 Service Worker
 supabase/schema.sql     DB スキーマ（IaC。SQL Editor / migration で適用）
 wrangler.jsonc          Worker 設定（assets / cron / nodejs_compat）
 .github/workflows/
@@ -89,7 +97,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 3. Gmail から新着メールを取得（初回は直近1日分、以降は `last_fetch_at` 以降。1回の上限 40 通）
 4. 既に tasks に存在するスレッドはスキップ。新規メールを Claude API で分類:
    - `is_business_task`: 業務メールか否か（広告・通知・営業は false）
-   - `assignee`: 担当者（settings の3名から。不明時は先頭の担当者）
+   - `assignee`: 担当者（settings の3名から。不明・範囲外は「（担当未設定）」にして画面でオレンジ警告）
    - `due_date`: 期限（「来週末」等の相対表現も JST 基準で YYYY-MM-DD に変換）
    - `title`: タスクタイトル（30字以内で自動生成）
    - `sender_display`: 送信元の会社名・氏名（**問い合わせフォーム経由は本文の記載を優先**）
@@ -132,11 +140,16 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - ログインユーザー名は担当者フィルターと同じ行の右端に大きめ（17px）に表示
 - 4列カンバン（列背景はステータス色を薄く混ぜた濃いめの色）。ステータス名 16px
 - タスクカード: タイトル / 送信元（👤 会社名・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
+- 未処理列のヘッダーに新規タスク手動登録の「＋」ボタン（**青地＋白文字**で強調）
 - 担当者フィルター（チップ、15px）。ドラッグ＆ドロップでステータス変更（anon キーは status 列のみ更新可）
-- タスク詳細モーダル（幅560px）: タイトル+×は固定ヘッダー、最下部は固定フッタ。フッタ左に「ステータス」見出し＋変更ボタン、右に「メール参照」「返信」ボタン
+- タスク詳細モーダル（幅820px・視認性重視で文字は大きめ）: タイトル+×は固定ヘッダー、最下部は固定フッタ。フッタ左に「ステータス」見出し＋変更ボタン、右に「メール参照」「返信」ボタン
+  - 担当者・期限・留意事項（remarks）は詳細画面で編集し「保存」（`PATCH /api/tasks`）。担当者が「（担当未設定）」のときはオレンジで警告
+  - **添付ファイル**（メール由来タスクのみ）: 開いた時に元メールの添付一覧を Gmail から取得。ありなら「📎 添付あり」バッジ＋ファイル名・サイズ・[ダウンロード]ボタンを表示。ダウンロードは Worker 経由で取得（後述 4-5）
   - **メール参照**: Gmail のウェブ画面で該当メールを開く（`https://mail.google.com/mail/?authuser=<共有アドレス>#all/<gmail_message_id>`。パスに `/u/<アドレス>` を埋め込む形式は 404 になることがあるため authuser クエリを使う。共有アカウントへのログインが必要）
   - **返信**: `mailto:` でメーラーの返信画面を開く。TO=タスクの返信先アドレス（フォーム経由は本文記載のアドレス）、CC=`if@eiwa-up.jp`（固定。同アドレス宛は共有 Gmail にも配信されるため返信検知の対象になる）、本文に元メールを引用
 - クレジット不足時は警告バナー＋「APIクレジットをチャージ」ボタン
+- **アプリ更新バナー**（PWA）: 新バージョン検知時に画面上部へ「新しいバージョンがあります → 更新」を表示（後述 4-6）
+- ヘッダー左のロゴはタップで最新化ボタンを兼ねる。ロゴ横に `ver.YYYY-MM-DD HH:MM`（ビルド時刻・JST）を表示
 
 **操作ログ画面（/logs）**:
 - ヘッダー「操作ログ」+「×」（カンバンへ戻る）。ヘッダーの「ログ」ボタン（メイン画面）から遷移
@@ -152,14 +165,37 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 | メソッド/パス | 認証 | 内容 |
 |---|---|---|
-| POST `/api/login` | 不要 | bcrypt 照合 → HS256 JWT（7日有効）を発行 |
+| POST `/api/login` | 不要 | bcrypt 照合 → HS256 JWT（**30日**有効）を発行 |
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert（service role 経由） |
+| POST `/api/tasks` | JWT | タスクの手動登録（`source='manual'`、id は `manual:<uuid>`） |
+| PATCH `/api/tasks` | JWT | `assignee` / `due_date` / `remarks` / `title` を更新（service role 経由） |
+| GET `/api/attachments` | JWT | 元メールの添付一覧（ファイル名/MIME/サイズ/attachmentId）を返す |
+| GET `/api/attachment` | JWT | 添付本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
-settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`
+- 認証必須 API は `Authorization: Bearer <JWT>` を要求。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）。カンバンのステータス変更は Supabase 直結（anon）で Worker を通らない点に注意
+- settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`
 
 > **実装ノート（カレンダーIDの扱い）**: 「栄和共通」は独立した副カレンダーではなく、共有アカウント `eiwa.public@gmail.com` の**メイン（デフォルト）カレンダーに付けた表示名**だった。メインカレンダーの ID はアカウントのメールアドレスそのもの（`eiwa.public@gmail.com`）であり、`calendarList.list` では表示名ではなくメールアドレス名で返るため「栄和共通」という名前では解決できなかった。このため `calendar_name` にカレンダーID（`eiwa.public@gmail.com`）を直接指定する運用にしている。
+
+### 4-5. 添付ファイル表示・ダウンロード
+
+- メール由来タスクの詳細画面を開くと、`GET /api/attachments` で**元メールの添付一覧をその場で Gmail から取得**して表示する（`gmail.js` が payload を再帰的に辿り、`filename` と `body.attachmentId` を持つパートを抽出。署名等に埋め込まれたインライン画像 = `Content-Disposition: inline` の image/* は除外）。
+- 各ファイルの [ダウンロード] は `GET /api/attachment` を叩き、Worker が Gmail の `messages/{id}/attachments/{attachmentId}` から本体（base64url）を取得してバイト列で返す。フロントは Bearer 付き fetch → Blob 化してダウンロードを起動する。
+- **設計判断**: 添付メタ情報を DB に持たせず取得のたびに Gmail へ問い合わせる方式にした。理由は (1) 既存タスクにも追加改修なしで対応できる、(2) メール取得パイプライン・スキーマに手を入れずリスクを抑えられる、(3) 共有アカウントの認証情報で取得するので担当者個人の Gmail ログインが不要。既存の `gmail.readonly` スコープで動作する。
+
+### 4-6. PWA（アプリ更新の通知・明示的な最新化）
+
+別プロジェクトのスキル `pwa-auto-update` を Vite + React 向けに移植して適用。**キャッシュを一切行わない最小 Service Worker**を採用しているのが要点。
+
+- **Service Worker（`public/sw.js`。`scripts/generate-sw.mjs` がビルド時に生成）**: `fetch` ハンドラを持たず、リクエストを横取りしない。役割は「更新の検知」と「`SKIP_WAITING` による有効化」のみ。`SW_VERSION`（git SHA）を刻印し、デプロイごとに内容が変わることでブラウザが新版を検知する。`activate` 時に旧キャッシュを掃除し `clients.claim()`。
+  - ※ キャッシュ型 SW（`vite-plugin-pwa`/Workbox 等）は Cloudflare 環境でナビゲーション/RSC を横取りして遷移を壊す事例があるため**採用しない**。この SW に fetch/キャッシュ処理を足さないこと。
+- **更新バナー（`src/pwa/ReloadPrompt.jsx`）**: 新版検知時に画面上部へ「新しいバージョンがあります → 更新」を表示。約1分間隔で `registration.update()` をポーリング。更新ボタン押下で `SKIP_WAITING` を送り、「更新中…」表示を約0.8秒見せてからリロード（クリックを明確に認知させるため）。本番ビルドのみ描画（`import.meta.env.PROD`）。初回インストール時は自動リロードしないガードあり。
+- **ロゴタップ最新化（`src/pwa/reloadApp.js`）**: ダッシュボード左上のロゴがボタンを兼ね、待機中の新 SW があれば有効化してリロード（iOS 向けの保険タイマー付き）。
+- **表示用バージョン（`src/lib/version.js`）**: `vite.config.js` の `define` でビルド時刻を `__BUILD_TIME__` に埋め込み、ヘッダーに `ver.YYYY-MM-DD HH:MM`（JST）を表示。端末が最新デプロイを取得できているかの確認用（更新“検知”は SW_VERSION が担い、この表示値とは独立）。
+- **マニフェスト（`public/manifest.webmanifest`）**: ホーム画面追加用。theme_color=#33604d。`index.html` に manifest link・apple-touch-icon・`viewport-fit=cover` を追加。
+- `npm run build` は `node scripts/generate-sw.mjs && vite build`。`public/sw.js` は生成物のため gitignore。
 
 ---
 
@@ -182,8 +218,11 @@ settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `activ
 | sender_email | text | 返信先アドレス（フォーム経由は本文記載を優先） |
 | source | text | 取得元。`email`（Gmail）/ `calendar`（Google カレンダー）。既定 email |
 | subject / body_preview | text | body_preview は先頭500字 |
+| remarks | text | 留意事項。詳細画面で手動入力（マイグレーション `add_remarks_to_tasks`） |
 | classification_note | text | AI の判定理由 |
 | received_at / created_at / updated_at | timestamptz | updated_at はトリガーで自動更新 |
+
+> 添付ファイルは DB に保持しない（詳細画面を開くたびに Gmail から取得。4-5 参照）。手動登録タスクは `source='manual'`、`gmail_thread_id`/`gmail_message_id` が `manual:<uuid>`。
 
 ### settings（key/value）
 `fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `api_credit_alert`, `last_fetch_at`
@@ -252,7 +291,8 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 - service role キー・API キー類は Worker シークレットのみに保持し、フロントエンドへは渡さない
 - フロントエンドは anon キー + RLS（読み取りと status 更新のみ）
 - ログインは bcrypt ハッシュ照合。ユーザー不在とパスワード不一致は同一メッセージ（存在推測の防止）
-- JWT は HS256・7日有効。サーバー側で署名検証、クライアント側は exp による自動ログアウトのみ
+- JWT は HS256・**30日**有効。サーバー側で署名検証、クライアント側は exp による自動ログアウト。加えて認証必須 API が 401 を返したらフロントが即ログアウトしてログイン画面へ誘導する
+- 添付ファイル API はログイン必須。共有アカウントの Gmail 認証情報（readonly）で取得し、フロントには渡さない
 - Gmail は readonly スコープ。HTTPS は Cloudflare が終端
 
 ---
