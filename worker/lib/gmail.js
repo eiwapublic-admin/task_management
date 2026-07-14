@@ -94,6 +94,50 @@ function header(payload, name) {
   return h ? h.value : ''
 }
 
+// payload を再帰的に辿って添付ファイルのメタ情報を集める。
+// 実ファイル添付（filename と body.attachmentId を持つ）のみ対象とし、
+// 署名などに埋め込まれたインライン画像（Content-Disposition: inline の image/*）は除外する。
+function collectAttachments(payload, out) {
+  if (!payload) return
+  const filename = payload.filename || ''
+  const attachmentId = payload.body?.attachmentId
+  if (filename && attachmentId) {
+    const disposition = header(payload, 'Content-Disposition').toLowerCase()
+    const isInline = disposition.startsWith('inline')
+    const isImage = (payload.mimeType || '').startsWith('image/')
+    if (!(isInline && isImage)) {
+      out.push({
+        filename,
+        mimeType: payload.mimeType || 'application/octet-stream',
+        size: payload.body?.size || 0,
+        attachmentId,
+      })
+    }
+  }
+  for (const part of payload.parts || []) collectAttachments(part, out)
+}
+
+export function extractAttachments(payload) {
+  const out = []
+  collectAttachments(payload || {}, out)
+  return out
+}
+
+// 1 通のメッセージの添付ファイル一覧（メタ情報のみ）を返す。
+export async function getMessageAttachments(accessToken, id) {
+  const msg = await apiGet(accessToken, `/messages/${encodeURIComponent(id)}?format=full`)
+  return extractAttachments(msg.payload || {})
+}
+
+// 添付ファイルの実体（base64url 文字列）とサイズを返す。
+export async function getAttachmentData(accessToken, messageId, attachmentId) {
+  const data = await apiGet(
+    accessToken,
+    `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`
+  )
+  return { data: data.data || '', size: data.size || 0 }
+}
+
 // 1 通のメッセージを取得し、扱いやすい形に整形して返す。
 export async function getMessage(accessToken, id) {
   const msg = await apiGet(accessToken, `/messages/${id}?format=full`)
