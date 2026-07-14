@@ -1,6 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-07-06
+最終更新: 2026-07-14
 設計の詳細は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md) を参照。
 
 ---
@@ -34,6 +34,10 @@
 7. 返信検知を2方式に拡張（件名ベース + スレッドベース、自社ドメイン `company_domains` 発も検知）。返信検知時はタスク本文を返信内容で置き換え、判定理由に追記。誤検知ガード（元メッセージ自体・元差出人の追加送信は除外）も導入済み
 8. UI・運用の改善（2026-07-09）: 「対応中」列を薄い黄色に / 画面の自動更新（5分間隔 + タブ復帰時。バックエンド取り込み後の再読込を明示操作なしで反映）/ 自社→社外への新規送信メールは初めから「返信済み」で登録 / 担当者を特定できない場合は先頭担当者ではなく「（担当未設定）」にしてオレンジ警告表示
 9. 機能追加（2026-07-09）: タスクの手動登録（未処理列の「＋」ボタン）/ 自動登録分を含む担当者・期限の編集（詳細画面）/ 「留意事項」フィールド（`tasks.remarks`）を詳細画面で入力可能に
+10. セッション期限切れ対応（2026-07-14）: JWT の有効期限を 7日→**30日**に延長。API が 401 を返したら自動でログアウトしてログイン画面へ誘導（`/login?expired=1` で案内表示）。従来は「認証が必要です」で行き止まりだった
+11. 詳細画面の視認性向上（2026-07-14）: モーダルを拡大（幅 560→820px）し文字を全体的に大きく。未処理列の新規追加「＋」ボタンを青地＋白文字に
+12. 添付ファイル対応（2026-07-14）: タスク詳細で元メールの添付ファイルを一覧表示（「📎 添付あり」バッジ）し、その場でダウンロード可能に。Worker が共有アカウントの認証情報で Gmail から取得するため、担当者が Gmail に未ログインでも取得できる。**DB 変更なし**（詳細を開くたび Gmail から取得する方式で既存タスクにも対応）
+13. PWA 対応（2026-07-14）: アプリ更新の自動通知バナー / ロゴタップでの明示的な最新化 / ヘッダーのビルド時刻表示（`ver.…`）。キャッシュしない最小 Service Worker（別プロジェクトのスキル `pwa-auto-update` を移植。詳細は下記「アプリの更新（PWA）」）
 
 ---
 
@@ -97,12 +101,24 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
   - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` を更新
 - いずれもログイン必須（JWT）。
 
+### 添付ファイル API（Worker）
+- 元メールの添付ファイルは **DB に保存せず、詳細画面を開くたびに Worker 経由で Gmail から取得**する（既存タスクにも対応・スキーマ変更不要）。
+  - `GET /api/attachments?message_id=…`: 添付の一覧（ファイル名・MIME・サイズ・attachmentId）を返す。署名等のインライン画像は除外
+  - `GET /api/attachment?message_id=…&attachment_id=…&filename=…&mime=…`: 添付本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）
+- いずれもログイン必須（JWT）。共有アカウントの認証情報（既存の `gmail.readonly` スコープ）で取得するため、担当者が Gmail に未ログインでも落とせる。
+
+### PWA / Service Worker
+- `npm run build` は `node scripts/generate-sw.mjs && vite build`。ビルド時に `public/sw.js`（生成物・gitignore）を作り `SW_VERSION`(git SHA) を刻印する。
+- SW は **fetch ハンドラを持たない最小構成**（キャッシュしない）。更新検知と `SKIP_WAITING` のみを担うため、React Router の遷移を壊さない。**この SW に fetch/キャッシュ処理を足さないこと**（足すと遷移破壊・stale の原因）。
+- 関連ファイル: `src/pwa/ReloadPrompt.jsx`（更新バナー）/ `src/pwa/reloadApp.js`（ロゴタップ最新化）/ `public/manifest.webmanifest` / `src/lib/version.js`（`__BUILD_TIME__` を整形表示。`vite.config.js` の `define` で埋め込み）。
+
 ---
 
 ## 4. 障害対応の知見（実際に起きたもの）
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
+| 設定保存やタスク編集で「認証が必要です」（保存できない） | JWT トークンの有効期限切れ。UI 上はログイン状態のままでもサーバー側で 401 になる（カンバンのステータス変更は Supabase 直結なので通り続けるため気づきにくい） | 対応済み（2026-07-14）: 401 で自動ログアウト→ログイン画面へ誘導。TTL も 7日→30日に延長。応急対応は一度ログアウト→再ログイン |
 | 画面が真っ白 | ビルド時の `VITE_SUPABASE_URL` が URL 形式でなく `createClient` が例外 | フォールバック実装済みで再発しない。Secrets の値も正しておく |
 | 「Gmail トークン取得に失敗 (400) invalid_grant」 | リフレッシュトークン失効。**OAuth 同意画面が「テスト」だと7日で失効する** | Google Cloud Console でアプリを「本番」に公開（対応済み）。再発時は OAuth Playground で再取得 → Secret 更新 → Deploy 実行 |
 | デプロイ失敗 error 10215（Secret edit failed） | デプロイの途中キャンセル等で「未デプロイの新バージョン」が残ると、シークレット同期が先に走る構成では自己復旧できない | 対策済み: ワークフローを「deploy → secrets」の2段階化 + `cancel-in-progress: false`。もし再発したら Deploy を再実行すれば直る |
