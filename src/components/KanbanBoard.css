@@ -107,27 +107,29 @@
   gap: var(--space-2);
 }
 
-/* 未処理列の「＋」（タスク手動登録）ボタン */
+/* 未処理列の「＋」（タスク手動登録）ボタン。青塗りで目立たせる */
 .kanban-column-add {
-  border: 1px solid var(--border-strong);
-  background: var(--bg-surface);
-  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
   border-radius: var(--radius-sm);
-  width: 24px;
-  height: 24px;
-  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(37, 99, 235, 0.3));
   transition: background var(--transition), border-color var(--transition);
 }
 
 .kanban-column-add:hover {
-  background: var(--color-primary-weak);
-  border-color: var(--color-primary);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .kanban-column-header {
@@ -340,9 +342,9 @@
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   padding: 0 var(--space-5);
-  width: 680px;
+  width: 820px;
   max-width: 100%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
   position: relative;
   box-shadow: var(--shadow-lg);
@@ -364,7 +366,7 @@
 
 .task-detail-modal h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   color: var(--text-strong);
   line-height: 1.4;
 }
@@ -386,9 +388,9 @@
 
 .task-detail-fields {
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: var(--space-2) var(--space-3);
-  font-size: 13px;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-3) var(--space-4);
+  font-size: 16px;
   margin: var(--space-4) 0;
 }
 
@@ -429,7 +431,7 @@
 }
 
 .task-detail-footer-label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
@@ -450,9 +452,9 @@
 .task-action-btn {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   border: 1px solid var(--border-strong);
@@ -482,7 +484,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-base);
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), color var(--transition);
@@ -502,11 +504,11 @@
 /* ---------- 詳細画面の編集フォーム（担当者・期限・留意事項） ---------- */
 .task-detail-input {
   font-family: inherit;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-base);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-2);
   background: var(--bg-surface);
   max-width: 100%;
 }
@@ -525,7 +527,7 @@ select.task-detail-input.is-unassigned {
 
 .task-detail-warn {
   margin-left: var(--space-2);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--due-soon);
   white-space: nowrap;
@@ -547,14 +549,91 @@ select.task-detail-input.is-unassigned {
 }
 
 .task-detail-save-error {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--due-overdue);
 }
 
 .task-detail-save-ok {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--status-done);
   font-weight: 600;
+}
+
+/* ---------- 添付ファイル ---------- */
+/* タイトル横の「📎 添付あり」バッジ */
+.task-detail-attach-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-3);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-primary-weak);
+  color: var(--color-primary-hover);
+  border: 1px solid var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.task-detail-attach-muted {
+  color: var(--text-muted);
+}
+
+.task-detail-attach-error {
+  color: var(--due-overdue);
+}
+
+.task-detail-attachments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-detail-attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.task-detail-attachment-name {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.task-detail-attachment-size {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.task-detail-attachment-download {
+  margin-left: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.task-detail-attachment-download:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.task-detail-attachment-download:disabled {
+  background: var(--color-primary-disabled);
+  border-color: var(--color-primary-disabled);
+  cursor: default;
 }
 
 /* ---------- タスク手動登録フォーム ---------- */

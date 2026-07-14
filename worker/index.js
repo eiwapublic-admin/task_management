@@ -3,6 +3,7 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
+import { getAccessToken, getMessageAttachments, getAttachmentData } from './lib/gmail.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -240,6 +241,63 @@ async function handleTaskUpdate(req) {
   }
 }
 
+// Gmail のメッセージIDは英数・ハイフン・アンダースコアのみ
+const GMAIL_ID_RE = /^[A-Za-z0-9_-]+$/
+
+// GET /api/attachments?message_id=... — 元メールの添付ファイル一覧（メタ情報）を返す。ログイン必須。
+// 共有アカウントの認証情報で Gmail から取得するため、担当者が Gmail にログインしていなくても参照できる。
+async function handleListAttachments(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const messageId = new URL(req.url).searchParams.get('message_id') || ''
+    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
+    const accessToken = await getAccessToken()
+    const attachments = await getMessageAttachments(accessToken, messageId)
+    return json({ attachments })
+  } catch (err) {
+    console.error('attachments 一覧取得失敗:', err)
+    return json({ error: String(err.message || err) }, 500)
+  }
+}
+
+// base64url 文字列をバイト列に変換する
+function base64UrlToBytes(data) {
+  const normalized = (data || '').replace(/-/g, '+').replace(/_/g, '/')
+  return new Uint8Array(Buffer.from(normalized, 'base64'))
+}
+
+// GET /api/attachment?message_id=..&attachment_id=..&filename=..&mime=.. — 添付ファイル本体を返す。ログイン必須。
+async function handleDownloadAttachment(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const params = new URL(req.url).searchParams
+    const messageId = params.get('message_id') || ''
+    const attachmentId = params.get('attachment_id') || ''
+    const filename = (params.get('filename') || 'attachment').slice(0, 255)
+    const mimeType = params.get('mime') || 'application/octet-stream'
+    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
+    if (!attachmentId) return json({ error: 'attachment_id が必要です' }, 400)
+
+    const accessToken = await getAccessToken()
+    const { data } = await getAttachmentData(accessToken, messageId, attachmentId)
+    const bytes = base64UrlToBytes(data)
+
+    // Content-Disposition のファイル名: ASCII フォールバック + RFC 5987 の UTF-8 指定を併記
+    const asciiName = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_')
+    const encodedName = encodeURIComponent(filename)
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Disposition': `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
+  } catch (err) {
+    console.error('attachment ダウンロード失敗:', err)
+    return json({ error: String(err.message || err) }, 500)
+  }
+}
+
 export default {
   async fetch(req, env) {
     const { pathname } = new URL(req.url)
@@ -259,6 +317,12 @@ export default {
       if (req.method === 'POST') return handleTaskCreate(req)
       if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
       return json({ error: 'Method Not Allowed' }, 405)
+    }
+    if (pathname === '/api/attachments') {
+      return req.method === 'GET' ? handleListAttachments(req) : json({ error: 'Method Not Allowed' }, 405)
+    }
+    if (pathname === '/api/attachment') {
+      return req.method === 'GET' ? handleDownloadAttachment(req) : json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname.startsWith('/api/')) {
       return json({ error: 'Not Found' }, 404)

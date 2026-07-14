@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import { formatDateTime } from '../lib/format'
 import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
+import { listAttachments, downloadAttachment } from '../lib/api'
+
+// バイト数を読みやすい単位にする
+function formatBytes(n) {
+  if (!n || n <= 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
 
 export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask }) {
   const modalRef = useRef(null)
@@ -15,6 +24,13 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  // 添付ファイル（元メールから都度取得）
+  const [attachments, setAttachments] = useState([])
+  const [attLoading, setAttLoading] = useState(false)
+  const [attError, setAttError] = useState('')
+  const [downloadingId, setDownloadingId] = useState('')
+  const [downloadError, setDownloadError] = useState('')
+
   // 対象タスクが切り替わったら編集フォームを初期化する
   useEffect(() => {
     if (!task) return
@@ -23,6 +39,33 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setRemarks(task.remarks || '')
     setSaveError('')
     setSaved(false)
+  }, [task])
+
+  // メール由来のタスクは、開いたときに元メールの添付ファイル一覧を取得する
+  useEffect(() => {
+    setAttachments([])
+    setAttError('')
+    setDownloadError('')
+    setDownloadingId('')
+    if (!task || task.source !== 'email' || !task.gmail_message_id) {
+      setAttLoading(false)
+      return
+    }
+    let cancelled = false
+    setAttLoading(true)
+    listAttachments(task.gmail_message_id)
+      .then((res) => {
+        if (!cancelled) setAttachments(res.attachments || [])
+      })
+      .catch((err) => {
+        if (!cancelled) setAttError(err.message || '添付ファイルの確認に失敗しました')
+      })
+      .finally(() => {
+        if (!cancelled) setAttLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [task])
 
   useEffect(() => {
@@ -102,6 +145,25 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     }
   }
 
+  async function handleDownload(att) {
+    setDownloadingId(att.attachmentId)
+    setDownloadError('')
+    try {
+      await downloadAttachment({
+        messageId: task.gmail_message_id,
+        attachmentId: att.attachmentId,
+        filename: att.filename,
+        mimeType: att.mimeType,
+      })
+    } catch (err) {
+      setDownloadError(err.message || 'ダウンロードに失敗しました')
+    } finally {
+      setDownloadingId('')
+    }
+  }
+
+  const hasAttachments = attachments.length > 0
+
   return (
     <div className="task-detail-overlay" onClick={onClose}>
       <div
@@ -113,7 +175,14 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
         onClick={(e) => e.stopPropagation()}
       >
         <div className="task-detail-header">
-          <h2 id="task-detail-title">{task.title}</h2>
+          <h2 id="task-detail-title">
+            {task.title}
+            {hasAttachments && (
+              <span className="task-detail-attach-badge" title="添付ファイルあり" aria-label="添付ファイルあり">
+                📎 添付あり
+              </span>
+            )}
+          </h2>
           <button className="task-detail-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
@@ -151,6 +220,48 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
           <dd>{task.sender}</dd>
           <dt>件名</dt>
           <dd>{task.subject}</dd>
+          {isEmail && (
+            <>
+              <dt>添付ファイル</dt>
+              <dd>
+                {attLoading && <span className="task-detail-attach-muted">確認中…</span>}
+                {!attLoading && attError && (
+                  <span className="task-detail-attach-error">{attError}</span>
+                )}
+                {!attLoading && !attError && !hasAttachments && (
+                  <span className="task-detail-attach-muted">なし</span>
+                )}
+                {!attLoading && hasAttachments && (
+                  <ul className="task-detail-attachments">
+                    {attachments.map((att) => (
+                      <li key={att.attachmentId} className="task-detail-attachment">
+                        <span className="task-detail-attachment-icon" aria-hidden="true">
+                          📎
+                        </span>
+                        <span className="task-detail-attachment-name">{att.filename}</span>
+                        {att.size > 0 && (
+                          <span className="task-detail-attachment-size">
+                            （{formatBytes(att.size)}）
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="task-detail-attachment-download"
+                          onClick={() => handleDownload(att)}
+                          disabled={downloadingId === att.attachmentId}
+                        >
+                          {downloadingId === att.attachmentId ? '取得中…' : 'ダウンロード'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {downloadError && (
+                  <div className="task-detail-attach-error">{downloadError}</div>
+                )}
+              </dd>
+            </>
+          )}
           <dt>留意事項</dt>
           <dd>
             <textarea
