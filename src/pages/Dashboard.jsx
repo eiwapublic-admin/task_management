@@ -6,6 +6,8 @@ import { fetchTasks, fetchSettings, updateTaskStatus, logStatusChange } from '..
 import { runFetch, createTask, updateTask } from '../lib/api'
 import { formatDateTime } from '../lib/format'
 import { BILLING_URL } from '../lib/pricing'
+import { reloadApp } from '../pwa/reloadApp'
+import { formatBuildTime } from '../lib/version'
 import './Dashboard.css'
 
 // バックエンドの取り込み処理を画面に反映するための自動更新間隔（ミリ秒）。
@@ -160,8 +162,20 @@ export default function Dashboard() {
     <div className="dashboard-page">
       <header className="dashboard-header">
         <div className="dashboard-header-left">
-          <img className="dashboard-logo" src="/logo.svg" alt="栄和ロゴ" />
-          <h1>栄和　タスク管理システム</h1>
+          <button
+            type="button"
+            className="dashboard-logo-button"
+            onClick={() => reloadApp()}
+            aria-label="最新の状態に更新"
+            title="タップで最新の状態に更新"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <img className="dashboard-logo" src="/logo.svg" alt="栄和ロゴ" />
+          </button>
+          <div className="dashboard-title-wrap">
+            <h1>栄和　タスク管理システム</h1>
+            <span className="dashboard-version">ver.{formatBuildTime()}</span>
+          </div>
         </div>
         <div className="dashboard-header-right">
           {lastFetchAt && (

@@ -1,0 +1,14 @@
+{
+  "name": "栄和 タスク管理システム",
+  "short_name": "タスク管理",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#33604d",
+  "theme_color": "#33604d",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
