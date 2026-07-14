@@ -34,3 +34,6 @@ dist-ssr
 # Cloudflare
 .wrangler
 .dev.vars
+
+# PWA: ビルド時に scripts/generate-sw.mjs が生成する
+/public/sw.js

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Logs from './pages/Logs'
 import { isAuthenticated } from './lib/auth'
+import { ReloadPrompt } from './pwa/ReloadPrompt'
 
 function RequireAuth({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />
@@ -11,7 +12,10 @@ function RequireAuth({ children }) {
 
 function App() {
   return (
-    <BrowserRouter>
+    <>
+      {/* 新バージョン検知バナー。開発中(vite dev)は SW を登録せず出さない */}
+      {import.meta.env.PROD && <ReloadPrompt accentColor="#33604d" position="top" />}
+      <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -39,7 +43,8 @@ function App() {
           }
         />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </>
   )
 }
 
