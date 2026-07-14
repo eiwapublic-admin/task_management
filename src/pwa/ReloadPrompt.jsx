@@ -93,9 +93,9 @@ export function ReloadPrompt({
     } catch {
       /* 失敗してもリロードする */
     }
-    // 「更新中…」を一瞬描画させてからリロードする（同期リロードだと無反応に見えるため）。
+    // 「更新中…」を視認できる程度に見せてからリロードする（同期リロードだと無反応に見えるため）。
     // この SW はキャッシュしないので、リロード＝最新版取得。
-    window.setTimeout(() => window.location.reload(), 250)
+    window.setTimeout(() => window.location.reload(), 800)
   }
 
   return (
