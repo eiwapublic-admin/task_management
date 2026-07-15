@@ -3,7 +3,8 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
-import { getAccessToken, getMessageAttachments, getThreadAttachments, getAttachmentData } from './lib/gmail.js'
+import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
+import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -258,7 +259,35 @@ async function handleListAttachments(req) {
     const accessToken = await getAccessToken()
     if (threadId) {
       if (!GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が不正です' }, 400)
-      const all = await getThreadAttachments(accessToken, threadId)
+      // 対象タスクの顧客(counterpart)を特定し、同一件名で複数顧客が1スレッドに
+      // まとまった場合に、別顧客宛メッセージの添付が混ざらないよう絞り込む。
+      let counterpart = ''
+      try {
+        const supabase = getAdminClient()
+        const { data: task } = await supabase
+          .from('tasks')
+          .select('sender, sender_email, gmail_message_id')
+          .eq('gmail_thread_id', threadId)
+          .maybeSingle()
+        if (task) {
+          const { data: settingsRows } = await supabase
+            .from('settings')
+            .select('key, value')
+            .in('key', ['company_domains', 'shared_gmail'])
+          const settings = {}
+          for (const r of settingsRows || []) settings[r.key] = r.value
+          const isCompanyAddress = makeIsCompanyAddress(
+            settings.shared_gmail,
+            parseCompanyDomains(settings.company_domains)
+          )
+          const meta = await getThreadMessages(accessToken, threadId)
+          counterpart = resolveCounterpart(task, meta, isCompanyAddress)
+        }
+      } catch (e) {
+        // 顧客特定に失敗しても添付一覧自体は返す（フィルタ無し）
+        console.error('counterpart 特定失敗:', e)
+      }
+      const all = await getThreadAttachments(accessToken, threadId, counterpart)
       // 同一ファイル（ファイル名 + サイズ + MIME）が複数メッセージに現れる場合は1件に集約する
       const seen = new Map()
       for (const a of all) {

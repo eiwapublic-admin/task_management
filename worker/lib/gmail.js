@@ -141,12 +141,21 @@ export async function getMessageAttachments(accessToken, id) {
 // スレッド内の全メッセージの添付（メタ情報）を、各添付に所属メッセージ ID を付けて返す。
 // 返信で本文が上書きされても、最初・途中の返信に添付されたファイルが失われないよう、
 // スレッド全体の添付を集約して表示するために使う。
-export async function getThreadAttachments(accessToken, threadId) {
+// counterpart（対象顧客のアドレス）を渡すと、その顧客が参加している（From/To/Cc に含む）
+// メッセージの添付だけを対象にする。同一件名で複数顧客が1スレッドにまとまった場合に、
+// 別顧客宛メッセージの添付が混ざるのを防ぐ。
+export async function getThreadAttachments(accessToken, threadId, counterpart = '') {
   const thread = await apiGet(accessToken, `/threads/${encodeURIComponent(threadId)}?format=full`)
   const messages = thread.messages || []
+  const cp = (counterpart || '').toLowerCase()
   const out = []
   for (const m of messages) {
-    for (const a of extractAttachments(m.payload || {})) {
+    const payload = m.payload || {}
+    if (cp) {
+      const participants = `${header(payload, 'From')} ${header(payload, 'To')} ${header(payload, 'Cc')}`.toLowerCase()
+      if (!participants.includes(cp)) continue
+    }
+    for (const a of extractAttachments(payload)) {
       out.push({ ...a, messageId: m.id })
     }
   }
