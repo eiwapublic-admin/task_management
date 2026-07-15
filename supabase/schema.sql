@@ -18,6 +18,7 @@ create table if not exists tasks (
   body_preview     text,
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
+  contact          text,           -- 先方担当者の宛名（会社・氏名＋様。返信メール冒頭に使う。Claude 抽出 or sender_display+様）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
   remarks          text,           -- 留意事項（担当者が詳細画面で自由入力するメモ）
   last_reply_message_id text,       -- 最後に取り込んだ返信メールの Gmail message id（返信検知の冪等化・返信済みへの再返信で本文を上書きするため）
@@ -30,6 +31,7 @@ create table if not exists tasks (
 -- 既存テーブルへの後方互換の追加（Phase 2 で導入）
 alter table tasks add column if not exists classification_note text;
 alter table tasks add column if not exists sender_display text;
+alter table tasks add column if not exists contact text;
 alter table tasks add column if not exists sender_email text;
 alter table tasks add column if not exists remarks text;
 alter table tasks add column if not exists last_reply_message_id text;

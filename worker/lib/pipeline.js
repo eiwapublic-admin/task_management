@@ -351,6 +351,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
           ? result.sender_display.trim().slice(0, 120)
           : null
 
+      // 先方担当者の宛名（会社・氏名＋様。返信メールの冒頭に使う）。
+      // Claude が抽出できなければ sender_display に「様」を付けてフォールバックする。
+      const contact =
+        typeof result.contact === 'string' && result.contact.trim()
+          ? result.contact.trim().slice(0, 120)
+          : senderDisplay
+            ? `${senderDisplay} 様`
+            : null
+
       // 返信先アドレス: Claude の抽出（フォーム経由は本文のアドレス）を優先し、
       // 無ければ Reply-To → From の順にフォールバック
       const senderEmail =
@@ -370,6 +379,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         due_date: dueDate,
         sender: email.from || '（不明）',
         sender_display: senderDisplay,
+        contact,
         sender_email: senderEmail,
         subject: email.subject || '（件名なし）',
         body_preview: compactBody(email.body).slice(0, MAX_BODY_PREVIEW),

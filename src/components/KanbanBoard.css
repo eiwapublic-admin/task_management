@@ -386,6 +386,38 @@
   color: var(--text-strong);
 }
 
+/* 1行目: 担当者・受信日時・期限を横並びにする行 */
+.task-detail-toprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin: var(--space-4) 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+}
+
+.task-detail-topitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.task-detail-topitem-label {
+  color: var(--text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* 送信者の右隣に出す発信元の名前（contact） */
+.task-detail-contact {
+  margin-left: var(--space-3);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
 .task-detail-fields {
   display: grid;
   grid-template-columns: 110px 1fr;

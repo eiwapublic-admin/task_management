@@ -36,9 +36,15 @@ export function buildReplyMailto(task) {
     .split('\n')
     .map((line) => `> ${line}`)
     .join('\r\n')
+
+  // 本文の先頭に先方の宛名（会社・氏名＋様）を入れ、そのあと2行の空行を空ける。
+  // contact（AI 抽出の敬称付き宛名）を優先し、無ければ sender_display に「様」を付ける。
+  const greeting = task.contact || (task.sender_display ? `${task.sender_display} 様` : '')
+  // greeting のあとに空行を2つ（= 配列の '' 2個）入れてから元メッセージを続ける
+  const greetingLines = greeting ? [greeting, '', ''] : ['', '']
+
   const body = [
-    '',
-    '',
+    ...greetingLines,
     `----- 元のメッセージ -----`,
     `差出人: ${task.sender_display || task.sender || ''}`,
     `件名: ${task.subject || ''}`,
