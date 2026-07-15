@@ -120,6 +120,10 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const replyHref = isEmail ? buildReplyMailto(task) : null
   const isUnassigned = assignee === UNASSIGNED
 
+  // 送信者の右隣に出す発信元の宛名。contact（AI 抽出の敬称付き宛名）を優先し、
+  // 無ければ sender_display に「様」を付けて補う（contact 生成前の既存タスク向け）。
+  const contactLabel = task.contact || (task.sender_display ? `${task.sender_display} 様` : null)
+
   // 担当者の選択肢（既存の担当者一覧 + 未設定 + 現在値の取りこぼし防止）
   const assigneeOptions = Array.from(new Set([UNASSIGNED, ...assignees, task.assignee].filter(Boolean)))
 
@@ -225,7 +229,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
           <dt>送信者</dt>
           <dd>
             {task.sender}
-            {task.contact && <span className="task-detail-contact">{task.contact}</span>}
+            {contactLabel && <span className="task-detail-contact">{contactLabel}</span>}
           </dd>
           <dt>件名</dt>
           <dd>{task.subject}</dd>
