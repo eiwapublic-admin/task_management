@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, listMessageIds, getMessage, getThreadLatest } from './gmail.js'
+import { getAccessToken, listMessageIds, getMessage, getThreadMessages } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 
@@ -404,25 +404,39 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       .eq('source', 'email')
     for (const task of openTasks || []) {
       try {
-        const latest = await getThreadLatest(accessToken, task.gmail_thread_id)
-        if (!latest) continue
+        const messages = await getThreadMessages(accessToken, task.gmail_thread_id)
+        if (messages.length === 0) continue
+        const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
+        const counterpart = (task.sender_email || extractEmail(task.sender) || '').toLowerCase()
+        // スレッド内で最も新しい「自社発」メッセージを返信とみなす。顧客が受領返信を
+        // 最後に送っていても、担当者（自社）の最新の更新返信をタスクに反映できるようにする。
+        // ガード:
+        //  - 自社発（共有アドレス or 自社ドメイン）であること
+        //  - 元の差出人（顧客）自身の送信は除外（社内発・フォーム発の誤検知防止）
+        //  - タスク登録の元メール自体は除外
+        //  - 宛先(To/Cc)に元の顧客(counterpart)を含むこと（同一件名で複数顧客が
+        //    スレッドにまとまる場合の混線を防ぐ。正当な返信は必ず顧客宛て）
+        let reply = null
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i]
+          const from = (extractEmail(m.from) || '').toLowerCase()
+          if (!isCompanyAddress(from)) continue
+          if (from === originalFrom) continue
+          if (m.id === task.gmail_message_id) continue
+          if (counterpart) {
+            const recipients = `${m.to || ''} ${m.cc || ''}`.toLowerCase()
+            if (!recipients.includes(counterpart)) continue
+          }
+          reply = m
+          break
+        }
+        if (!reply) continue
         // 既に取り込んだ返信と同じなら、本文の再取得もせずスキップする
         // （返信済みタスクを毎サイクル走査するため、同じ返信の再適用・コスト増を防ぐ）。
-        if (latest.id === task.last_reply_message_id) continue
-        // タスク登録の元になったメール自体や、元の差出人による追加送信は「返信」ではない
-        // （社内発・フォームシステム発のメールは From が自社ドメインのため、
-        //   このガードが無いと返信ゼロでも誤検知する）
-        const latestFrom = (extractEmail(latest.from) || '').toLowerCase()
-        const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
-        if (
-          latest.id !== task.gmail_message_id &&
-          latestFrom !== originalFrom &&
-          isCompanyAddress(latestFrom)
-        ) {
-          // 返信の本文でタスク詳細を更新するため、最新メッセージ全体を取得する
-          const replyEmail = await getMessage(accessToken, latest.id)
-          await incorporateReply(task, 'スレッドで返信を検知', replyEmail)
-        }
+        if (reply.id === task.last_reply_message_id) continue
+        // 返信の本文でタスク詳細を更新するため、対象メッセージ全体を取得する
+        const replyEmail = await getMessage(accessToken, reply.id)
+        await incorporateReply(task, 'スレッドで返信を検知', replyEmail)
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
       }

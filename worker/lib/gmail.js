@@ -158,11 +158,19 @@ export async function getMessage(accessToken, id) {
   }
 }
 
-// スレッドの最新メッセージの ID と From を返す（返信検知用）。
-export async function getThreadLatest(accessToken, threadId) {
-  const thread = await apiGet(accessToken, `/threads/${threadId}?format=metadata&metadataHeaders=From`)
+// スレッドの全メッセージのメタ情報（id / From / To / Cc）を古い順に返す（返信検知用）。
+// スレッドの「最新の自社発メッセージ」を選ぶために、末尾だけでなく全件のメタを取得する
+// （顧客が受領返信を最後に送っていても、担当者の最新の更新返信を拾えるようにするため）。
+export async function getThreadMessages(accessToken, threadId) {
+  const thread = await apiGet(
+    accessToken,
+    `/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc`
+  )
   const messages = thread.messages || []
-  if (messages.length === 0) return null
-  const last = messages[messages.length - 1]
-  return { id: last.id, from: header(last.payload || {}, 'From') }
+  return messages.map((m) => ({
+    id: m.id,
+    from: header(m.payload || {}, 'From'),
+    to: header(m.payload || {}, 'To'),
+    cc: header(m.payload || {}, 'Cc'),
+  }))
 }
