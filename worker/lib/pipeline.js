@@ -6,6 +6,10 @@ import { classifyEmail } from './anthropic.js'
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
 const MAX_MESSAGES = 40
 
+// タスク本文（body_preview）に保存する最大文字数。引用された過去のやり取り
+// （初回発信メールまで）も含めて全文を残せるよう十分大きく取る。暴走メール対策の上限。
+const MAX_BODY_PREVIEW = 20000
+
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 
 // 担当者を特定できないときに設定する既定値。
@@ -70,7 +74,8 @@ function compactBody(text) {
     // 各行頭の引用マークを除去（半角 ">"・全角 "＞"、前後の空白やネストにも対応）
     .replace(/^[ \t　]*(?:[>＞]+[ \t　]*)+/gm, '')
     .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{2,}/g, '\n')
+    // 3つ以上連続する改行は空行1つ（改行2つ）に圧縮し、段落の区切りは保持する
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
@@ -218,7 +223,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // reply には返信メール（getMessage の結果）を渡す。
   // 冪等化のため、取り込んだ返信の message id を last_reply_message_id に記録する。
   async function incorporateReply(task, via, reply = null) {
-    const newBody = reply && reply.body ? compactBody(reply.body).slice(0, 500) : null
+    const newBody = reply && reply.body ? compactBody(reply.body).slice(0, MAX_BODY_PREVIEW) : null
     const replyId = reply ? reply.id : null
 
     // --- 既に返信済みのタスクへの、さらなる返信（本文の上書き） ---
@@ -367,7 +372,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         sender_display: senderDisplay,
         sender_email: senderEmail,
         subject: email.subject || '（件名なし）',
-        body_preview: compactBody(email.body).slice(0, 500),
+        body_preview: compactBody(email.body).slice(0, MAX_BODY_PREVIEW),
         received_at: email.receivedAt || new Date().toISOString(),
         classification_note: classificationNote,
       })
