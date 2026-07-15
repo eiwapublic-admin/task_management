@@ -70,9 +70,18 @@ function extractText(payload) {
     return decodeBody(html)
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
+      // 改行を伴うブロック要素は改行に変換してから他のタグを除去する（改行を保持するため）
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|tr|li|h[1-6]|blockquote)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
-      .replace(/\s+/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      // 横方向の空白のみ圧縮し、改行は保持する
+      .replace(/[ \t ]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
   }
   return ''
