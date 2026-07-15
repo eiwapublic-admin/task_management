@@ -47,16 +47,15 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setAttError('')
     setDownloadError('')
     setDownloadingId('')
-    // 返信で上書きされたタスクは、添付も最新の返信メール側にあるため
-    // last_reply_message_id を優先し、無ければ元メール(gmail_message_id)を使う。
-    const attachMessageId = task && (task.last_reply_message_id || task.gmail_message_id)
-    if (!task || task.source !== 'email' || !attachMessageId) {
+    // スレッド全体の添付を集約して取得する。返信で本文が上書きされても、
+    // 最初・途中の返信に添付されたファイルが失われず表示されるようにするため。
+    if (!task || task.source !== 'email' || !task.gmail_thread_id) {
       setAttLoading(false)
       return
     }
     let cancelled = false
     setAttLoading(true)
-    listAttachments(attachMessageId)
+    listAttachments(task.gmail_thread_id)
       .then((res) => {
         if (!cancelled) setAttachments(res.attachments || [])
       })
@@ -153,7 +152,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setDownloadError('')
     try {
       await downloadAttachment({
-        messageId: task.last_reply_message_id || task.gmail_message_id,
+        messageId: att.messageId || task.gmail_message_id,
         attachmentId: att.attachmentId,
         filename: att.filename,
         mimeType: att.mimeType,
@@ -237,7 +236,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                 {!attLoading && hasAttachments && (
                   <ul className="task-detail-attachments">
                     {attachments.map((att) => (
-                      <li key={att.attachmentId} className="task-detail-attachment">
+                      <li key={`${att.messageId || ''}-${att.attachmentId}`} className="task-detail-attachment">
                         <span className="task-detail-attachment-icon" aria-hidden="true">
                           📎
                         </span>
