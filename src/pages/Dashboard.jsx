@@ -48,6 +48,9 @@ export default function Dashboard() {
   const [notice, setNotice] = useState('')
   const [creditAlert, setCreditAlert] = useState(null)
   const [sharedGmail, setSharedGmail] = useState('')
+  // モバイルのハンバーガーメニュー（ヘッダーの操作ボタンを畳む）の開閉状態
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
   const navigate = useNavigate()
   const user = getCurrentUser()
   // 楽観的更新中のステータス書き込み件数。0 より大きい間は自動更新をスキップし、
@@ -153,6 +156,23 @@ export default function Dashboard() {
     }
   }
 
+  // メニューを開いている間は、外側クリック / Escape で閉じる
+  useEffect(() => {
+    if (!menuOpen) return
+    function onPointerDown(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menuOpen])
+
   function handleLogout() {
     logout()
     navigate('/login')
@@ -178,15 +198,35 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="dashboard-header-right">
-          {lastFetchAt && (
-            <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
-          )}
-          <button onClick={handleRunFetch} disabled={fetching}>
-            {fetching ? '取得中…' : '今すぐ取得'}
-          </button>
-          <button onClick={() => navigate('/logs')}>ログ</button>
-          <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
-          <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
+          <div className="dashboard-menu" ref={menuRef}>
+            <button
+              type="button"
+              className="dashboard-menu-toggle"
+              aria-label="メニュー"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span className="dashboard-menu-icon" aria-hidden="true"></span>
+            </button>
+            <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
+              {lastFetchAt && (
+                <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
+              )}
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  handleRunFetch()
+                }}
+                disabled={fetching}
+              >
+                {fetching ? '取得中…' : '今すぐ取得'}
+              </button>
+              <button onClick={() => navigate('/logs')}>ログ</button>
+              <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
+              <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
+            </div>
+          </div>
         </div>
       </header>
 

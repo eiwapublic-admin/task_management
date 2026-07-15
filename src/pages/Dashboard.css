@@ -238,6 +238,55 @@
   color: var(--text-muted);
 }
 
+/* 操作ボタン群のラッパー。デスクトップは横並び、モバイルはメニューに畳む */
+.dashboard-menu {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 3本線（ハンバーガー）ボタン。モバイルでのみ表示する。
+   （.dashboard-header-right button より詳細度を上げて display を確実に上書きする） */
+.dashboard-header-right .dashboard-menu-toggle {
+  display: none;
+  width: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.dashboard-menu-icon,
+.dashboard-menu-icon::before,
+.dashboard-menu-icon::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.dashboard-menu-icon {
+  position: relative;
+}
+
+.dashboard-menu-icon::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 0;
+}
+
+.dashboard-menu-icon::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 0;
+}
+
 /* ヘッダー内のボタン・リンクは高さと縦位置を統一する */
 .dashboard-header-right button,
 .dashboard-header-right .usage-billing-link {
@@ -405,17 +454,56 @@
     min-width: 0;
   }
 
-  /* 右側の操作ボタンはタイトルの下（全幅）に落とし、右寄せで並べる */
-  .dashboard-header-right {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: var(--space-2);
-  }
-
   .dashboard-header-right button,
   .dashboard-header-right .usage-billing-link {
     white-space: nowrap;
+  }
+
+  /* --- メイン画面のヘッダー: 操作ボタンを3本線メニューに畳む --- */
+  .dashboard-menu {
+    position: relative;
+  }
+
+  .dashboard-header-right .dashboard-menu-toggle {
+    display: inline-flex;
+  }
+
+  /* 通常はドロップダウンを隠し、開いたときだけ縦並びで表示する */
+  .dashboard-actions {
+    display: none;
+  }
+
+  .dashboard-actions.is-open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    min-width: 190px;
+    padding: var(--space-2);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 20;
+  }
+
+  /* ドロップダウン内のボタンは全幅・左寄せで押しやすく */
+  .dashboard-actions.is-open button {
+    width: 100%;
+    height: 40px;
+    justify-content: flex-start;
+  }
+
+  /* 最終取得の時刻はメニュー先頭の情報行に（緑背景用の白文字を可読色へ） */
+  .dashboard-actions.is-open .dashboard-lastfetch {
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2) var(--space-2);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-1);
+    white-space: normal;
   }
 
   /* 操作ログ: 4列テーブルは横スクロールで各列の可読幅を確保する */
