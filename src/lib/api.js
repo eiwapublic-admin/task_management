@@ -49,9 +49,11 @@ export function updateTask(id, values) {
   return authFetch('/api/tasks', { method: 'PATCH', body: JSON.stringify({ id, ...values }) })
 }
 
-// 元メールの添付ファイル一覧（メタ情報）を取得する（/api/attachments）。{ attachments: [...] } を返す。
-export function listAttachments(messageId) {
-  return authFetch(`/api/attachments?message_id=${encodeURIComponent(messageId)}`)
+// スレッド内の全メッセージの添付ファイル一覧（メタ情報）を取得する（/api/attachments）。
+// 返信で本文が上書きされても最初・途中の添付が失われないよう、スレッド単位で集約して取得する。
+// { attachments: [{ filename, mimeType, size, attachmentId, messageId }, ...] } を返す。
+export function listAttachments(threadId) {
+  return authFetch(`/api/attachments?thread_id=${encodeURIComponent(threadId)}`)
 }
 
 // 添付ファイルを Gmail から取得してブラウザに保存させる（/api/attachment）。

@@ -3,7 +3,7 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
-import { getAccessToken, getMessageAttachments, getAttachmentData } from './lib/gmail.js'
+import { getAccessToken, getMessageAttachments, getThreadAttachments, getAttachmentData } from './lib/gmail.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -244,14 +244,30 @@ async function handleTaskUpdate(req) {
 // Gmail のメッセージIDは英数・ハイフン・アンダースコアのみ
 const GMAIL_ID_RE = /^[A-Za-z0-9_-]+$/
 
-// GET /api/attachments?message_id=... — 元メールの添付ファイル一覧（メタ情報）を返す。ログイン必須。
-// 共有アカウントの認証情報で Gmail から取得するため、担当者が Gmail にログインしていなくても参照できる。
+// GET /api/attachments?thread_id=... （または ?message_id=...）
+//   添付ファイル一覧（メタ情報）を返す。ログイン必須。
+//   thread_id 指定時はスレッド内の全メッセージの添付を集約して返す（各添付に message_id 付き）。
+//   これにより返信で本文が上書きされても、最初・途中の返信の添付が失われずに表示できる。
+//   共有アカウントの認証情報で Gmail から取得するため、担当者が Gmail にログインしていなくても参照できる。
 async function handleListAttachments(req) {
   if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
   try {
-    const messageId = new URL(req.url).searchParams.get('message_id') || ''
-    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
+    const params = new URL(req.url).searchParams
+    const threadId = params.get('thread_id') || ''
+    const messageId = params.get('message_id') || ''
     const accessToken = await getAccessToken()
+    if (threadId) {
+      if (!GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が不正です' }, 400)
+      const all = await getThreadAttachments(accessToken, threadId)
+      // 同一ファイル（ファイル名 + サイズ + MIME）が複数メッセージに現れる場合は1件に集約する
+      const seen = new Map()
+      for (const a of all) {
+        const key = `${a.filename}|${a.size}|${a.mimeType}`
+        if (!seen.has(key)) seen.set(key, a)
+      }
+      return json({ attachments: Array.from(seen.values()) })
+    }
+    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
     const attachments = await getMessageAttachments(accessToken, messageId)
     return json({ attachments })
   } catch (err) {

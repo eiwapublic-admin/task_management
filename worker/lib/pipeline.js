@@ -407,26 +407,36 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         const messages = await getThreadMessages(accessToken, task.gmail_thread_id)
         if (messages.length === 0) continue
         const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
-        const counterpart = (task.sender_email || extractEmail(task.sender) || '').toLowerCase()
+        // 顧客(counterpart)のアドレスを特定する。
+        //  - 受信メール由来のタスク（sender が顧客）: 元の送信者が顧客
+        //  - 自社発信由来のタスク（sender が自社）: 元メッセージの宛先(To/Cc)のうち
+        //    自社以外が顧客（例: 自社→社外への送信で「返信済み」登録されたタスク）
+        let counterpart = ''
+        if (isCompanyAddress(originalFrom)) {
+          const orig = messages.find((m) => m.id === task.gmail_message_id)
+          const recips = orig ? extractEmails(`${orig.to || ''} ${orig.cc || ''}`) : []
+          counterpart = recips.find((a) => !isCompanyAddress(a)) || ''
+        } else {
+          const se = (task.sender_email || '').toLowerCase()
+          counterpart = se && !isCompanyAddress(se) ? se : originalFrom
+        }
+        // 顧客を特定できない場合は安全側で何もしない（誤上書き防止）
+        if (!counterpart) continue
         // スレッド内で最も新しい「自社発」メッセージを返信とみなす。顧客が受領返信を
         // 最後に送っていても、担当者（自社）の最新の更新返信をタスクに反映できるようにする。
         // ガード:
         //  - 自社発（共有アドレス or 自社ドメイン）であること
-        //  - 元の差出人（顧客）自身の送信は除外（社内発・フォーム発の誤検知防止）
         //  - タスク登録の元メール自体は除外
-        //  - 宛先(To/Cc)に元の顧客(counterpart)を含むこと（同一件名で複数顧客が
-        //    スレッドにまとまる場合の混線を防ぐ。正当な返信は必ず顧客宛て）
+        //  - 宛先(To/Cc)に顧客(counterpart)を含むこと（同一件名で複数顧客が
+        //    スレッドにまとまる場合の混線防止。正当な返信は必ず顧客宛て）
         let reply = null
         for (let i = messages.length - 1; i >= 0; i--) {
           const m = messages[i]
           const from = (extractEmail(m.from) || '').toLowerCase()
           if (!isCompanyAddress(from)) continue
-          if (from === originalFrom) continue
           if (m.id === task.gmail_message_id) continue
-          if (counterpart) {
-            const recipients = `${m.to || ''} ${m.cc || ''}`.toLowerCase()
-            if (!recipients.includes(counterpart)) continue
-          }
+          const recipients = `${m.to || ''} ${m.cc || ''}`.toLowerCase()
+          if (!recipients.includes(counterpart)) continue
           reply = m
           break
         }

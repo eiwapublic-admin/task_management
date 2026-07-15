@@ -129,6 +129,21 @@ export async function getMessageAttachments(accessToken, id) {
   return extractAttachments(msg.payload || {})
 }
 
+// スレッド内の全メッセージの添付（メタ情報）を、各添付に所属メッセージ ID を付けて返す。
+// 返信で本文が上書きされても、最初・途中の返信に添付されたファイルが失われないよう、
+// スレッド全体の添付を集約して表示するために使う。
+export async function getThreadAttachments(accessToken, threadId) {
+  const thread = await apiGet(accessToken, `/threads/${encodeURIComponent(threadId)}?format=full`)
+  const messages = thread.messages || []
+  const out = []
+  for (const m of messages) {
+    for (const a of extractAttachments(m.payload || {})) {
+      out.push({ ...a, messageId: m.id })
+    }
+  }
+  return out
+}
+
 // 添付ファイルの実体（base64url 文字列）とサイズを返す。
 export async function getAttachmentData(accessToken, messageId, attachmentId) {
   const data = await apiGet(
