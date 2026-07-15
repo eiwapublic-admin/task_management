@@ -158,7 +158,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     }
   }
 
-  const summary = { fetched: 0, created: 0, replied: 0, nonBusiness: 0, errors: [], creditAlert: null }
+  const summary = { fetched: 0, created: 0, replied: 0, updated: 0, nonBusiness: 0, errors: [], creditAlert: null }
   const logRows = []
 
   // Claude 利用量の集計とクレジット不足の検知
@@ -191,21 +191,71 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 未処理タスクの一覧（件名ベースの返信検知用）。
   // 担当者が自分のメーラーから返信すると References ヘッダーが付かず
   // 元スレッドに紐付かないことがあるため、件名の一致でも返信を検知する。
+  // 未処理タスクに加えて「返信済み」タスクも対象にする。返信済みのタスクに
+  // さらに新しい返信が来た場合、本文を最新の返信で上書きするため。
   const { data: openTaskRows } = await supabase
     .from('tasks')
-    .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
-    .eq('status', '未処理')
+    .select(
+      'id, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
+    )
+    .in('status', ['未処理', '返信済み'])
     .eq('source', 'email')
+  // 件名 → タスクの対応表。同じ件名に未処理と返信済みが併存する場合は未処理を優先する
+  // （初回の返信検知を、返信済みの上書き検知より優先させるため）。
   const openBySubject = new Map()
-  for (const t of openTaskRows || []) openBySubject.set(normalizeSubject(t.subject), t)
+  for (const t of openTaskRows || []) {
+    if (t.status === '返信済み') openBySubject.set(normalizeSubject(t.subject), t)
+  }
+  for (const t of openTaskRows || []) {
+    if (t.status === '未処理') openBySubject.set(normalizeSubject(t.subject), t)
+  }
 
-  // タスクを「返信済み」にし、操作ログを積む（返信検知の共通処理）。
-  // reply（返信メール）が渡された場合は、タスクの詳細内容を返信の本文全体で
-  // 置き換える（元のメール内容は返信内の引用として残っている想定）。
-  async function markReplied(task, via, reply = null) {
-    const fields = { status: '返信済み' }
-    if (reply && reply.body) {
-      fields.body_preview = compactBody(reply.body).slice(0, 500)
+  // 返信を検知したタスクを更新する（返信検知の共通処理）。
+  // - 未処理タスク: ステータスを「返信済み」にし、本文を返信内容へ置き換える（初回検知）。
+  //   元のメール内容は返信内の引用として残っている想定。
+  // - 既に返信済みのタスク: さらに新しい返信が来たケース。ステータスは「返信済み」のまま
+  //   本文だけを最新の返信で上書きする。既に取り込み済みの返信（本文が同一）は何もしない。
+  // reply には返信メール（getMessage の結果）を渡す。
+  // 冪等化のため、取り込んだ返信の message id を last_reply_message_id に記録する。
+  async function incorporateReply(task, via, reply = null) {
+    const newBody = reply && reply.body ? compactBody(reply.body).slice(0, 500) : null
+    const replyId = reply ? reply.id : null
+
+    // --- 既に返信済みのタスクへの、さらなる返信（本文の上書き） ---
+    if (task.status === '返信済み') {
+      // 同じ返信を再検知しただけ（本文が変わらない）なら、毎サイクルの再適用を避けるため
+      // last_reply_message_id だけ静かに控えて終了する（ログも件数も増やさない）。
+      if (!newBody || newBody === task.body_preview) {
+        if (replyId && replyId !== task.last_reply_message_id) {
+          await supabase.from('tasks').update({ last_reply_message_id: replyId }).eq('id', task.id)
+        }
+        return false
+      }
+      const note = `【返信更新】${via}（差出人: ${reply.from || '不明'}）。さらに新しい返信を受信したため、本文を最新の内容に置き換えました。`
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          body_preview: newBody,
+          last_reply_message_id: replyId,
+          classification_note: task.classification_note ? `${task.classification_note}\n${note}` : note,
+        })
+        .eq('id', task.id)
+        .eq('status', '返信済み')
+      if (error) return false
+      summary.updated += 1
+      logRows.push({
+        log_type: 'status_change',
+        actor: 'システム（自動）',
+        message: `「${task.title}」を最新の返信で更新（${via}・返信済みのまま本文を上書き）`,
+        detail: { task_id: task.id },
+      })
+      return true
+    }
+
+    // --- 未処理 → 返信済み（初回の返信検知） ---
+    const fields = { status: '返信済み', last_reply_message_id: replyId }
+    if (newBody) {
+      fields.body_preview = newBody
       const note = `【返信検知】${via}（差出人: ${reply.from || '不明'}）。本文を返信の内容に置き換えました。元のメールは返信内の引用を参照。`
       fields.classification_note = task.classification_note
         ? `${task.classification_note}\n${note}`
@@ -252,7 +302,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         const isOurReply =
           fromEmail && fromEmail !== counterpart && isCompanyAddress(fromEmail) && sentToCounterpart
         if (isOurReply) {
-          await markReplied(openTask, '返信を検知', email)
+          await incorporateReply(openTask, '返信を検知', email)
           continue
         }
       }
@@ -344,28 +394,34 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 3) スレッドベースの返信検知: 未処理タスクのスレッド最新メールが
   //    自社側（共有アドレス or 自社ドメイン）発なら「返信済み」に
   {
+    // 未処理に加えて「返信済み」タスクも対象にし、さらなる返信があれば本文を上書きする。
     const { data: openTasks } = await supabase
       .from('tasks')
-      .select('id, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, classification_note')
-      .eq('status', '未処理')
+      .select(
+        'id, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
+      )
+      .in('status', ['未処理', '返信済み'])
       .eq('source', 'email')
     for (const task of openTasks || []) {
       try {
         const latest = await getThreadLatest(accessToken, task.gmail_thread_id)
+        if (!latest) continue
+        // 既に取り込んだ返信と同じなら、本文の再取得もせずスキップする
+        // （返信済みタスクを毎サイクル走査するため、同じ返信の再適用・コスト増を防ぐ）。
+        if (latest.id === task.last_reply_message_id) continue
         // タスク登録の元になったメール自体や、元の差出人による追加送信は「返信」ではない
         // （社内発・フォームシステム発のメールは From が自社ドメインのため、
         //   このガードが無いと返信ゼロでも誤検知する）
-        const latestFrom = (extractEmail(latest?.from) || '').toLowerCase()
+        const latestFrom = (extractEmail(latest.from) || '').toLowerCase()
         const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
         if (
-          latest &&
           latest.id !== task.gmail_message_id &&
           latestFrom !== originalFrom &&
           isCompanyAddress(latestFrom)
         ) {
-          // 返信の本文でタスク詳細を置き換えるため、最新メッセージ全体を取得する
+          // 返信の本文でタスク詳細を更新するため、最新メッセージ全体を取得する
           const replyEmail = await getMessage(accessToken, latest.id)
-          await markReplied(task, 'スレッドで返信を検知', replyEmail)
+          await incorporateReply(task, 'スレッドで返信を検知', replyEmail)
         }
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
@@ -470,7 +526,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
   const fetchMessage =
     `メール取得: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
-    `返信検知 ${summary.replied} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
+    `返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
     `カレンダー登録 ${summary.calendarCreated} 件` +
     (summary.errors.length > 0 ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
   logRows.unshift({ log_type: 'fetch', actor, message: fetchMessage, detail: summary })
