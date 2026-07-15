@@ -401,11 +401,15 @@
 .task-detail-fields dd {
   margin: 0;
   color: var(--text-base);
+  /* 長いメールアドレスやURLがはみ出さないよう折り返す */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .task-detail-body {
   white-space: pre-wrap;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .task-detail-note {
@@ -709,5 +713,69 @@ select.task-detail-input.is-unassigned {
     flex: 0 0 82%;
     scroll-snap-align: start;
     min-height: 60vh;
+  }
+}
+
+/* ---------- レスポンシブ: スマートフォン（詳細モーダル・フォーム） ---------- */
+@media (max-width: 560px) {
+  /* モーダルは画面幅をほぼ使い切り、上端寄せで表示する */
+  .task-detail-overlay {
+    padding: var(--space-2);
+    align-items: flex-start;
+  }
+
+  .task-detail-modal {
+    padding: 0 var(--space-4);
+    max-height: 94vh;
+  }
+
+  .task-detail-modal h2 {
+    font-size: 18px;
+  }
+
+  /* 2カラムのラベル/値を積み上げて窮屈さを解消する */
+  .task-detail-fields {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+    margin: var(--space-3) 0;
+  }
+
+  .task-detail-fields dt {
+    margin-top: var(--space-3);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .task-detail-fields dt:first-of-type {
+    margin-top: 0;
+  }
+
+  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
+  .task-detail-input,
+  .task-form-field input,
+  .task-form-field select,
+  .task-form-field textarea {
+    font-size: 16px;
+  }
+
+  /* タッチ操作しやすいようステータス/操作ボタンを大きめに */
+  .task-detail-status {
+    width: 100%;
+  }
+
+  .status-btn {
+    flex: 1 1 auto;
+    text-align: center;
+    padding: var(--space-2) var(--space-2);
+  }
+
+  .task-detail-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .task-detail-actions .task-action-btn {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }

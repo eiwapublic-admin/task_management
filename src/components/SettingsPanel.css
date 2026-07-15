@@ -40,6 +40,12 @@
   .settings-org-textarea {
     min-height: 260px;
   }
+
+  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
+  .settings-panel input,
+  .settings-panel textarea {
+    font-size: 16px;
+  }
 }
 
 .settings-panel section h2 {
