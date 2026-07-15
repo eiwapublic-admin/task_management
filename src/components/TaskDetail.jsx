@@ -47,13 +47,16 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setAttError('')
     setDownloadError('')
     setDownloadingId('')
-    if (!task || task.source !== 'email' || !task.gmail_message_id) {
+    // 返信で上書きされたタスクは、添付も最新の返信メール側にあるため
+    // last_reply_message_id を優先し、無ければ元メール(gmail_message_id)を使う。
+    const attachMessageId = task && (task.last_reply_message_id || task.gmail_message_id)
+    if (!task || task.source !== 'email' || !attachMessageId) {
       setAttLoading(false)
       return
     }
     let cancelled = false
     setAttLoading(true)
-    listAttachments(task.gmail_message_id)
+    listAttachments(attachMessageId)
       .then((res) => {
         if (!cancelled) setAttachments(res.attachments || [])
       })
@@ -150,7 +153,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setDownloadError('')
     try {
       await downloadAttachment({
-        messageId: task.gmail_message_id,
+        messageId: task.last_reply_message_id || task.gmail_message_id,
         attachmentId: att.attachmentId,
         filename: att.filename,
         mimeType: att.mimeType,
