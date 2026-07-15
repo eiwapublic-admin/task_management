@@ -189,9 +189,10 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             ×
           </button>
         </div>
-        <dl className="task-detail-fields">
-          <dt>担当者</dt>
-          <dd>
+        {/* 1行目: 担当者・受信日時・期限を横並び（ステータスはフッタにあるため省略） */}
+        <div className="task-detail-toprow">
+          <div className="task-detail-topitem">
+            <span className="task-detail-topitem-label">担当者</span>
             <select
               className={`task-detail-input${isUnassigned ? ' is-unassigned' : ''}`}
               value={assignee}
@@ -203,23 +204,29 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                 </option>
               ))}
             </select>
-            {isUnassigned && <span className="task-detail-warn">⚠ 担当者が未設定です</span>}
-          </dd>
-          <dt>ステータス</dt>
-          <dd>{task.status}</dd>
-          <dt>期限</dt>
-          <dd>
+            {isUnassigned && <span className="task-detail-warn">⚠ 未設定</span>}
+          </div>
+          <div className="task-detail-topitem">
+            <span className="task-detail-topitem-label">受信日時</span>
+            <span>{formatDateTime(task.received_at) ?? '不明'}</span>
+          </div>
+          <div className="task-detail-topitem">
+            <span className="task-detail-topitem-label">期限</span>
             <input
               type="date"
               className="task-detail-input"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
-          </dd>
-          <dt>受信日時</dt>
-          <dd>{formatDateTime(task.received_at) ?? '不明'}</dd>
+          </div>
+        </div>
+
+        <dl className="task-detail-fields">
           <dt>送信者</dt>
-          <dd>{task.sender}</dd>
+          <dd>
+            {task.sender}
+            {task.contact && <span className="task-detail-contact">{task.contact}</span>}
+          </dd>
           <dt>件名</dt>
           <dd>{task.subject}</dd>
           {isEmail && (
