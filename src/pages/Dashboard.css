@@ -389,15 +389,42 @@
 }
 
 @media (max-width: 768px) {
+  /* 狭幅ではヘッダーを折り返し、操作ボタン群を2行目に回して溢れを防ぐ */
   .dashboard-header {
-    padding: var(--space-3) var(--space-3);
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding: var(--space-3);
   }
 
   .dashboard-header h1 {
     font-size: 17px;
   }
 
+  .dashboard-header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 右側の操作ボタンはタイトルの下（全幅）に落とし、右寄せで並べる */
   .dashboard-header-right {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--space-2);
+  }
+
+  .dashboard-header-right button,
+  .dashboard-header-right .usage-billing-link {
+    white-space: nowrap;
+  }
+
+  /* 操作ログ: 4列テーブルは横スクロールで各列の可読幅を確保する */
+  .logs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .logs-table {
+    min-width: 560px;
   }
 }
