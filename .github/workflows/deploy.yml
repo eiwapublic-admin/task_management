@@ -2,10 +2,11 @@
 # 必要な GitHub Secrets（リポジトリの Settings → Secrets and variables → Actions）:
 #   CLOUDFLARE_API_TOKEN   … Cloudflare ダッシュボードで発行（テンプレート「Workersを編集する」）
 #   CLOUDFLARE_ACCOUNT_ID  … Cloudflare ダッシュボード右下の Account ID
-#   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY … フロントエンドのビルドに埋め込む公開値
 #   SUPABASE_URL / SUPABASE_SERVICE_KEY / SESSION_SECRET / ANTHROPIC_API_KEY /
 #   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN
 #     … Worker のシークレットとしてデプロイ時に自動同期される
+# フロントエンドはデータ面を anon キーで直接読み書きしないため、
+# VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY のビルド時注入は不要（廃止済み）。
 name: Deploy to Cloudflare Workers
 
 on:
@@ -35,9 +36,6 @@ jobs:
 
       - name: Build frontend
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # デプロイを先に実行する（wrangler-action はシークレット同期をコマンドより
       # 先に行うため、1ステップにまとめると「未デプロイの新バージョンが残った」
