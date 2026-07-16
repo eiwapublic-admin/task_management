@@ -36,6 +36,13 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
     '',
     `【本日の日付】${today}（JST）。「来週末」「今月中」などの相対表現はこの日付を基準にYYYY-MM-DD形式へ変換してください。`,
     '',
+    '【添付ファイル（PDF・画像）の読み取り】',
+    'このメッセージには PDF や画像の添付ファイルが同梱されることがあります（複合機からのFAX転送メールや、注文書・見積書・請求書などのPDF）。',
+    '添付がある場合は、その中身も必ず読み取り、本文と合わせて業務タスクかどうかを判断してください。',
+    'FAX 転送メールは本文がほとんど無く（件名が「Attached Image」等）、内容はすべて添付の画像/PDFにあります。この場合は添付の内容だけで判断してください。',
+    '添付から読み取った内容は document_summary に日本語で分かりやすくまとめてください。特に「顧客（差出人の会社・氏名）」「資料の種類・件名（注文書/見積書/請求書/納品書など）」「金額・数量・納期・品番などの要点」を優先して記載します。表組みは文章で要約して構いません。複数ファイルがあればファイルごとに区切って要約してください。',
+    '添付の内容から会社名・氏名・宛名・期限が読み取れる場合は、title・sender_display・contact・due_date にも反映してください。',
+    '',
     '【出力JSONの形式】',
     '{',
     '  "is_business_task": true か false（広告・ニュースレター・自動通知・営業/プロモーションは false）,',
@@ -45,6 +52,7 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
     '  "sender_display": "株式会社サンプル 山田太郎" のように送信元の会社名と氏名。問い合わせフォーム経由のメールは本文に記載された会社名・氏名を優先して読み取る。一方しか分からなければ分かる方だけ。どちらも不明なら null,',
     '  "contact": "先方（顧客）の担当者への宛名。会社名・氏名に敬称『様』を付けた形（例:『實守紙業株式会社 小林侑希 様』『中村秀利 様』）。会社名のみ/氏名のみでも可。返信メールの冒頭の宛名に使う。判断できないときは null,',
     '  "sender_email": "返信すべきメールアドレス。問い合わせフォーム経由のメールは本文に記載された差出人のメールアドレスを、それ以外は From のアドレスを返す。不明なら null",',
+    '  "document_summary": "添付のPDF・画像（FAXを含む）から読み取った内容の要約。顧客・資料の件名・金額/数量/納期などの要点を日本語でまとめる。表は文章で要約。添付が無い、または読み取れないときは null",',
     '  "reason": "業務/非業務の判断根拠と、担当者を選んだ理由を1〜2文で簡潔に"',
     '}',
     '',
@@ -53,7 +61,11 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
   ].join('\n')
 }
 
-export async function classifyEmail(email, context) {
+// documents: 添付の PDF/画像を Claude に渡すためのブロック配列。
+//   { type: 'pdf', data }（data はパディング済み標準 base64）
+//   { type: 'image', mediaType, data }
+// 省略時（[]）は従来どおりテキストのみで分類する。
+export async function classifyEmail(email, context, documents = []) {
   const { ANTHROPIC_API_KEY } = process.env
   if (!ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY が設定されていません')
@@ -61,14 +73,38 @@ export async function classifyEmail(email, context) {
   const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
 
   const system = buildSystemPrompt(context)
-  const userContent = [
+  const attachmentNote =
+    email.attachments && email.attachments.length
+      ? email.attachments.map((a) => `${a.filename || '(名称なし)'}（${a.mimeType}）`).join('、')
+      : 'なし'
+  const userText = [
     `差出人(From): ${email.from}`,
     `宛先(To): ${email.to}`,
     `件名(Subject): ${email.subject}`,
     `受信日時: ${email.date}`,
+    `添付ファイル: ${attachmentNote}`,
     '本文:',
     (email.body || '').slice(0, 4000),
   ].join('\n')
+
+  // ドキュメントブロック（PDF/画像）はテキストブロックより前に置く。
+  const content = []
+  for (const doc of documents || []) {
+    if (doc && doc.type === 'pdf' && doc.data) {
+      content.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: doc.data },
+      })
+    } else if (doc && doc.type === 'image' && doc.data && doc.mediaType) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: doc.mediaType, data: doc.data },
+      })
+    }
+  }
+  content.push({ type: 'text', text: userText })
+  // 添付を読ませる場合は要約分の出力トークンを多めに確保する。
+  const hasDocs = content.length > 1
 
   const res = await fetch(API_ENDPOINT, {
     method: 'POST',
@@ -79,9 +115,9 @@ export async function classifyEmail(email, context) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 400,
+      max_tokens: hasDocs ? 1500 : 400,
       system,
-      messages: [{ role: 'user', content: userContent }],
+      messages: [{ role: 'user', content }],
     }),
   })
 

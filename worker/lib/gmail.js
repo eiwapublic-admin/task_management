@@ -188,6 +188,10 @@ export async function getMessage(accessToken, id) {
     snippet: msg.snippet || '',
     receivedAt: msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : null,
     body: bodyText || msg.snippet || '',
+    // 添付ファイルのメタ情報（filename / mimeType / size / attachmentId）。
+    // FAX 転送メール（PDF/画像）や見積書・注文書などの添付を分類器に読ませるために使う。
+    // 実体は format=full で取得済みの payload から抽出するため追加の API 呼び出しは不要。
+    attachments: extractAttachments(payload),
   }
 }
 
