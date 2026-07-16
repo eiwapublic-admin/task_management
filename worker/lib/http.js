@@ -7,6 +7,39 @@ export function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS })
 }
 
+// 全レスポンス共通のセキュリティヘッダ。クリックジャッキング（X-Frame-Options）・
+// MIMEスニッフィング（X-Content-Type-Options）対策、リファラーの最小化、
+// 自己ホストのアセットのみを許可するCSPを付与する。
+// アプリは外部CDN・フォント・画像を一切使わず同一オリジンで完結しているため、
+// ほぼ全ディレクティブを 'self' に絞れる。
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+].join('; ')
+
+// 静的アセット/API どちらのレスポンスにも同じヘッダを付与する。
+// Response.headers は fetch() が返した直後であれば変更可能なため、
+// 新しい Headers にコピーしてから追記する（元レスポンスの body/status は維持）。
+export function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers)
+  headers.set('X-Frame-Options', 'DENY')
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  if (!headers.has('Content-Security-Policy')) {
+    headers.set('Content-Security-Policy', CONTENT_SECURITY_POLICY)
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+}
+
 // Authorization: Bearer <token> を検証する。
 // ログイン時に SESSION_SECRET で署名した JWT を想定。
 // 検証に失敗した場合は null を返す（呼び出し側で 401 を返す）。
