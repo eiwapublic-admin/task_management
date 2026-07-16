@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import { getCurrentUser, logout } from '../lib/auth'
-import { fetchTasks, fetchSettings, updateTaskStatus, logStatusChange } from '../lib/tasks'
+import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { runFetch, createTask, updateTask } from '../lib/api'
 import { formatDateTime } from '../lib/format'
 import { BILLING_URL } from '../lib/pricing'
@@ -103,9 +103,8 @@ export default function Dashboard() {
     setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, status } : t)))
     pendingWrites.current += 1
     try {
+      // 操作ログは Worker（サーバー側）が更新と同時に記録する
       await updateTaskStatus(task.id, status)
-      // ログの記録失敗はステータス変更自体には影響させない
-      logStatusChange(task, task.status, status, user?.display_name).catch(() => {})
     } catch (err) {
       setTasks(prev)
       setError(err.message)

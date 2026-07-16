@@ -74,9 +74,92 @@ async function handleRunFetch(req) {
   }
 }
 
+// GET /api/tasks — タスク一覧（受信日時の新しい順）。ログイン必須。
+// データ面（Supabase REST）は anon キーでの匿名アクセスを全廃したため、
+// 読み取りも service role 経由・JWT 認証必須の Worker API に統一する。
+async function handleTaskList(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('received_at', { ascending: false })
+    if (error) {
+      console.error('task-list:', error.message)
+      return json({ error: 'タスクの取得に失敗しました' }, 500)
+    }
+    return json({ tasks: data || [] })
+  } catch (err) {
+    console.error('task-list 失敗:', err)
+    return json({ error: 'タスクの取得に失敗しました' }, 500)
+  }
+}
+
+// GET /api/settings — 設定の読み取り（{key: value}）。ログイン必須。
+async function handleSettingsRead(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const supabase = getAdminClient()
+    const { data, error } = await supabase.from('settings').select('key, value')
+    if (error) {
+      console.error('settings-read:', error.message)
+      return json({ error: '設定の取得に失敗しました' }, 500)
+    }
+    const map = {}
+    for (const r of data || []) map[r.key] = r.value
+    return json({ settings: map })
+  } catch (err) {
+    console.error('settings-read 失敗:', err)
+    return json({ error: '設定の取得に失敗しました' }, 500)
+  }
+}
+
+// GET /api/logs — 操作ログ（新しい順・上限200）。ログイン必須。
+async function handleLogs(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('id, log_type, actor, message, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) {
+      console.error('logs:', error.message)
+      return json({ error: 'ログの取得に失敗しました' }, 500)
+    }
+    return json({ logs: data || [] })
+  } catch (err) {
+    console.error('logs 失敗:', err)
+    return json({ error: 'ログの取得に失敗しました' }, 500)
+  }
+}
+
+// GET /api/usage?month=YYYY-MM — 月次利用量。ログイン必須。
+async function handleUsage(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const month = new URL(req.url).searchParams.get('month') || ''
+    if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
+    const supabase = getAdminClient()
+    const { data, error } = await supabase
+      .from('api_usage')
+      .select('month, input_tokens, output_tokens, calls, updated_at')
+      .eq('month', month)
+      .maybeSingle()
+    if (error) {
+      console.error('usage:', error.message)
+      return json({ error: '利用量の取得に失敗しました' }, 500)
+    }
+    return json({ usage: data })
+  } catch (err) {
+    console.error('usage 失敗:', err)
+    return json({ error: '利用量の取得に失敗しました' }, 500)
+  }
+}
+
 // PUT /api/settings — 設定の保存。ログイン必須。
-// フロントからの読み取りは anon キーで settings テーブルを直接 SELECT する
-// （RLS で参照は許可済み）。書き込みだけ service role 経由に限定する。
 const ALLOWED_SETTING_KEYS = new Set([
   'fetch_interval_minutes',
   'active_hours_start',
@@ -195,8 +278,8 @@ async function handleTaskCreate(req) {
   }
 }
 
-// PATCH /api/tasks — タスクの担当者・期限・留意事項・タイトルの編集。ログイン必須。
-// フロントの anon キーは status 列しか更新できないため、その他の列は service role 経由で更新する。
+// PATCH /api/tasks — タスクの担当者・期限・留意事項・タイトル・ステータスの編集。ログイン必須。
+// データ面はすべて service role 経由に統一したため、カンバンのステータス変更もここで扱う。
 async function handleTaskUpdate(req) {
   const auth = await verifyRequestAuth(req)
   if (!auth) return json({ error: '認証が必要です' }, 401)
@@ -223,11 +306,22 @@ async function handleTaskUpdate(req) {
       const d = normalizeDueDate(payload.due_date)
       if (d !== undefined) fields.due_date = d
     }
+    if (typeof payload.status === 'string' && VALID_STATUSES.has(payload.status)) {
+      fields.status = payload.status
+    }
     if (Object.keys(fields).length === 0) {
       return json({ error: '更新できる項目がありません' }, 400)
     }
 
     const supabase = getAdminClient()
+
+    // ステータス変更時は操作ログに残すため、更新前の値を取得しておく
+    let prevStatus = null
+    if (fields.status) {
+      const { data: before } = await supabase.from('tasks').select('title, status').eq('id', id).maybeSingle()
+      prevStatus = before?.status ?? null
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .update(fields)
@@ -235,6 +329,16 @@ async function handleTaskUpdate(req) {
       .select()
       .single()
     if (error) return json({ error: `更新に失敗しました: ${error.message}` }, 500)
+
+    if (fields.status && prevStatus && prevStatus !== fields.status) {
+      await supabase.from('activity_logs').insert({
+        log_type: 'status_change',
+        actor: auth.display_name || auth.username || '不明なユーザー',
+        message: `「${data.title}」のステータスを ${prevStatus} → ${fields.status} に変更`,
+        detail: { task_id: id },
+      })
+    }
+
     return json({ ok: true, task: data })
   } catch (err) {
     console.error('task-update 失敗:', err)
@@ -354,14 +458,21 @@ export default {
       return req.method === 'POST' ? handleRunFetch(req) : json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname === '/api/settings') {
-      return req.method === 'PUT' || req.method === 'POST'
-        ? handleSettings(req)
-        : json({ error: 'Method Not Allowed' }, 405)
+      if (req.method === 'GET') return handleSettingsRead(req)
+      if (req.method === 'PUT' || req.method === 'POST') return handleSettings(req)
+      return json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname === '/api/tasks') {
+      if (req.method === 'GET') return handleTaskList(req)
       if (req.method === 'POST') return handleTaskCreate(req)
       if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
       return json({ error: 'Method Not Allowed' }, 405)
+    }
+    if (pathname === '/api/logs') {
+      return req.method === 'GET' ? handleLogs(req) : json({ error: 'Method Not Allowed' }, 405)
+    }
+    if (pathname === '/api/usage') {
+      return req.method === 'GET' ? handleUsage(req) : json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname === '/api/attachments') {
       return req.method === 'GET' ? handleListAttachments(req) : json({ error: 'Method Not Allowed' }, 405)

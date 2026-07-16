@@ -124,9 +124,12 @@ create trigger trg_tasks_updated_at
   for each row execute function set_updated_at();
 
 -- Row Level Security
--- フロントエンドは anon key のみを使用するため、
--- tasks/settings は読み取りを許可し、書き込みは service role (Netlify Functions) 経由に限定する。
--- users テーブルはフロントエンドから一切アクセスさせない（service role のみ）。
+-- フロントエンドは Supabase を直接読み書きしない（anon key による匿名アクセスは全廃）。
+-- tasks/settings/activity_logs/api_usage への読み書きはすべて Worker が
+-- service role 経由・JWT 認証必須の /api/* を通して行う。
+-- anon(publishable) キーは公開値であり、これに読み書き権限を与えると
+-- 未認証の第三者が顧客データを読める／改ざんできてしまうため、
+-- RLS は有効のままポリシーを一切持たせず、GRANT もすべて剥奪する。
 
 alter table tasks enable row level security;
 alter table settings enable row level security;
@@ -134,46 +137,20 @@ alter table users enable row level security;
 alter table api_usage enable row level security;
 alter table activity_logs enable row level security;
 
+-- 過去に存在した匿名向けの緩いポリシーを削除（RLS 有効・ポリシー無し = anon は一切アクセス不可）
 drop policy if exists "tasks_select_all" on tasks;
-create policy "tasks_select_all" on tasks
-  for select using (true);
-
--- フロントエンド（anon key）はカンバンのステータス変更のみ行える。
--- RLSの with check だけでは「どの列を更新できるか」を制限できないため、
--- 列レベルのGRANTで status 列のみ更新可能にする。
--- INSERT / DELETE / その他の列の更新は service role（Netlify Functions）経由に限定される。
 drop policy if exists "tasks_update_status" on tasks;
-create policy "tasks_update_status" on tasks
-  for update using (true) with check (true);
-
-revoke insert, update, delete on tasks from anon, authenticated;
-grant update (status) on tasks to anon, authenticated;
-
 drop policy if exists "settings_select_all" on settings;
-create policy "settings_select_all" on settings
-  for select using (true);
-
--- api_usage はフロントエンドから参照のみ許可。書き込みは service role（rpc）経由。
 drop policy if exists "api_usage_select_all" on api_usage;
-create policy "api_usage_select_all" on api_usage
-  for select using (true);
-
-grant select on api_usage to anon, authenticated;
-revoke insert, update, delete on api_usage from anon, authenticated;
-
--- activity_logs はフロントエンドから参照と追記のみ許可（改変・削除は service role のみ）。
 drop policy if exists "activity_logs_select_all" on activity_logs;
-create policy "activity_logs_select_all" on activity_logs
-  for select using (true);
-
 drop policy if exists "activity_logs_insert_all" on activity_logs;
-create policy "activity_logs_insert_all" on activity_logs
-  for insert with check (true);
 
-grant select, insert on activity_logs to anon, authenticated;
-revoke update, delete on activity_logs from anon, authenticated;
+revoke all on tasks         from anon, authenticated;
+revoke all on settings      from anon, authenticated;
+revoke all on api_usage     from anon, authenticated;
+revoke all on activity_logs from anon, authenticated;
 
 revoke all on function add_api_usage(text, bigint, bigint, integer) from public, anon, authenticated;
 grant execute on function add_api_usage(text, bigint, bigint, integer) to service_role;
 
--- users テーブルには anon 向けポリシーを一切作成しない（service role key のみが操作可能）
+-- users テーブルには anon 向けポリシーを一切作成しない（service role key のみが操作可能。従来どおり）

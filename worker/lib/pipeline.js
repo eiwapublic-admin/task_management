@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, listMessageIds, getMessage, getThreadMessages } from './gmail.js'
+import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 
@@ -11,6 +11,66 @@ const MAX_MESSAGES = 40
 const MAX_BODY_PREVIEW = 20000
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
+
+// 分類器（Claude）に読ませる添付ファイルの対応 MIME と種別。
+// PDF は document ブロック、主要な画像形式は image ブロックとして渡す。
+// TIFF は Claude が非対応のため対象外（従来 FAX の TIFF はここに含めない）。
+const CLASSIFY_DOC_TYPES = {
+  'application/pdf': 'pdf',
+  'image/png': 'image',
+  'image/jpeg': 'image',
+  'image/jpg': 'image',
+  'image/gif': 'image',
+  'image/webp': 'image',
+}
+// 1ファイルあたりの上限（Claude の PDF 上限は 32MB。安全側で 10MB）。
+const MAX_CLASSIFY_DOC_BYTES = 10 * 1024 * 1024
+// 1メールで分類器に渡す添付の最大数と合計サイズ（コスト・リクエストサイズの保護）。
+const MAX_CLASSIFY_DOCS = 5
+const MAX_CLASSIFY_TOTAL_BYTES = 12 * 1024 * 1024
+
+// Gmail の添付は base64url。Claude は改行なしの標準 base64 を要求するため変換する。
+function base64urlToBase64(data) {
+  let s = (data || '').replace(/-/g, '+').replace(/_/g, '/').replace(/\s+/g, '')
+  const pad = s.length % 4
+  if (pad) s += '='.repeat(4 - pad)
+  return s
+}
+
+// メールの添付から、分類器に読ませる PDF/画像を集めて取得する。
+// 対応形式・サイズ上限・件数上限でフィルタし、実体（base64）を取得して返す。
+// FAX 転送メール（PDF/画像）や見積書・注文書などをそのまま Claude に読ませるために使う。
+async function collectClassifierDocuments(accessToken, email) {
+  const atts = email.attachments || []
+  const docs = []
+  let total = 0
+  for (const a of atts) {
+    if (docs.length >= MAX_CLASSIFY_DOCS) break
+    const kind = CLASSIFY_DOC_TYPES[(a.mimeType || '').toLowerCase()]
+    if (!kind) continue
+    if (!a.attachmentId) continue
+    if (a.size && a.size > MAX_CLASSIFY_DOC_BYTES) continue
+    if (total + (a.size || 0) > MAX_CLASSIFY_TOTAL_BYTES) continue
+    try {
+      const { data, size } = await getAttachmentData(accessToken, email.id, a.attachmentId)
+      if (!data) continue
+      if (size && size > MAX_CLASSIFY_DOC_BYTES) continue
+      total += size || 0
+      if (total > MAX_CLASSIFY_TOTAL_BYTES) break
+      const base64 = base64urlToBase64(data)
+      if (kind === 'pdf') {
+        docs.push({ type: 'pdf', data: base64, filename: a.filename })
+      } else {
+        // image/jpg は Claude 的には image/jpeg
+        const mediaType = a.mimeType.toLowerCase() === 'image/jpg' ? 'image/jpeg' : a.mimeType.toLowerCase()
+        docs.push({ type: 'image', mediaType, data: base64, filename: a.filename })
+      }
+    } catch {
+      // 個別の添付取得失敗は無視して分類は継続する
+    }
+  }
+  return docs
+}
 
 // 担当者を特定できないときに設定する既定値。
 // 以前は先頭の担当者（橋口）を既定にしていたが、未判定であることを
@@ -315,7 +375,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
       processedThreads.add(email.threadId)
 
-      const { classification: result, usage } = await classifyEmail(email, context)
+      // 添付（PDF/画像）があれば分類器に読ませる。FAX 転送メールや見積書等に対応。
+      let documents = []
+      try {
+        documents = await collectClassifierDocuments(accessToken, email)
+      } catch (err) {
+        summary.errors.push(`attachment: ${String(err.message || err)}`)
+      }
+
+      const { classification: result, usage } = await classifyEmail(email, context, documents)
       usageInput += usage.input_tokens
       usageOutput += usage.output_tokens
       classifyCalls += 1
@@ -365,10 +433,33 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const senderEmail =
         extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
 
+      // 添付（FAX/PDF/画像）から Claude が読み取った要約。FAX 転送メールは本文が
+      // ほぼ無いため、この要約を本文として表示する。通常メールで本文もある場合は
+      // 本文の後ろに添付内容を追記する。
+      const docSummary =
+        typeof result.document_summary === 'string' && result.document_summary.trim()
+          ? result.document_summary.trim()
+          : null
+      const emailBody = compactBody(email.body)
+      let bodyPreview
+      if (docSummary) {
+        bodyPreview =
+          emailBody && emailBody.length > 20
+            ? `${emailBody}\n\n──────────\n【添付資料の内容（自動読取）】\n${docSummary}`
+            : `【添付資料の内容（自動読取）】\n${docSummary}`
+      } else {
+        bodyPreview = emailBody
+      }
+      bodyPreview = bodyPreview.slice(0, MAX_BODY_PREVIEW)
+
       const outboundNote = isOutbound
         ? '自社から社外への新規送信メールのため、初めから「返信済み」で登録しました。'
         : null
-      const classificationNote = [result.reason || null, outboundNote].filter(Boolean).join('\n') || null
+      const docNote = docSummary && documents.length
+        ? `添付${documents.length}件（PDF/画像）を読み取って内容を反映しました。`
+        : null
+      const classificationNote =
+        [result.reason || null, outboundNote, docNote].filter(Boolean).join('\n') || null
 
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
@@ -382,7 +473,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         contact,
         sender_email: senderEmail,
         subject: email.subject || '（件名なし）',
-        body_preview: compactBody(email.body).slice(0, MAX_BODY_PREVIEW),
+        body_preview: bodyPreview,
         received_at: email.receivedAt || new Date().toISOString(),
         classification_note: classificationNote,
       })
