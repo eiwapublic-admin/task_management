@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
 import { UNASSIGNED } from '../lib/status'
 
-// カードに表示する送信元。Claude が抽出した会社名・氏名（sender_display）を優先し、
-// 無い場合は From ヘッダーの表示名（"名前 <mail@...>" の名前部分）にフォールバックする。
+// カードに表示する発信元の名前。先方（顧客＝タスクのオーナー）の宛名 contact を最優先で表示する。
+// 自社発信・フォーム経由のタスクは sender_display が自社担当者になるため、contact があればそれを使う。
+// contact が無ければ sender_display、それも無ければ From ヘッダーの表示名にフォールバックする。
 function senderLabel(task) {
+  if (task.contact) return task.contact
   if (task.sender_display) return task.sender_display
   const from = task.sender || ''
   const name = from.replace(/<[^>]*>/g, '').replace(/["']/g, '').trim()
