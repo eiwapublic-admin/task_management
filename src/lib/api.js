@@ -58,9 +58,12 @@ export function listAttachments(threadId) {
 
 // 添付ファイルを Gmail から取得してブラウザに保存させる（/api/attachment）。
 // バイナリを扱うため authFetch は使わず、取得した Blob をダウンロードとして起動する。
-export async function downloadAttachment({ messageId, attachmentId, filename, mimeType }) {
+// thread_id はタスク所属の検証に使う（サーバー側で thread_id がタスクに
+// 紐づくこと・message_id がそのスレッドに実在することを確認する）。
+export async function downloadAttachment({ threadId, messageId, attachmentId, filename, mimeType }) {
   const token = getToken()
   const params = new URLSearchParams({
+    thread_id: threadId,
     message_id: messageId,
     attachment_id: attachmentId,
     filename: filename || 'attachment',

@@ -3,7 +3,7 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
-import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
+import { getAccessToken, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
 import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
 
 // Cloudflare Worker 本体。
@@ -11,8 +11,13 @@ import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from '.
 // - scheduled: 5分ごとの Cron Trigger でメール取得パイプラインを実行
 //   （実際の取得間隔は settings.fetch_interval_minutes で runPipeline 内がゲート）
 
+// ログイン失敗回数の上限とロックアウト期間（総当たり/辞書攻撃対策）。
+// IP + ユーザー名の組で数え、上限に達すると一定時間ログインを拒否する。
+const LOGIN_MAX_ATTEMPTS = 8
+const LOGIN_LOCKOUT_SECONDS = 15 * 60
+
 // POST /api/login — ユーザー名/パスワード認証して JWT を返す
-async function handleLogin(req) {
+async function handleLogin(req, env) {
   try {
     const { username, password } = await req.json().catch(() => ({}))
     if (!username || !password) {
@@ -26,26 +31,55 @@ async function handleLogin(req) {
       return json({ error: 'サーバー設定エラーが発生しました' }, 500)
     }
 
+    // KV が使えない環境（ローカル開発等）でも認証自体は動くよう、binding が
+    // 無ければレート制限をスキップする（本番は wrangler.jsonc でバインド済み）。
+    const attemptsKv = env?.LOGIN_ATTEMPTS || null
+    const ip = req.headers.get('cf-connecting-ip') || 'unknown'
+    const attemptKey = `fail:${ip}:${username}`
+    if (attemptsKv) {
+      const failed = Number(await attemptsKv.get(attemptKey)) || 0
+      if (failed >= LOGIN_MAX_ATTEMPTS) {
+        return json({ error: '試行回数が多すぎます。しばらくしてから再度お試しください' }, 429)
+      }
+    }
+
     const supabaseAdmin = getAdminClient()
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('id, username, password_hash, display_name')
+      .select('id, username, password_hash, display_name, token_version')
       .eq('username', username)
       .maybeSingle()
 
     // ユーザー不在とパスワード不一致は同じメッセージにして、ユーザー名の存在を推測させない
     if (error || !user) {
+      if (attemptsKv) {
+        const failed = (Number(await attemptsKv.get(attemptKey)) || 0) + 1
+        await attemptsKv.put(attemptKey, String(failed), { expirationTtl: LOGIN_LOCKOUT_SECONDS })
+      }
       return json({ error: 'ユーザー名またはパスワードが違います' }, 401)
     }
 
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) {
+      if (attemptsKv) {
+        const failed = (Number(await attemptsKv.get(attemptKey)) || 0) + 1
+        await attemptsKv.put(attemptKey, String(failed), { expirationTtl: LOGIN_LOCKOUT_SECONDS })
+      }
       return json({ error: 'ユーザー名またはパスワードが違います' }, 401)
     }
 
+    if (attemptsKv) await attemptsKv.delete(attemptKey)
+
+    // tv（発行時点の token_version）を埋め込む。後日 token_version をインクリメント
+    // することで、このトークンを含む当該ユーザーの全トークンを即時失効できる。
     const token = await signJwt(
-      { sub: user.id, username: user.username, display_name: user.display_name },
+      {
+        sub: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        tv: user.token_version ?? 0,
+      },
       SESSION_SECRET
     )
 
@@ -354,58 +388,64 @@ const GMAIL_ID_RE = /^[A-Za-z0-9_-]+$/
 //   thread_id 指定時はスレッド内の全メッセージの添付を集約して返す（各添付に message_id 付き）。
 //   これにより返信で本文が上書きされても、最初・途中の返信の添付が失われずに表示できる。
 //   共有アカウントの認証情報で Gmail から取得するため、担当者が Gmail にログインしていなくても参照できる。
+// タスクに紐づく Gmail スレッド ID かどうかを検証する。
+// 存在しなければ null を返す（タスク化されていない共有メールボックスの
+// 任意メッセージまで JWT だけで読めてしまわないよう、常にタスク所属を要求する）。
+async function findTaskByThreadId(supabase, threadId) {
+  const { data } = await supabase
+    .from('tasks')
+    .select('sender, sender_email, gmail_message_id')
+    .eq('gmail_thread_id', threadId)
+    .maybeSingle()
+  return data || null
+}
+
+// GET /api/attachments?thread_id=... — 添付ファイル一覧（メタ情報）を返す。ログイン必須。
+// タスクに紐づかない共有Gmailの任意スレッドを引けないよう、thread_id は必ず
+// tasks.gmail_thread_id に存在するものに限定する（message_id 単体の経路は廃止）。
 async function handleListAttachments(req) {
   if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
   try {
     const params = new URL(req.url).searchParams
     const threadId = params.get('thread_id') || ''
-    const messageId = params.get('message_id') || ''
+    if (!threadId || !GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が必要です' }, 400)
+
+    const supabase = getAdminClient()
+    const task = await findTaskByThreadId(supabase, threadId)
+    if (!task) return json({ error: '対象が見つかりません' }, 404)
+
     const accessToken = await getAccessToken()
-    if (threadId) {
-      if (!GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が不正です' }, 400)
-      // 対象タスクの顧客(counterpart)を特定し、同一件名で複数顧客が1スレッドに
-      // まとまった場合に、別顧客宛メッセージの添付が混ざらないよう絞り込む。
-      let counterpart = ''
-      try {
-        const supabase = getAdminClient()
-        const { data: task } = await supabase
-          .from('tasks')
-          .select('sender, sender_email, gmail_message_id')
-          .eq('gmail_thread_id', threadId)
-          .maybeSingle()
-        if (task) {
-          const { data: settingsRows } = await supabase
-            .from('settings')
-            .select('key, value')
-            .in('key', ['company_domains', 'shared_gmail'])
-          const settings = {}
-          for (const r of settingsRows || []) settings[r.key] = r.value
-          const isCompanyAddress = makeIsCompanyAddress(
-            settings.shared_gmail,
-            parseCompanyDomains(settings.company_domains)
-          )
-          const meta = await getThreadMessages(accessToken, threadId)
-          counterpart = resolveCounterpart(task, meta, isCompanyAddress)
-        }
-      } catch (e) {
-        // 顧客特定に失敗しても添付一覧自体は返す（フィルタ無し）
-        console.error('counterpart 特定失敗:', e)
-      }
-      const all = await getThreadAttachments(accessToken, threadId, counterpart)
-      // 同一ファイル（ファイル名 + サイズ + MIME）が複数メッセージに現れる場合は1件に集約する
-      const seen = new Map()
-      for (const a of all) {
-        const key = `${a.filename}|${a.size}|${a.mimeType}`
-        if (!seen.has(key)) seen.set(key, a)
-      }
-      return json({ attachments: Array.from(seen.values()) })
+    // 対象タスクの顧客(counterpart)を特定し、同一件名で複数顧客が1スレッドに
+    // まとまった場合に、別顧客宛メッセージの添付が混ざらないよう絞り込む。
+    let counterpart = ''
+    try {
+      const { data: settingsRows } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', ['company_domains', 'shared_gmail'])
+      const settings = {}
+      for (const r of settingsRows || []) settings[r.key] = r.value
+      const isCompanyAddress = makeIsCompanyAddress(
+        settings.shared_gmail,
+        parseCompanyDomains(settings.company_domains)
+      )
+      const meta = await getThreadMessages(accessToken, threadId)
+      counterpart = resolveCounterpart(task, meta, isCompanyAddress)
+    } catch (e) {
+      // 顧客特定に失敗しても添付一覧自体は返す（フィルタ無し）
+      console.error('counterpart 特定失敗:', e)
     }
-    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
-    const attachments = await getMessageAttachments(accessToken, messageId)
-    return json({ attachments })
+    const all = await getThreadAttachments(accessToken, threadId, counterpart)
+    // 同一ファイル（ファイル名 + サイズ + MIME）が複数メッセージに現れる場合は1件に集約する
+    const seen = new Map()
+    for (const a of all) {
+      const key = `${a.filename}|${a.size}|${a.mimeType}`
+      if (!seen.has(key)) seen.set(key, a)
+    }
+    return json({ attachments: Array.from(seen.values()) })
   } catch (err) {
     console.error('attachments 一覧取得失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: '添付ファイル一覧の取得に失敗しました' }, 500)
   }
 }
 
@@ -415,19 +455,34 @@ function base64UrlToBytes(data) {
   return new Uint8Array(Buffer.from(normalized, 'base64'))
 }
 
-// GET /api/attachment?message_id=..&attachment_id=..&filename=..&mime=.. — 添付ファイル本体を返す。ログイン必須。
+// GET /api/attachment?thread_id=..&message_id=..&attachment_id=..&filename=..&mime=..
+//   添付ファイル本体を返す。ログイン必須。
+//   thread_id がタスクに紐づくこと・message_id がそのスレッドに実在することを
+//   検証してから取得する（タスク化されていない共有Gmailの任意メッセージを
+//   JWTだけで引けてしまわないようにするため）。
 async function handleDownloadAttachment(req) {
   if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
   try {
     const params = new URL(req.url).searchParams
+    const threadId = params.get('thread_id') || ''
     const messageId = params.get('message_id') || ''
     const attachmentId = params.get('attachment_id') || ''
     const filename = (params.get('filename') || 'attachment').slice(0, 255)
     const mimeType = params.get('mime') || 'application/octet-stream'
+    if (!threadId || !GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が必要です' }, 400)
     if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
     if (!attachmentId) return json({ error: 'attachment_id が必要です' }, 400)
 
+    const supabase = getAdminClient()
+    const task = await findTaskByThreadId(supabase, threadId)
+    if (!task) return json({ error: '対象が見つかりません' }, 404)
+
     const accessToken = await getAccessToken()
+    const threadMeta = await getThreadMessages(accessToken, threadId)
+    if (!threadMeta.some((m) => m.id === messageId)) {
+      return json({ error: '対象が見つかりません' }, 404)
+    }
+
     const { data } = await getAttachmentData(accessToken, messageId, attachmentId)
     const bytes = base64UrlToBytes(data)
 
@@ -443,7 +498,7 @@ async function handleDownloadAttachment(req) {
     })
   } catch (err) {
     console.error('attachment ダウンロード失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: '添付ファイルの取得に失敗しました' }, 500)
   }
 }
 
@@ -452,7 +507,7 @@ export default {
     const { pathname } = new URL(req.url)
 
     if (pathname === '/api/login') {
-      return req.method === 'POST' ? handleLogin(req) : json({ error: 'Method Not Allowed' }, 405)
+      return req.method === 'POST' ? handleLogin(req, env) : json({ error: 'Method Not Allowed' }, 405)
     }
     if (pathname === '/api/run-fetch') {
       return req.method === 'POST' ? handleRunFetch(req) : json({ error: 'Method Not Allowed' }, 405)

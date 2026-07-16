@@ -156,6 +156,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setDownloadError('')
     try {
       await downloadAttachment({
+        threadId: task.gmail_thread_id,
         messageId: att.messageId || task.gmail_message_id,
         attachmentId: att.attachmentId,
         filename: att.filename,

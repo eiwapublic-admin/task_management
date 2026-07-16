@@ -16,6 +16,11 @@
     // 5分ごとに起動。実際の取得間隔は settings.fetch_interval_minutes でゲート
     "crons": ["*/5 * * * *"]
   },
+  // ログイン試行回数の記録用（総当たり/辞書攻撃対策のレート制限。IPごとに一定回数の
+  // 失敗でロックアウトする。handleLogin から env.LOGIN_ATTEMPTS として参照する）
+  "kv_namespaces": [
+    { "binding": "LOGIN_ATTEMPTS", "id": "34182593196e4bc08791fc1091a59f87" }
+  ],
   "observability": {
     "enabled": true
   }
