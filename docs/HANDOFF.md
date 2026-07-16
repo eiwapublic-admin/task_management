@@ -1,6 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-07-15
+最終更新: 2026-07-16
 設計の詳細は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md) を参照。
 
 ---
@@ -9,7 +9,7 @@
 
 - **本番 URL**: https://task-management.eiwa-public.workers.dev
 - **稼働状況**: 全機能開通済み（ログイン → Gmail 取得 → Claude 分類 → カンバン登録 → 返信自動検知 → 5分ごとの Cron）。実メールでのタスク登録を確認済み
-- **リポジトリ**: `eiwapublic-admin/task_management`（デフォルトブランチ main）
+- **リポジトリ**: `eiwapublic-admin/task_management`（デフォルトブランチ main。**2026-07-16 に非公開（Private）化**）
 - **Cloudflare**: Worker 名 `task-management`（アカウントに残す Worker はこの1つだけ）
 - **Supabase**: プロジェクト `Eiwapublic Project`（ref: `pfiogfdnbctunkhslmcp`, region: ap-southeast-2）。スキーマ・マイグレーション適用済み
 - **Anthropic**: $5 クレジット購入済みのアカウントの API キーで稼働（モデル: claude-haiku-4-5）
@@ -46,6 +46,15 @@
     - 詳細画面の1行目に**担当者・受信日時・期限を横並び**表示。**ステータス行は省略**（フッタのステータス変更ボタンと重複のため）。**送信者の右隣に発信元の宛名**（`contact`）を表示（PR #43 / #44）
     - **返信メールの本文先頭に先方の宛名（会社・氏名＋様）を挿入**し、そのあと2行の空行を空ける（`src/lib/mail.js`）。`contact` を優先し、無ければ `sender_display`＋「様」で補う
     - `contact`（敬称付き宛名。例:「株式会社大屋設備 青山みつき 様」）は分類プロンプトに追加して**新規取得メールから自動生成**（`sender_display`+様 でフォールバック）。既存タスク（生成前で `contact`=null）でも、表示・返信の宛名は `sender_display`+様 でフォールバックされる。列 `tasks.contact` は本番に既存（マイグレーション不要。schema.sql に追記済み）
+19. FAX・PDF添付の読み取り分類（2026-07-16）: 複合機からのFAX転送メール（本文がほぼ無く内容がPDF/画像）や注文書・見積書・請求書などのPDF添付を、他のメールと同等に処理対象化。対応形式のPDF・画像（PDF・PNG・JPEG・GIF・WebP。TIFF非対応）を Claude に読ませ、業務判定・担当割り当てに加えて内容要約（`document_summary`＝顧客・資料の件名・要点）を `body_preview` に反映する（PR #47。詳細は設計書 4-7）。**注意**: メーリングリスト経由で届くFAXはGmail APIの取得対象に入らないため、共有アカウント宛への直接転送（PDF形式）に設定変更する必要がある（実際のFAX取り込みテストは未完了。設定変更待ち）
+20. セキュリティ強化（2026-07-16）: 外部セキュリティ審査（2026-07-15実施）の指摘を全件是正。
+    - **C1（致命的）**: anon(publishable) キーによる匿名アクセスを全廃。tasks/settings/activity_logs/api_usage への読み書きを Worker(`/api/*`・service role・JWT必須) 経由に統一し、Supabase側でanon/authenticatedのGRANTを全剥奪（PR #47）
+    - **C2**: リポジトリをPrivate化、公開されていたpublishableキーを削除、GitHub Secret Protection/Push protectionを有効化（確認）
+    - **H1**: ログインのレート制限（Cloudflare KV `LOGIN_ATTEMPTS`、8回失敗で15分ロックアウト）
+    - **H2**: JWT失効機構（`users.token_version` 追加。ログイン時に `tv` を埋め込み毎リクエストDB突合。パスワード変更等で `token_version` をインクリメントすれば即時全トークン失効可能）
+    - **H3**: 添付/メール取得APIを `thread_id` 必須・タスク所属チェックに限定（タスク化されていない共有メールの任意メッセージを引けなくした）
+    - **N1・N2**: クライアントへのエラー詳細非露出（汎用メッセージ化）、セキュリティヘッダ/CSP付与
+    （PR #47〜#49。詳細は設計書 8章。N3〜N7は運用ルール整備が中心で未着手）
 
 ---
 
@@ -83,13 +92,19 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 | Secret | 用途 |
 |---|---|
 | CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID | CI からのデプロイ |
-| VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY | フロントビルド埋め込み（公開値） |
 | SUPABASE_URL / SUPABASE_SERVICE_KEY | Worker → Supabase（service role） |
 | SESSION_SECRET | JWT 署名鍵 |
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
 
-※ `VITE_SUPABASE_URL` / `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`src/lib/supabase.js` / `worker/lib/supabase-admin.js`）。Secrets は 2026-07-06 に正しい値へ修正済み（フォールバックは保険として残置）。
+※ `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`worker/lib/supabase-admin.js`）。Secrets は 2026-07-06 に正しい値へ修正済み（フォールバックは保険として残置）。
+
+※ `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（フロントビルド埋め込みの公開値）は **2026-07-16 に削除**。フロントが anon キーで Supabase を直接読み書きする経路を全廃したため不要になった（セキュリティ強化。上記「経緯の要約」20番）。
+
+### KV Namespace（`wrangler.jsonc` にバインド。2026-07-16 追加）
+| バインディング名 | 用途 |
+|---|---|
+| LOGIN_ATTEMPTS | ログインのレート制限用。IP+ユーザー名ごとの失敗回数を記録（15分TTL） |
 
 ### ローカル開発
 ```bash
@@ -104,17 +119,23 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - 追加列: `tasks.remarks`（留意事項。詳細画面で手動入力。マイグレーション `add_remarks_to_tasks` 適用済み）
 - 追加列: `tasks.last_reply_message_id`（返信検知の冪等化用。最後に取り込んだ返信の Gmail message id。マイグレーション `add_last_reply_message_id_to_tasks` 適用済み。NULL 許容・後方互換）
 - 列: `tasks.contact`（先方担当者の宛名「会社・氏名＋様」。返信メール冒頭と詳細画面の送信者右隣に使う。**本番には既存の列**のためマイグレーション不要。schema.sql に追記済み）
+- 追加列: `users.token_version`（JWT失効用。既定0。マイグレーション `add_users_token_version` 適用済み。2026-07-16）
+- RLS/権限: `lockdown_anon_access` マイグレーション適用済み（2026-07-16）。anon/authenticated への tasks/settings/activity_logs/api_usage への GRANT を全剥奪し、緩いポリシーを削除。データ面へのアクセスはWorker(service role)経由に一本化（詳細は設計書8章）
 
-### タスクの手動登録・編集 API（Worker）
-- フロントの anon キーは RLS で **status 列の更新のみ**許可。担当者・期限・留意事項の編集や手動登録は Worker の `/api/tasks`（service role）経由で行う。
+### タスク・設定・ログ・利用量 API（Worker）
+- **2026-07-16 変更**: 従来はフロントの anon キーが Supabase を直接読み取り、status 列の更新のみ anon に許可していたが、anon キーは公開値で匿名の第三者に全データを読み書きされる脆弱性だったため全廃。**タスク一覧・設定・ログ・利用量の読み取りも含め、すべて Worker の `/api/*`（service role・JWT必須）経由**に統一した。
+  - `GET /api/tasks`: タスク一覧（受信日時の新しい順）
   - `POST /api/tasks`: 手動登録（未処理列の「＋」）。`gmail_thread_id`/`gmail_message_id` は `manual:<uuid>`、`source='manual'`
-  - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` を更新
-- いずれもログイン必須（JWT）。
+  - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` / **`status`** を更新（ステータス変更時はサーバー側で操作ログを記録）
+  - `GET /api/settings` / `PUT /api/settings`: 設定の読み取り・保存
+  - `GET /api/logs`: 操作ログ（新しい順・上限200）
+  - `GET /api/usage?month=YYYY-MM`: 月次API利用量
+- いずれもログイン必須（JWT）。`src/lib/tasks.js` が `authFetch`（`src/lib/api.js`）経由で呼ぶ。フロントは匿名 Supabase クライアントを持たない（`src/lib/supabase.js` は削除済み）。
 
 ### 添付ファイル API（Worker）
 - 元メールの添付ファイルは **DB に保存せず、詳細画面を開くたびに Worker 経由で Gmail から取得**する（既存タスクにも対応・スキーマ変更不要）。
-  - `GET /api/attachments?thread_id=…`: **スレッド全体**の添付一覧（ファイル名・MIME・サイズ・attachmentId・所属 message_id）を返す。返信で本文が上書きされても最初・途中の添付が消えないようスレッド単位で集約する。署名等のインライン画像は除外、同一ファイル（名前+サイズ+MIME）は集約。**対象タスクの顧客(counterpart)が参加しているメッセージの添付だけ**に絞り込む（同一件名で複数顧客が1スレッドにまとまった場合に別顧客宛の添付が混ざるのを防ぐ）。`message_id=…` 指定にも後方互換で対応（単一メッセージの添付）
-  - `GET /api/attachment?message_id=…&attachment_id=…&filename=…&mime=…`: 添付本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）。フロントは一覧の各添付が持つ `messageId` を使う
+  - `GET /api/attachments?thread_id=…`（`thread_id` 必須）: **スレッド全体**の添付一覧（ファイル名・MIME・サイズ・attachmentId・所属 message_id）を返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404（タスクに紐づかない共有メールの任意スレッドを引けないようにするため。2026-07-16対応）。返信で本文が上書きされても最初・途中の添付が消えないようスレッド単位で集約する。署名等のインライン画像は除外、同一ファイル（名前+サイズ+MIME）は集約。**対象タスクの顧客(counterpart)が参加しているメッセージの添付だけ**に絞り込む（同一件名で複数顧客が1スレッドにまとまった場合に別顧客宛の添付が混ざるのを防ぐ）
+  - `GET /api/attachment?thread_id=…&message_id=…&attachment_id=…&filename=…&mime=…`（`thread_id` 必須）: 添付本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから取得する（2026-07-16対応。以前は `message_id` の形式チェックのみで、タスク化されていない任意メッセージまで取得できた）
 - いずれもログイン必須（JWT）。共有アカウントの認証情報（既存の `gmail.readonly` スコープ）で取得するため、担当者が Gmail に未ログインでも落とせる。
 - アドレス判定・顧客(counterpart)特定のロジックは `worker/lib/mail-utils.js` に集約（返信検知パイプラインと共有）。
 
@@ -171,9 +192,12 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 
 ## 6. 残タスク・改善候補
 
-- [x] GitHub Secrets の `VITE_SUPABASE_URL` / `SUPABASE_URL` を正しい URL に修正（2026-07-06 対応済み）
+- [x] GitHub Secrets の `VITE_SUPABASE_URL` / `SUPABASE_URL` を正しい URL に修正（2026-07-06 対応済み。VITE_SUPABASE系は2026-07-16に不要になり削除）
 - [ ] 実運用での振り分け精度を見ながら org_context を調整
 - [ ] 返信検知の精度を実運用で観察（誤検知・検知漏れがあれば操作ログとタスクの「AI判定の理由」を手がかりに調整）
 - [ ] 社員による評価運用（2026-07-15〜）。評価ユーザーは `hyoka` 登録済み。追加は Supabase `users` に INSERT。気づき（返信検知・本文/添付の見え方・モバイル操作性など）は操作ログと「AI判定の理由」を手がかりに調整
 - [x] 会社アカウントへの移管（2026-07-13 完了。上記 5 章）
 - [ ] （任意）ロゴを原本の配色で使いたい場合は `public/logo.svg` を差し替え（原本の枠線版は `public/logo_black.svg` に保管済み）
+- [x] セキュリティ審査の致命的・危険・注意（コード対応分）への是正（2026-07-16 完了。C1/C2/H1〜H3/N1・N2。上記「経緯の要約」20番、設計書8章）
+- [ ] FAXの取り込み設定変更: 現状メーリングリスト経由でFAXが届いており、Gmail APIで取得できない。共有アカウント宛への直接転送（PDF形式）に変更後、実データでの取り込みテストが必要（次回オフィス作業時。上記「経緯の要約」19番）
+- [ ] セキュリティ審査の N3〜N7（運用ルール整備）: Anthropicへの送信データ最小化の検討／秘密情報の定期ローテーション手順化／アカウント運用ルール（パスワード強度・退職時の即失効運用）／操作ログのPII保持ルール／依存関係(`npm audit`)の定期監査。コード変更を伴わないため未着手
