@@ -1,7 +1,8 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-15
+最終更新: 2026-07-16
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
+リポジトリ: `eiwapublic-admin/task_management`（**非公開（Private）**。2026-07-16 にPrivate化）
 
 > 旧設計書 `task-management-spec.md`（Netlify 版）は初期計画の記録として残す。
 > 本書が現行の正であり、両者が食い違う場合は本書に従う。
@@ -62,14 +63,15 @@ worker/
     ├── anthropic.js    Claude API クライアント（分類プロンプト・JSON抽出・課金エラー検知）
     ├── supabase-admin.js  service role クライアント（URL不正時はフォールバック）
     ├── jwt.js          HS256 JWT の署名・検証（Web Crypto）
-    └── http.js         JSONレスポンス・Bearer トークン検証ヘルパー
+    └── http.js         JSONレスポンス・Bearer トークン検証（token_version失効チェック込み）・
+                        全レスポンス共通のセキュリティヘッダ付与（withSecurityHeaders）
 src/
 ├── pages/              Login / Dashboard（カンバン）/ Settings / Logs
 ├── components/         KanbanBoard, KanbanColumn, TaskCard, TaskDetail,
 │                       TaskForm, FilterBar, SettingsPanel, UsagePanel
 ├── pwa/                ReloadPrompt.jsx（更新バナー）, reloadApp.js（ロゴタップ最新化）
-└── lib/                supabase(anon), auth, api, tasks, format, status, pricing,
-                        mail, version（ビルド時刻表示）
+└── lib/                auth, api（authFetch）, tasks（Worker API経由）, format, status,
+                        pricing, mail, version（ビルド時刻表示）
 scripts/
 └── generate-sw.mjs     ビルド時に public/sw.js を生成（SW_VERSION=git SHA を刻印）
 public/
@@ -104,8 +106,10 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - `sender_display`: 送信元の会社名・氏名（**問い合わせフォーム経由は本文の記載を優先**）
    - `contact`: 先方担当者の宛名「会社・氏名＋様」（返信メール冒頭・詳細画面の表示に使う。取れなければ保存時に `sender_display`＋様 でフォールバック）
    - `sender_email`: 返信先メールアドレス（フォーム経由は本文記載のアドレスを優先。取れない場合は Reply-To → From にフォールバック）
+   - `document_summary`: 添付のPDF・画像（FAX転送メールを含む）から読み取った内容の要約（顧客・資料の件名・金額/数量/納期等の要点）。添付が無い/読み取れない場合は null
    - `reason`: 判定理由（振り分けルール調整の参考用に保存）
-5. 業務メールのみ tasks に INSERT（ステータス「未処理」）
+   - **添付（PDF・画像）の読み取り**: 対応形式（PDF・PNG・JPEG・GIF・WebP、1ファイル10MB・合計12MB・最大5件まで）の添付があれば、本文と一緒に Claude へ渡して読み取らせる。FAX転送メール（件名「Attached Image」等・本文ほぼ無し）はこれが無いと内容を判定できないため必須。詳細は 4-7 参照
+5. 業務メールのみ tasks に INSERT（ステータス「未処理」）。`document_summary` があれば `body_preview` に反映（本文が薄いFAXは要約がそのまま本文に、通常メールは本文の後ろに追記）
 6. **返信検知**（2方式。「未処理」タスクに加えて「返信済み」タスクも対象にする）:
    - **件名ベース**: 受信メールの件名（Re: 等を除去して正規化）が対象タスクと一致し、差出人が自社側（共有アドレス or `company_domains` のドメイン）かつ宛先が元の顧客（counterpart）なら返信とみなす（Claude 分類はスキップ＝コスト節約）。担当者が自分のメーラーから返信し CC の社内 ML 経由で共有アドレスに配信されたケースを拾う
    - **スレッドベース**: タスクのスレッドを読み、**スレッド内で最も新しい「自社発」メッセージ**を返信とみなす。顧客が受領返信を最後に送っていても、担当者（自社）の最新の更新返信を採用できる。宛先(To/Cc)に顧客(counterpart)を含むメッセージだけを対象にし、同一件名で複数顧客が1スレッドにまとまった場合の混線を防ぐ
@@ -145,7 +149,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - 4列カンバン（列背景はステータス色を薄く混ぜた濃いめの色）。ステータス名 16px
 - タスクカード: タイトル / 送信元（👤 会社名・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
 - 未処理列のヘッダーに新規タスク手動登録の「＋」ボタン（**青地＋白文字**で強調）
-- 担当者フィルター（チップ、15px）。ドラッグ＆ドロップでステータス変更（anon キーは status 列のみ更新可）
+- 担当者フィルター（チップ、15px）。ドラッグ＆ドロップでステータス変更（`PATCH /api/tasks` 経由。service role・JWT必須）
 - タスク詳細モーダル（幅820px・視認性重視で文字は大きめ・モバイルは1カラム）: タイトル+×は固定ヘッダー、最下部は固定フッタ。フッタ左に「ステータス」見出し＋変更ボタン、右に「メール参照」「返信」ボタン
   - **1行目に担当者・受信日時・期限を横並び**表示（`task-detail-toprow`）。ステータスはフッタの変更ボタンと重複するため本文側では省略
   - **送信者の右隣に発信元の宛名**（`contact`）を表示。`contact` が無ければ `sender_display`＋「様」で補う（生成前の既存タスク向けフォールバック）
@@ -169,19 +173,27 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 ### 4-4. API エンドポイント（Worker）
 
+**2026-07-16 の変更**: 従来はフロントエンドが anon(publishable) キーで Supabase を直接読み書きしていたが、この鍵は公開値であり匿名の第三者が全顧客データを読み取れる致命的な脆弱性だったため全廃した。**データ面（tasks/settings/logs/usage）へのアクセスはすべて Worker の `/api/*` を JWT 認証つきで経由する**方式に統一している（詳細は 8 章）。
+
 | メソッド/パス | 認証 | 内容 |
 |---|---|---|
-| POST `/api/login` | 不要 | bcrypt 照合 → HS256 JWT（**30日**有効）を発行 |
-| POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
-| PUT `/api/settings` | JWT | 許可キーのみ settings に upsert（service role 経由） |
+| POST `/api/login` | 不要 | bcrypt 照合 → HS256 JWT（**30日**有効、`tv`=token_version を埋め込み）を発行。IP+ユーザー名ごとの失敗回数を記録し、8回失敗で15分ロックアウト |
+| GET `/api/tasks` | JWT | タスク一覧（受信日時の新しい順） |
 | POST `/api/tasks` | JWT | タスクの手動登録（`source='manual'`、id は `manual:<uuid>`） |
-| PATCH `/api/tasks` | JWT | `assignee` / `due_date` / `remarks` / `title` を更新（service role 経由） |
-| GET `/api/attachments` | JWT | `thread_id=…` でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。対象タスクの顧客宛メッセージのみに絞り込み。`message_id=…` の単一メッセージ指定にも後方互換 |
-| GET `/api/attachment` | JWT | 添付本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記） |
+| PATCH `/api/tasks` | JWT | `assignee` / `due_date` / `remarks` / `title` / `status` を更新。`status` 変更時はサーバー側で操作ログ（`activity_logs`）を記録 |
+| GET `/api/settings` | JWT | 設定一覧（`{key: value}`） |
+| PUT `/api/settings` | JWT | 許可キーのみ settings に upsert |
+| GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
+| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量 |
+| POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
+| GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み |
+| GET `/api/attachment` | JWT | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
-- 認証必須 API は `Authorization: Bearer <JWT>` を要求。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）。カンバンのステータス変更は Supabase 直結（anon）で Worker を通らない点に注意
+- 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
 - settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`
+- 添付系APIは `thread_id` 必須（`message_id` 単体でタスクに紐づかない共有メールボックスの任意メッセージを引ける経路は廃止済み）
+- 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（ほぼ全ディレクティブ `'self'`）を付与（`worker/lib/http.js` の `withSecurityHeaders`）
 
 > **実装ノート（カレンダーIDの扱い）**: 「栄和共通」は独立した副カレンダーではなく、共有アカウント `eiwa.public@gmail.com` の**メイン（デフォルト）カレンダーに付けた表示名**だった。メインカレンダーの ID はアカウントのメールアドレスそのもの（`eiwa.public@gmail.com`）であり、`calendarList.list` では表示名ではなくメールアドレス名で返るため「栄和共通」という名前では解決できなかった。このため `calendar_name` にカレンダーID（`eiwa.public@gmail.com`）を直接指定する運用にしている。
 
@@ -203,6 +215,16 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **表示用バージョン（`src/lib/version.js`）**: `vite.config.js` の `define` でビルド時刻を `__BUILD_TIME__` に埋め込み、ヘッダーに `ver.YYYY-MM-DD HH:MM`（JST）を表示。端末が最新デプロイを取得できているかの確認用（更新“検知”は SW_VERSION が担い、この表示値とは独立）。
 - **マニフェスト（`public/manifest.webmanifest`）**: ホーム画面追加用。theme_color=#33604d。`index.html` に manifest link・apple-touch-icon・`viewport-fit=cover` を追加。
 - `npm run build` は `node scripts/generate-sw.mjs && vite build`。`public/sw.js` は生成物のため gitignore。
+
+### 4-7. FAX・PDF添付の読み取り分類（2026-07-16）
+
+複合機からのFAX転送メール（本文がほぼ無く、内容がPDF/画像）や、注文書・見積書・請求書などのPDF添付を、通常メールと同等に処理対象にする機能。
+
+- **`worker/lib/gmail.js`**: `getMessage` の戻り値に `attachments`（filename / mimeType / size / attachmentId）を追加。`format=full` で取得済みの payload から抽出するため追加のAPI呼び出しは無い。
+- **`worker/lib/anthropic.js`**: `classifyEmail(email, context, documents)` の第3引数 `documents` に、対応形式の添付をPDFは `document` ブロック（`{type:'document', source:{type:'base64', media_type:'application/pdf', data}}`）、画像は `image` ブロックとして渡す。システムプロンプトに添付読取の指示と出力項目 `document_summary` を追加。添付ありのときは `max_tokens` を引き上げる（400→1500）。
+- **`worker/lib/pipeline.js`**: `collectClassifierDocuments()` が対応形式（PDF・PNG・JPEG・GIF・WebP。TIFFは非対応）の添付を、サイズ上限（1ファイル10MB・合計12MB）・件数上限（5件）でフィルタしつつ `getAttachmentData` で取得し、base64url→標準base64に変換して分類器へ渡す。
+- **非対応形式**: TIFF（Claude非対応）。複合機のFAXが `mimi@eiwa-up.com` 宛にTIFF形式で転送される運用が残っている場合、その添付は読み取れない（PDF転送であれば読み取れる）。
+- **取り込みの前提条件（重要）**: システムはGmail APIで共有アカウント（`eiwa.public@gmail.com`）のメールを取得する。**メーリングリスト/Googleグループ宛に届いたメールはGmail APIの検索・取得対象に入らない**（Web画面には見えるがAPI経由では取得できない）。FAXがメーリングリスト経由で届く設定のままだと、この機能があってもタスク化されない。FAXを取り込むには、共有アカウント宛に**直接**（PDF形式で）転送されるようにする必要がある。
 
 ---
 
@@ -237,7 +259,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 `fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `api_credit_alert`, `last_fetch_at`
 
 ### users
-id / username(unique) / password_hash(bcrypt) / display_name / created_at。**anon からは一切アクセス不可（service role のみ）**
+id / username(unique) / password_hash(bcrypt) / display_name / **token_version**(既定0) / created_at。**anon からは一切アクセス不可（service role のみ）**
+
+`token_version` はJWT失効用（2026-07-16追加）。ログイン時に発行するJWTへ発行時点の値を `tv` として埋め込み、以後のリクエストで現在値と突合する。パスワード変更・退職・トークン漏洩時にこの値をインクリメントするだけで、有効期限（30日）を待たずに当該ユーザーの全トークンを即時失効できる。
 
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算
@@ -252,12 +276,14 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / updated_at。`add_
 | detail | jsonb | 取得サマリー等の生データ |
 | created_at | timestamptz | |
 
-書き込み元: パイプライン（取得結果 + 返信検知の自動ステータス変更 = service role）、フロントエンド（担当者の手動ステータス変更 = anon INSERT）。60日より古いログはパイプライン実行時に自動削除。画面 `/logs`（操作ログ）で直近200件を参照。
+書き込み元: パイプライン（取得結果 + 返信検知の自動ステータス変更）、Worker の `PATCH /api/tasks`（担当者の手動ステータス変更時にサーバー側で記録）。いずれも service role 経由。60日より古いログはパイプライン実行時に自動削除。画面 `/logs`（操作ログ）で直近200件を参照。
 
-### RLS / 権限設計
-- tasks・settings・api_usage: anon は SELECT 可。tasks は **status 列のみ** anon が UPDATE 可（列レベル GRANT）
-- activity_logs: anon は SELECT / INSERT 可（UPDATE / DELETE は service role のみ）
-- INSERT / DELETE / その他の列更新・users への操作は service role（Worker）経由に限定
+### RLS / 権限設計（2026-07-16 に全面変更）
+**anon・authenticated ロールには tasks・settings・activity_logs・api_usage への GRANT を一切与えていない**（RLSは有効のままポリシーも一切無し＝匿名は読み書き共に不可）。以前は「フロントは anon キーで直接読み取り、書き込みは status 列のみ anon 許可」としていたが、anon(publishable) キーは公開値であり、これは**認証なしで全顧客データが読める・改ざんできる致命的な脆弱性**だった（2026-07-15 セキュリティ審査で指摘・是正）。
+
+- tasks・settings・activity_logs・api_usage への読み書きは**すべて Worker の `/api/*`（service role・JWT認証必須）経由**に統一
+- users は従来どおり anon 向けポリシーを一切持たない（service role のみ）
+- フロントエンドは匿名 Supabase クライアントを持たない（`src/lib/supabase.js` は削除済み）。`src/lib/tasks.js` は `authFetch` 経由で Worker を呼ぶ
 
 ---
 
@@ -271,13 +297,15 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / updated_at。`add_
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
 
-### ビルド時（フロントエンド埋め込み・公開値）
-| 名前 | 備考 |
+### KV Namespace（`wrangler.jsonc` にバインド）
+| バインディング名 | 用途 |
 |---|---|
-| VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY | 未設定・不正な URL の場合はコード内の本番公開値にフォールバック（`src/lib/supabase.js`） |
+| LOGIN_ATTEMPTS | ログインのレート制限用。IP+ユーザー名ごとの失敗回数を記録（15分TTL） |
 
 ### CI 用
 CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUDFLARE_ACCOUNT_ID
+
+> **2026-07-16 削除**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（フロントエンド埋め込みの公開値）は、フロントが Supabase を直接読み書きしなくなったため不要になり削除した。
 
 ---
 
@@ -297,12 +325,34 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 
 ## 8. セキュリティ
 
-- service role キー・API キー類は Worker シークレットのみに保持し、フロントエンドへは渡さない
-- フロントエンドは anon キー + RLS（読み取りと status 更新のみ）
+2026-07-15 に外部セキュリティ審査を実施し、致命的1件・危険3件・注意7件を洗い出した。致命的・危険・注意のうちコードで対応できるものは 2026-07-16 にすべて修正・デプロイ済み（下記）。
+
+### データ面へのアクセス（2026-07-16 全面刷新）
+- **service role キー・API キー類は Worker シークレットのみに保持し、フロントエンドへは渡さない**（従来どおり）
+- **フロントエンドは anon(publishable) キーによる Supabase 直接アクセスを一切行わない**。tasks/settings/activity_logs/api_usage への読み書きはすべて Worker の `/api/*`（service role・JWT必須）経由に統一した。以前は anon に SELECT（tasksはUPDATEも）を許可しており、anonキーは公開値のため**認証なしで全顧客データが読み書きできる致命的な脆弱性**だった（審査での指摘: C1）。修正後は Supabase 側で anon/authenticated への GRANT を全剥奪し、RLSポリシーも一切持たない状態にしている
+
+### 認証・セッション
 - ログインは bcrypt ハッシュ照合。ユーザー不在とパスワード不一致は同一メッセージ（存在推測の防止）
+- **ログインのレート制限（2026-07-16追加）**: Cloudflare KV（`LOGIN_ATTEMPTS`）でIP+ユーザー名ごとの失敗回数を記録し、8回失敗で15分ロックアウト（429）。総当たり/辞書攻撃対策
 - JWT は HS256・**30日**有効。サーバー側で署名検証、クライアント側は exp による自動ログアウト。加えて認証必須 API が 401 を返したらフロントが即ログアウトしてログイン画面へ誘導する
-- 添付ファイル API はログイン必須。共有アカウントの Gmail 認証情報（readonly）で取得し、フロントには渡さない
+- **JWT失効機構（2026-07-16追加）**: `users.token_version` を発行時点のJWTへ `tv` として埋め込み、`verifyRequestAuth`（毎リクエスト）でDBの現在値と突合。不一致・DB参照失敗は無効扱い（フェイルクローズ）。パスワード変更・退職・トークン漏洩時は `token_version` をインクリメントするだけで、有効期限を待たずに当該ユーザーの全トークンを即時失効できる
+
+### 添付ファイルAPI
+- ログイン必須。共有アカウントの Gmail 認証情報（readonly）で取得し、フロントには渡さない
+- **タスクスコープの限定（2026-07-16追加）**: `thread_id` を必須化し、①タスクに紐づくスレッドであること ②`message_id` がそのスレッドに実在すること、を検証してから取得する。以前は `message_id` の形式チェックのみで、タスク化されていない共有メールボックスの任意メッセージまで取得できた（審査での指摘: H3）
+
+### レスポンス・通信
 - Gmail は readonly スコープ。HTTPS は Cloudflare が終端
+- **エラー詳細の非露出（2026-07-16追加）**: Supabase等の内部エラーメッセージをクライアントへそのまま返さず、汎用メッセージのみ返却。詳細は `console.error` でサーバーログにのみ出力（審査での指摘: N1）
+- **セキュリティヘッダ/CSP（2026-07-16追加）**: 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（外部CDN等を使わないため、ほぼ全ディレクティブ `'self'`）を付与（審査での指摘: N2）
+
+### リポジトリ・鍵管理
+- **リポジトリは非公開（Private）**（2026-07-16、審査での指摘 C2 に対応。従来は public だった）
+- 公開リポジトリに含まれていた anon(publishable) キー（`sb_publishable_...`）は Supabase 側で削除済み。レガシーの `anon`/`service_role`（JWT形式）キーは公開されたことがなく、`service_role` はWorkerの稼働に必要なため意図的に未変更
+- GitHub の Secret Protection / Push protection は有効化済み（確認済み）
+
+### 残課題（運用ルール整備。コード変更なし）
+審査の N3〜N7（Anthropicへの送信データ最小化の検討・秘密情報のローテーション運用・アカウント運用ルール・ログのPII保持ルール・依存関係の定期監査）は未着手。緊急性は低く、運用ルール化が中心。
 
 ---
 
