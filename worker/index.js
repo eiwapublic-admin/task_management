@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { runPipeline } from './lib/pipeline.js'
-import { json, verifyRequestAuth } from './lib/http.js'
+import { json, verifyRequestAuth, withSecurityHeaders } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
 import { getAccessToken, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
@@ -104,7 +104,7 @@ async function handleRunFetch(req) {
     return json(summary)
   } catch (err) {
     console.error('run-fetch 失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: 'メール取得処理に失敗しました' }, 500)
   }
 }
 
@@ -230,12 +230,13 @@ async function handleSettings(req) {
     const supabase = getAdminClient()
     const { error } = await supabase.from('settings').upsert(rows, { onConflict: 'key' })
     if (error) {
-      return json({ error: `保存に失敗しました: ${error.message}` }, 500)
+      console.error('settings 保存失敗:', error.message)
+      return json({ error: '設定の保存に失敗しました' }, 500)
     }
     return json({ ok: true, saved: rows.map((r) => r.key) })
   } catch (err) {
     console.error('settings 失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: '設定の保存に失敗しました' }, 500)
   }
 }
 
@@ -296,7 +297,10 @@ async function handleTaskCreate(req) {
       })
       .select()
       .single()
-    if (error) return json({ error: `登録に失敗しました: ${error.message}` }, 500)
+    if (error) {
+      console.error('task-create 登録失敗:', error.message)
+      return json({ error: 'タスクの登録に失敗しました' }, 500)
+    }
 
     // 操作ログ
     await supabase.from('activity_logs').insert({
@@ -308,7 +312,7 @@ async function handleTaskCreate(req) {
     return json({ ok: true, task: data })
   } catch (err) {
     console.error('task-create 失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: 'タスクの登録に失敗しました' }, 500)
   }
 }
 
@@ -362,7 +366,10 @@ async function handleTaskUpdate(req) {
       .eq('id', id)
       .select()
       .single()
-    if (error) return json({ error: `更新に失敗しました: ${error.message}` }, 500)
+    if (error) {
+      console.error('task-update 更新失敗:', error.message)
+      return json({ error: 'タスクの更新に失敗しました' }, 500)
+    }
 
     if (fields.status && prevStatus && prevStatus !== fields.status) {
       await supabase.from('activity_logs').insert({
@@ -376,7 +383,7 @@ async function handleTaskUpdate(req) {
     return json({ ok: true, task: data })
   } catch (err) {
     console.error('task-update 失敗:', err)
-    return json({ error: String(err.message || err) }, 500)
+    return json({ error: 'タスクの更新に失敗しました' }, 500)
   }
 }
 
@@ -502,45 +509,52 @@ async function handleDownloadAttachment(req) {
   }
 }
 
+// パスと静的アセットへのルーティング本体。戻り値は fetch() で
+// withSecurityHeaders を通してから返す（API・静的アセットの両方に一律適用するため）。
+async function route(req, env) {
+  const { pathname } = new URL(req.url)
+
+  if (pathname === '/api/login') {
+    return req.method === 'POST' ? handleLogin(req, env) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/run-fetch') {
+    return req.method === 'POST' ? handleRunFetch(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/settings') {
+    if (req.method === 'GET') return handleSettingsRead(req)
+    if (req.method === 'PUT' || req.method === 'POST') return handleSettings(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/tasks') {
+    if (req.method === 'GET') return handleTaskList(req)
+    if (req.method === 'POST') return handleTaskCreate(req)
+    if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/logs') {
+    return req.method === 'GET' ? handleLogs(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/usage') {
+    return req.method === 'GET' ? handleUsage(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/attachments') {
+    return req.method === 'GET' ? handleListAttachments(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/attachment') {
+    return req.method === 'GET' ? handleDownloadAttachment(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname.startsWith('/api/')) {
+    return json({ error: 'Not Found' }, 404)
+  }
+
+  // 静的アセット（SPA フォールバックは wrangler.jsonc の not_found_handling で処理）
+  return env.ASSETS.fetch(req)
+}
+
 export default {
   async fetch(req, env) {
-    const { pathname } = new URL(req.url)
-
-    if (pathname === '/api/login') {
-      return req.method === 'POST' ? handleLogin(req, env) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/run-fetch') {
-      return req.method === 'POST' ? handleRunFetch(req) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/settings') {
-      if (req.method === 'GET') return handleSettingsRead(req)
-      if (req.method === 'PUT' || req.method === 'POST') return handleSettings(req)
-      return json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/tasks') {
-      if (req.method === 'GET') return handleTaskList(req)
-      if (req.method === 'POST') return handleTaskCreate(req)
-      if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
-      return json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/logs') {
-      return req.method === 'GET' ? handleLogs(req) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/usage') {
-      return req.method === 'GET' ? handleUsage(req) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/attachments') {
-      return req.method === 'GET' ? handleListAttachments(req) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname === '/api/attachment') {
-      return req.method === 'GET' ? handleDownloadAttachment(req) : json({ error: 'Method Not Allowed' }, 405)
-    }
-    if (pathname.startsWith('/api/')) {
-      return json({ error: 'Not Found' }, 404)
-    }
-
-    // 静的アセット（SPA フォールバックは wrangler.jsonc の not_found_handling で処理）
-    return env.ASSETS.fetch(req)
+    const res = await route(req, env)
+    return withSecurityHeaders(res)
   },
 
   async scheduled(_event, _env, ctx) {
