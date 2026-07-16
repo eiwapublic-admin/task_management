@@ -103,8 +103,14 @@ create table if not exists users (
   username      text not null unique,
   password_hash text not null,
   display_name  text not null,
+  -- JWT失効用のバージョン番号。ログイン時に発行するJWTへ tv として埋め込み、
+  -- 以後のリクエストでこの値と突合する。パスワード変更・退職・トークン漏洩時に
+  -- インクリメントすると、有効期限（30日）を待たずに当該ユーザーの全トークンを即時失効できる。
+  token_version integer not null default 0,
   created_at    timestamptz default now()
 );
+
+alter table users add column if not exists token_version integer not null default 0;
 
 -- updated_at 自動更新
 create or replace function set_updated_at()
