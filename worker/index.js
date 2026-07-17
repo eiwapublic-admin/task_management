@@ -3,7 +3,7 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth, withSecurityHeaders } from './lib/http.js'
 import { signJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
-import { getAccessToken, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
+import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
 import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
 
 // Cloudflare Worker 本体。
@@ -402,7 +402,7 @@ const GMAIL_ID_RE = /^[A-Za-z0-9_-]+$/
 async function findTaskByThreadId(supabase, threadId) {
   const { data } = await supabase
     .from('tasks')
-    .select('sender, sender_email, gmail_message_id')
+    .select('sender, sender_email, gmail_message_id, channel')
     .eq('gmail_thread_id', threadId)
     .maybeSingle()
   return data || null
@@ -423,6 +423,18 @@ async function handleListAttachments(req) {
     if (!task) return json({ error: '対象が見つかりません' }, 404)
 
     const accessToken = await getAccessToken()
+
+    // FAX（件名が「Attached Image」等の定型で共通するため、Gmail側で複数の
+    // 別々のFAXが1スレッドにまとまってしまうことがある）は、スレッド集約では
+    // なくこのタスクの元になった単一メッセージの添付だけを返す。
+    // スレッド集約すると、別のFAXの添付や、送信元アドレスが全FAX共通
+    // （複合機のFAXゲートウェイ）で counterpart によるフィルタが効かないため
+    // 無関係な添付まで混ざってしまう。
+    if (task.channel === 'fax') {
+      const attachments = await getMessageAttachments(accessToken, task.gmail_message_id)
+      return json({ attachments })
+    }
+
     // 対象タスクの顧客(counterpart)を特定し、同一件名で複数顧客が1スレッドに
     // まとまった場合に、別顧客宛メッセージの添付が混ざらないよう絞り込む。
     let counterpart = ''
