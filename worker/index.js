@@ -108,7 +108,8 @@ async function handleRunFetch(req) {
   }
 }
 
-// GET /api/tasks — タスク一覧（受信日時の新しい順）。ログイン必須。
+// GET /api/tasks — カンバンに表示するタスク一覧（受信日時の新しい順）。ログイン必須。
+// アーカイブ済み（archived_at が非 NULL）は除外する（アーカイブ画面で参照）。
 // データ面（Supabase REST）は anon キーでの匿名アクセスを全廃したため、
 // 読み取りも service role 経由・JWT 認証必須の Worker API に統一する。
 async function handleTaskList(req) {
@@ -118,6 +119,7 @@ async function handleTaskList(req) {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
+      .is('archived_at', null)
       .order('received_at', { ascending: false })
     if (error) {
       console.error('task-list:', error.message)
@@ -127,6 +129,53 @@ async function handleTaskList(req) {
   } catch (err) {
     console.error('task-list 失敗:', err)
     return json({ error: 'タスクの取得に失敗しました' }, 500)
+  }
+}
+
+// GET /api/archive?assignee=&channel=&q= — アーカイブ済みタスク一覧（アーカイブ日の新しい順）。ログイン必須。
+// 担当者（assignee）・情報源（channel）での絞り込みと、フリーワード（q）での全文検索に対応する。
+async function handleArchiveList(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  try {
+    const params = new URL(req.url).searchParams
+    const assignee = (params.get('assignee') || '').trim()
+    const channel = (params.get('channel') || '').trim()
+    // フリーワードは PostgREST の or() フィルタに直接入るため、区切り記号として
+    // 意味を持つ文字（, ( ) % * \）を除去して注入・文法崩れを防ぐ。
+    const q = (params.get('q') || '').replace(/[,()%*\\]/g, ' ').trim().slice(0, 100)
+
+    const supabase = getAdminClient()
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+      .limit(500)
+    if (assignee) query = query.eq('assignee', assignee)
+    if (channel) query = query.eq('channel', channel)
+    if (q) {
+      const like = `%${q}%`
+      query = query.or(
+        [
+          `title.ilike.${like}`,
+          `subject.ilike.${like}`,
+          `body_preview.ilike.${like}`,
+          `sender.ilike.${like}`,
+          `sender_display.ilike.${like}`,
+          `contact.ilike.${like}`,
+          `remarks.ilike.${like}`,
+        ].join(',')
+      )
+    }
+    const { data, error } = await query
+    if (error) {
+      console.error('archive-list:', error.message)
+      return json({ error: 'アーカイブの取得に失敗しました' }, 500)
+    }
+    return json({ tasks: data || [] })
+  } catch (err) {
+    console.error('archive-list 失敗:', err)
+    return json({ error: 'アーカイブの取得に失敗しました' }, 500)
   }
 }
 
@@ -204,6 +253,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'shared_gmail',
   'company_domains',
   'calendar_name',
+  'archive_after_days',
 ])
 
 async function handleSettings(req) {
@@ -294,6 +344,7 @@ async function handleTaskCreate(req) {
         subject: title.slice(0, 120),
         remarks,
         received_at: now,
+        completed_at: status === '完了' ? now : null,
         classification_note: `${auth.display_name || auth.username || '不明なユーザー'} が手動で登録しました。`,
       })
       .select()
@@ -359,6 +410,15 @@ async function handleTaskUpdate(req) {
     if (fields.status) {
       const { data: before } = await supabase.from('tasks').select('title, status').eq('id', id).maybeSingle()
       prevStatus = before?.status ?? null
+
+      // 完了への遷移で completed_at を記録（アーカイブ移行の起点）。
+      // 完了以外へ戻したら completed_at・archived_at をクリアしてカンバンへ復帰させる。
+      if (fields.status === '完了') {
+        if (prevStatus !== '完了') fields.completed_at = new Date().toISOString()
+      } else {
+        fields.completed_at = null
+        fields.archived_at = null
+      }
     }
 
     const { data, error } = await supabase
@@ -543,6 +603,9 @@ async function route(req, env) {
     if (req.method === 'POST') return handleTaskCreate(req)
     if (req.method === 'PATCH' || req.method === 'PUT') return handleTaskUpdate(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/archive') {
+    return req.method === 'GET' ? handleArchiveList(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/logs') {
     return req.method === 'GET' ? handleLogs(req) : json({ error: 'Method Not Allowed' }, 405)

@@ -233,6 +233,7 @@ export default function Dashboard() {
                 {fetching ? '取得中…' : '今すぐ取得'}
               </button>
               <button onClick={() => navigate('/logs')}>処理ログ</button>
+              <button onClick={() => navigate('/archive')}>アーカイブ</button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
             </div>
           </div>

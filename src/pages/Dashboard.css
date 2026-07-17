@@ -457,6 +457,80 @@
   color: var(--text-muted);
 }
 
+/* ---------- アーカイブ画面 ---------- */
+.archive-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.archive-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.archive-filter select,
+.archive-filter input {
+  height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-base);
+  font-size: 14px;
+}
+
+.archive-filter-search {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.archive-filter-search input {
+  width: 100%;
+}
+
+.archive-search-btn {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter var(--transition);
+}
+
+.archive-search-btn:hover {
+  filter: brightness(0.92);
+}
+
+/* 行タップで詳細を開くため、ホバー・フォーカスで押せることを示す */
+.archive-row {
+  cursor: pointer;
+}
+
+.archive-row:hover td,
+.archive-row:focus-visible td {
+  background: var(--bg-subtle);
+}
+
+.archive-channel {
+  text-align: center;
+  font-size: 16px;
+}
+
+.archive-title {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 /* 日付が切り替わる行に太い区切り線を入れて日の境界を目立たせる */
 .logs-table tbody tr.logs-day-boundary td {
   border-top: 3px solid var(--text-strong);

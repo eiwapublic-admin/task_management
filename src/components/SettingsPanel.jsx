@@ -5,20 +5,29 @@ export default function SettingsPanel({ settings, onSave }) {
   const [fetchInterval, setFetchInterval] = useState(settings.fetch_interval_minutes)
   const [activeStart, setActiveStart] = useState(settings.active_hours_start ?? 8)
   const [activeEnd, setActiveEnd] = useState(settings.active_hours_end ?? 18)
-  const [assignees, setAssignees] = useState(settings.assignees)
+  const [archiveAfterDays, setArchiveAfterDays] = useState(settings.archive_after_days ?? 30)
+  // 担当者は DB では JSON 配列で保持するが、画面ではエリア節約のため
+  // 改行区切りの1つのテキストエリアで編集する（保存時に配列へ戻す）。
+  const [assigneesText, setAssigneesText] = useState((settings.assignees || []).join('\n'))
   const [businessKeywords, setBusinessKeywords] = useState(settings.business_keywords)
   const [orgContext, setOrgContext] = useState(settings.org_context ?? '')
 
-  function handleAssigneeChange(index, value) {
-    setAssignees((prev) => prev.map((a, i) => (i === index ? value : a)))
-  }
-
   function handleSubmit(e) {
     e.preventDefault()
+    // 改行区切りのテキストを配列へ。空行を除き、重複を排除する。
+    const assignees = Array.from(
+      new Set(
+        assigneesText
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    )
     onSave({
       fetch_interval_minutes: Number(fetchInterval),
       active_hours_start: Number(activeStart),
       active_hours_end: Number(activeEnd),
+      archive_after_days: Number(archiveAfterDays),
       assignees,
       business_keywords: businessKeywords,
       org_context: orgContext,
@@ -81,13 +90,39 @@ export default function SettingsPanel({ settings, onSave }) {
       </section>
 
       <section>
+        <h2>完了タスクのアーカイブ</h2>
+        <label>
+          アーカイブまでの日数
+          <input
+            type="number"
+            min={0}
+            max={3650}
+            step={1}
+            value={archiveAfterDays}
+            onChange={(e) => setArchiveAfterDays(e.target.value)}
+            onBlur={(e) => {
+              const n = Math.round(Number(e.target.value))
+              setArchiveAfterDays(Number.isFinite(n) ? Math.min(3650, Math.max(0, n)) : 30)
+            }}
+          />
+        </label>
+        <p className="settings-hint">
+          「完了」にしてからこの日数を超えたタスクを自動的にアーカイブへ移します（アーカイブ画面で参照）。0 で無効。
+        </p>
+      </section>
+
+      <section>
         <h2>担当者名</h2>
-        {assignees.map((name, i) => (
-          <label key={i}>
-            担当者{i + 1}
-            <input value={name} onChange={(e) => handleAssigneeChange(i, e.target.value)} />
-          </label>
-        ))}
+        <label>
+          担当者（1行に1名）
+          <textarea
+            value={assigneesText}
+            onChange={(e) => setAssigneesText(e.target.value)}
+            placeholder={'橋口\n西川\n岡田'}
+            rows={4}
+          />
+        </label>
+        <p className="settings-hint">1行につき担当者を1名ずつ入力します（人数の増減も改行で調整できます）。</p>
       </section>
 
       <section className="settings-org">

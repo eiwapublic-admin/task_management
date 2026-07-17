@@ -663,11 +663,34 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   summary.usage = { input_tokens: usageInput, output_tokens: usageOutput, calls: classifyCalls }
 
+  // 5.5) 完了タスクのアーカイブ移行
+  //   「完了」になってから archive_after_days 日を超えたタスクを archived_at に
+  //   移して、カンバンの完了列に溜まり続けないようにする（アーカイブ画面で参照）。
+  //   archive_after_days が 0 以下なら無効。completed_at が無い（旧データ）ものは対象外。
+  summary.archived = 0
+  const archiveAfterDays = Number(settings.archive_after_days)
+  if (Number.isFinite(archiveAfterDays) && archiveAfterDays > 0) {
+    const cutoff = new Date(Date.now() - archiveAfterDays * 86400000).toISOString()
+    const { data: archivedRows, error: archiveError } = await supabase
+      .from('tasks')
+      .update({ archived_at: new Date().toISOString() })
+      .is('archived_at', null)
+      .eq('status', '完了')
+      .not('completed_at', 'is', null)
+      .lt('completed_at', cutoff)
+      .select('id')
+    if (archiveError) {
+      summary.errors.push(`archive: ${archiveError.message}`)
+    } else {
+      summary.archived = archivedRows?.length || 0
+    }
+  }
+
   // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
   const fetchMessage =
     `メール取得: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
     `返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
-    `カレンダー登録 ${summary.calendarCreated} 件` +
+    `カレンダー登録 ${summary.calendarCreated} 件 / アーカイブ ${summary.archived} 件` +
     (summary.errors.length > 0 ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
   logRows.unshift({ log_type: 'fetch', actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)

@@ -36,6 +36,9 @@ export default function Settings() {
           active_hours_end: Number.isFinite(Number(s.active_hours_end))
             ? Number(s.active_hours_end)
             : 18,
+          archive_after_days: Number.isFinite(Number(s.archive_after_days))
+            ? Number(s.archive_after_days)
+            : 30,
           assignees: parseAssignees(s.assignees),
           business_keywords: s.business_keywords || '',
           org_context: s.org_context || '',
