@@ -341,15 +341,11 @@
   filter: brightness(0.92);
 }
 
-/* 「設定」= ブルー / 「ログアウト」= 黒 */
-.dashboard-header-right .btn-settings {
-  background: var(--color-primary);
-  color: #fff;
-}
-
+/* ハンバーガーメニュー内の項目は全て白で統一する（設定・今すぐ取得・処理ログ・ログアウト共通） */
+.dashboard-header-right .btn-settings,
 .dashboard-header-right .btn-logout {
-  background: #1f2937;
-  color: #fff;
+  background: var(--bg-surface);
+  color: var(--text-base);
 }
 
 /* 設定画面: 保存せずに閉じる「×」ボタン */

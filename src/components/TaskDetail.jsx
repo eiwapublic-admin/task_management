@@ -224,6 +224,18 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
               onChange={(e) => setDueDate(e.target.value)}
             />
           </div>
+          <div className="task-detail-save-group">
+            {saveError && <span className="task-detail-save-error">{saveError}</span>}
+            {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
+            <button
+              type="button"
+              className="task-action-btn task-action-reply"
+              onClick={handleSave}
+              disabled={saving || !dirty}
+            >
+              {saving ? '保存中…' : '保存'}
+            </button>
+          </div>
         </div>
 
         <dl className="task-detail-fields">
@@ -296,19 +308,6 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
           )}
         </dl>
 
-        <div className="task-detail-edit-bar">
-          {saveError && <span className="task-detail-save-error">{saveError}</span>}
-          {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
-          <button
-            type="button"
-            className="task-action-btn task-action-reply"
-            onClick={handleSave}
-            disabled={saving || !dirty}
-          >
-            {saving ? '保存中…' : '担当者・期限・留意事項を保存'}
-          </button>
-        </div>
-
         <div className="task-detail-footer">
           <span className="task-detail-footer-label">ステータス</span>
           <div className="task-detail-status" role="group" aria-label="ステータスを変更">
@@ -330,7 +329,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
               </a>
             )}
             {replyHref && (
-              <a className="task-action-btn task-action-reply" href={replyHref}>
+              <a className="task-action-btn task-action-dark" href={replyHref}>
                 返信
               </a>
             )}
