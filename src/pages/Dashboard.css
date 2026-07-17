@@ -238,25 +238,58 @@
   color: var(--text-muted);
 }
 
-/* 操作ボタン群のラッパー。デスクトップは横並び、モバイルはメニューに畳む */
+/* 操作ボタン群のラッパー。常に3本線（ハンバーガー）メニューに畳む */
 .dashboard-menu {
   display: inline-flex;
   align-items: center;
+  position: relative;
 }
 
-.dashboard-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-/* 3本線（ハンバーガー）ボタン。モバイルでのみ表示する。
+/* 3本線（ハンバーガー）ボタン。画面幅によらず常に表示する。
    （.dashboard-header-right button より詳細度を上げて display を確実に上書きする） */
 .dashboard-header-right .dashboard-menu-toggle {
-  display: none;
+  display: inline-flex;
   width: 40px;
   justify-content: center;
   padding: 0;
+}
+
+/* 通常はドロップダウンを隠し、開いたときだけ縦並びで表示する */
+.dashboard-actions {
+  display: none;
+}
+
+.dashboard-actions.is-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 190px;
+  padding: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+}
+
+/* ドロップダウン内のボタンは全幅・左寄せで押しやすく */
+.dashboard-actions.is-open button {
+  width: 100%;
+  height: 40px;
+  justify-content: flex-start;
+}
+
+/* 最終取得の時刻はメニュー先頭の情報行に（緑背景用の白文字を可読色へ） */
+.dashboard-actions.is-open .dashboard-lastfetch {
+  color: var(--text-muted);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-1);
+  white-space: normal;
 }
 
 .dashboard-menu-icon,
@@ -459,54 +492,7 @@
     white-space: nowrap;
   }
 
-  /* --- メイン画面のヘッダー: 操作ボタンを3本線メニューに畳む --- */
-  .dashboard-menu {
-    position: relative;
-  }
-
-  .dashboard-header-right .dashboard-menu-toggle {
-    display: inline-flex;
-  }
-
-  /* 通常はドロップダウンを隠し、開いたときだけ縦並びで表示する */
-  .dashboard-actions {
-    display: none;
-  }
-
-  .dashboard-actions.is-open {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
-    position: absolute;
-    top: calc(100% + var(--space-2));
-    right: 0;
-    min-width: 190px;
-    padding: var(--space-2);
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    z-index: 20;
-  }
-
-  /* ドロップダウン内のボタンは全幅・左寄せで押しやすく */
-  .dashboard-actions.is-open button {
-    width: 100%;
-    height: 40px;
-    justify-content: flex-start;
-  }
-
-  /* 最終取得の時刻はメニュー先頭の情報行に（緑背景用の白文字を可読色へ） */
-  .dashboard-actions.is-open .dashboard-lastfetch {
-    color: var(--text-muted);
-    padding: var(--space-1) var(--space-2) var(--space-2);
-    border-bottom: 1px solid var(--border);
-    margin-bottom: var(--space-1);
-    white-space: normal;
-  }
-
-  /* 操作ログ: 4列テーブルは横スクロールで各列の可読幅を確保する */
+  /* 処理ログ: 4列テーブルは横スクロールで各列の可読幅を確保する */
   .logs-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
