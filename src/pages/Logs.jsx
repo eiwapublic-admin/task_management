@@ -29,7 +29,7 @@ export default function Logs() {
     <div className="dashboard-page">
       <header className="dashboard-header">
         <div className="dashboard-header-left">
-          <h1>操作ログ</h1>
+          <h1>処理ログ</h1>
         </div>
         <div className="dashboard-header-right">
           <button

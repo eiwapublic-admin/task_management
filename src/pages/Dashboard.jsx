@@ -212,6 +212,7 @@ export default function Dashboard() {
               {lastFetchAt && (
                 <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
               )}
+              <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
               <button
                 onClick={() => {
                   setMenuOpen(false)
@@ -221,8 +222,7 @@ export default function Dashboard() {
               >
                 {fetching ? '取得中…' : '今すぐ取得'}
               </button>
-              <button onClick={() => navigate('/logs')}>ログ</button>
-              <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
+              <button onClick={() => navigate('/logs')}>処理ログ</button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
             </div>
           </div>
