@@ -12,6 +12,10 @@ const MAX_BODY_PREVIEW = 20000
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 
+// カード・詳細画面のアイコン表示用の経路種別。source='email' のタスクのみ
+// Claude の分類結果から決める（メール/フォーム/FAX の区別）。
+const CHANNEL_VALUES = new Set(['email', 'form', 'fax'])
+
 // 分類器（Claude）に読ませる添付ファイルの対応 MIME と種別。
 // PDF は document ブロック、主要な画像形式は image ブロックとして渡す。
 // TIFF は Claude が非対応のため対象外（従来 FAX の TIFF はここに含めない）。
@@ -461,6 +465,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const classificationNote =
         [result.reason || null, outboundNote, docNote].filter(Boolean).join('\n') || null
 
+      // カード・詳細画面のアイコン表示用（メール/フォーム/FAX の区別）。
+      // 分類できない・想定外の値は既定の "email" にする。
+      const channel = CHANNEL_VALUES.has(result.channel) ? result.channel : 'email'
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
@@ -476,6 +484,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         body_preview: bodyPreview,
         received_at: email.receivedAt || new Date().toISOString(),
         classification_note: classificationNote,
+        channel,
       })
 
       if (insertError) {
@@ -594,6 +603,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
             gmail_thread_id: key,
             gmail_message_id: ev.id,
             source: 'calendar',
+            channel: 'calendar',
             title: (ev.title || '（無題の予定）').slice(0, 120),
             assignee,
             status: '未処理',
