@@ -21,6 +21,18 @@ export async function fetchLogs() {
   return data.logs || []
 }
 
+// アーカイブ済みタスクを取得する（アーカイブ日の新しい順）。
+// filters: { assignee, channel, q } で担当者・情報源・フリーワードの絞り込みが可能。
+export async function fetchArchive({ assignee = '', channel = '', q = '' } = {}) {
+  const params = new URLSearchParams()
+  if (assignee) params.set('assignee', assignee)
+  if (channel) params.set('channel', channel)
+  if (q) params.set('q', q)
+  const query = params.toString()
+  const data = await authFetch(`/api/archive${query ? `?${query}` : ''}`)
+  return data.tasks || []
+}
+
 // settings を { key: value } に整形して返す。
 export async function fetchSettings() {
   const data = await authFetch('/api/settings')

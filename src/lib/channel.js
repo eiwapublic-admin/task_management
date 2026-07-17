@@ -34,3 +34,10 @@ export function channelIcon(task) {
 export function channelLabel(task) {
   return CHANNEL_LABELS[resolveChannel(task)] || CHANNEL_LABELS.email
 }
+
+// 情報源フィルタ用の選択肢（value=channel, label=表示名, icon=絵文字）。
+export const CHANNEL_OPTIONS = ['email', 'form', 'calendar', 'fax', 'manual'].map((value) => ({
+  value,
+  label: CHANNEL_LABELS[value],
+  icon: CHANNEL_ICONS[value],
+}))

@@ -26,6 +26,8 @@ create table if not exists tasks (
   channel          text,           -- カード/詳細画面のアイコン表示用の経路種別: 'email'/'form'/'fax'/'calendar'/'manual'。
                                     -- source='email' の内訳（通常メール/問い合わせフォーム/FAX転送）を区別するために追加。
                                     -- source の値（返信検知等のロジックで使用）とは独立。null の既存タスクは source から表示用に補完する
+  completed_at     timestamptz,    -- ステータスが「完了」になった日時（アーカイブ移行の起点。完了以外に戻すと null に戻す）
+  archived_at      timestamptz,    -- アーカイブに移行した日時（NULL でない = アーカイブ済み。カンバンから除外しアーカイブ画面で参照）
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -40,6 +42,10 @@ alter table tasks add column if not exists remarks text;
 alter table tasks add column if not exists last_reply_message_id text;
 alter table tasks add column if not exists source text not null default 'email';
 alter table tasks add column if not exists channel text;
+alter table tasks add column if not exists completed_at timestamptz;
+alter table tasks add column if not exists archived_at timestamptz;
+
+create index if not exists idx_tasks_archived_at on tasks (archived_at);
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);
@@ -60,6 +66,7 @@ insert into settings (key, value) values
   ('shared_gmail', 'eiwa.public@gmail.com'),
   ('company_domains', 'eiwa-up.jp'),  -- 自社ドメイン（カンマ区切り）。このドメイン発のメールは「自社からの返信」とみなす
   ('calendar_name', '栄和共通'),      -- 取得対象の Google カレンダー名 または カレンダーID（@を含む場合はID直接指定）
+  ('archive_after_days', '30'),  -- 「完了」からこの日数を超えたタスクをアーカイブに移行（0 で無効）
   ('api_credit_alert', ''),      -- クレジット不足アラート（pipeline が設定/解除）
   ('last_fetch_at', null)
 on conflict (key) do nothing;

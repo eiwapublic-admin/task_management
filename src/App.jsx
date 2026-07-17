@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Logs from './pages/Logs'
+import Archive from './pages/Archive'
 import { isAuthenticated } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -31,6 +32,14 @@ function App() {
           element={
             <RequireAuth>
               <Logs />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/archive"
+          element={
+            <RequireAuth>
+              <Archive />
             </RequireAuth>
           }
         />
