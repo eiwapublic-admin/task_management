@@ -498,3 +498,47 @@
     min-width: 560px;
   }
 }
+
+/* 「このシステムについて」モーダル: 構成図の画像だけを表示するシンプルなウインドウ */
+.about-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: var(--space-4);
+}
+
+.about-modal {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  width: 900px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.about-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.about-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-strong);
+}
+
+.about-modal-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}

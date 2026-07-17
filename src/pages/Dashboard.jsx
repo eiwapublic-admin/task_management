@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
+import AboutModal from '../components/AboutModal'
 import { getCurrentUser, logout } from '../lib/auth'
 import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { runFetch, createTask, updateTask } from '../lib/api'
@@ -50,6 +51,7 @@ export default function Dashboard() {
   const [sharedGmail, setSharedGmail] = useState('')
   // モバイルのハンバーガーメニュー（ヘッダーの操作ボタンを畳む）の開閉状態
   const [menuOpen, setMenuOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const menuRef = useRef(null)
   const navigate = useNavigate()
   const user = getCurrentUser()
@@ -212,6 +214,14 @@ export default function Dashboard() {
               {lastFetchAt && (
                 <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
               )}
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  setAboutOpen(true)
+                }}
+              >
+                このシステムについて
+              </button>
               <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
               <button
                 onClick={() => {
@@ -276,6 +286,7 @@ export default function Dashboard() {
           sharedGmail={sharedGmail}
         />
       )}
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   )
 }
