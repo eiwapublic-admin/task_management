@@ -411,6 +411,15 @@
   white-space: nowrap;
 }
 
+/* 「保存」ボタン（＋保存結果メッセージ）。1行目（期限の行）の右端に寄せる */
+.task-detail-save-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
 /* 送信者の右隣に出す発信元の名前（contact） */
 .task-detail-contact {
   margin-left: var(--space-3);
@@ -504,7 +513,7 @@
   border-color: var(--color-primary);
 }
 
-/* 「返信」はメインアクションとして青で目立たせる */
+/* 「保存」はメインアクションとして青で目立たせる */
 .task-action-btn.task-action-reply {
   background: var(--color-primary);
   border-color: var(--color-primary);
@@ -513,6 +522,17 @@
 
 .task-action-btn.task-action-reply:hover {
   filter: brightness(0.92);
+}
+
+/* 「返信」「ダウンロード」は黒背景 */
+.task-action-btn.task-action-dark {
+  background: #1f2937;
+  border-color: #1f2937;
+  color: #fff;
+}
+
+.task-action-btn.task-action-dark:hover {
+  filter: brightness(1.2);
 }
 
 .status-btn {
@@ -573,15 +593,6 @@ select.task-detail-input.is-unassigned {
   width: 100%;
   resize: vertical;
   line-height: 1.5;
-}
-
-.task-detail-edit-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-top: var(--space-2);
 }
 
 .task-detail-save-error {
@@ -651,24 +662,22 @@ select.task-detail-input.is-unassigned {
   margin-left: var(--space-1);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
+  border: 1px solid #1f2937;
+  background: #1f2937;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--transition), border-color var(--transition);
+  transition: filter var(--transition);
 }
 
 .task-detail-attachment-download:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  filter: brightness(1.2);
 }
 
 .task-detail-attachment-download:disabled {
-  background: var(--color-primary-disabled);
-  border-color: var(--color-primary-disabled);
+  filter: brightness(1.6);
   cursor: default;
 }
 
