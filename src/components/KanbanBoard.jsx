@@ -12,7 +12,7 @@ export default function KanbanBoard({
   onStatusChange,
   onCreateTask,
   onUpdateTask,
-  userName,
+  onOpenArchive,
   sharedGmail,
 }) {
   const [selectedAssignee, setSelectedAssignee] = useState(null)
@@ -57,7 +57,11 @@ export default function KanbanBoard({
           selectedAssignee={selectedAssignee}
           onChange={setSelectedAssignee}
         />
-        {userName && <span className="kanban-user">{userName} さん</span>}
+        {onOpenArchive && (
+          <button type="button" className="kanban-archive-btn" onClick={onOpenArchive}>
+            アーカイブ
+          </button>
+        )}
       </div>
       <div className="kanban-columns">
         {STATUS_LIST.map((status) => (

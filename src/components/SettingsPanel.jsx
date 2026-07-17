@@ -86,13 +86,12 @@ export default function SettingsPanel({ settings, onSave }) {
             />
           </label>
         </div>
-        <p className="settings-hint">指定した時間帯で指定した頻度でメールを自動取得します。</p>
       </section>
 
       <section>
         <h2>完了タスクのアーカイブ</h2>
         <label>
-          アーカイブまでの日数
+          アーカイブまでの日数（0 で無効）
           <input
             type="number"
             min={0}
@@ -106,9 +105,6 @@ export default function SettingsPanel({ settings, onSave }) {
             }}
           />
         </label>
-        <p className="settings-hint">
-          「完了」にしてからこの日数を超えたタスクを自動的にアーカイブへ移します（アーカイブ画面で参照）。0 で無効。
-        </p>
       </section>
 
       <section>
@@ -122,7 +118,6 @@ export default function SettingsPanel({ settings, onSave }) {
             rows={4}
           />
         </label>
-        <p className="settings-hint">1行につき担当者を1名ずつ入力します（人数の増減も改行で調整できます）。</p>
       </section>
 
       <section className="settings-org">

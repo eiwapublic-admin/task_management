@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Logs from './pages/Logs'
 import Archive from './pages/Archive'
+import Usage from './pages/Usage'
 import { isAuthenticated } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -40,6 +41,14 @@ function App() {
           element={
             <RequireAuth>
               <Archive />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/usage"
+          element={
+            <RequireAuth>
+              <Usage />
             </RequireAuth>
           }
         />

@@ -1,6 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-07-16
+最終更新: 2026-07-17
 設計の詳細は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md) を参照。
 
 ---
@@ -55,6 +55,17 @@
     - **H3**: 添付/メール取得APIを `thread_id` 必須・タスク所属チェックに限定（タスク化されていない共有メールの任意メッセージを引けなくした）
     - **N1・N2**: クライアントへのエラー詳細非露出（汎用メッセージ化）、セキュリティヘッダ/CSP付与
     （PR #47〜#49。詳細は設計書 8章。N3〜N7は運用ルール整備が中心で未着手）
+21. UI追加（2026-07-16〜17）:
+    - ヘッダーを画面幅によらず**常時ハンバーガーメニュー**化。ログ画面名を「操作ログ」→「処理ログ」に変更（PR #51）
+    - タスクの**情報源アイコン**（📧メール/🌐フォーム/📅カレンダー/📠FAX/✏️手入力）をカード・詳細のタイトル先頭に表示。`tasks.channel` 列を追加（Claude が email/form/fax を判定、calendar/manual は登録時に設定。旧データは source から補完）。`src/lib/channel.js`（PR #53）
+    - ハンバーガーメニューに**「このシステムについて」**を追加。`public/system-overview.png`（構成図）を表示するモーダル（PR #54）
+    - メニュー内の配色統一（全て白）、タスク詳細の「保存」ボタンを期限行右端へ・「ダウンロード」「返信」を黒背景に（PR #52）
+22. FAX添付の混線修正（2026-07-17）: FAXは件名「Attached Image」共通でGmailが複数FAXを1スレッドにまとめ、送信元も共通で counterpart 絞り込みが効かず別FAXの添付が混ざる不具合。**`channel='fax'` は単一メッセージの添付だけ**表示するよう修正（PR #55）。※FAX読取のハルシネーション対策（上位モデル化）はトークン消費増のため保留（来週相談）
+23. 完了タスクのアーカイブ機能（2026-07-17）: 「完了」から設定日数（既定30・0で無効）を超えたタスクを自動アーカイブし、専用画面（`/archive`）で担当者・情報源・フリーワード検索して参照。`tasks.completed_at`/`archived_at` 列を追加（PR #56。詳細は設計書 4-8）
+24. レイアウト改善・従量課金画面（2026-07-17）:
+    - メイン画面: ログインユーザー名をヘッダー（ハンバーガー左）へ移動。ツールバー右端に**「アーカイブ」ボタン（グレー）**を配置
+    - 設定画面: フォントを少し大きく。冗長な説明文を削除。「アーカイブまでの日数（0で無効）」を更新頻度の下に配置。担当者入力を改行区切りの1テキストエリアに（DBは配列のまま）
+    - **新画面「従量課金事項」（`/usage`）**: 設定画面下部にあった「今月のAnthropic API 利用状況」を独立画面へ移設（縦並び・値のタブ位置揃え）。ヘッダーにあった「Anthropic API 支払設定」ボタンもこの画面末尾へ移動。メニューは「設定」の下
 
 ---
 
@@ -121,15 +132,19 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - 列: `tasks.contact`（先方担当者の宛名「会社・氏名＋様」。返信メール冒頭と詳細画面の送信者右隣に使う。**本番には既存の列**のためマイグレーション不要。schema.sql に追記済み）
 - 追加列: `users.token_version`（JWT失効用。既定0。マイグレーション `add_users_token_version` 適用済み。2026-07-16）
 - RLS/権限: `lockdown_anon_access` マイグレーション適用済み（2026-07-16）。anon/authenticated への tasks/settings/activity_logs/api_usage への GRANT を全剥奪し、緩いポリシーを削除。データ面へのアクセスはWorker(service role)経由に一本化（詳細は設計書8章）
+- 追加列: `tasks.channel`（情報源アイコン用。email/form/fax/calendar/manual。マイグレーション `add_tasks_channel`。2026-07-17。旧データは source から補完済み）
+- 追加列: `tasks.completed_at` / `tasks.archived_at`（完了タスクのアーカイブ用。マイグレーション `add_tasks_archive`。2026-07-17。既存の完了タスクは updated_at で completed_at を補完済み）
+- 追加設定: `settings.archive_after_days`（既定30。完了からアーカイブまでの日数。0で無効。2026-07-17）
 
 ### タスク・設定・ログ・利用量 API（Worker）
 - **2026-07-16 変更**: 従来はフロントの anon キーが Supabase を直接読み取り、status 列の更新のみ anon に許可していたが、anon キーは公開値で匿名の第三者に全データを読み書きされる脆弱性だったため全廃。**タスク一覧・設定・ログ・利用量の読み取りも含め、すべて Worker の `/api/*`（service role・JWT必須）経由**に統一した。
-  - `GET /api/tasks`: タスク一覧（受信日時の新しい順）
+  - `GET /api/tasks`: カンバン用タスク一覧（受信日時の新しい順）。**アーカイブ済みは除外**
   - `POST /api/tasks`: 手動登録（未処理列の「＋」）。`gmail_thread_id`/`gmail_message_id` は `manual:<uuid>`、`source='manual'`
-  - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` / **`status`** を更新（ステータス変更時はサーバー側で操作ログを記録）
+  - `PATCH /api/tasks`: `assignee` / `due_date` / `remarks` / `title` / **`status`** を更新（ステータス変更時はサーバー側で操作ログを記録。完了への遷移で `completed_at` 記録、完了以外で `completed_at`/`archived_at` クリア）
+  - `GET /api/archive`: アーカイブ済み一覧（担当者・情報源・フリーワード検索。2026-07-17）
   - `GET /api/settings` / `PUT /api/settings`: 設定の読み取り・保存
-  - `GET /api/logs`: 操作ログ（新しい順・上限200）
-  - `GET /api/usage?month=YYYY-MM`: 月次API利用量
+  - `GET /api/logs`: 処理ログ（新しい順・上限200）
+  - `GET /api/usage?month=YYYY-MM`: 月次API利用量（「従量課金事項」画面で表示）
 - いずれもログイン必須（JWT）。`src/lib/tasks.js` が `authFetch`（`src/lib/api.js`）経由で呼ぶ。フロントは匿名 Supabase クライアントを持たない（`src/lib/supabase.js` は削除済み）。
 
 ### 添付ファイル API（Worker）

@@ -1,6 +1,6 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-16
+最終更新: 2026-07-17
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
 リポジトリ: `eiwapublic-admin/task_management`（**非公開（Private）**。2026-07-16 にPrivate化）
 
@@ -66,18 +66,19 @@ worker/
     └── http.js         JSONレスポンス・Bearer トークン検証（token_version失効チェック込み）・
                         全レスポンス共通のセキュリティヘッダ付与（withSecurityHeaders）
 src/
-├── pages/              Login / Dashboard（カンバン）/ Settings / Logs
+├── pages/              Login / Dashboard（カンバン）/ Settings / Logs（処理ログ）/ Archive（アーカイブ）
 ├── components/         KanbanBoard, KanbanColumn, TaskCard, TaskDetail,
-│                       TaskForm, FilterBar, SettingsPanel, UsagePanel
+│                       TaskForm, FilterBar, SettingsPanel, UsagePanel, AboutModal
 ├── pwa/                ReloadPrompt.jsx（更新バナー）, reloadApp.js（ロゴタップ最新化）
 └── lib/                auth, api（authFetch）, tasks（Worker API経由）, format, status,
-                        pricing, mail, version（ビルド時刻表示）
+                        pricing, mail, version（ビルド時刻表示）, channel（情報源アイコン解決）
 scripts/
 └── generate-sw.mjs     ビルド時に public/sw.js を生成（SW_VERSION=git SHA を刻印）
 public/
 ├── logo.svg            栄和ロゴ（原本 logo_black.svg を赤 #c81021 で塗ったもの）
 ├── logo_black.svg      ロゴ原本（枠線のみ）
 ├── manifest.webmanifest  PWA マニフェスト
+├── system-overview.png  「このシステムについて」モーダルで表示するシステム構成図
 └── sw.js               ★ビルド生成物（gitignore）。最小 Service Worker
 supabase/schema.sql     DB スキーマ（IaC。SQL Editor / migration で適用）
 wrangler.jsonc          Worker 設定（assets / cron / nodejs_compat）
@@ -107,6 +108,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - `contact`: 先方担当者の宛名「会社・氏名＋様」（返信メール冒頭・詳細画面の表示に使う。取れなければ保存時に `sender_display`＋様 でフォールバック）
    - `sender_email`: 返信先メールアドレス（フォーム経由は本文記載のアドレスを優先。取れない場合は Reply-To → From にフォールバック）
    - `document_summary`: 添付のPDF・画像（FAX転送メールを含む）から読み取った内容の要約（顧客・資料の件名・金額/数量/納期等の要点）。添付が無い/読み取れない場合は null
+   - `channel`: 経路種別 `email`（通常メール）/ `form`（問い合わせフォーム）/ `fax`（FAX転送メール）。カード・詳細画面のアイコン表示に使う（source とは独立）
    - `reason`: 判定理由（振り分けルール調整の参考用に保存）
    - **添付（PDF・画像）の読み取り**: 対応形式（PDF・PNG・JPEG・GIF・WebP、1ファイル10MB・合計12MB・最大5件まで）の添付があれば、本文と一緒に Claude へ渡して読み取らせる。FAX転送メール（件名「Attached Image」等・本文ほぼ無し）はこれが無いと内容を判定できないため必須。詳細は 4-7 参照
 5. 業務メールのみ tasks に INSERT（ステータス「未処理」）。`document_summary` があれば `body_preview` に反映（本文が薄いFAXは要約がそのまま本文に、通常メールは本文の後ろに追記）
@@ -121,8 +123,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - `calendar_name` は**表示名**（calendarList から解決）または**カレンダーID**（`@` を含む値は ID 直接指定）のどちらでも指定可。表示名で解決できない場合は利用可能なカレンダー名を操作ログに出す
    - 本番では ID 直接指定を採用（値: `eiwa.public@gmail.com`）。理由は下記の実装ノート参照
 7. **利用量集計**: Claude のトークン使用量を api_usage に月次加算（推定コスト表示用）
-8. **クレジット監視**: Claude API が残高不足エラーを返したら `api_credit_alert` を設定（正常分類で自動解除）。ダッシュボードに警告バナー＋チャージ導線を表示
-9. `last_fetch_at` を現在時刻に更新
+8. **完了タスクのアーカイブ**: ステータス「完了」になってから `archive_after_days`（既定30。0で無効）を超えたタスクを `archived_at` にセットしてアーカイブへ移す（カンバンの完了列に溜まり続けないようにする。アーカイブ画面で参照）。`completed_at` を持たない旧データは対象外
+9. **クレジット監視**: Claude API が残高不足エラーを返したら `api_credit_alert` を設定（正常分類で自動解除）。ダッシュボードに警告バナー＋チャージ導線を表示
+10. `last_fetch_at` を現在時刻に更新
 
 ### 4-2. タスクのステータス管理
 
@@ -136,6 +139,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | 返信済み | 共有 Gmail からの返信を検知して自動遷移（未処理のみ対象） |
 | 対応中 / 完了 | 担当者が手動で変更（ドラッグ＆ドロップ or 詳細画面のボタン） |
 
+「完了」への遷移時に `completed_at` を記録し、これがアーカイブ移行の起点になる。完了以外へ戻すと `completed_at`・`archived_at` をクリアしてカンバンへ復帰させる（詳細は 4-8 アーカイブ）。
+
 ### 4-3. 画面仕様
 
 **共通**: ヘッダーは落ち着いたグリーン（#33604d）。左上に栄和ロゴ（白円台座）。ヘッダー内のボタンは高さ36pxで統一。
@@ -143,17 +148,21 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 **ログイン画面**: ロゴ + 「栄和　タスク管理システム」。ユーザー名/パスワード認証。
 
 **メイン画面（カンバン）**:
-- タイトル「栄和　タスク管理システム」(22px)。右側に「今すぐ取得」（白）「ログ」（白）「設定」（青）「ログアウト」（黒）
-- **レスポンシブ / モバイル対応**: 幅 768px 以下ではヘッダーの操作ボタンを右上の**3本線（ハンバーガー）メニュー**に畳む（開くと最終取得時刻＋各操作を縦並び。外側クリック/Esc で閉じる）。カンバン列は横スクロール、タスク詳細モーダルは1カラム化。入力欄はモバイルで16pxにして iOS のフォーカス時ズームを抑止。デスクトップの見た目は不変。関連 CSS は `Dashboard.css` / `KanbanBoard.css` 等の `@media` 、開閉ロジックは `Dashboard.jsx`
-- ログインユーザー名は担当者フィルターと同じ行の右端に大きめ（17px）に表示
+- タイトル「栄和　タスク管理システム」(22px)。**ヘッダー右端は常に3本線（ハンバーガー）メニュー**に集約（画面幅によらず）。その左に**ログインユーザー名**（「○○ さん」）を表示
+- **ハンバーガーメニュー**（上から順に）: このシステムについて / 設定 / 従量課金事項 / 今すぐ取得 / 処理ログ / ログアウト。各項目は白背景で統一。開くと先頭に最終取得時刻を表示。外側クリック/Esc で閉じる
+- **「このシステムについて」**: システム構成図（`public/system-overview.png`）を表示するモーダルを開く（`AboutModal.jsx`）
+- **レスポンシブ / モバイル対応**: 幅 768px 以下でもレイアウトは崩れない。カンバン列は横スクロール、タスク詳細モーダルは1カラム化。入力欄はモバイルで16pxにして iOS のフォーカス時ズームを抑止
+- **ツールバー**（担当者フィルターの行）: 左に担当者フィルター（チップ）、右端に**「アーカイブ」ボタン（グレー背景）**でアーカイブ画面へ遷移
 - 4列カンバン（列背景はステータス色を薄く混ぜた濃いめの色）。ステータス名 16px
-- タスクカード: タイトル / 送信元（👤 会社名・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
+- タスクカード: **タイトル先頭に情報源アイコン**（📧メール / 🌐フォーム / 📅カレンダー / 📠FAX / ✏️手入力。`src/lib/channel.js` が `channel` から解決、旧データは `source` から補完）/ 送信元（会社・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
 - 未処理列のヘッダーに新規タスク手動登録の「＋」ボタン（**青地＋白文字**で強調）
 - 担当者フィルター（チップ、15px）。ドラッグ＆ドロップでステータス変更（`PATCH /api/tasks` 経由。service role・JWT必須）
 - タスク詳細モーダル（幅820px・視認性重視で文字は大きめ・モバイルは1カラム）: タイトル+×は固定ヘッダー、最下部は固定フッタ。フッタ左に「ステータス」見出し＋変更ボタン、右に「メール参照」「返信」ボタン
   - **1行目に担当者・受信日時・期限を横並び**表示（`task-detail-toprow`）。ステータスはフッタの変更ボタンと重複するため本文側では省略
   - **送信者の右隣に発信元の宛名**（`contact`）を表示。`contact` が無ければ `sender_display`＋「様」で補う（生成前の既存タスク向けフォールバック）
-  - 担当者・期限・留意事項（remarks）は詳細画面で編集し「保存」（`PATCH /api/tasks`）。担当者が「（担当未設定）」のときはオレンジで警告
+  - **タイトル先頭に情報源アイコン**（カードと同じ📧/🌐/📅/📠/✏️）を表示
+  - 担当者・期限・留意事項（remarks）は詳細画面で編集。**「保存」ボタンは1行目（期限の行）の右端**に青色で配置（`PATCH /api/tasks`）。担当者が「（担当未設定）」のときはオレンジで警告
+  - フッタの「ダウンロード」「返信」は黒背景ボタン
   - **添付ファイル**（メール由来タスクのみ）: 開いた時に**スレッド全体**の添付一覧を Gmail から取得（対象顧客宛メッセージのみ・別顧客分は除外）。ありなら「📎 添付あり」バッジ＋ファイル名・サイズ・[ダウンロード]ボタンを表示。返信で本文が上書きされても最初・途中の添付は残る。ダウンロードは Worker 経由で取得（後述 4-5）
   - **メール参照**: Gmail のウェブ画面で該当メールを開く（`https://mail.google.com/mail/?authuser=<共有アドレス>#all/<gmail_message_id>`。パスに `/u/<アドレス>` を埋め込む形式は 404 になることがあるため authuser クエリを使う。共有アカウントへのログインが必要）
   - **返信**: `mailto:` でメーラーの返信画面を開く。TO=タスクの返信先アドレス（フォーム経由は本文記載のアドレス）、CC=`if@eiwa-up.jp`（固定。同アドレス宛は共有 Gmail にも配信されるため返信検知の対象になる）。**本文の先頭に先方の宛名（`contact`。無ければ `sender_display`＋様）を入れ、そのあと2行の空行**を空け、続けて元メールを引用
@@ -161,15 +170,25 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **アプリ更新バナー**（PWA）: 新バージョン検知時に画面上部へ「新しいバージョンがあります → 更新」を表示（後述 4-6）
 - ヘッダー左のロゴはタップで最新化ボタンを兼ねる。ロゴ横に `ver.YYYY-MM-DD HH:MM`（ビルド時刻・JST）を表示
 
-**操作ログ画面（/logs）**:
-- ヘッダー「操作ログ」+「×」（カンバンへ戻る）。ヘッダーの「ログ」ボタン（メイン画面）から遷移
+**処理ログ画面（/logs）**:
+- ヘッダー「処理ログ」+「×」（カンバンへ戻る）。ハンバーガーメニューの「処理ログ」から遷移
 - 直近200件を表形式で表示: 日時 / 種別（メール取得・ステータス変更）/ 実行者 / 内容
 - 実行者は担当者の表示名（手動操作）または「システム（自動）」（Cron 実行・返信自動検知）
 
+**アーカイブ画面（/archive）**（4-8 参照）:
+- ヘッダー「アーカイブ」+「×」。ツールバーの「アーカイブ」ボタンから遷移
+- 処理ログと同じ一覧表形式（情報源アイコン / タイトル / 担当者 / 期限 / 受信日時 / アーカイブ日）。行タップでタスク詳細モーダルを開く
+- 絞り込み: 担当者・情報源のプルダウン ＋ フリーワード全文検索
+
 **設定画面**:
-- ヘッダー右: 保存メッセージ /「Anthropic API 支払設定」（赤）/「保存」（青）/「×」（保存せずカンバンへ戻る）
-- 2カラム。左: 「更新頻度と時間帯」（開始時・終了時・頻度分を1行）/ 担当者名3名 / 業務判定キーワード。右: 業務背景・振り分けルール（org_context、大きな入力欄）
-- 下部: 「今月の Anthropic API 利用状況」（対象月・分類件数・入出力トークン・推定コストを1行表示）、最下部に試算の注釈
+- ヘッダー右: 保存メッセージ /「保存」（青）/「×」（保存せずカンバンへ戻る）。※支払設定・利用状況は「従量課金事項」画面へ移動
+- 2カラム。左: 「更新頻度と時間帯」（開始時・終了時・頻度分を1行）/ **「完了タスクのアーカイブ」（アーカイブまでの日数。0で無効）** / 担当者名（改行区切りの1つのテキストエリア。1行に1名。DBはJSON配列のまま）/ 業務判定キーワード。右: 業務背景・振り分けルール（org_context、大きな入力欄）
+- フォントは視認性のため少し大きめ（label 15px / h2 16px 等）
+
+**従量課金事項画面（/usage）**:
+- ヘッダー「従量課金事項」+「×」。ハンバーガーメニューの「従量課金事項」（設定の下）から遷移
+- 「今月の Anthropic API 利用状況」（対象月・分類件数・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
+- 最下部に「Anthropic API 支払設定」ボタン（赤。以前は設定画面ヘッダーにあったものを移設）
 
 ### 4-4. API エンドポイント（Worker）
 
@@ -178,9 +197,10 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | メソッド/パス | 認証 | 内容 |
 |---|---|---|
 | POST `/api/login` | 不要 | bcrypt 照合 → HS256 JWT（**30日**有効、`tv`=token_version を埋め込み）を発行。IP+ユーザー名ごとの失敗回数を記録し、8回失敗で15分ロックアウト |
-| GET `/api/tasks` | JWT | タスク一覧（受信日時の新しい順） |
+| GET `/api/tasks` | JWT | カンバン用タスク一覧（受信日時の新しい順）。**アーカイブ済み（`archived_at` 非NULL）は除外** |
 | POST `/api/tasks` | JWT | タスクの手動登録（`source='manual'`、id は `manual:<uuid>`） |
-| PATCH `/api/tasks` | JWT | `assignee` / `due_date` / `remarks` / `title` / `status` を更新。`status` 変更時はサーバー側で操作ログ（`activity_logs`）を記録 |
+| PATCH `/api/tasks` | JWT | `assignee` / `due_date` / `remarks` / `title` / `status` を更新。`status` 変更時はサーバー側で操作ログ（`activity_logs`）を記録し、完了への遷移で `completed_at` を記録／完了以外で `completed_at`・`archived_at` をクリア |
+| GET `/api/archive` | JWT | アーカイブ済みタスク一覧（アーカイブ日の新しい順・上限500）。`assignee`（担当者）・`channel`（情報源）で絞り込み、`q` でフリーワード全文検索（PostgRESTフィルタ注入対策としてサニタイズ） |
 | GET `/api/settings` | JWT | 設定一覧（`{key: value}`） |
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert |
 | GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
@@ -191,7 +211,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
-- settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`
+- settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`, `archive_after_days`
 - 添付系APIは `thread_id` 必須（`message_id` 単体でタスクに紐づかない共有メールボックスの任意メッセージを引ける経路は廃止済み）
 - 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（ほぼ全ディレクティブ `'self'`）を付与（`worker/lib/http.js` の `withSecurityHeaders`）
 
@@ -201,6 +221,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 - メール由来タスクの詳細画面を開くと、`GET /api/attachments?thread_id=…` で**スレッド全体の添付一覧をその場で Gmail から取得**して表示する（`gmail.js` が各メッセージの payload を再帰的に辿り、`filename` と `body.attachmentId` を持つパートを抽出。署名等に埋め込まれたインライン画像 = `Content-Disposition: inline` の image/* は除外）。
 - **スレッド集約**: 返信で本文が上書きされても最初・途中の返信の添付が失われないよう、スレッド内の全メッセージの添付を集約する（同一ファイル=名前+サイズ+MIME は1件に集約）。ただし同一件名で複数顧客が1スレッドにまとまる場合に別顧客宛の添付が混ざるのを防ぐため、**対象タスクの顧客(counterpart)が参加している（From/To/Cc に含む）メッセージの添付だけ**に絞り込む（counterpart は `mail-utils.js` で特定）。各添付は所属 `messageId` を持ち、ダウンロード時に使う。
+- **FAX の例外（2026-07-17）**: `channel='fax'` のタスクはスレッド集約を行わず、タスクの元メッセージ（`gmail_message_id`）単体の添付だけを返す。FAXは件名共通で複数が1スレッドに混在し、送信元も共通で counterpart 絞り込みが効かないため。
 - 各ファイルの [ダウンロード] は `GET /api/attachment` を叩き、Worker が Gmail の `messages/{id}/attachments/{attachmentId}` から本体（base64url）を取得してバイト列で返す。フロントは Bearer 付き fetch → Blob 化してダウンロードを起動する。
 - **設計判断**: 添付メタ情報を DB に持たせず取得のたびに Gmail へ問い合わせる方式にした。理由は (1) 既存タスクにも追加改修なしで対応できる、(2) メール取得パイプライン・スキーマに手を入れずリスクを抑えられる、(3) 共有アカウントの認証情報で取得するので担当者個人の Gmail ログインが不要。既存の `gmail.readonly` スコープで動作する。
 
@@ -225,6 +246,17 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **`worker/lib/pipeline.js`**: `collectClassifierDocuments()` が対応形式（PDF・PNG・JPEG・GIF・WebP。TIFFは非対応）の添付を、サイズ上限（1ファイル10MB・合計12MB）・件数上限（5件）でフィルタしつつ `getAttachmentData` で取得し、base64url→標準base64に変換して分類器へ渡す。
 - **非対応形式**: TIFF（Claude非対応）。複合機のFAXが `mimi@eiwa-up.com` 宛にTIFF形式で転送される運用が残っている場合、その添付は読み取れない（PDF転送であれば読み取れる）。
 - **取り込みの前提条件（重要）**: システムはGmail APIで共有アカウント（`eiwa.public@gmail.com`）のメールを取得する。**メーリングリスト/Googleグループ宛に届いたメールはGmail APIの検索・取得対象に入らない**（Web画面には見えるがAPI経由では取得できない）。FAXがメーリングリスト経由で届く設定のままだと、この機能があってもタスク化されない。FAXを取り込むには、共有アカウント宛に**直接**（PDF形式で）転送されるようにする必要がある。
+- **FAXの添付表示（2026-07-17修正）**: FAX転送メールは件名が「Attached Image」等で共通するため、Gmail側で複数の別々のFAXが同一スレッドにまとまることがある。送信元も全FAX共通のため counterpart 絞り込みが効かない。そこで **`channel='fax'` のタスクはスレッド集約を行わず、タスクの元になった単一メッセージの添付だけ**を表示する（4-5参照）。
+
+### 4-8. 完了タスクのアーカイブ（2026-07-17）
+
+「完了」列にタスクが溜まり続けるのを防ぐため、一定日数を超えた完了タスクをアーカイブへ移し、専用画面で参照する。
+
+- **移行**: パイプライン（メール取得時）で、`status='完了'` かつ `completed_at` が `archive_after_days`（設定・既定30。0で無効）日より前のタスクに `archived_at` をセットする。`completed_at` を持たない旧データは対象外。
+- **`completed_at` の記録**: `PATCH /api/tasks` でステータスが「完了」になった時に記録。完了以外へ戻すと `completed_at`・`archived_at` をクリアしてカンバンへ復帰させる。
+- **カンバンからの除外**: `GET /api/tasks` は `archived_at` 非NULLを除外する。
+- **アーカイブ画面（`/archive`）**: `GET /api/archive` で取得。担当者・情報源での絞り込みと、フリーワード全文検索（タイトル・件名・本文・送信者・宛名・留意事項をサーバー側 ilike で横断）。行タップで既存のタスク詳細モーダルを開く（編集・ステータス変更も可能）。
+- **既存の完了タスクの扱い**: 導入時のマイグレーションで、既存の完了タスクは `updated_at` を `completed_at` の代替として補完済み。デプロイ後、次回のパイプライン実行時にまとめてアーカイブへ移る。
 
 ---
 
@@ -246,17 +278,20 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | sender_display | text | AI 抽出の会社名・氏名（フォーム経由は本文優先） |
 | contact | text | 先方担当者の宛名（会社・氏名＋様）。返信メール冒頭・詳細画面の送信者右隣に使う。AI 抽出、無ければ `sender_display`＋様。本番に既存の列 |
 | sender_email | text | 返信先アドレス（フォーム経由は本文記載を優先） |
-| source | text | 取得元。`email`（Gmail）/ `calendar`（Google カレンダー）。既定 email |
+| source | text | 取得元。`email`（Gmail）/ `calendar`（Google カレンダー）/ `manual`（手動登録）。既定 email。返信検知等のロジックで使用 |
+| channel | text | 情報源アイコン表示用の経路種別 `email`/`form`/`fax`/`calendar`/`manual`。source='email' の内訳（通常/フォーム/FAX）を区別。source とは独立（マイグレーション `add_tasks_channel`。旧データは source から補完済み） |
 | subject / body_preview | text | body_preview は先頭 20000字（`MAX_BODY_PREVIEW`。引用履歴を含む全文を保持。改行も保持） |
 | remarks | text | 留意事項。詳細画面で手動入力（マイグレーション `add_remarks_to_tasks`） |
 | last_reply_message_id | text | 最後に取り込んだ返信の Gmail message id。返信検知の冪等化用（マイグレーション `add_last_reply_message_id_to_tasks`。NULL 可） |
 | classification_note | text | AI の判定理由 |
+| completed_at | timestamptz | ステータスが「完了」になった日時。アーカイブ移行の起点（マイグレーション `add_tasks_archive`。旧完了タスクは updated_at で補完） |
+| archived_at | timestamptz | アーカイブ移行日時。非NULL＝アーカイブ済み（カンバンから除外・アーカイブ画面で参照） |
 | received_at / created_at / updated_at | timestamptz | updated_at はトリガーで自動更新 |
 
 > 添付ファイルは DB に保持しない（詳細画面を開くたびに Gmail から取得。4-5 参照）。手動登録タスクは `source='manual'`、`gmail_thread_id`/`gmail_message_id` が `manual:<uuid>`。
 
 ### settings（key/value）
-`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `api_credit_alert`, `last_fetch_at`
+`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`
 
 ### users
 id / username(unique) / password_hash(bcrypt) / display_name / **token_version**(既定0) / created_at。**anon からは一切アクセス不可（service role のみ）**
