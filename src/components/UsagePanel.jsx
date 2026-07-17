@@ -34,7 +34,7 @@ export default function UsagePanel() {
       ) : !loaded ? (
         <p className="dashboard-loading">読み込み中…</p>
       ) : (
-        <dl className="usage-fields usage-fields-row">
+        <dl className="usage-fields">
           <div className="usage-item">
             <dt>対象月</dt>
             <dd>{month}</dd>

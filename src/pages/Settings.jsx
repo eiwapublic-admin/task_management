@@ -1,10 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import SettingsPanel from '../components/SettingsPanel'
-import UsagePanel from '../components/UsagePanel'
 import { fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
-import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
@@ -68,14 +66,6 @@ export default function Settings() {
           <span className="settings-saved" role="status" aria-live="polite">
             {status}
           </span>
-          <a
-            className="usage-billing-link"
-            href={BILLING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Anthropic API 支払設定
-          </a>
           <button className="btn-save" type="submit" form="settings-form">
             保存
           </button>
@@ -101,7 +91,6 @@ export default function Settings() {
         ) : (
           !error && <p className="dashboard-loading">読み込み中…</p>
         )}
-        <UsagePanel />
       </div>
     </div>
   )

@@ -199,6 +199,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="dashboard-header-right">
+          {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
           <div className="dashboard-menu" ref={menuRef}>
             <button
               type="button"
@@ -223,6 +224,7 @@ export default function Dashboard() {
                 このシステムについて
               </button>
               <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
+              <button onClick={() => navigate('/usage')}>従量課金事項</button>
               <button
                 onClick={() => {
                   setMenuOpen(false)
@@ -233,7 +235,6 @@ export default function Dashboard() {
                 {fetching ? '取得中…' : '今すぐ取得'}
               </button>
               <button onClick={() => navigate('/logs')}>処理ログ</button>
-              <button onClick={() => navigate('/archive')}>アーカイブ</button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
             </div>
           </div>
@@ -283,7 +284,7 @@ export default function Dashboard() {
           onStatusChange={handleStatusChange}
           onCreateTask={handleCreateTask}
           onUpdateTask={handleUpdateTask}
-          userName={user?.display_name}
+          onOpenArchive={() => navigate('/archive')}
           sharedGmail={sharedGmail}
         />
       )}

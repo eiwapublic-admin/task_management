@@ -14,11 +14,23 @@
   flex-wrap: wrap;
 }
 
-.kanban-user {
-  font-size: 17px;
+/* ツールバー右端の「アーカイブ」ボタン（グレー背景） */
+.kanban-archive-btn {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-base);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-strong);
+  cursor: pointer;
   white-space: nowrap;
+  transition: filter var(--transition);
+}
+
+.kanban-archive-btn:hover {
+  filter: brightness(0.95);
 }
 
 /* ---------- フィルタバー ---------- */
