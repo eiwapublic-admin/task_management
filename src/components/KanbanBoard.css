@@ -214,6 +214,11 @@
   line-height: 1.4;
 }
 
+/* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */
+.task-card-channel-icon {
+  margin-right: 4px;
+}
+
 /* 送信元の会社・氏名 */
 .task-card-sender {
   font-size: 12px;
@@ -369,6 +374,11 @@
   font-size: 22px;
   color: var(--text-strong);
   line-height: 1.4;
+}
+
+/* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */
+.task-detail-channel-icon {
+  margin-right: 6px;
 }
 
 .task-detail-close {

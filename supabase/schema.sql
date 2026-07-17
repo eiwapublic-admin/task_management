@@ -23,6 +23,9 @@ create table if not exists tasks (
   remarks          text,           -- 留意事項（担当者が詳細画面で自由入力するメモ）
   last_reply_message_id text,       -- 最後に取り込んだ返信メールの Gmail message id（返信検知の冪等化・返信済みへの再返信で本文を上書きするため）
   source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー） / 'manual'（手動登録）
+  channel          text,           -- カード/詳細画面のアイコン表示用の経路種別: 'email'/'form'/'fax'/'calendar'/'manual'。
+                                    -- source='email' の内訳（通常メール/問い合わせフォーム/FAX転送）を区別するために追加。
+                                    -- source の値（返信検知等のロジックで使用）とは独立。null の既存タスクは source から表示用に補完する
   received_at      timestamptz not null,
   created_at       timestamptz default now(),
   updated_at       timestamptz default now()
@@ -36,6 +39,7 @@ alter table tasks add column if not exists sender_email text;
 alter table tasks add column if not exists remarks text;
 alter table tasks add column if not exists last_reply_message_id text;
 alter table tasks add column if not exists source text not null default 'email';
+alter table tasks add column if not exists channel text;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);

@@ -285,6 +285,7 @@ async function handleTaskCreate(req) {
         gmail_thread_id: syntheticId,
         gmail_message_id: syntheticId,
         source: 'manual',
+        channel: 'manual',
         title: title.slice(0, 120),
         assignee,
         status,
