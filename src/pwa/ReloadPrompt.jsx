@@ -34,7 +34,10 @@ export function ReloadPrompt({
     }
 
     navigator.serviceWorker
-      .register('/sw.js')
+      // updateViaCache: 'none' で sw.js 自体の取得を常にHTTPキャッシュ無視にする。
+      // これが無いと、ブラウザ/中間キャッシュの挙動次第で新版の sw.js を
+      // 取得できず、何度デプロイしても更新バナーが出ないことがある。
+      .register('/sw.js', { updateViaCache: 'none' })
       .then((reg) => {
         // 既に待機中の新版があれば即バナー表示
         if (reg.waiting && navigator.serviceWorker.controller) {

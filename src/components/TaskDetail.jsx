@@ -3,7 +3,7 @@ import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import { formatDateTime } from '../lib/format'
 import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
 import { listAttachments, downloadAttachment } from '../lib/api'
-import { channelIcon, channelLabel } from '../lib/channel'
+import { channelIconSrc, channelLabel } from '../lib/channel'
 
 // バイト数を読みやすい単位にする
 function formatBytes(n) {
@@ -184,9 +184,12 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
       >
         <div className="task-detail-header">
           <h2 id="task-detail-title">
-            <span className="task-detail-channel-icon" aria-label={channelLabel(task)} title={channelLabel(task)}>
-              {channelIcon(task)}
-            </span>
+            <img
+              className="task-detail-channel-icon"
+              src={channelIconSrc(task)}
+              alt={channelLabel(task)}
+              title={channelLabel(task)}
+            />
             {task.title}
             {hasAttachments && (
               <span className="task-detail-attach-badge" title="添付ファイルあり" aria-label="添付ファイルあり">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import AppHeader from '../components/AppHeader'
 import { fetchLogs } from '../lib/tasks'
 import { formatDateTime } from '../lib/format'
 import './Dashboard.css'
@@ -15,7 +15,6 @@ function jstDate(value) {
 }
 
 export default function Logs() {
-  const navigate = useNavigate()
   const [logs, setLogs] = useState(null)
   const [error, setError] = useState('')
 
@@ -27,23 +26,9 @@ export default function Logs() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-header">
-        <div className="dashboard-header-left">
-          <h1>処理ログ</h1>
-        </div>
-        <div className="dashboard-header-right">
-          <button
-            className="btn-cancel"
-            type="button"
-            aria-label="カンバンへ戻る"
-            title="カンバンへ戻る"
-            onClick={() => navigate('/')}
-          >
-            ×
-          </button>
-        </div>
-      </header>
+      <AppHeader />
       <div className="logs-container">
+        <h2 className="page-title">処理ログ</h2>
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}

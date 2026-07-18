@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import AppHeader from '../components/AppHeader'
 import TaskDetail from '../components/TaskDetail'
 import { fetchArchive, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { updateTask } from '../lib/api'
 import { formatDate, formatDateTime } from '../lib/format'
-import { channelIcon, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
+import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
 import { UNASSIGNED } from '../lib/status'
 import './Dashboard.css'
 
@@ -21,7 +21,6 @@ function parseAssignees(raw) {
 }
 
 export default function Archive() {
-  const navigate = useNavigate()
   const [tasks, setTasks] = useState(null)
   const [error, setError] = useState('')
   const [assignees, setAssignees] = useState(DEFAULT_ASSIGNEES)
@@ -97,23 +96,9 @@ export default function Archive() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-header">
-        <div className="dashboard-header-left">
-          <h1>アーカイブ</h1>
-        </div>
-        <div className="dashboard-header-right">
-          <button
-            className="btn-cancel"
-            type="button"
-            aria-label="カンバンへ戻る"
-            title="カンバンへ戻る"
-            onClick={() => navigate('/')}
-          >
-            ×
-          </button>
-        </div>
-      </header>
+      <AppHeader />
       <div className="logs-container">
+        <h2 className="page-title">アーカイブ</h2>
         <form className="archive-filters" onSubmit={handleSearch}>
           <label className="archive-filter">
             担当者
@@ -188,9 +173,11 @@ export default function Archive() {
                   }}
                 >
                   <td className="archive-channel">
-                    <span title={channelLabel(task)} aria-label={channelLabel(task)}>
-                      {channelIcon(task)}
-                    </span>
+                    <img
+                      src={channelIconSrc(task)}
+                      alt={channelLabel(task)}
+                      title={channelLabel(task)}
+                    />
                   </td>
                   <td className="archive-title">{task.title}</td>
                   <td>{task.assignee}</td>
