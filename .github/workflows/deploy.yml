@@ -40,12 +40,19 @@ jobs:
       # デプロイを先に実行する（wrangler-action はシークレット同期をコマンドより
       # 先に行うため、1ステップにまとめると「未デプロイの新バージョンが残った」
       # 状態(error 10215)から自己復旧できなくなる）
+      #
+      # --message でコミットメッセージを Version History に残す。式(${{ }})を
+      # command 文字列に直接埋め込むとコミットメッセージ中の記号でコマンドが
+      # 壊れる/インジェクションの恐れがあるため、まず env 変数に受けてから
+      # シェル変数として展開する（GitHub Actions の推奨パターン）。
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
+        env:
+          DEPLOY_MESSAGE: ${{ github.event.head_commit.message || github.sha }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --message "$DEPLOY_MESSAGE"
 
       - name: Sync secrets
         uses: cloudflare/wrangler-action@v3
