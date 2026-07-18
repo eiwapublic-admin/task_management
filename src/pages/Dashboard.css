@@ -411,7 +411,6 @@
 /* 操作ログ画面 */
 .logs-container {
   padding: var(--space-4) var(--space-5);
-  max-width: 1100px;
 }
 
 .logs-table {
