@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
-import AboutModal from '../components/AboutModal'
-import { getCurrentUser, logout } from '../lib/auth'
+import AppHeader from '../components/AppHeader'
 import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { runFetch, createTask, updateTask } from '../lib/api'
-import { formatDateTime } from '../lib/format'
 import { BILLING_URL } from '../lib/pricing'
-import { reloadApp } from '../pwa/reloadApp'
-import { formatBuildTime } from '../lib/version'
 import './Dashboard.css'
 
 // バックエンドの取り込み処理を画面に反映するための自動更新間隔（ミリ秒）。
@@ -49,12 +45,7 @@ export default function Dashboard() {
   const [notice, setNotice] = useState('')
   const [creditAlert, setCreditAlert] = useState(null)
   const [sharedGmail, setSharedGmail] = useState('')
-  // モバイルのハンバーガーメニュー（ヘッダーの操作ボタンを畳む）の開閉状態
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [aboutOpen, setAboutOpen] = useState(false)
-  const menuRef = useRef(null)
   const navigate = useNavigate()
-  const user = getCurrentUser()
   // 楽観的更新中のステータス書き込み件数。0 より大きい間は自動更新をスキップし、
   // 未確定の変更が背景の再取得で巻き戻されるのを防ぐ。
   const pendingWrites = useRef(0)
@@ -157,89 +148,9 @@ export default function Dashboard() {
     }
   }
 
-  // メニューを開いている間は、外側クリック / Escape で閉じる
-  useEffect(() => {
-    if (!menuOpen) return
-    function onPointerDown(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
-    }
-    function onKeyDown(e) {
-      if (e.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [menuOpen])
-
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
-
   return (
     <div className="dashboard-page">
-      <header className="dashboard-header">
-        <div className="dashboard-header-left">
-          <button
-            type="button"
-            className="dashboard-logo-button"
-            onClick={() => reloadApp()}
-            aria-label="最新の状態に更新"
-            title="タップで最新の状態に更新"
-            style={{ touchAction: 'manipulation' }}
-          >
-            <img className="dashboard-logo" src="/logo.svg" alt="栄和ロゴ" />
-          </button>
-          <div className="dashboard-title-wrap">
-            <h1>栄和　タスク管理システム</h1>
-            <span className="dashboard-version">ver.{formatBuildTime()}</span>
-          </div>
-        </div>
-        <div className="dashboard-header-right">
-          {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
-          <div className="dashboard-menu" ref={menuRef}>
-            <button
-              type="button"
-              className="dashboard-menu-toggle"
-              aria-label="メニュー"
-              aria-haspopup="true"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <span className="dashboard-menu-icon" aria-hidden="true"></span>
-            </button>
-            <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
-              {lastFetchAt && (
-                <span className="dashboard-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
-              )}
-              <button
-                onClick={() => {
-                  setMenuOpen(false)
-                  setAboutOpen(true)
-                }}
-              >
-                このシステムについて
-              </button>
-              <button className="btn-settings" onClick={() => navigate('/settings')}>設定</button>
-              <button onClick={() => navigate('/usage')}>従量課金事項</button>
-              <button
-                onClick={() => {
-                  setMenuOpen(false)
-                  handleRunFetch()
-                }}
-                disabled={fetching}
-              >
-                {fetching ? '取得中…' : '今すぐ取得'}
-              </button>
-              <button onClick={() => navigate('/logs')}>処理ログ</button>
-              <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {creditAlert && (
         <div className="dashboard-banner dashboard-credit-alert" role="alert">
@@ -285,10 +196,12 @@ export default function Dashboard() {
           onCreateTask={handleCreateTask}
           onUpdateTask={handleUpdateTask}
           onOpenArchive={() => navigate('/archive')}
+          onRunFetch={handleRunFetch}
+          fetching={fetching}
+          lastFetchAt={lastFetchAt}
           sharedGmail={sharedGmail}
         />
       )}
-      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   )
 }

@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import AppHeader from '../components/AppHeader'
 import SettingsPanel from '../components/SettingsPanel'
 import { fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
@@ -18,7 +18,6 @@ function parseAssignees(raw) {
 }
 
 export default function Settings() {
-  const navigate = useNavigate()
   const [settings, setSettings] = useState(null)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -58,29 +57,17 @@ export default function Settings() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-header">
-        <div className="dashboard-header-left">
-          <h1>設定</h1>
-        </div>
-        <div className="dashboard-header-right">
+      <AppHeader />
+      <div className="settings-container">
+        <div className="settings-toolbar">
+          <h2 className="page-title">設定</h2>
           <span className="settings-saved" role="status" aria-live="polite">
             {status}
           </span>
           <button className="btn-save" type="submit" form="settings-form">
             保存
           </button>
-          <button
-            className="btn-cancel"
-            type="button"
-            aria-label="保存せずにカンバンへ戻る"
-            title="保存せずにカンバンへ戻る"
-            onClick={() => navigate('/')}
-          >
-            ×
-          </button>
         </div>
-      </header>
-      <div className="settings-container">
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}

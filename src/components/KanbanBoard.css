@@ -14,13 +14,27 @@
   flex-wrap: wrap;
 }
 
-/* ツールバー右端の「アーカイブ」ボタン（グレー背景） */
-.kanban-archive-btn {
+/* ツールバー右端: 最終取得時刻 + 「今すぐ取得」+「アーカイブ」 */
+.kanban-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.kanban-lastfetch {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 「今すぐ取得」ボタン（白背景） */
+.kanban-fetch-btn {
   height: 36px;
   padding: 0 var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg-subtle);
+  background: var(--bg-surface);
   color: var(--text-base);
   font-size: 14px;
   font-weight: 600;
@@ -29,8 +43,32 @@
   transition: filter var(--transition);
 }
 
-.kanban-archive-btn:hover {
+.kanban-fetch-btn:hover {
   filter: brightness(0.95);
+}
+
+.kanban-fetch-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 「アーカイブ」ボタン（グレー塗りつぶし背景） */
+.kanban-archive-btn {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid #6b7280;
+  border-radius: var(--radius-sm);
+  background: #6b7280;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter var(--transition);
+}
+
+.kanban-archive-btn:hover {
+  filter: brightness(1.1);
 }
 
 /* ---------- フィルタバー ---------- */
@@ -228,7 +266,11 @@
 
 /* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */
 .task-card-channel-icon {
+  width: 14px;
+  height: 14px;
   margin-right: 4px;
+  vertical-align: -2px;
+  object-fit: contain;
 }
 
 /* 送信元の会社・氏名 */
@@ -390,7 +432,11 @@
 
 /* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */
 .task-detail-channel-icon {
+  width: 20px;
+  height: 20px;
   margin-right: 6px;
+  vertical-align: -3px;
+  object-fit: contain;
 }
 
 .task-detail-close {

@@ -84,12 +84,6 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
-.dashboard-lastfetch {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 /* ハンバーガーメニュー左のログインユーザー名（緑ヘッダー上で白く表示） */
 .dashboard-user {
   font-size: 15px;
@@ -306,15 +300,6 @@
   justify-content: flex-start;
 }
 
-/* 最終取得の時刻はメニュー先頭の情報行に（緑背景用の白文字を可読色へ） */
-.dashboard-actions.is-open .dashboard-lastfetch {
-  color: var(--text-muted);
-  padding: var(--space-1) var(--space-2) var(--space-2);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-1);
-  white-space: normal;
-}
-
 .dashboard-menu-icon,
 .dashboard-menu-icon::before,
 .dashboard-menu-icon::after {
@@ -343,9 +328,8 @@
   left: 0;
 }
 
-/* ヘッダー内のボタン・リンクは高さと縦位置を統一する */
-.dashboard-header-right button,
-.dashboard-header-right .usage-billing-link {
+/* ヘッダー内のボタンは高さと縦位置を統一する */
+.dashboard-header-right button {
   box-sizing: border-box;
   height: 36px;
   display: inline-flex;
@@ -364,53 +348,64 @@
   filter: brightness(0.92);
 }
 
-/* ハンバーガーメニュー内の項目は全て白で統一する（設定・今すぐ取得・処理ログ・ログアウト共通） */
+/* ハンバーガーメニュー内の項目は全て白で統一する（メイン・アーカイブ・設定・処理ログ・ログアウト共通） */
 .dashboard-header-right .btn-settings,
 .dashboard-header-right .btn-logout {
   background: var(--bg-surface);
   color: var(--text-base);
 }
 
-/* 設定画面: 保存せずに閉じる「×」ボタン */
-.dashboard-header-right .btn-cancel {
-  width: 36px;
-  justify-content: center;
-  padding: 0;
-  font-size: 18px;
+/* 画面共通ページタイトル（コンテンツ側の見出し。ヘッダー自体は全画面共通のため画面名はここに出す） */
+.page-title {
+  font-size: 20px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-}
-
-/* ヘッダー内の「Anthropic API 支払設定」（赤で目立たせる） */
-.dashboard-header-right a.usage-billing-link {
-  background: #c81021;
-  color: #fff;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-/* 設定画面ヘッダーの「保存」ボタン */
-.dashboard-header-right .btn-save {
-  background: var(--color-primary);
-  color: #fff;
-  font-weight: 700;
-  padding: var(--space-2) var(--space-5);
-}
-
-/* ヘッダー上の保存完了メッセージ（緑背景に載るため白系で） */
-.dashboard-header .settings-saved {
-  color: #d9f4e3;
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0;
-  min-height: 0;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-4);
 }
 
 /* 設定ページの本文コンテナ（横に広く使い、縦スクロールを減らす） */
 .settings-container {
   padding: var(--space-4) var(--space-5);
   max-width: 1240px;
+}
+
+/* 設定ページ: タイトル・保存結果メッセージ・保存ボタンを1行に */
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.settings-toolbar .page-title {
+  margin: 0;
+  margin-right: auto;
+}
+
+.settings-toolbar .settings-saved {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--status-done, #33604d);
+  min-height: 0;
+}
+
+.settings-toolbar .btn-save {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-5);
+  cursor: pointer;
+  transition: filter var(--transition);
+}
+
+.settings-toolbar .btn-save:hover {
+  filter: brightness(0.92);
 }
 
 /* 操作ログ画面 */
@@ -549,6 +544,13 @@
   font-size: 16px;
 }
 
+.archive-channel img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
 .archive-title {
   font-weight: 600;
   color: var(--text-strong);
@@ -580,8 +582,7 @@
     min-width: 0;
   }
 
-  .dashboard-header-right button,
-  .dashboard-header-right .usage-billing-link {
+  .dashboard-header-right button {
     white-space: nowrap;
   }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
 import { UNASSIGNED } from '../lib/status'
-import { channelIcon, channelLabel } from '../lib/channel'
+import { channelIconSrc, channelLabel } from '../lib/channel'
 
 // カードに表示する発信元の名前。先方（顧客＝タスクのオーナー）の宛名 contact を最優先で表示する。
 // 自社発信・フォーム経由のタスクは sender_display が自社担当者になるため、contact があればそれを使う。
@@ -39,9 +39,12 @@ export default function TaskCard({ task, onDragStart, onClick }) {
       onKeyDown={handleKeyDown}
     >
       <div className="task-card-title">
-        <span className="task-card-channel-icon" aria-label={channelLabel(task)} title={channelLabel(task)}>
-          {channelIcon(task)}
-        </span>
+        <img
+          className="task-card-channel-icon"
+          src={channelIconSrc(task)}
+          alt={channelLabel(task)}
+          title={channelLabel(task)}
+        />
         {task.title}
       </div>
 

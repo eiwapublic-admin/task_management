@@ -4,6 +4,7 @@ import FilterBar from './FilterBar'
 import TaskDetail from './TaskDetail'
 import TaskForm from './TaskForm'
 import { STATUS_LIST } from '../lib/status'
+import { formatDateTime } from '../lib/format'
 import './KanbanBoard.css'
 
 export default function KanbanBoard({
@@ -13,6 +14,9 @@ export default function KanbanBoard({
   onCreateTask,
   onUpdateTask,
   onOpenArchive,
+  onRunFetch,
+  fetching,
+  lastFetchAt,
   sharedGmail,
 }) {
   const [selectedAssignee, setSelectedAssignee] = useState(null)
@@ -57,11 +61,26 @@ export default function KanbanBoard({
           selectedAssignee={selectedAssignee}
           onChange={setSelectedAssignee}
         />
-        {onOpenArchive && (
-          <button type="button" className="kanban-archive-btn" onClick={onOpenArchive}>
-            アーカイブ
-          </button>
-        )}
+        <div className="kanban-toolbar-right">
+          {lastFetchAt && (
+            <span className="kanban-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
+          )}
+          {onRunFetch && (
+            <button
+              type="button"
+              className="kanban-fetch-btn"
+              onClick={onRunFetch}
+              disabled={fetching}
+            >
+              {fetching ? '取得中…' : '今すぐ取得'}
+            </button>
+          )}
+          {onOpenArchive && (
+            <button type="button" className="kanban-archive-btn" onClick={onOpenArchive}>
+              アーカイブ
+            </button>
+          )}
+        </div>
       </div>
       <div className="kanban-columns">
         {STATUS_LIST.map((status) => (
