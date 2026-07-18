@@ -184,7 +184,7 @@ revoke all on settings      from anon, authenticated;
 revoke all on api_usage     from anon, authenticated;
 revoke all on activity_logs from anon, authenticated;
 
-revoke all on function add_api_usage(text, bigint, bigint, integer) from public, anon, authenticated;
-grant execute on function add_api_usage(text, bigint, bigint, integer) to service_role;
+revoke all on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint) from public, anon, authenticated;
+grant execute on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint) to service_role;
 
 -- users テーブルには anon 向けポリシーを一切作成しない（service role key のみが操作可能。従来どおり）

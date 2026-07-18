@@ -305,6 +305,7 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「分類したメール」「分類したFAX」の件数を分けて表示）
+> **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。
 
 ### activity_logs（操作ログ）
 | 列 | 型 | 備考 |
