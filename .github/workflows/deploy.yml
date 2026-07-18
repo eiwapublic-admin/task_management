@@ -37,22 +37,22 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      # デプロイを先に実行する（wrangler-action はシークレット同期をコマンドより
-      # 先に行うため、1ステップにまとめると「未デプロイの新バージョンが残った」
-      # 状態(error 10215)から自己復旧できなくなる）
+      # デプロイを先に実行する（シークレット同期をこのコマンドより先に行うと
+      # 「未デプロイの新バージョンが残った」状態(error 10215)から自己復旧
+      # できなくなるため、順序はこのまま維持する）。
       #
-      # --message でコミットメッセージを Version History に残す。式(${{ }})を
-      # command 文字列に直接埋め込むとコミットメッセージ中の記号でコマンドが
-      # 壊れる/インジェクションの恐れがあるため、まず env 変数に受けてから
-      # シェル変数として展開する（GitHub Actions の推奨パターン）。
+      # --message でコミットメッセージを Version History に残す。wrangler-action
+      # の command: 入力はシェルを介さず引数分割されるため $DEPLOY_MESSAGE が
+      # 展開されず、文字列そのまま渡ってしまう（実際に確認済み）。そのため
+      # wrangler CLI を直接 run: で呼び出し、bash に変数展開させる。
+      # 式(${{ }})をコマンド文字列に直接埋め込むとコミットメッセージ中の記号で
+      # コマンドが壊れる/インジェクションの恐れがあるため、env 変数経由で渡す。
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_MESSAGE: ${{ github.event.head_commit.message || github.sha }}
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --message "$DEPLOY_MESSAGE"
+        run: npx wrangler deploy --message "$DEPLOY_MESSAGE"
 
       - name: Sync secrets
         uses: cloudflare/wrangler-action@v3
