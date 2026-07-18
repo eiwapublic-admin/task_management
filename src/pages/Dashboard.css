@@ -363,10 +363,26 @@
   margin: 0 0 var(--space-4);
 }
 
-/* 設定ページの本文コンテナ（横に広く使い、縦スクロールを減らす） */
+/* 設定ページ: ウインドウの高さに収め、業務背景欄が余った高さ・幅を埋めるようにする
+   （ページ全体のスクロールではなく、はみ出す場合は左カラム側だけが内部スクロールする） */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.settings-page .dashboard-header {
+  flex-shrink: 0;
+}
+
+/* 設定ページの本文コンテナ（横は画面いっぱいに使う） */
 .settings-container {
   padding: var(--space-4) var(--space-5);
-  max-width: 1240px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 設定ページ: タイトル・保存結果メッセージ・保存ボタンを1行に */
@@ -375,6 +391,7 @@
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+  flex-shrink: 0;
 }
 
 .settings-toolbar .page-title {
@@ -406,6 +423,21 @@
 
 .settings-toolbar .btn-save:hover {
   filter: brightness(0.92);
+}
+
+@media (max-width: 900px) {
+  /* 1カラムに積む幅では、設定パネル側(SettingsPanel.css)と合わせて
+     ウインドウ高さ固定をやめ、従来どおりページ全体でスクロールさせる */
+  .settings-page {
+    height: auto;
+    overflow: visible;
+  }
+
+  .settings-container {
+    flex: none;
+    min-height: auto;
+    display: block;
+  }
 }
 
 /* 操作ログ画面 */

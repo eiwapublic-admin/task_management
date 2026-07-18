@@ -36,89 +36,101 @@ export default function SettingsPanel({ settings, onSave }) {
 
   return (
     <form id="settings-form" className="settings-panel" onSubmit={handleSubmit}>
-      <section>
-        <h2>更新頻度と時間帯</h2>
-        <div className="settings-hours">
+      <div className="settings-left">
+        <section>
+          <h2>更新頻度と時間帯</h2>
+          <div className="settings-hours">
+            <label>
+              開始（時）
+              <input
+                type="number"
+                min={0}
+                max={23}
+                step={1}
+                value={activeStart}
+                onChange={(e) => setActiveStart(e.target.value)}
+                onBlur={(e) => {
+                  const n = Math.round(Number(e.target.value))
+                  setActiveStart(Number.isFinite(n) ? Math.min(23, Math.max(0, n)) : 8)
+                }}
+              />
+            </label>
+            <label>
+              終了（時）
+              <input
+                type="number"
+                min={1}
+                max={24}
+                step={1}
+                value={activeEnd}
+                onChange={(e) => setActiveEnd(e.target.value)}
+                onBlur={(e) => {
+                  const n = Math.round(Number(e.target.value))
+                  setActiveEnd(Number.isFinite(n) ? Math.min(24, Math.max(1, n)) : 18)
+                }}
+              />
+            </label>
+            <label>
+              頻度（分）
+              <input
+                type="number"
+                min={5}
+                max={120}
+                step={1}
+                value={fetchInterval}
+                onChange={(e) => setFetchInterval(e.target.value)}
+                onBlur={(e) => {
+                  // 範囲外・非整数の入力を 5〜120 に丸める
+                  const n = Math.round(Number(e.target.value))
+                  setFetchInterval(Number.isFinite(n) ? Math.min(120, Math.max(5, n)) : 30)
+                }}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section>
+          <h2>完了タスクのアーカイブ</h2>
           <label>
-            開始（時）
+            アーカイブまでの日数（0 で無効）
             <input
               type="number"
               min={0}
-              max={23}
+              max={3650}
               step={1}
-              value={activeStart}
-              onChange={(e) => setActiveStart(e.target.value)}
+              value={archiveAfterDays}
+              onChange={(e) => setArchiveAfterDays(e.target.value)}
               onBlur={(e) => {
                 const n = Math.round(Number(e.target.value))
-                setActiveStart(Number.isFinite(n) ? Math.min(23, Math.max(0, n)) : 8)
+                setArchiveAfterDays(Number.isFinite(n) ? Math.min(3650, Math.max(0, n)) : 30)
               }}
             />
           </label>
-          <label>
-            終了（時）
-            <input
-              type="number"
-              min={1}
-              max={24}
-              step={1}
-              value={activeEnd}
-              onChange={(e) => setActiveEnd(e.target.value)}
-              onBlur={(e) => {
-                const n = Math.round(Number(e.target.value))
-                setActiveEnd(Number.isFinite(n) ? Math.min(24, Math.max(1, n)) : 18)
-              }}
-            />
-          </label>
-          <label>
-            頻度（分）
-            <input
-              type="number"
-              min={5}
-              max={120}
-              step={1}
-              value={fetchInterval}
-              onChange={(e) => setFetchInterval(e.target.value)}
-              onBlur={(e) => {
-                // 範囲外・非整数の入力を 5〜120 に丸める
-                const n = Math.round(Number(e.target.value))
-                setFetchInterval(Number.isFinite(n) ? Math.min(120, Math.max(5, n)) : 30)
-              }}
-            />
-          </label>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <h2>完了タスクのアーカイブ</h2>
-        <label>
-          アーカイブまでの日数（0 で無効）
-          <input
-            type="number"
-            min={0}
-            max={3650}
-            step={1}
-            value={archiveAfterDays}
-            onChange={(e) => setArchiveAfterDays(e.target.value)}
-            onBlur={(e) => {
-              const n = Math.round(Number(e.target.value))
-              setArchiveAfterDays(Number.isFinite(n) ? Math.min(3650, Math.max(0, n)) : 30)
-            }}
-          />
-        </label>
-      </section>
+        <section>
+          <h2>担当者名</h2>
+          <label>
+            担当者（1行に1名）
+            <textarea
+              value={assigneesText}
+              onChange={(e) => setAssigneesText(e.target.value)}
+              placeholder={'橋口\n西川\n岡田'}
+              rows={4}
+            />
+          </label>
+        </section>
 
-      <section>
-        <h2>担当者名</h2>
-        <label>
-          担当者（1行に1名）
+        <section>
+          <h2>業務関連であると判定するワード</h2>
           <textarea
-            value={assigneesText}
-            onChange={(e) => setAssigneesText(e.target.value)}
-            placeholder={'橋口\n西川\n岡田'}
+            value={businessKeywords}
+            onChange={(e) => setBusinessKeywords(e.target.value)}
+            placeholder="例: 見積, 発注, 納期 など、Claude APIへの追加コンテキストとして使われます"
             rows={4}
           />
-        </label>
-      </section>
+        </section>
+      </div>
 
       <section className="settings-org">
         <h2>業務の背景・振り分けルール</h2>
@@ -131,20 +143,8 @@ export default function SettingsPanel({ settings, onSave }) {
           value={orgContext}
           onChange={(e) => setOrgContext(e.target.value)}
           placeholder="例: 「リニューアルプレート」「ダウンライト」「調光器」に関する問い合わせは岡田が担当。プロモーション/広告メールは業務タスクではない。"
-          rows={22}
         />
       </section>
-
-      <section>
-        <h2>業務判定のキーワードヒント</h2>
-        <textarea
-          value={businessKeywords}
-          onChange={(e) => setBusinessKeywords(e.target.value)}
-          placeholder="例: 見積, 発注, 納期 など、Claude APIへの追加コンテキストとして使われます"
-          rows={4}
-        />
-      </section>
-
     </form>
   )
 }
