@@ -72,28 +72,45 @@ insert into settings (key, value) values
 on conflict (key) do nothing;
 
 -- api_usage: Claude API の月次利用量（推定コスト表示用）
+-- fax_* 列（2026-07-18 add_fax_usage_breakdown）: FAX分類（添付PDF/画像の読取を伴う）は
+-- メール分類より入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）を使う場合に
+-- 単価を分けて試算できるよう、メール/フォームとFAXの利用量を分けて集計する。
 create table if not exists api_usage (
-  month         text primary key,          -- 'YYYY-MM'（JST基準）
-  input_tokens  bigint not null default 0,
-  output_tokens bigint not null default 0,
-  calls         integer not null default 0,
-  updated_at    timestamptz not null default now()
+  month             text primary key,          -- 'YYYY-MM'（JST基準）
+  input_tokens      bigint not null default 0,
+  output_tokens     bigint not null default 0,
+  calls             integer not null default 0,
+  fax_calls         integer not null default 0,
+  fax_input_tokens  bigint not null default 0,
+  fax_output_tokens bigint not null default 0,
+  updated_at        timestamptz not null default now()
 );
 
 -- 月次利用量を原子的に加算するヘルパー（service role から rpc で呼ぶ）
-create or replace function add_api_usage(p_month text, p_input bigint, p_output bigint, p_calls integer)
+create or replace function add_api_usage(
+  p_month text,
+  p_input bigint,
+  p_output bigint,
+  p_calls integer,
+  p_fax_calls integer default 0,
+  p_fax_input bigint default 0,
+  p_fax_output bigint default 0
+)
 returns void
 language sql
 security definer
 set search_path = public
 as $$
-  insert into api_usage(month, input_tokens, output_tokens, calls, updated_at)
-  values (p_month, p_input, p_output, p_calls, now())
+  insert into api_usage(month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, updated_at)
+  values (p_month, p_input, p_output, p_calls, p_fax_calls, p_fax_input, p_fax_output, now())
   on conflict (month) do update set
-    input_tokens  = api_usage.input_tokens  + excluded.input_tokens,
-    output_tokens = api_usage.output_tokens + excluded.output_tokens,
-    calls         = api_usage.calls         + excluded.calls,
-    updated_at    = now();
+    input_tokens      = api_usage.input_tokens      + excluded.input_tokens,
+    output_tokens     = api_usage.output_tokens     + excluded.output_tokens,
+    calls             = api_usage.calls             + excluded.calls,
+    fax_calls         = api_usage.fax_calls         + excluded.fax_calls,
+    fax_input_tokens  = api_usage.fax_input_tokens  + excluded.fax_input_tokens,
+    fax_output_tokens = api_usage.fax_output_tokens + excluded.fax_output_tokens,
+    updated_at        = now();
 $$;
 
 -- activity_logs: 操作ログ（メール取得の実行結果、タスクのステータス変更）
