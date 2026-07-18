@@ -1,6 +1,6 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-17
+最終更新: 2026-07-18
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
 リポジトリ: `eiwapublic-admin/task_management`（**非公開（Private）**。2026-07-16 にPrivate化）
 
@@ -66,9 +66,10 @@ worker/
     └── http.js         JSONレスポンス・Bearer トークン検証（token_version失効チェック込み）・
                         全レスポンス共通のセキュリティヘッダ付与（withSecurityHeaders）
 src/
-├── pages/              Login / Dashboard（カンバン）/ Settings / Logs（処理ログ）/ Archive（アーカイブ）
-├── components/         KanbanBoard, KanbanColumn, TaskCard, TaskDetail,
-│                       TaskForm, FilterBar, SettingsPanel, UsagePanel, AboutModal
+├── pages/              Login / Dashboard（カンバン）/ Settings / Usage（従量課金事項）/
+│                       Logs（処理ログ）/ Archive（アーカイブ）
+├── components/         AppHeader（全画面共通ヘッダー）, KanbanBoard, KanbanColumn, TaskCard,
+│                       TaskDetail, TaskForm, FilterBar, SettingsPanel, UsagePanel, AboutModal
 ├── pwa/                ReloadPrompt.jsx（更新バナー）, reloadApp.js（ロゴタップ最新化）
 └── lib/                auth, api（authFetch）, tasks（Worker API経由）, format, status,
                         pricing, mail, version（ビルド時刻表示）, channel（情報源アイコン解決）
@@ -79,6 +80,8 @@ public/
 ├── logo_black.svg      ロゴ原本（枠線のみ）
 ├── manifest.webmanifest  PWA マニフェスト
 ├── system-overview.png  「このシステムについて」モーダルで表示するシステム構成図
+├── icons/              情報源アイコン画像（mail_icon.png / globe_icon.png / calendar_icon.png /
+│                       fax_icon.png / pen_icon.png。2026-07-17〜）
 └── sw.js               ★ビルド生成物（gitignore）。最小 Service Worker
 supabase/schema.sql     DB スキーマ（IaC。SQL Editor / migration で適用）
 wrangler.jsonc          Worker 設定（assets / cron / nodejs_compat）
@@ -143,24 +146,25 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 ### 4-3. 画面仕様
 
-**共通**: ヘッダーは落ち着いたグリーン（#33604d）。左上に栄和ロゴ（白円台座）。ヘッダー内のボタンは高さ36pxで統一。
+**共通ヘッダー（`src/components/AppHeader.jsx`。2026-07-17に共通化）**: 全画面（メイン/設定/従量課金事項/処理ログ/アーカイブ）で同一のヘッダーコンポーネントを使う。落ち着いたグリーン（#33604d）。左に栄和ロゴ（タップで最新化。後述4-6）＋タイトル「栄和　タスク管理システム」(22px)＋ビルド時刻。右に**ログインユーザー名**（「○○ さん」）と**常時3本線（ハンバーガー）メニュー**（画面幅によらず）。各画面固有の「×で閉じる」ボタンは無く、ハンバーガーメニューから自由に行き来する。
+- **ハンバーガーメニュー**（上から順に）: メイン / アーカイブ / 設定 / 従量課金事項 / 処理ログ / このシステムについて / ログアウト。各項目は白背景で統一。外側クリック/Esc で閉じる
+- **「このシステムについて」**: システム構成図（`public/system-overview.png`）を表示するモーダルを開く（`AboutModal.jsx`）
 
 **ログイン画面**: ロゴ + 「栄和　タスク管理システム」。ユーザー名/パスワード認証。
 
+**情報源アイコン（`src/lib/channel.js`）**: メール📧/フォーム🌐/カレンダー📅/FAX📠/手入力✏️の5種を、カード・詳細画面・アーカイブ一覧のタイトル先頭に表示。**2026-07-17より絵文字から実画像（`public/icons/*.png`、`channelIconSrc()`）表示に変更**。カードは20px、詳細画面も20px（2026-07-18にカードを14px→20pxへ拡大し統一）。絵文字版（`channelIcon()`）は `<select><option>` 等、画像を使えない箇所向けに残置。`channel` は `email`/`form`/`fax`/`calendar`/`manual`（`task.channel` が無い旧データは `source` から補完）。
+
 **メイン画面（カンバン）**:
-- タイトル「栄和　タスク管理システム」(22px)。**ヘッダー右端は常に3本線（ハンバーガー）メニュー**に集約（画面幅によらず）。その左に**ログインユーザー名**（「○○ さん」）を表示
-- **ハンバーガーメニュー**（上から順に）: このシステムについて / 設定 / 従量課金事項 / 今すぐ取得 / 処理ログ / ログアウト。各項目は白背景で統一。開くと先頭に最終取得時刻を表示。外側クリック/Esc で閉じる
-- **「このシステムについて」**: システム構成図（`public/system-overview.png`）を表示するモーダルを開く（`AboutModal.jsx`）
 - **レスポンシブ / モバイル対応**: 幅 768px 以下でもレイアウトは崩れない。カンバン列は横スクロール、タスク詳細モーダルは1カラム化。入力欄はモバイルで16pxにして iOS のフォーカス時ズームを抑止
-- **ツールバー**（担当者フィルターの行）: 左に担当者フィルター（チップ）、右端に**「アーカイブ」ボタン（グレー背景）**でアーカイブ画面へ遷移
+- **ツールバー**（担当者フィルターの行）: 左に担当者フィルター（チップ）、右に最終取得時刻・「今すぐ取得」ボタン・**「アーカイブ」ボタン（グレー背景）**（アーカイブ画面へ遷移）
 - 4列カンバン（列背景はステータス色を薄く混ぜた濃いめの色）。ステータス名 16px
-- タスクカード: **タイトル先頭に情報源アイコン**（📧メール / 🌐フォーム / 📅カレンダー / 📠FAX / ✏️手入力。`src/lib/channel.js` が `channel` から解決、旧データは `source` から補完）/ 送信元（会社・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
+- タスクカード: **タイトル先頭に情報源アイコン**（上記）/ 送信元（会社・氏名。旧データは From 表示名で代替）/ 担当者アバター / 期限（超過・間近バッジ）/ 受信日時 / 件名（折りたたみ）
 - 未処理列のヘッダーに新規タスク手動登録の「＋」ボタン（**青地＋白文字**で強調）
 - 担当者フィルター（チップ、15px）。ドラッグ＆ドロップでステータス変更（`PATCH /api/tasks` 経由。service role・JWT必須）
 - タスク詳細モーダル（幅820px・視認性重視で文字は大きめ・モバイルは1カラム）: タイトル+×は固定ヘッダー、最下部は固定フッタ。フッタ左に「ステータス」見出し＋変更ボタン、右に「メール参照」「返信」ボタン
   - **1行目に担当者・受信日時・期限を横並び**表示（`task-detail-toprow`）。ステータスはフッタの変更ボタンと重複するため本文側では省略
   - **送信者の右隣に発信元の宛名**（`contact`）を表示。`contact` が無ければ `sender_display`＋「様」で補う（生成前の既存タスク向けフォールバック）
-  - **タイトル先頭に情報源アイコン**（カードと同じ📧/🌐/📅/📠/✏️）を表示
+  - **タイトル先頭に情報源アイコン**（上記）を表示
   - 担当者・期限・留意事項（remarks）は詳細画面で編集。**「保存」ボタンは1行目（期限の行）の右端**に青色で配置（`PATCH /api/tasks`）。担当者が「（担当未設定）」のときはオレンジで警告
   - フッタの「ダウンロード」「返信」は黒背景ボタン
   - **添付ファイル**（メール由来タスクのみ）: 開いた時に**スレッド全体**の添付一覧を Gmail から取得（対象顧客宛メッセージのみ・別顧客分は除外）。ありなら「📎 添付あり」バッジ＋ファイル名・サイズ・[ダウンロード]ボタンを表示。返信で本文が上書きされても最初・途中の添付は残る。ダウンロードは Worker 経由で取得（後述 4-5）
@@ -170,24 +174,24 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **アプリ更新バナー**（PWA）: 新バージョン検知時に画面上部へ「新しいバージョンがあります → 更新」を表示（後述 4-6）
 - ヘッダー左のロゴはタップで最新化ボタンを兼ねる。ロゴ横に `ver.YYYY-MM-DD HH:MM`（ビルド時刻・JST）を表示
 
-**処理ログ画面（/logs）**:
-- ヘッダー「処理ログ」+「×」（カンバンへ戻る）。ハンバーガーメニューの「処理ログ」から遷移
+**処理ログ画面（/logs）**（共通ヘッダー＋`<h2 className="page-title">処理ログ</h2>`。「×」で閉じるボタンは無く、ハンバーガーメニューから他画面へ遷移）:
 - 直近200件を表形式で表示: 日時 / 種別（メール取得・ステータス変更）/ 実行者 / 内容
 - 実行者は担当者の表示名（手動操作）または「システム（自動）」（Cron 実行・返信自動検知）
+- **表示幅は画面いっぱい**（2026-07-18: `.logs-container` の `max-width: 1100px` を撤廃。広い画面で余白を残したまま列が折り返される問題を解消）
 
-**アーカイブ画面（/archive）**（4-8 参照）:
-- ヘッダー「アーカイブ」+「×」。ツールバーの「アーカイブ」ボタンから遷移
+**アーカイブ画面（/archive）**（4-8 参照。共通ヘッダー＋ページタイトル）:
 - 処理ログと同じ一覧表形式（情報源アイコン / タイトル / 担当者 / 期限 / 受信日時 / アーカイブ日）。行タップでタスク詳細モーダルを開く
 - 絞り込み: 担当者・情報源のプルダウン ＋ フリーワード全文検索
 
-**設定画面**:
-- ヘッダー右: 保存メッセージ /「保存」（青）/「×」（保存せずカンバンへ戻る）。※支払設定・利用状況は「従量課金事項」画面へ移動
+**設定画面**（共通ヘッダー＋ページタイトル）:
+- ページタイトル行に保存メッセージ /「保存」（青）ボタン。※支払設定・利用状況は「従量課金事項」画面へ移動
 - 2カラム。左: 「更新頻度と時間帯」（開始時・終了時・頻度分を1行）/ **「完了タスクのアーカイブ」（アーカイブまでの日数。0で無効）** / 担当者名（改行区切りの1つのテキストエリア。1行に1名。DBはJSON配列のまま）/ 業務判定キーワード。右: 業務背景・振り分けルール（org_context、大きな入力欄）
 - フォントは視認性のため少し大きめ（label 15px / h2 16px 等）
 
 **従量課金事項画面（/usage）**:
-- ヘッダー「従量課金事項」+「×」。ハンバーガーメニューの「従量課金事項」（設定の下）から遷移
-- 「今月の Anthropic API 利用状況」（対象月・分類件数・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
+- 共通ヘッダー＋ページタイトル。ハンバーガーメニューの「従量課金事項」（設定の下）から遷移
+- 「今月の Anthropic API 利用状況」（対象月・**分類したメール件数・分類したFAX件数**・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
+  - **FAXの内訳を分離表示（2026-07-18）**: FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える可能性があるため、「分類したメール」件数はFAXを除いた件数、別行で「分類したFAX」件数を表示する。トークン数・推定コストは現状メール/FAX合算のまま（内訳データは `api_usage` に保持済み。単価別コスト試算はまだ未実装。5章参照）
 - 最下部に「Anthropic API 支払設定」ボタン（赤。以前は設定画面ヘッダーにあったものを移設）
 
 ### 4-4. API エンドポイント（Worker）
@@ -204,7 +208,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/settings` | JWT | 設定一覧（`{key: value}`） |
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert |
 | GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
-| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量 |
+| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、および2026-07-18よりFAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を含む） |
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
 | GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み |
 | GET `/api/attachment` | JWT | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記） |
@@ -231,6 +235,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 - **Service Worker（`public/sw.js`。`scripts/generate-sw.mjs` がビルド時に生成）**: `fetch` ハンドラを持たず、リクエストを横取りしない。役割は「更新の検知」と「`SKIP_WAITING` による有効化」のみ。`SW_VERSION`（git SHA）を刻印し、デプロイごとに内容が変わることでブラウザが新版を検知する。`activate` 時に旧キャッシュを掃除し `clients.claim()`。
   - ※ キャッシュ型 SW（`vite-plugin-pwa`/Workbox 等）は Cloudflare 環境でナビゲーション/RSC を横取りして遷移を壊す事例があるため**採用しない**。この SW に fetch/キャッシュ処理を足さないこと。
+  - **既知の不具合と対策（2026-07-18）: 更新チェックがブラウザ/中間キャッシュの影響を受けうる**。`register()` に `updateViaCache` を指定しないと、ブラウザや経路上の中間キャッシュ（CDN・プロキシ等）の挙動次第で `/sw.js` の新版が取得できず、何度デプロイしても更新バナーが出ない・ロゴタップでも最新化されないことがある（実際に発生・修正済み）。対策は二重で行う: ① クライアント側で `register("/sw.js", { updateViaCache: "none" })` を指定（`src/pwa/ReloadPrompt.jsx`）、② サーバー側で `/sw.js` のレスポンスにだけ明示的に `Cache-Control: no-store, no-cache, must-revalidate` を付与（`worker/index.js`。Cloudflare Workers の静的アセット配信は既定でキャッシュ可能なヘッダーを返しうるため）。
 - **更新バナー（`src/pwa/ReloadPrompt.jsx`）**: 新版検知時に画面上部へ「新しいバージョンがあります → 更新」を表示。約1分間隔で `registration.update()` をポーリング。更新ボタン押下で `SKIP_WAITING` を送り、「更新中…」表示を約0.8秒見せてからリロード（クリックを明確に認知させるため）。本番ビルドのみ描画（`import.meta.env.PROD`）。初回インストール時は自動リロードしないガードあり。
 - **ロゴタップ最新化（`src/pwa/reloadApp.js`）**: ダッシュボード左上のロゴがボタンを兼ね、待機中の新 SW があれば有効化してリロード（iOS 向けの保険タイマー付き）。
 - **表示用バージョン（`src/lib/version.js`）**: `vite.config.js` の `define` でビルド時刻を `__BUILD_TIME__` に埋め込み、ヘッダーに `ver.YYYY-MM-DD HH:MM`（JST）を表示。端末が最新デプロイを取得できているかの確認用（更新“検知”は SW_VERSION が担い、この表示値とは独立）。
@@ -299,7 +304,8 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 `token_version` はJWT失効用（2026-07-16追加）。ログイン時に発行するJWTへ発行時点の値を `tv` として埋め込み、以後のリクエストで現在値と突合する。パスワード変更・退職・トークン漏洩時にこの値をインクリメントするだけで、有効期限（30日）を待たずに当該ユーザーの全トークンを即時失効できる。
 
 ### api_usage
-month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算
+month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「分類したメール」「分類したFAX」の件数を分けて表示）
+> **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。
 
 ### activity_logs（操作ログ）
 | 列 | 型 | 備考 |
@@ -347,13 +353,17 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 ## 7. デプロイ・CI/CD
 
 - main へ push → `.github/workflows/deploy.yml` が起動:
-  1. `npm ci` → `npm run build`（VITE_* を埋め込み）
-  2. **wrangler deploy**（Worker + 静的アセット + Cron）
-  3. **シークレット同期**（デプロイ後に実行）
+  1. `npm ci` → `npm run build`
+  2. **Compute deploy message**: コミットメッセージから Version History 表示用の文言を作る（後述）
+  3. **Deploy Worker**: `npx wrangler deploy --message "<コミットメッセージ本文>" --secrets-file <一時JSON>` を1回だけ実行し、**コード配布とシークレット同期を同一コマンド**で行う（2026-07-18に一本化。旧: 別ステップで `wrangler secret bulk` 相当を実行していたため、デプロイのたびに Version History にメッセージ無しの版がもう1つ増えていた）
 - 手動実行: Actions タブ →「Deploy to Cloudflare Workers」→ Run workflow
+- **Version History 表示（2026-07-18）**: Cloudflare の Workers & Pages → Version History にデプロイのコミットメッセージが表示されるよう `--message` を指定している。
+  - マージコミットの1行目「Merge pull request #N from owner/branch」はPRタイトルより先に表示されて読みにくいため、空行より後ろの本文（PRタイトル）だけを取り出して渡す（マージコミットでない場合は全文をそのまま使う）
+  - `${{ github.event.head_commit.message }}` を `run:` のコマンド文字列に直接埋め込むとコマンドインジェクション/構文破壊の恐れがあるため、必ず `env:` 経由でシェル変数として渡す
+  - `cloudflare/wrangler-action` の `command:` 入力はシェルを介さず引数分割されるため、`"$VAR"` を書いてもシェル変数として展開されない（実機で確認済みの既知の落とし穴）。そのため `wrangler` CLI を `run:` から直接呼び出している
+- シークレットは `jq` でJSON化して `$RUNNER_TEMP`（ジョブ終了で消える領域）に書き出し、デプロイ後（失敗時含む）に明示的に削除する
 - 設計上の注意（過去の障害から）:
-  - デプロイ→シークレットの**2段階**にしてある。1ステップにまとめると、未デプロイの新バージョンが残った際に error 10215 で自己復旧できなくなる
-  - `concurrency.cancel-in-progress` は **false**。途中キャンセルが上記の不整合を作るため
+  - `concurrency.cancel-in-progress` は **false**。デプロイの途中キャンセルは Worker のバージョン/シークレット不整合（error 10215）を起こし自己復旧できなくなるため、常に1本ずつ順番に処理する
 - 不要 Worker の削除: Actions →「Delete Cloudflare Worker」で Worker 名を指定して実行
 
 ---
@@ -401,5 +411,5 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 | Claude API (haiku) | 従量課金 | 1通あたり約0.3円。購入済み $5 で数か月分 |
 
 - 稼働時間帯設定により時間外の起動を停止（Claude 費用はメール数比例のため総額はほぼ不変だが、無駄な実行を削減）
-- 設定画面の「今月の Anthropic API 利用状況」で自前計測ベースの推定コストを常時確認可能
+- 「従量課金事項」画面（旧・設定画面）の「今月の Anthropic API 利用状況」で自前計測ベースの推定コストを常時確認可能。2026-07-18より「分類したメール」「分類したFAX」の件数を分けて表示（FAXのみ将来的に上位モデルへ切り替える場合の単価別試算の準備。現状の推定コストはメール/FAX合算のまま）
 - 残高不足は自動検知し、ダッシュボードに警告＋チャージ導線を表示

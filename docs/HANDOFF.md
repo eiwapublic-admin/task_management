@@ -1,6 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-07-17
+最終更新: 2026-07-18
 設計の詳細は [`task-management-spec-cloudflare.md`](./task-management-spec-cloudflare.md) を参照。
 
 ---
@@ -66,6 +66,13 @@
     - メイン画面: ログインユーザー名をヘッダー（ハンバーガー左）へ移動。ツールバー右端に**「アーカイブ」ボタン（グレー）**を配置
     - 設定画面: フォントを少し大きく。冗長な説明文を削除。「アーカイブまでの日数（0で無効）」を更新頻度の下に配置。担当者入力を改行区切りの1テキストエリアに（DBは配列のまま）
     - **新画面「従量課金事項」（`/usage`）**: 設定画面下部にあった「今月のAnthropic API 利用状況」を独立画面へ移設（縦並び・値のタブ位置揃え）。ヘッダーにあった「Anthropic API 支払設定」ボタンもこの画面末尾へ移動。メニューは「設定」の下
+25. ヘッダー共通化・情報源アイコンの画像化（2026-07-17〜18）: 各画面で個別実装していたヘッダーを `AppHeader.jsx` に共通化（メイン/設定/従量課金事項/処理ログ/アーカイブ）。ハンバーガーメニューを メイン/アーカイブ/設定/従量課金事項/処理ログ/このシステムについて/ログアウト に整理。情報源アイコンを絵文字から実画像（`public/icons/*.png`、`channelIconSrc()`）表示に変更。カードのアイコンは14→20pxに拡大し詳細画面と統一（PR #58 / #59）
+26. PWA更新検知の不具合修正（2026-07-18）: 「更新バナーが出ない・ロゴタップでも更新されない」という報告を調査し、Service Workerの更新チェックがブラウザ/中間キャッシュの影響を受けうる既知の不具合と判明。`register()` に `updateViaCache: "none"` を指定し、加えてサーバー側で `/sw.js` に `Cache-Control: no-store, no-cache, must-revalidate` を明示付与する二重対策で修正（PR #58。設計書4-6・下記「アプリの更新（PWA）」）
+27. 問い合わせフォームのchannel誤判定修正（2026-07-18）: 「ランプシェード張替え見積り依頼」ほか、問い合わせフォーム経由メールが `channel: "email"` に誤判定される事例を調査。フォームの自動送信メールは件名・本文冒頭の定型文が固定のため、Claudeの判定によらず定型文一致で確実に `"form"` と判定するよう修正。既存の該当3件のタスクもDB上で修正済み（PR #59）
+28. 処理ログ画面の表示幅修正（2026-07-18）: `.logs-container` の `max-width: 1100px` を撤廃し、右側に余白を残したまま折り返される問題を解消（PR #60）
+29. デプロイのVersion History表示対応（2026-07-18）: Cloudflare の Workers & Pages → Version History にコミットメッセージが表示されるよう `wrangler deploy --message` を追加。試行錯誤の末（`wrangler-action` の `command:` はシェルを介さず変数展開されないと判明→`wrangler` CLIを`run:`で直接実行に変更、マージコミットの定型文がPRタイトルより先に表示される問題も解消）、最終的にシークレット同期も`--secrets-file`で同一コマンドに一本化し、デプロイのたびに「Manually deployed」という余分な版が増える問題も解消した（PR #61〜#63。設計書7章）
+30. 従量課金事項にFAX内訳を追加（2026-07-18）: FAX分類は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデルへ切り替える場合に単価を分けて試算できるよう、`api_usage` に `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を追加。「分類したメール」（FAXを除く件数）と「分類したFAX」を分けて表示（PR #64。実際のモデル切り替えは未実施・保留中）
+31. DB関数の権限漏れ是正（2026-07-18）: 上記30番のマイグレーションで `add_api_usage()` を引数7個版に変更した際、PostgreSQLの関数識別はシグネチャ単位のため既存の4引数版を置き換えず別オーバーロードとして追加されてしまい、新オーバーロードがデフォルトのPUBLIC権限のまま `anon`/`authenticated` からも実行可能になっていた（C1是正の方針に反する回帰）。旧4引数版を削除し新版を `service_role` 限定に是正（マイグレーション `fix_add_api_usage_overload_grants`）。**関数の引数を増減する変更をした際は必ず `pg_proc.proacl` で権限を確認すること**（設計書5章に教訓を記載）
 
 ---
 
@@ -87,6 +94,7 @@
 - 本アプリは PWA 化済み。デプロイのたびに Service Worker（`SW_VERSION` = git SHA を刻印）が更新され、開いている端末には**「新しいバージョンがあります → 更新」バナー**が出る（最大1分間隔のチェック or 再訪時）。ロゴをタップしても明示的に最新化できる
 - ヘッダーの `ver.YYYY-MM-DD HH:MM`（JST）はビルド時刻。端末が最新デプロイを取得できているかの確認に使う（表示は更新検知とは独立）
 - SW はキャッシュを一切行わない最小構成（`fetch` ハンドラ無し）で、通常利用は常に最新が配信される。ホーム画面に追加すればアプリのように起動できる
+- **既知の不具合と対策（2026-07-18）**: 更新バナーが出ない・ロゴタップでも最新化されない場合、Service Workerの更新チェックがブラウザ/中間キャッシュの影響を受けている可能性がある。対策として `register()` に `updateViaCache: "none"` を指定（`src/pwa/ReloadPrompt.jsx`）し、サーバー側でも `/sw.js` のレスポンスに `Cache-Control: no-store, no-cache, must-revalidate` を明示付与している（`worker/index.js`）。移植元のスキル `pwa-auto-update`（このシステム固有ではなく汎用のPWA導入スキル）側の設計ノートにもこの不具合と対策を反映済み
 
 ---
 
@@ -135,6 +143,7 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - 追加列: `tasks.channel`（情報源アイコン用。email/form/fax/calendar/manual。マイグレーション `add_tasks_channel`。2026-07-17。旧データは source から補完済み）
 - 追加列: `tasks.completed_at` / `tasks.archived_at`（完了タスクのアーカイブ用。マイグレーション `add_tasks_archive`。2026-07-17。既存の完了タスクは updated_at で completed_at を補完済み）
 - 追加設定: `settings.archive_after_days`（既定30。完了からアーカイブまでの日数。0で無効。2026-07-17）
+- 追加列: `api_usage.fax_calls` / `fax_input_tokens` / `fax_output_tokens`（FAX分の利用量内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18）。**関数の引数を増やす変更をした際の注意**: `add_api_usage()` を7引数版に変更したとき `create or replace` だけでは既存の4引数版を置き換えず別オーバーロードとして残ってしまい、新版がPUBLIC権限のまま `anon`/`authenticated` から実行可能になっていた。旧版の削除と権限の是正が別途必要だった（マイグレーション `fix_add_api_usage_overload_grants`。上記「経緯の要約」31番）
 
 ### タスク・設定・ログ・利用量 API（Worker）
 - **2026-07-16 変更**: 従来はフロントの anon キーが Supabase を直接読み取り、status 列の更新のみ anon に許可していたが、anon キーは公開値で匿名の第三者に全データを読み書きされる脆弱性だったため全廃。**タスク一覧・設定・ログ・利用量の読み取りも含め、すべて Worker の `/api/*`（service role・JWT必須）経由**に統一した。
