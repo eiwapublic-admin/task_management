@@ -228,7 +228,7 @@ async function handleUsage(req) {
     const supabase = getAdminClient()
     const { data, error } = await supabase
       .from('api_usage')
-      .select('month, input_tokens, output_tokens, calls, updated_at')
+      .select('month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, updated_at')
       .eq('month', month)
       .maybeSingle()
     if (error) {

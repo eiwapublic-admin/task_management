@@ -22,6 +22,11 @@ export default function UsagePanel() {
   const input = usage?.input_tokens || 0
   const output = usage?.output_tokens || 0
   const calls = usage?.calls || 0
+  const faxCalls = usage?.fax_calls || 0
+  // 「分類したメール」はFAXを除いた件数にする（FAXは添付の読取を伴い単価が異なる
+  // ため、内訳として分けて表示する。将来FAXのみ上位モデルへ切り替える場合の
+  // 単価別コスト試算の準備）。
+  const mailCalls = Math.max(calls - faxCalls, 0)
   const costUSD = estimateCostUSD(input, output)
 
   return (
@@ -41,7 +46,11 @@ export default function UsagePanel() {
           </div>
           <div className="usage-item">
             <dt>分類したメール</dt>
-            <dd>{calls.toLocaleString('ja-JP')} 件</dd>
+            <dd>{mailCalls.toLocaleString('ja-JP')} 件</dd>
+          </div>
+          <div className="usage-item">
+            <dt>分類したFAX</dt>
+            <dd>{faxCalls.toLocaleString('ja-JP')} 件</dd>
           </div>
           <div className="usage-item">
             <dt>入力トークン</dt>

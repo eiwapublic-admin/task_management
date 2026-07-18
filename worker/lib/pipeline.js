@@ -244,6 +244,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   let usageInput = 0
   let usageOutput = 0
   let classifyCalls = 0
+  // FAX（添付PDF/画像の読取）はメールより入出力トークンが多く、将来的に上位モデルへ
+  // 切り替える可能性があるため、内訳として別集計しておく（メール/フォームと合算しない）。
+  let faxUsageInput = 0
+  let faxUsageOutput = 0
+  let classifyFaxCalls = 0
   let billingError = null
 
   const accessToken = await getAccessToken()
@@ -401,6 +406,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       usageInput += usage.input_tokens
       usageOutput += usage.output_tokens
       classifyCalls += 1
+      if (result.channel === 'fax') {
+        faxUsageInput += usage.input_tokens
+        faxUsageOutput += usage.output_tokens
+        classifyFaxCalls += 1
+      }
 
       if (!result.is_business_task) {
         summary.nonBusiness += 1
@@ -658,6 +668,9 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       p_input: usageInput,
       p_output: usageOutput,
       p_calls: classifyCalls,
+      p_fax_calls: classifyFaxCalls,
+      p_fax_input: faxUsageInput,
+      p_fax_output: faxUsageOutput,
     })
     if (usageError) summary.errors.push(`usage: ${usageError.message}`)
   }
@@ -677,7 +690,14 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     )
   }
 
-  summary.usage = { input_tokens: usageInput, output_tokens: usageOutput, calls: classifyCalls }
+  summary.usage = {
+    input_tokens: usageInput,
+    output_tokens: usageOutput,
+    calls: classifyCalls,
+    fax_calls: classifyFaxCalls,
+    fax_input_tokens: faxUsageInput,
+    fax_output_tokens: faxUsageOutput,
+  }
 
   // 5.5) 完了タスクのアーカイブ移行
   //   「完了」になってから archive_after_days 日を超えたタスクを archived_at に
