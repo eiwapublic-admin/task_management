@@ -266,10 +266,10 @@
 
 /* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */
 .task-card-channel-icon {
-  width: 14px;
-  height: 14px;
-  margin-right: 4px;
-  vertical-align: -2px;
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+  vertical-align: -4px;
   object-fit: contain;
 }
 
