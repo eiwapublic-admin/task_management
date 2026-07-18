@@ -624,7 +624,20 @@ async function route(req, env) {
   }
 
   // 静的アセット（SPA フォールバックは wrangler.jsonc の not_found_handling で処理）
-  return env.ASSETS.fetch(req)
+  const assetRes = await env.ASSETS.fetch(req)
+  // sw.js は PWA の更新検知の要。中間キャッシュ/ブラウザキャッシュに乗って
+  // 新版が配信されない事態を避けるため、明示的にキャッシュ無効化する
+  // （フロント側の updateViaCache: 'none' と合わせた二重の対策）。
+  if (pathname === '/sw.js') {
+    const headers = new Headers(assetRes.headers)
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    return new Response(assetRes.body, {
+      status: assetRes.status,
+      statusText: assetRes.statusText,
+      headers,
+    })
+  }
+  return assetRes
 }
 
 export default {
