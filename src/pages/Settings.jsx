@@ -56,7 +56,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page settings-page">
       <AppHeader />
       <div className="settings-container">
         <div className="settings-toolbar">
