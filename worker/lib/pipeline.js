@@ -16,6 +16,16 @@ const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 // Claude の分類結果から決める（メール/フォーム/FAX の区別）。
 const CHANNEL_VALUES = new Set(['email', 'form', 'fax'])
 
+// お問い合わせフォームの自動送信メールは件名・本文冒頭の定型文が固定のため、
+// Claude の判断に頼らずここで確実に判定する（"channel" 分類漏れ対策）。
+const FORM_BODY_MARKER = 'ホームページよりお問い合わせがありました'
+const FORM_SUBJECT_MARKER = 'ホームページからのお問い合わせ'
+function isFormSubmission(email) {
+  const subject = email.subject || ''
+  const body = email.body || ''
+  return subject.includes(FORM_SUBJECT_MARKER) || body.includes(FORM_BODY_MARKER)
+}
+
 // 分類器（Claude）に読ませる添付ファイルの対応 MIME と種別。
 // PDF は document ブロック、主要な画像形式は image ブロックとして渡す。
 // TIFF は Claude が非対応のため対象外（従来 FAX の TIFF はここに含めない）。
@@ -467,7 +477,13 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
       // カード・詳細画面のアイコン表示用（メール/フォーム/FAX の区別）。
       // 分類できない・想定外の値は既定の "email" にする。
-      const channel = CHANNEL_VALUES.has(result.channel) ? result.channel : 'email'
+      // フォームの自動送信メールは定型文で確実に判定できるため、Claude の
+      // 判定結果より優先する（分類漏れで "email" になるのを防ぐ）。
+      const channel = isFormSubmission(email)
+        ? 'form'
+        : CHANNEL_VALUES.has(result.channel)
+          ? result.channel
+          : 'email'
 
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
