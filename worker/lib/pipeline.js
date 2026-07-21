@@ -412,20 +412,40 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         classifyFaxCalls += 1
       }
 
-      if (!result.is_business_task) {
+      // カード・詳細画面のアイコン表示用（メール/フォーム/FAX の区別）。
+      // 分類できない・想定外の値は既定の "email" にする。
+      // フォームの自動送信メールは定型文で確実に判定できるため、Claude の
+      // 判定結果より優先する（分類漏れで "email" になるのを防ぐ）。
+      const channel = isFormSubmission(email)
+        ? 'form'
+        : CHANNEL_VALUES.has(result.channel)
+          ? result.channel
+          : 'email'
+
+      // FAXの読み取り失敗（ハルシネーション対策）: 添付の判読に自信が持てない場合、
+      // Claudeは document_readable=false を返す（プロンプトで明示的に禁止しているため、
+      // このときの他フィールドは信頼できない＝会社名・金額などを創作している恐れがある）。
+      // 誤った情報でタスクを作らず、タイトルに読み取り失敗を明記して人が添付を直接
+      // 確認できるようにする。is_business_task の判定自体も読み取り失敗時は信頼できない
+      // ため、判定によらず必ずタスク化する。
+      const isFaxReadFailure = channel === 'fax' && result.document_readable === false
+
+      if (!isFaxReadFailure && !result.is_business_task) {
         summary.nonBusiness += 1
         continue
       }
 
       // 担当者の正規化（不明・範囲外は「（担当未設定）」にして画面で警告表示させる）
-      let assignee = result.assignee
+      let assignee = isFaxReadFailure ? null : result.assignee
       if (!assignee || !assignees.includes(assignee)) assignee = UNASSIGNED
 
-      const dueDate = typeof result.due_date === 'string' && DUE_RE.test(result.due_date)
+      const dueDate = !isFaxReadFailure && typeof result.due_date === 'string' && DUE_RE.test(result.due_date)
         ? result.due_date
         : null
 
-      const title = (result.title || email.subject || '（件名なし）').slice(0, 120)
+      const title = isFaxReadFailure
+        ? '（FAX内容の読み取り失敗）'
+        : (result.title || email.subject || '（件名なし）').slice(0, 120)
 
       // 自社の社員が社外の宛先へ新規に送ったメールは、こちらから既に連絡済みのため
       // 初めから「返信済み」で登録する。差出人が自社（共有アドレス/自社ドメイン）かつ
@@ -437,16 +457,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         isCompanyAddress(fromEmail) && recipientEmails.some((a) => !isCompanyAddress(a))
       const initialStatus = isOutbound ? '返信済み' : '未処理'
 
-      // 送信元の会社・氏名（Claude が件名/本文から抽出。フォーム経由は本文優先）
+      // 送信元の会社・氏名（Claude が件名/本文から抽出。フォーム経由は本文優先）。
+      // FAX読み取り失敗時は添付から抽出した情報が信頼できないため使わない。
       const senderDisplay =
-        typeof result.sender_display === 'string' && result.sender_display.trim()
+        !isFaxReadFailure && typeof result.sender_display === 'string' && result.sender_display.trim()
           ? result.sender_display.trim().slice(0, 120)
           : null
 
       // 先方担当者の宛名（会社・氏名＋様。返信メールの冒頭に使う）。
       // Claude が抽出できなければ sender_display に「様」を付けてフォールバックする。
       const contact =
-        typeof result.contact === 'string' && result.contact.trim()
+        !isFaxReadFailure && typeof result.contact === 'string' && result.contact.trim()
           ? result.contact.trim().slice(0, 120)
           : senderDisplay
             ? `${senderDisplay} 様`
@@ -454,19 +475,27 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
       // 返信先アドレス: Claude の抽出（フォーム経由は本文のアドレス）を優先し、
       // 無ければ Reply-To → From の順にフォールバック
-      const senderEmail =
-        extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
+      const senderEmail = isFaxReadFailure
+        ? extractEmail(email.replyTo) || extractEmail(email.from)
+        : extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
 
       // 添付（FAX/PDF/画像）から Claude が読み取った要約。FAX 転送メールは本文が
       // ほぼ無いため、この要約を本文として表示する。通常メールで本文もある場合は
-      // 本文の後ろに添付内容を追記する。
+      // 本文の後ろに添付内容を追記する。FAX読み取り失敗時は要約自体が信頼できない
+      // ため使わず、失敗理由を代わりに表示する。
       const docSummary =
-        typeof result.document_summary === 'string' && result.document_summary.trim()
+        !isFaxReadFailure && typeof result.document_summary === 'string' && result.document_summary.trim()
           ? result.document_summary.trim()
           : null
       const emailBody = compactBody(email.body)
       let bodyPreview
-      if (docSummary) {
+      if (isFaxReadFailure) {
+        const issue =
+          typeof result.document_read_issue === 'string' && result.document_read_issue.trim()
+            ? result.document_read_issue.trim()
+            : '添付の画質が不十分などの理由で内容を判読できませんでした'
+        bodyPreview = `【FAXの内容を読み取れませんでした】\n理由: ${issue}\n\n添付のFAX画像/PDFを直接ご確認ください。`
+      } else if (docSummary) {
         bodyPreview =
           emailBody && emailBody.length > 20
             ? `${emailBody}\n\n──────────\n【添付資料の内容（自動読取）】\n${docSummary}`
@@ -482,18 +511,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const docNote = docSummary && documents.length
         ? `添付${documents.length}件（PDF/画像）を読み取って内容を反映しました。`
         : null
+      const faxFailureNote = isFaxReadFailure
+        ? '添付の内容を自信を持って判読できなかったため、内容を推測せずタスク化しました。担当者は添付を直接確認してください。'
+        : null
       const classificationNote =
-        [result.reason || null, outboundNote, docNote].filter(Boolean).join('\n') || null
-
-      // カード・詳細画面のアイコン表示用（メール/フォーム/FAX の区別）。
-      // 分類できない・想定外の値は既定の "email" にする。
-      // フォームの自動送信メールは定型文で確実に判定できるため、Claude の
-      // 判定結果より優先する（分類漏れで "email" になるのを防ぐ）。
-      const channel = isFormSubmission(email)
-        ? 'form'
-        : CHANNEL_VALUES.has(result.channel)
-          ? result.channel
-          : 'email'
+        [faxFailureNote, result.reason || null, outboundNote, docNote].filter(Boolean).join('\n') || null
 
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
