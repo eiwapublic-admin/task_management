@@ -3,8 +3,11 @@
 #   CLOUDFLARE_API_TOKEN   … Cloudflare ダッシュボードで発行（テンプレート「Workersを編集する」）
 #   CLOUDFLARE_ACCOUNT_ID  … Cloudflare ダッシュボード右下の Account ID
 #   SUPABASE_URL / SUPABASE_SERVICE_KEY / SESSION_SECRET / ANTHROPIC_API_KEY /
-#   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN
+#   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN /
+#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
 #     … Worker のシークレットとしてデプロイ時に自動同期される
+#   VAPID_* が未設定の間は新規タスク登録時のWeb Push通知機能が無効のまま
+#   （デプロイ自体は失敗しない。worker/lib/push.js が空チェックしてスキップする）。
 # フロントエンドはデータ面を anon キーで直接読み書きしないため、
 # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY のビルド時注入は不要（廃止済み）。
 name: Deploy to Cloudflare Workers
@@ -74,6 +77,9 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
           SECRETS_FILE="$RUNNER_TEMP/worker-secrets.json"
           umask 077
@@ -85,6 +91,9 @@ jobs:
             --arg GMAIL_CLIENT_ID "$GMAIL_CLIENT_ID" \
             --arg GMAIL_CLIENT_SECRET "$GMAIL_CLIENT_SECRET" \
             --arg GMAIL_REFRESH_TOKEN "$GMAIL_REFRESH_TOKEN" \
+            --arg VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY" \
+            --arg VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY" \
+            --arg VAPID_SUBJECT "$VAPID_SUBJECT" \
             '{
               SUPABASE_URL: $SUPABASE_URL,
               SUPABASE_SERVICE_KEY: $SUPABASE_SERVICE_KEY,
@@ -92,7 +101,10 @@ jobs:
               ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY,
               GMAIL_CLIENT_ID: $GMAIL_CLIENT_ID,
               GMAIL_CLIENT_SECRET: $GMAIL_CLIENT_SECRET,
-              GMAIL_REFRESH_TOKEN: $GMAIL_REFRESH_TOKEN
+              GMAIL_REFRESH_TOKEN: $GMAIL_REFRESH_TOKEN,
+              VAPID_PUBLIC_KEY: $VAPID_PUBLIC_KEY,
+              VAPID_PRIVATE_KEY: $VAPID_PRIVATE_KEY,
+              VAPID_SUBJECT: $VAPID_SUBJECT
             }' > "$SECRETS_FILE"
           # --message="..." (= 形式) にする: コミット本文が "- " 等ハイフンで始まる箇条書きだと、
           # "--message value" の空白区切りでは wrangler(yargs) が value を新しいオプションの

@@ -582,6 +582,75 @@ async function handleDownloadAttachment(req) {
   }
 }
 
+// GET /api/push/public-key — Web Push購読作成に必要なVAPID公開鍵を返す。ログイン必須。
+// 公開鍵は秘密情報ではないが、未ログインの第三者に機能の有無を晒さないため認証を要求する。
+async function handlePushPublicKey(req) {
+  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  const publicKey = process.env.VAPID_PUBLIC_KEY || ''
+  if (!publicKey) return json({ error: 'プッシュ通知は未設定です' }, 404)
+  return json({ publicKey })
+}
+
+// POST /api/push/subscribe — ブラウザのPushSubscriptionを保存する。ログイン必須。
+// endpoint は端末（ブラウザインストール）ごとに一意なため、同じ端末からの
+// 再購読は upsert で1行に保つ（ユーザーが変わってもその端末の最新の紐付けに更新）。
+async function handlePushSubscribe(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const payload = await req.json().catch(() => null)
+    const endpoint = typeof payload?.endpoint === 'string' ? payload.endpoint : ''
+    const p256dh = typeof payload?.keys?.p256dh === 'string' ? payload.keys.p256dh : ''
+    const authSecret = typeof payload?.keys?.auth === 'string' ? payload.keys.auth : ''
+    if (!endpoint || !p256dh || !authSecret) {
+      return json({ error: 'endpoint / keys.p256dh / keys.auth は必須です' }, 400)
+    }
+
+    const supabase = getAdminClient()
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(
+        { user_id: auth.sub, endpoint, p256dh, auth: authSecret },
+        { onConflict: 'endpoint' }
+      )
+    if (error) {
+      console.error('push-subscribe 登録失敗:', error.message)
+      return json({ error: '通知の登録に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('push-subscribe 失敗:', err)
+    return json({ error: '通知の登録に失敗しました' }, 500)
+  }
+}
+
+// POST /api/push/unsubscribe — PushSubscriptionを削除する。ログイン必須。
+// 自分（トークンのユーザー）に紐づく購読のみ削除できるよう user_id も突合する。
+async function handlePushUnsubscribe(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const payload = await req.json().catch(() => null)
+    const endpoint = typeof payload?.endpoint === 'string' ? payload.endpoint : ''
+    if (!endpoint) return json({ error: 'endpoint は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+      .eq('user_id', auth.sub)
+    if (error) {
+      console.error('push-unsubscribe 削除失敗:', error.message)
+      return json({ error: '通知の解除に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('push-unsubscribe 失敗:', err)
+    return json({ error: '通知の解除に失敗しました' }, 500)
+  }
+}
+
 // パスと静的アセットへのルーティング本体。戻り値は fetch() で
 // withSecurityHeaders を通してから返す（API・静的アセットの両方に一律適用するため）。
 async function route(req, env) {
@@ -618,6 +687,15 @@ async function route(req, env) {
   }
   if (pathname === '/api/attachment') {
     return req.method === 'GET' ? handleDownloadAttachment(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/push/public-key') {
+    return req.method === 'GET' ? handlePushPublicKey(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/push/subscribe') {
+    return req.method === 'POST' ? handlePushSubscribe(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/push/unsubscribe') {
+    return req.method === 'POST' ? handlePushUnsubscribe(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname.startsWith('/api/')) {
     return json({ error: 'Not Found' }, 404)

@@ -218,6 +218,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
 | GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み |
 | GET `/api/attachment` | JWT | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記） |
+| GET `/api/push/public-key` | JWT | Web Push購読作成用のVAPID公開鍵を返す（4-9参照）。未設定時は404 |
+| POST `/api/push/subscribe` | JWT | ブラウザの`PushSubscription`（`endpoint`/`keys.p256dh`/`keys.auth`）を`push_subscriptions`に保存（`endpoint`で upsert） |
+| POST `/api/push/unsubscribe` | JWT | 指定`endpoint`の購読を削除（自分（トークンのuser_id）に紐づくもののみ） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -280,6 +283,19 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **アーカイブ画面（`/archive`）**: `GET /api/archive` で取得。担当者・情報源での絞り込みと、フリーワード全文検索（タイトル・件名・本文・送信者・宛名・留意事項をサーバー側 ilike で横断）。行タップで既存のタスク詳細モーダルを開く（編集・ステータス変更も可能）。
 - **既存の完了タスクの扱い**: 導入時のマイグレーションで、既存の完了タスクは `updated_at` を `completed_at` の代替として補完済み。デプロイ後、次回のパイプライン実行時にまとめてアーカイブへ移る。
 
+### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
+
+メール/フォーム/FAX/Googleカレンダーから**自動登録**されたタスクについて、購読中のブラウザ/端末へWeb Push通知を送る。手動登録（画面の「＋」からの登録）は対象外（登録した本人が既に画面上にいるため）。
+
+- **暗号化方式**: RFC 8291（`aes128gcm`）準拠。npmパッケージ `web-push-browser`（ゼロ依存・WebCrypto APIのみで実装、Cloudflare Workers対応）を使用。古い草案の `aesgcm` 方式は現在のSafari等では復号できないため使わない。
+- **VAPID鍵**: `web-push-browser` の `generateVapidKeys`/`serializeVapidKeys` で1回だけ生成し、`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` としてSecretsに保存（6章）。未設定の間は `worker/lib/push.js` が何もせず処理をスキップする（通知機能オフ。パイプライン自体は正常に動く）。
+- **購読の保存**: `push_subscriptions` テーブル（5章）。`endpoint` は端末（ブラウザインストール）ごとに一意なため、同じ端末からの再購読は upsert で1行に保つ。
+- **購読UI**: ハンバーガーメニュー内「🔔 通知をオンにする/オフにする」（`AppHeader.jsx` / `src/lib/push.js`）。`Notification.requestPermission()` → `PushManager.subscribe()` → `POST /api/push/subscribe`。ブラウザが対応していない場合はメニュー項目自体を表示しない。ブラウザ側で通知がブロックされている場合はグレー表示で理由をtitle属性に表示。
+- **通知の送信**: `worker/lib/push.js` の `notifyNewTask()` を、`pipeline.js` の通常タスク登録・カレンダータスク登録の直後に呼ぶ。全購読者へ一律送信（担当者に限定しない）。送信失敗時にステータス404/410（購読失効）が返った購読はDBから削除する。パイプライン全体を止めないよう、通知処理の例外は握りつぶしてログにのみ残す。
+- **通知タップ時の遷移**: メイン画面（`/`）を開く。タスクの個別URLは無い（SPAのモーダル表示のため）ので、開いたあと該当タスクをカンバンから探す形になる。
+- **iOS/Safariの制約**: iPhoneは**ホーム画面に追加したPWA（スタンドアロン表示）からのみ**通知を受け取れる。Safariのタブで開いているだけでは通知が届かない。
+- **未検証事項**: 実際のプッシュ配信（ブラウザの購読作成〜Push送信〜端末での表示）はこのサンドボックス環境では検証できていない（実機・実ブラウザでの確認が必要）。エンドポイントの疎通・エラーハンドリング・UIの状態遷移は確認済み。
+
 ---
 
 ## 5. データベース設計（Supabase）
@@ -324,6 +340,17 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「分類したメール」「分類したFAX」の件数を分けて表示）
 > **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。
 
+### push_subscriptions（2026-07-21。Web Push通知の購読情報）
+| 列 | 型 | 備考 |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid | `users.id` 参照（`on delete cascade`） |
+| endpoint | text unique | ブラウザのインストールごとに一意。再購読時はこのキーで upsert |
+| p256dh / auth | text | `PushSubscription.keys`。ペイロード暗号化（RFC 8291）に使う |
+| created_at | timestamptz | |
+
+`anon`/`authenticated` からは一切アクセス不可（service role のみ。他テーブルと同じ方針）。4-9参照。
+
 ### activity_logs（操作ログ）
 | 列 | 型 | 備考 |
 |---|---|---|
@@ -354,6 +381,7 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 | SESSION_SECRET | JWT 署名鍵 |
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | Web Push通知の署名鍵（2026-07-21）。未設定の間は通知機能が無効のまま（デプロイは失敗しない）。`web-push-browser`パッケージの`generateVapidKeys`/`serializeVapidKeys`で生成した値。VAPID_SUBJECTは`mailto:`アドレス（無指定時は`eiwa.public@gmail.com`にフォールバック） |
 
 ### KV Namespace（`wrangler.jsonc` にバインド）
 | バインディング名 | 用途 |

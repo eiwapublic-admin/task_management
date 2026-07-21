@@ -49,6 +49,21 @@ export function updateTask(id, values) {
   return authFetch('/api/tasks', { method: 'PATCH', body: JSON.stringify({ id, ...values }) })
 }
 
+// Web Push購読作成に必要なVAPID公開鍵を取得する（/api/push/public-key）。
+export function getPushPublicKey() {
+  return authFetch('/api/push/public-key')
+}
+
+// ブラウザのPushSubscriptionをサーバーに登録する（/api/push/subscribe）。
+export function subscribePush(subscription) {
+  return authFetch('/api/push/subscribe', { method: 'POST', body: JSON.stringify(subscription) })
+}
+
+// PushSubscriptionの登録を解除する（/api/push/unsubscribe）。
+export function unsubscribePush(endpoint) {
+  return authFetch('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) })
+}
+
 // スレッド内の全メッセージの添付ファイル一覧（メタ情報）を取得する（/api/attachments）。
 // 返信で本文が上書きされても最初・途中の添付が失われないよう、スレッド単位で集約して取得する。
 // { attachments: [{ filename, mimeType, size, attachmentId, messageId }, ...] } を返す。

@@ -28,7 +28,8 @@ const sw = `/*
  * 最小 Service Worker（自動生成 / scripts/generate-sw.mjs）
  * -----------------------------------------------------------
  * fetch ハンドラを持たない = リクエストを一切横取りしない。
- * よってナビゲーションを壊さず、更新検知と SKIP_WAITING のみを担う。
+ * よってナビゲーションを壊さず、更新検知・SKIP_WAITING・Web Push通知の
+ * 表示のみを担う（オフラインキャッシュは行わない）。
  */
 const SW_VERSION = ${JSON.stringify(version)}
 
@@ -58,6 +59,42 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting()
   }
+})
+
+// 新しいタスクの自動登録時（worker/lib/push.js）に届くWeb Push通知を表示する。
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch (e) {
+    data = {}
+  }
+  const title = data.title || '栄和 タスク管理システム'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: '/logo.svg',
+      data: { url: data.url || '/' },
+    })
+  )
+})
+
+// 通知タップで既存のタブがあればそれをフォーカス、無ければ新規に開く。
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/'
+  event.waitUntil(
+    (async () => {
+      const clientsArr = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      for (const client of clientsArr) {
+        if ('focus' in client) {
+          if ('navigate' in client) client.navigate(url).catch(() => {})
+          return client.focus()
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+    })()
+  )
 })
 `
 

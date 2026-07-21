@@ -2,6 +2,7 @@ import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
+import { notifyNewTask } from './push.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
 const MAX_MESSAGES = 40
@@ -625,6 +626,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       } else {
         summary.created += 1
         existingThreads.add(email.threadId)
+        // 通知の失敗でパイプライン自体を止めないよう、ここでは投げない
+        try {
+          await notifyNewTask({ title })
+        } catch (err) {
+          console.error('push通知失敗:', err)
+        }
       }
     } catch (err) {
       summary.errors.push(String(err.message || err))
@@ -753,6 +760,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
           } else {
             summary.calendarCreated += 1
             existingThreads.add(key)
+            try {
+              await notifyNewTask({ title: ev.title || '（無題の予定）' })
+            } catch (err) {
+              console.error('push通知失敗:', err)
+            }
           }
         }
       }
