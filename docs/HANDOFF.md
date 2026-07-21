@@ -85,6 +85,7 @@
 41. `pwa-auto-update`スキルへの知見反映（2026-07-21）: 上記37番の不具合（`run_worker_first`の範囲指定漏れでCache-Control上書きコードが実行されていなかった件）を、このリポジトリ外で個別管理している移植元スキル`pwa-auto-update`のSKILL.mdにも追記し、他プロジェクトでの再発を防止できるようにした
 42. iPhoneのメイン画面でヘッダーのタイトルが見えなくなる不具合への対策（2026-07-21）: ヘッダー（`.dashboard-header`）に`env(safe-area-inset-top)`分の上余白が無く、`viewport-fit=cover`＋ホーム画面追加（PWAスタンドアロン表示）時にノッチ/ステータスバー領域とヘッダーの内容が重なっていた可能性を想定し、`src/pages/Dashboard.css`のヘッダー上パディングに`env(safe-area-inset-top)`を追加（`TaskDetail`のオーバーレイ・`ReloadPrompt.jsx`で既に採用済みの対策と同種）。**注意**: 手元のPlaywright（Chromium）では実機の症状を再現できず、安全域の余白追加を模擬パディングで構造確認したのみで、実機での解消は未確認。ユーザーの実機での再確認が必要
 43. ハンバーガーメニューへ「今すぐ取得」ボタンを移動（2026-07-21）: 画面上部ツールバーにあった「今すぐ取得」ボタンを廃止し、ハンバーガーメニュー内の「処理ログ」の下（区切り線あり）に移動。`AppHeader.jsx`に取得処理を内包し、完了後は`window.location.assign('/')`でトップへ強制遷移してタスク一覧を再取得させる（`AppHeader`は各ページで個別にマウントされ、Dashboardのローカル状態に直接アクセスできないため）。この変更に伴い、取得完了時に表示していた件数内訳の通知バナー（`dashboard-notice`）は廃止（メニュー操作の完了は画面遷移そのもので分かるため）。設計書4-3章
+44. デプロイワークフローの `wrangler deploy --message` 引数解析エラーを修正（2026-07-21）: 上記43番のPR（#73）をマージ後、自動デプロイが失敗。squashマージのコミット本文が `- ` で始まる箇条書き（Markdownリスト）だったため、`npx wrangler deploy --message "$DEPLOY_MESSAGE" ...`（空白区切り）だと wrangler(yargs) がその値をオプションの値ではなく新しいフラグの開始と誤認し「Not enough arguments following: message」で失敗した。`--message="$DEPLOY_MESSAGE"`（=形式、1トークン化）に変更して解消（`--secrets-file` も同様に統一）。**教訓**: コミットメッセージ本文がハイフンで始まり得るCLIフラグへの値渡しは、空白区切りではなく `--flag=value` 形式にする。`.github/workflows/deploy.yml`
 
 ---
 

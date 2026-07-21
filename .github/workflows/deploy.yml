@@ -94,7 +94,10 @@ jobs:
               GMAIL_CLIENT_SECRET: $GMAIL_CLIENT_SECRET,
               GMAIL_REFRESH_TOKEN: $GMAIL_REFRESH_TOKEN
             }' > "$SECRETS_FILE"
-          npx wrangler deploy --message "$DEPLOY_MESSAGE" --secrets-file "$SECRETS_FILE"
+          # --message="..." (= 形式) にする: コミット本文が "- " 等ハイフンで始まる箇条書きだと、
+          # "--message value" の空白区切りでは wrangler(yargs) が value を新しいオプションの
+          # 開始と誤認し "Not enough arguments following: message" で失敗するため。
+          npx wrangler deploy --message="$DEPLOY_MESSAGE" --secrets-file="$SECRETS_FILE"
           rm -f "$SECRETS_FILE"
 
       - name: Remove secrets file (on failure)
