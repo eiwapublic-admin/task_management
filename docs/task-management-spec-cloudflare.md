@@ -372,7 +372,7 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 - main へ push → `.github/workflows/deploy.yml` が起動:
   1. `npm ci` → `npm run build`
   2. **Compute deploy message**: コミットメッセージから Version History 表示用の文言を作る（後述）
-  3. **Deploy Worker**: `npx wrangler deploy --message "<コミットメッセージ本文>" --secrets-file <一時JSON>` を1回だけ実行し、**コード配布とシークレット同期を同一コマンド**で行う（2026-07-18に一本化。旧: 別ステップで `wrangler secret bulk` 相当を実行していたため、デプロイのたびに Version History にメッセージ無しの版がもう1つ増えていた）
+  3. **Deploy Worker**: `npx wrangler deploy --message="<コミットメッセージ本文>" --secrets-file="<一時JSON>"` を1回だけ実行し、**コード配布とシークレット同期を同一コマンド**で行う（2026-07-18に一本化。旧: 別ステップで `wrangler secret bulk` 相当を実行していたため、デプロイのたびに Version History にメッセージ無しの版がもう1つ増えていた）。**`--message=値`（=形式）にする理由（2026-07-21）**: squashマージ等でコミット本文が `- ` から始まる箇条書きになることがあり、`--message "値"`（空白区切り）だと wrangler(yargs) が値をオプションの値ではなく次の新しいフラグの開始と誤認し `Not enough arguments following: message` でデプロイが失敗した。ハイフンで始まり得る値をCLIフラグへ渡す際は空白区切りを避け `--flag=value` 形式にする
 - 手動実行: Actions タブ →「Deploy to Cloudflare Workers」→ Run workflow
 - **Version History 表示（2026-07-18）**: Cloudflare の Workers & Pages → Version History にデプロイのコミットメッセージが表示されるよう `--message` を指定している。
   - マージコミットの1行目「Merge pull request #N from owner/branch」はPRタイトルより先に表示されて読みにくいため、空行より後ろの本文（PRタイトル）だけを取り出して渡す（マージコミットでない場合は全文をそのまま使う）
