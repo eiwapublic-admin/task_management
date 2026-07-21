@@ -10,7 +10,11 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
+  /* viewport-fit=cover によりホーム画面追加（スタンドアロン）時はコンテンツが
+     ノッチ/ステータスバーの裏側まで広がるため、その分を上パディングに加算し、
+     ロゴ・タイトルがステータスバーに隠れないようにする（通常のブラウザ表示では
+     env(safe-area-inset-top) が0のため見た目は変わらない）。 */
+  padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-5) var(--space-3);
   background: var(--header-bg);
   border-bottom: 1px solid color-mix(in srgb, var(--header-bg) 80%, #000);
   position: sticky;
@@ -103,12 +107,6 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: 13px;
-}
-
-.dashboard-notice {
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--bg-surface));
-  border: 1px solid var(--color-primary);
-  color: var(--text-strong);
 }
 
 .dashboard-error {
@@ -298,6 +296,18 @@
   width: 100%;
   height: 40px;
   justify-content: flex-start;
+}
+
+.dashboard-actions.is-open button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* メニュー項目の区切り線（処理ログ / 今すぐ取得の間など） */
+.dashboard-menu-divider {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--border);
 }
 
 .dashboard-menu-icon,
@@ -601,7 +611,7 @@
   .dashboard-header {
     flex-wrap: wrap;
     row-gap: var(--space-2);
-    padding: var(--space-3);
+    padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3) var(--space-3);
   }
 
   .dashboard-header h1 {

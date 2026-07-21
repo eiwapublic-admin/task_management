@@ -14,8 +14,6 @@ export default function KanbanBoard({
   onCreateTask,
   onUpdateTask,
   onOpenArchive,
-  onRunFetch,
-  fetching,
   lastFetchAt,
   sharedGmail,
 }) {
@@ -64,16 +62,6 @@ export default function KanbanBoard({
         <div className="kanban-toolbar-right">
           {lastFetchAt && (
             <span className="kanban-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
-          )}
-          {onRunFetch && (
-            <button
-              type="button"
-              className="kanban-fetch-btn"
-              onClick={onRunFetch}
-              disabled={fetching}
-            >
-              {fetching ? '取得中…' : '今すぐ取得'}
-            </button>
           )}
           {onOpenArchive && (
             <button type="button" className="kanban-archive-btn" onClick={onOpenArchive}>

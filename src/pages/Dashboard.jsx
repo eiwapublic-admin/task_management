@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import AppHeader from '../components/AppHeader'
 import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
-import { runFetch, createTask, updateTask } from '../lib/api'
+import { createTask, updateTask } from '../lib/api'
 import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
 
@@ -40,9 +40,7 @@ export default function Dashboard() {
   const [assignees, setAssignees] = useState(DEFAULT_ASSIGNEES)
   const [lastFetchAt, setLastFetchAt] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [creditAlert, setCreditAlert] = useState(null)
   const [sharedGmail, setSharedGmail] = useState('')
   const navigate = useNavigate()
@@ -124,30 +122,6 @@ export default function Dashboard() {
     return res.task
   }
 
-  async function handleRunFetch() {
-    setFetching(true)
-    setError('')
-    setNotice('')
-    try {
-      const summary = await runFetch()
-      if (summary.skipped) {
-        setNotice(`スキップ: ${summary.reason}`)
-      } else {
-        setNotice(
-          `取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / 返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated ?? 0} 件 / 業務外 ${summary.nonBusiness} 件 / カレンダー登録 ${summary.calendarCreated ?? 0} 件`
-        )
-        if (summary.errors && summary.errors.length > 0) {
-          setError(`一部の処理でエラーが発生しました（${summary.errors.length}件）: ${summary.errors[0]}`)
-        }
-      }
-      await load()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setFetching(false)
-    }
-  }
-
   return (
     <div className="dashboard-page">
       <AppHeader />
@@ -155,7 +129,7 @@ export default function Dashboard() {
       {creditAlert && (
         <div className="dashboard-banner dashboard-credit-alert" role="alert">
           <span>
-            ⚠️ APIクレジットが不足し、メールの自動分類が停止しています。チャージ後に「今すぐ取得」で再開できます。
+            ⚠️ APIクレジットが不足し、メールの自動分類が停止しています。チャージ後にハンバーガーメニューの「今すぐ取得」で再開できます。
           </span>
           <a
             className="dashboard-credit-button"
@@ -166,11 +140,6 @@ export default function Dashboard() {
             APIクレジットをチャージ
           </a>
         </div>
-      )}
-      {notice && (
-        <p className="dashboard-banner dashboard-notice" role="status" aria-live="polite">
-          {notice}
-        </p>
       )}
       {error && (
         <p className="dashboard-banner dashboard-error" role="alert">
@@ -184,8 +153,8 @@ export default function Dashboard() {
         <div className="dashboard-empty">
           <p>まだタスクがありません。</p>
           <p className="dashboard-empty-hint">
-            「今すぐ取得」を押すと共有メールを取得・分類します。まだ配信が始まったばかりの場合は、
-            メールが届いてから取得してください。
+            ハンバーガーメニューの「今すぐ取得」を押すと共有メールを取得・分類します。
+            まだ配信が始まったばかりの場合は、メールが届いてから取得してください。
           </p>
         </div>
       ) : (
@@ -196,8 +165,6 @@ export default function Dashboard() {
           onCreateTask={handleCreateTask}
           onUpdateTask={handleUpdateTask}
           onOpenArchive={() => navigate('/archive')}
-          onRunFetch={handleRunFetch}
-          fetching={fetching}
           lastFetchAt={lastFetchAt}
           sharedGmail={sharedGmail}
         />
