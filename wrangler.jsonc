@@ -10,7 +10,14 @@
     "directory": "dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // true で全パスをWorker経由にする。/api/* だけだと、それ以外（/sw.js・SPAの
+    // 各ルート等）はCloudflareの静的アセット配信層がWorkerを経由せず直接返して
+    // しまい、worker/index.js の route() で設定している index.html・sw.js への
+    // Cache-Control上書き（PWA更新検知に必須）が一度も実行されなかった不具合を
+    // 修正するため変更（2026-07-21）。ハッシュ付きファイル名のJS/CSS/画像等は
+    // route() 側で素通ししているため、Cloudflareの通常のアセットキャッシュが
+    // そのまま効く（振る舞いは変えていない）。
+    "run_worker_first": true
   },
   "triggers": {
     // 5分ごとに起動。実際の取得間隔は settings.fetch_interval_minutes でゲート
