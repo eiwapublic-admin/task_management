@@ -16,7 +16,8 @@
     "bcryptjs": "^3.0.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1"
+    "react-router-dom": "^7.18.1",
+    "web-push-browser": "^1.4.2"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

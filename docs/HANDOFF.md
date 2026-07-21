@@ -86,6 +86,7 @@
 42. iPhoneのメイン画面でヘッダーのタイトルが見えなくなる不具合への対策（2026-07-21）: ヘッダー（`.dashboard-header`）に`env(safe-area-inset-top)`分の上余白が無く、`viewport-fit=cover`＋ホーム画面追加（PWAスタンドアロン表示）時にノッチ/ステータスバー領域とヘッダーの内容が重なっていた可能性を想定し、`src/pages/Dashboard.css`のヘッダー上パディングに`env(safe-area-inset-top)`を追加（`TaskDetail`のオーバーレイ・`ReloadPrompt.jsx`で既に採用済みの対策と同種）。**注意**: 手元のPlaywright（Chromium）では実機の症状を再現できず、安全域の余白追加を模擬パディングで構造確認したのみで、実機での解消は未確認。ユーザーの実機での再確認が必要
 43. ハンバーガーメニューへ「今すぐ取得」ボタンを移動（2026-07-21）: 画面上部ツールバーにあった「今すぐ取得」ボタンを廃止し、ハンバーガーメニュー内の「処理ログ」の下（区切り線あり）に移動。`AppHeader.jsx`に取得処理を内包し、完了後は`window.location.assign('/')`でトップへ強制遷移してタスク一覧を再取得させる（`AppHeader`は各ページで個別にマウントされ、Dashboardのローカル状態に直接アクセスできないため）。この変更に伴い、取得完了時に表示していた件数内訳の通知バナー（`dashboard-notice`）は廃止（メニュー操作の完了は画面遷移そのもので分かるため）。設計書4-3章
 44. デプロイワークフローの `wrangler deploy --message` 引数解析エラーを修正（2026-07-21）: 上記43番のPR（#73）をマージ後、自動デプロイが失敗。squashマージのコミット本文が `- ` で始まる箇条書き（Markdownリスト）だったため、`npx wrangler deploy --message "$DEPLOY_MESSAGE" ...`（空白区切り）だと wrangler(yargs) がその値をオプションの値ではなく新しいフラグの開始と誤認し「Not enough arguments following: message」で失敗した。`--message="$DEPLOY_MESSAGE"`（=形式、1トークン化）に変更して解消（`--secrets-file` も同様に統一）。**教訓**: コミットメッセージ本文がハイフンで始まり得るCLIフラグへの値渡しは、空白区切りではなく `--flag=value` 形式にする。`.github/workflows/deploy.yml`
+45. 新規タスク登録時のWeb Push通知を追加（2026-07-21）: メール/フォーム/FAX/Googleカレンダーから**自動登録**されたタスクについて、購読中のブラウザ/端末へ通知を送る機能を新規追加（手動登録は対象外）。RFC 8291（`aes128gcm`）準拠のゼロ依存パッケージ `web-push-browser`（Cloudflare Workers対応・WebCrypto APIのみ）を採用。VAPID鍵を生成し `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` としてSecrets化、購読情報は新テーブル `push_subscriptions` に保存（他テーブルと同じくanon/authenticatedは一切アクセス不可）。新API3本（`/api/push/public-key`・`/api/push/subscribe`・`/api/push/unsubscribe`）、ハンバーガーメニューに「🔔 通知をオン/オフにする」を追加。`public/sw.js`（`scripts/generate-sw.mjs`）に`push`/`notificationclick`ハンドラを追加。**注意**: iPhoneは**ホーム画面に追加したPWAからのみ**通知を受け取れる（Safariのタブで開いているだけでは不可）。**未検証事項**: このサンドボックス環境では実際のプッシュ配信（購読作成〜送信〜端末での表示）を検証できていない（Chromiumのシークレット相当モードではPush API自体が使えない環境制約のため）。エンドポイントの疎通・エラーハンドリング・UIの状態遷移（購読済み/未購読/未対応/ブロック済み）は確認済み。**要対応**: このPRのマージ・デプロイ前に、GitHub Secretsへ `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` の3つを追加する必要あり（未設定の間は通知機能が無効なだけでデプロイ自体は失敗しない）。設計書4-9・5・6章
 
 ---
 
@@ -128,6 +129,9 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 | SESSION_SECRET | JWT 署名鍵 |
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | Web Push通知（2026-07-21。**要追加・下記参照**） |
+
+※ **VAPID_* は本PRで新規追加。マージ前にGitHub Secretsへの登録が必要**（未登録でも通知機能が無効なだけでデプロイ自体は失敗しない）。生成済みの値をこのセッションのチャットで共有済み。`VAPID_SUBJECT` は `mailto:eiwa.public@gmail.com` を設定（無指定でも同じ値にフォールバックするが明示推奨）。
 
 ※ `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`worker/lib/supabase-admin.js`）。Secrets は 2026-07-06 に正しい値へ修正済み（フォールバックは保険として残置）。
 

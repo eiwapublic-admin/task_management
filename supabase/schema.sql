@@ -140,6 +140,20 @@ create table if not exists users (
 
 alter table users add column if not exists token_version integer not null default 0;
 
+-- push_subscriptions: Web Push通知の購読情報（ブラウザ/端末ごと）。
+-- 新しいタスクが自動登録された際に、購読中の全端末へ通知を送るために使う
+-- （worker/lib/push.js）。endpoint はブラウザのインストールごとに一意。
+create table if not exists push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_push_subscriptions_user_id on push_subscriptions (user_id);
+
 -- updated_at 自動更新
 create or replace function set_updated_at()
 returns trigger
@@ -170,6 +184,7 @@ alter table settings enable row level security;
 alter table users enable row level security;
 alter table api_usage enable row level security;
 alter table activity_logs enable row level security;
+alter table push_subscriptions enable row level security;
 
 -- 過去に存在した匿名向けの緩いポリシーを削除（RLS 有効・ポリシー無し = anon は一切アクセス不可）
 drop policy if exists "tasks_select_all" on tasks;
@@ -179,10 +194,11 @@ drop policy if exists "api_usage_select_all" on api_usage;
 drop policy if exists "activity_logs_select_all" on activity_logs;
 drop policy if exists "activity_logs_insert_all" on activity_logs;
 
-revoke all on tasks         from anon, authenticated;
-revoke all on settings      from anon, authenticated;
-revoke all on api_usage     from anon, authenticated;
-revoke all on activity_logs from anon, authenticated;
+revoke all on tasks              from anon, authenticated;
+revoke all on settings           from anon, authenticated;
+revoke all on api_usage          from anon, authenticated;
+revoke all on activity_logs      from anon, authenticated;
+revoke all on push_subscriptions from anon, authenticated;
 
 revoke all on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint) from public, anon, authenticated;
 grant execute on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint) to service_role;
