@@ -26,6 +26,14 @@ function isFormSubmission(email) {
   return subject.includes(FORM_SUBJECT_MARKER) || body.includes(FORM_BODY_MARKER)
 }
 
+// タスクタイトルのキーワード一致による返信先の絞り込み（フォームタスクの返信検知）で、
+// ほぼ全てのタイトルに現れて識別力の無い定型語をノイズとして除外する。
+const KEYWORD_STOPWORDS = new Set([
+  '見積', '見積り', '見積書', '依頼', '発注', '発注書', '請求', '請求書', '納品', '納品書',
+  '納期', '問合', '問合せ', '問い合わせ', 'お問い合わせ', '連絡', 'ご連絡', '確認', 'ご確認',
+  '対応', '作成', '相談', 'ご相談', '案内', 'ご案内', '注文', '注文書',
+])
+
 // 分類器（Claude）に読ませる添付ファイルの対応 MIME と種別。
 // PDF は document ブロック、主要な画像形式は image ブロックとして渡す。
 // TIFF は Claude が非対応のため対象外（従来 FAX の TIFF はここに含めない）。
@@ -280,7 +288,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const { data: openTaskRows } = await supabase
     .from('tasks')
     .select(
-      'id, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
+      'id, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, channel, body_preview, classification_note, last_reply_message_id'
     )
     .in('status', ['未処理', '返信済み'])
     .eq('source', 'email')
@@ -292,6 +300,54 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   }
   for (const t of openTaskRows || []) {
     if (t.status === '未処理') openBySubject.set(normalizeSubject(t.subject), t)
+  }
+
+  // 顧客メールアドレス → 未処理のフォーム経由タスク一覧（フォームタスクの返信検知用）。
+  // 問い合わせフォームの自動送信メールは件名が定型（例:「ホームページからのお問い合わせ」）で
+  // 全顧客共通のため、件名ベースの検知（openBySubject）が使えない。フォーム本文から抽出した
+  // 顧客の実アドレス（sender_email）で代わりに引き当てる。
+  const openFormByEmail = new Map()
+  for (const t of openTaskRows || []) {
+    if (t.status !== '未処理' || t.channel !== 'form' || !t.sender_email) continue
+    const key = t.sender_email.toLowerCase()
+    const list = openFormByEmail.get(key)
+    if (list) list.push(t)
+    else openFormByEmail.set(key, [t])
+  }
+
+  // タイトルからキーワードを粗く抽出する（形態素解析は行わない簡易ヒューリスティック）。
+  // カタカナ・漢字・英数字それぞれの連続をトークンとして分け、ひらがな（助詞・活用語尾）は
+  // 区切りとして無視することで「ランプシェード」「見積作成」のような名詞の塊を拾いやすくする。
+  // ひらがな・カタカナ・漢字をまとめて1トークンにすると「見積り依頼」のような文全体が
+  // 1語になってしまい、部分一致しなくなるため分けている。
+  function extractTitleKeywords(title) {
+    const text = String(title || '')
+    const katakana = text.match(/[ァ-ヶー]{2,}/g) || []
+    const kanji = text.match(/[一-龠]{2,}/g) || []
+    const alnum = text.match(/[a-zA-Z0-9]{2,}/g) || []
+    return [...katakana, ...kanji, ...alnum].filter((k) => !KEYWORD_STOPWORDS.has(k))
+  }
+
+  // 同じ顧客メールアドレスに複数の未処理フォームタスクがある場合、新しいメールの件名・
+  // 本文とタスクタイトルのキーワード一致で1件に絞り込む。一致が無い、または複数タスクで
+  // 同点の場合は誤って結び付けないよう自動判定を見送る（null を返す）。
+  function pickFormReplyTarget(candidates, emailText) {
+    if (candidates.length === 1) return candidates[0]
+    let best = null
+    let bestScore = 0
+    let tied = false
+    for (const task of candidates) {
+      const score = extractTitleKeywords(task.title).filter((k) => emailText.includes(k)).length
+      if (score === 0) continue
+      if (score > bestScore) {
+        best = task
+        bestScore = score
+        tied = false
+      } else if (score === bestScore) {
+        tied = true
+      }
+    }
+    return tied ? null : best
   }
 
   // 返信を検知したタスクを更新する（返信検知の共通処理）。
@@ -387,6 +443,32 @@ export async function runPipeline({ force = false, actor = 'システム（自�
           fromEmail && fromEmail !== counterpart && isCompanyAddress(fromEmail) && sentToCounterpart
         if (isOurReply) {
           await incorporateReply(openTask, '返信を検知', email)
+          continue
+        }
+      }
+
+      // フォーム経由タスクの返信検知（顧客メールアドレス一致）: 上記の件名ベース検知は
+      // フォームの定型件名では機能しないため、当社担当者から顧客の実アドレス
+      // （sender_email）宛に送られたメールを返信とみなす。同じ顧客に複数の未処理
+      // フォームタスクがある場合は、タイトルのキーワードとメール内容の一致で絞り込み、
+      // 絞り込めなければ自動判定を見送る（誤って別件に結び付けない）。
+      if (isCompanyAddress(fromEmail) && openFormByEmail.size > 0) {
+        const recipients = extractEmails(`${email.to || ''} ${email.cc || ''}`)
+        const emailText = `${email.subject || ''}\n${email.body || ''}`
+        let formTask = null
+        for (const addr of recipients) {
+          const candidates = openFormByEmail.get(addr.toLowerCase())
+          if (!candidates || !candidates.length) continue
+          formTask = pickFormReplyTarget(candidates, emailText)
+          if (formTask) break
+        }
+        if (formTask && email.id !== formTask.gmail_message_id) {
+          await incorporateReply(formTask, 'フォームタスクへの返信を検知（顧客メールアドレス一致）', email)
+          // 解決したタスクだけを候補から外す（同じ顧客の他の未処理タスクは残す）
+          const key = formTask.sender_email.toLowerCase()
+          const remaining = (openFormByEmail.get(key) || []).filter((t) => t.id !== formTask.id)
+          if (remaining.length) openFormByEmail.set(key, remaining)
+          else openFormByEmail.delete(key)
           continue
         }
       }
