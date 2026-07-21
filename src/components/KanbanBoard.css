@@ -358,24 +358,13 @@
   margin-top: var(--space-1);
 }
 
-.task-card-subject-toggle {
+.task-card-remarks {
   margin-top: var(--space-2);
-  border: none;
-  background: none;
-  color: var(--color-primary);
-  font-size: 11px;
-  padding: 0;
-  cursor: pointer;
-}
-
-.task-card-subject {
-  margin-top: var(--space-1);
   font-size: 12px;
-  color: var(--text-base);
-  background: var(--bg-subtle);
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
+  color: var(--color-primary);
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- タスク詳細モーダル ---------- */

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
 import { UNASSIGNED } from '../lib/status'
 import { channelIconSrc, channelLabel } from '../lib/channel'
@@ -15,7 +14,6 @@ function senderLabel(task) {
 }
 
 export default function TaskCard({ task, onDragStart, onClick }) {
-  const [subjectOpen, setSubjectOpen] = useState(false)
   const due = dueStatus(task.due_date)
   const isUnassigned = task.assignee === UNASSIGNED
 
@@ -72,18 +70,7 @@ export default function TaskCard({ task, onDragStart, onClick }) {
 
       <div className="task-card-received">受信: {formatDateTime(task.received_at)}</div>
 
-      <button
-        type="button"
-        className="task-card-subject-toggle"
-        aria-expanded={subjectOpen}
-        onClick={(e) => {
-          e.stopPropagation()
-          setSubjectOpen((v) => !v)
-        }}
-      >
-        {subjectOpen ? '件名を閉じる ▲' : '件名を表示 ▼'}
-      </button>
-      {subjectOpen && <div className="task-card-subject">{task.subject}</div>}
+      {task.remarks && <div className="task-card-remarks">{task.remarks}</div>}
     </div>
   )
 }
