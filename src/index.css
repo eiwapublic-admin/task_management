@@ -77,6 +77,37 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Windows/macOS既定のオーバーレイ型スクロールバーはOS/ブラウザのUI層に描画され、
+   ページ自身のスタッキング（sticky固定のヘッダー等）と無関係に最前面へ重なって
+   表示されるため、ヘッダーに食い込んで見えることがある。常時表示の細いスクロール
+   バーをページ側で描画することで、通常のスタッキング順に従わせる。 */
+html {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--border-strong) transparent; /* Firefox */
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: content-box;
+}
+
 /* キーボード操作時のみフォーカスリングを表示（マウス操作では出さない） */
 :focus-visible {
   outline: 2px solid var(--color-primary);
