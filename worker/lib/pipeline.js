@@ -602,6 +602,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 添付内容を追記する。FAX読み取り失敗時は要約自体が信頼できないため使わず、
       // 失敗理由を代わりに表示する）。
       const emailBody = compactBody(email.body)
+      // FAXゲートウェイの本文は FROM=/TO=/DATE=/TIME=/TIMEZONE=/FCODE=/RJOBNUM= という
+      // 受信情報のみで業務内容を含まない。このうち RJOBNUM（受信ジョブ番号。複合機側で
+      // 受信書類を特定する際に使う）だけは残す価値があるため、FAXの場合は本文全体では
+      // なくこの行だけを抽出して使う。
+      const faxJobNumberLine = isFax ? (email.body || '').match(/^RJOBNUM=.*/m)?.[0]?.trim() || null : null
       let bodyPreview
       if (isFaxReadFailure) {
         const issue =
@@ -609,6 +614,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
             ? result.document_read_issue.trim()
             : '添付の画質が不十分などの理由で内容を判読できませんでした'
         bodyPreview = `【FAXの内容を読み取れませんでした】\n理由: ${issue}\n\n添付のFAX画像/PDFを直接ご確認ください。`
+      } else if (isFax) {
+        bodyPreview = docSummary
+          ? [faxJobNumberLine, `【添付資料の内容（自動読取）】\n${docSummary}`].filter(Boolean).join('\n\n')
+          : faxJobNumberLine || emailBody
       } else if (docSummary) {
         bodyPreview =
           emailBody && emailBody.length > 20
