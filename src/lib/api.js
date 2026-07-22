@@ -71,11 +71,11 @@ export function listAttachments(threadId) {
   return authFetch(`/api/attachments?thread_id=${encodeURIComponent(threadId)}`)
 }
 
-// 添付ファイルを Gmail から取得してブラウザに保存させる（/api/attachment）。
-// バイナリを扱うため authFetch は使わず、取得した Blob をダウンロードとして起動する。
-// thread_id はタスク所属の検証に使う（サーバー側で thread_id がタスクに
-// 紐づくこと・message_id がそのスレッドに実在することを確認する）。
-export async function downloadAttachment({ threadId, messageId, attachmentId, filename, mimeType }) {
+// 添付ファイルの実体（Blob）を Gmail 経由で取得する（/api/attachment）。
+// バイナリを扱うため authFetch は使わない。ダウンロード・プレビューの両方の
+// 基礎として使う共通関数。thread_id はタスク所属の検証に使う（サーバー側で
+// thread_id がタスクに紐づくこと・message_id がそのスレッドに実在することを確認する）。
+export async function fetchAttachmentBlob({ threadId, messageId, attachmentId, filename, mimeType }) {
   const token = getToken()
   const params = new URLSearchParams({
     thread_id: threadId,
@@ -98,10 +98,15 @@ export async function downloadAttachment({ threadId, messageId, attachmentId, fi
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.error || `ダウンロードに失敗しました (${res.status})`)
+    throw new Error(data.error || `取得に失敗しました (${res.status})`)
   }
 
-  const blob = await res.blob()
+  return res.blob()
+}
+
+// 添付ファイルを Gmail から取得してブラウザに保存させる（ダウンロードとして起動）。
+export async function downloadAttachment({ threadId, messageId, attachmentId, filename, mimeType }) {
+  const blob = await fetchAttachmentBlob({ threadId, messageId, attachmentId, filename, mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
