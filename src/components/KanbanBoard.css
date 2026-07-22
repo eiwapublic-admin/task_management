@@ -213,6 +213,7 @@
 
 /* ---------- タスクカード ---------- */
 .task-card {
+  position: relative;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
   padding: var(--space-3);
@@ -220,6 +221,21 @@
   border: 1px solid var(--border);
   cursor: pointer;
   transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+
+/* 取得・更新から24時間以内のタスクに付ける新着マーク */
+.task-card-new-badge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.02em;
 }
 
 .task-card:hover {
@@ -238,6 +254,7 @@
   color: var(--text-strong);
   margin-bottom: var(--space-2);
   line-height: 1.4;
+  padding-right: 36px; /* 右上の新着マークとの重なりを避ける */
 }
 
 /* タイトル先頭の情報源アイコン（メール/フォーム/カレンダー/FAX/手入力） */

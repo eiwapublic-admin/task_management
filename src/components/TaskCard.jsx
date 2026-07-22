@@ -13,9 +13,21 @@ function senderLabel(task) {
   return name || from.trim() || null
 }
 
+// 取得・更新から24時間以内かどうか（新着マーク表示用）。
+// updated_at は登録時・自動更新（返信検知等）・手動編集のいずれでも更新されるため、
+// 「取得または更新から24時間以内」の判定にそのまま使える。
+const NEW_BADGE_MS = 24 * 60 * 60 * 1000
+function isRecentlyUpdated(task) {
+  if (!task.updated_at) return false
+  const updatedAt = new Date(task.updated_at).getTime()
+  if (Number.isNaN(updatedAt)) return false
+  return Date.now() - updatedAt < NEW_BADGE_MS
+}
+
 export default function TaskCard({ task, onDragStart, onClick }) {
   const due = dueStatus(task.due_date)
   const isUnassigned = task.assignee === UNASSIGNED
+  const isNew = isRecentlyUpdated(task)
 
   function handleKeyDown(e) {
     // カード全体をキーボードで開けるようにする（Enter / Space）
@@ -36,6 +48,11 @@ export default function TaskCard({ task, onDragStart, onClick }) {
       onClick={() => onClick(task)}
       onKeyDown={handleKeyDown}
     >
+      {isNew && (
+        <span className="task-card-new-badge" title="24時間以内に取得・更新されました">
+          新着
+        </span>
+      )}
       <div className="task-card-title">
         <img
           className="task-card-channel-icon"

@@ -143,9 +143,9 @@ export default function AppHeader() {
                   }
                 >
                   {pushStatus === 'subscribed' && '🔔 通知をオフにする'}
-                  {pushStatus === 'unsubscribed' && '🔔 通知をオンにする'}
-                  {pushStatus === 'denied' && '🔔 通知がブロックされています'}
-                  {pushStatus === 'loading' && '🔔 通知'}
+                  {pushStatus === 'unsubscribed' && '通知をオンにする'}
+                  {pushStatus === 'denied' && '通知がブロックされています'}
+                  {pushStatus === 'loading' && '通知'}
                 </button>
               )}
               <button
