@@ -237,6 +237,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **FAX の例外（2026-07-17）**: `channel='fax'` のタスクはスレッド集約を行わず、タスクの元メッセージ（`gmail_message_id`）単体の添付だけを返す。FAXは件名共通で複数が1スレッドに混在し、送信元も共通で counterpart 絞り込みが効かないため。
 - 各ファイルの [ダウンロード] は `GET /api/attachment` を叩き、Worker が Gmail の `messages/{id}/attachments/{attachmentId}` から本体（base64url）を取得してバイト列で返す。フロントは Bearer 付き fetch → Blob 化してダウンロードを起動する（`src/lib/api.js` の `fetchAttachmentBlob` が共通の取得処理、`downloadAttachment` がそれを使ってダウンロードを起動する）。
 - **アプリ内プレビュー（2026-07-22）**: 画像・PDFの添付には [ダウンロード] と並べて [プレビュー] ボタンを表示（他形式はダウンロードのみ）。クリックすると `fetchAttachmentBlob` で取得したBlobをモーダル（`src/components/AttachmentPreview.jsx`）内に表示する。画像は`<img>`、PDFはブラウザ内蔵のPDFビューアを使う`<iframe>`で表示（追加ライブラリなし）。タスク詳細モーダル（z-index:50）の上に重ねて表示する（z-index:60）ため、背景クリック・Escapeキーで閉じる際にタスク詳細モーダルまで一緒に閉じないよう、クリックイベントの伝播を止め、プレビュー表示中はタスク詳細側のEscape/Tab処理を無効化している（`previewOpenRef`）。Blob URLはプレビューを閉じる時・タスク切り替え時に`URL.revokeObjectURL`で解放する。**既知の制限**: モバイルSafari（iPhone）はPDFの`<iframe>`表示が機種・OSバージョンによって不安定で、ダウンロードに落ちることがある。
+  - **CSPによる表示不具合の修正（2026-07-22）**: リリース直後、画像・PDFのプレビューが表示されない（画像は壊れて見え、PDFは真っ白）事象が発生。原因は `worker/lib/http.js` のContent-Security-Policyで、プレビューが使う`blob:`スキームのURLが`img-src`（`'self' data:`のみ）にも`frame-src`（未指定のため`default-src 'self'`にフォールバック）にも含まれておらずブロックされていたため。`img-src`に`blob:`を追加し、`frame-src 'self' blob:`を新設して解消した。
+  - **画像のズーム機能（2026-07-22）**: 画像プレビューはホイール/ピンチでの拡大縮小、ドラッグでの移動、ダブルクリックでの拡大/リセット、±ボタン・リセットボタンに対応（`AttachmentPreview.jsx`。1〜5倍の範囲。外部ライブラリ不要。`touch-action: none`でブラウザ標準のタッチ操作を無効化し、自前のPointer Events/Touch Eventsで制御）。PDFはブラウザ内蔵のPDFビューア自体がズーム機能を持つため対象外。
 - **設計判断**: 添付メタ情報を DB に持たせず取得のたびに Gmail へ問い合わせる方式にした。理由は (1) 既存タスクにも追加改修なしで対応できる、(2) メール取得パイプライン・スキーマに手を入れずリスクを抑えられる、(3) 共有アカウントの認証情報で取得するので担当者個人の Gmail ログインが不要。既存の `gmail.readonly` スコープで動作する。
 
 ### 4-6. PWA（アプリ更新の通知・明示的な最新化）
@@ -439,7 +441,7 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 ### レスポンス・通信
 - Gmail は readonly スコープ。HTTPS は Cloudflare が終端
 - **エラー詳細の非露出（2026-07-16追加）**: Supabase等の内部エラーメッセージをクライアントへそのまま返さず、汎用メッセージのみ返却。詳細は `console.error` でサーバーログにのみ出力（審査での指摘: N1）
-- **セキュリティヘッダ/CSP（2026-07-16追加）**: 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（外部CDN等を使わないため、ほぼ全ディレクティブ `'self'`）を付与（審査での指摘: N2）
+- **セキュリティヘッダ/CSP（2026-07-16追加）**: 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（外部CDN等を使わないため、ほぼ全ディレクティブ `'self'`）を付与（審査での指摘: N2）。**`img-src`/`frame-src`のみ`blob:`を追加で許可**（2026-07-22。添付ファイルのアプリ内プレビュー機能が`URL.createObjectURL()`のBlob URLを`<img>`/`<iframe>`で表示するために必要。外部オリジンへの許可ではないため、この機能追加によるリスク増は無い）
 
 ### リポジトリ・鍵管理
 - **リポジトリは非公開（Private）**（2026-07-16、審査での指摘 C2 に対応。従来は public だった）

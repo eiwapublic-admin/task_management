@@ -16,7 +16,12 @@ const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self'",
-  "img-src 'self' data:",
+  // blob: は添付ファイル（画像・PDF）のアプリ内プレビュー用（2026-07-22）。
+  // ダウンロードしたBlobをURL.createObjectURL()で表示するため、img-src・
+  // frame-srcの両方に必要（無いと<img>/<iframe>のblob: URLが読み込めず、
+  // 画像が壊れて見える・PDFが真っ白になる）。
+  "img-src 'self' data: blob:",
+  "frame-src 'self' blob:",
   "font-src 'self'",
   "connect-src 'self'",
   "manifest-src 'self'",
