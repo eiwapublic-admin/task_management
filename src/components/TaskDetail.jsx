@@ -2,8 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import { formatDateTime } from '../lib/format'
 import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
-import { listAttachments, downloadAttachment } from '../lib/api'
+import { listAttachments, downloadAttachment, fetchAttachmentBlob } from '../lib/api'
 import { channelIconSrc, channelLabel } from '../lib/channel'
+import AttachmentPreview from './AttachmentPreview'
+
+// アプリ内プレビューに対応する形式（画像・PDF）。それ以外はダウンロードのみ。
+function isPreviewable(mimeType) {
+  return (mimeType || '').startsWith('image/') || mimeType === 'application/pdf'
+}
 
 // バイト数を読みやすい単位にする
 function formatBytes(n) {
@@ -16,6 +22,12 @@ function formatBytes(n) {
 export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask }) {
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
+  // プレビューが開いている間はタスク詳細側のEscape/Tab処理を無効化する
+  // （refで管理し、下のkeydownハンドラのクロージャが常に最新値を参照できるようにする）
+  const previewOpenRef = useRef(false)
+  // 現在のプレビューのBlob URL。effectの依存配列に入れると添付一覧の再取得
+  // effectまで再実行されてしまうため、stateとは別にrefでも保持して参照する。
+  const previewUrlRef = useRef('')
 
   // 編集用のローカル状態（担当者・期限・留意事項）
   const [assignee, setAssignee] = useState(UNASSIGNED)
@@ -31,6 +43,11 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const [attError, setAttError] = useState('')
   const [downloadingId, setDownloadingId] = useState('')
   const [downloadError, setDownloadError] = useState('')
+
+  // アプリ内プレビュー（画像・PDF）。Blob URL はモーダルを閉じる際に解放する。
+  const [previewAtt, setPreviewAtt] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewingId, setPreviewingId] = useState('')
 
   // 対象タスクが切り替わったら編集フォームを初期化する
   useEffect(() => {
@@ -48,6 +65,13 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setAttError('')
     setDownloadError('')
     setDownloadingId('')
+    // タスクが切り替わったら開いていたプレビューも閉じる（Blob URLを解放）
+    previewOpenRef.current = false
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    previewUrlRef.current = ''
+    setPreviewAtt(null)
+    setPreviewUrl('')
+    setPreviewingId('')
     // スレッド全体の添付を集約して取得する。返信で本文が上書きされても、
     // 最初・途中の返信に添付されたファイルが失われず表示されるようにするため。
     if (!task || task.source !== 'email' || !task.gmail_thread_id) {
@@ -83,6 +107,8 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     modalRef.current?.querySelector('.task-detail-close')?.focus()
 
     function handleKeyDown(e) {
+      // プレビューモーダルが開いている間は、その独自のEscapeハンドラに任せる
+      if (previewOpenRef.current) return
       if (e.key === 'Escape') {
         onClose()
         return
@@ -168,6 +194,38 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     } finally {
       setDownloadingId('')
     }
+  }
+
+  // 画像・PDFをアプリ内でプレビュー表示する（さっと内容を確認したい用途）。
+  async function handlePreview(att) {
+    setPreviewingId(att.attachmentId)
+    setDownloadError('')
+    try {
+      const blob = await fetchAttachmentBlob({
+        threadId: task.gmail_thread_id,
+        messageId: att.messageId || task.gmail_message_id,
+        attachmentId: att.attachmentId,
+        filename: att.filename,
+        mimeType: att.mimeType,
+      })
+      const url = URL.createObjectURL(blob)
+      previewOpenRef.current = true
+      previewUrlRef.current = url
+      setPreviewAtt(att)
+      setPreviewUrl(url)
+    } catch (err) {
+      setDownloadError(err.message || 'プレビューの取得に失敗しました')
+    } finally {
+      setPreviewingId('')
+    }
+  }
+
+  function closePreview() {
+    previewOpenRef.current = false
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    previewUrlRef.current = ''
+    setPreviewAtt(null)
+    setPreviewUrl('')
   }
 
   const hasAttachments = attachments.length > 0
@@ -277,6 +335,16 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                             （{formatBytes(att.size)}）
                           </span>
                         )}
+                        {isPreviewable(att.mimeType) && (
+                          <button
+                            type="button"
+                            className="task-detail-attachment-preview"
+                            onClick={() => handlePreview(att)}
+                            disabled={previewingId === att.attachmentId}
+                          >
+                            {previewingId === att.attachmentId ? '取得中…' : 'プレビュー'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="task-detail-attachment-download"
@@ -343,6 +411,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
           </div>
         </div>
       </div>
+      <AttachmentPreview attachment={previewAtt} url={previewUrl} onClose={closePreview} />
     </div>
   )
 }
