@@ -103,9 +103,18 @@ function header(payload, name) {
   return h ? h.value : ''
 }
 
+// 署名などに埋め込まれた小さいロゴ画像とみなして除外するサイズの上限。
+// iPhoneのメールアプリ等で本文に直接貼り付けられた写真は数百KB〜数MBある一方、
+// 署名のロゴ画像は数KB程度のため、このサイズを閾値に区別する。
+const INLINE_LOGO_MAX_BYTES = 20 * 1024
+
 // payload を再帰的に辿って添付ファイルのメタ情報を集める。
-// 実ファイル添付（filename と body.attachmentId を持つ）のみ対象とし、
-// 署名などに埋め込まれたインライン画像（Content-Disposition: inline の image/*）は除外する。
+// 実ファイル添付（filename と body.attachmentId を持つ）のみ対象とする。
+// 署名などに埋め込まれたインライン画像（Content-Disposition: inline の image/*）は
+// 除外するが、本文に直接貼り付けられた写真（iPhone等でよくある、cid参照のinline画像）は
+// サイズが大きいため、小さいロゴ画像とはサイズで区別して除外しないようにする
+// （2026-07-22。「旧本社通用扉のノブに付けられた器具の報告」タスクの写真がこの
+// 除外条件に該当しダウンロードできなかった事象を受けて調整）。
 function collectAttachments(payload, out) {
   if (!payload) return
   const filename = payload.filename || ''
@@ -114,11 +123,13 @@ function collectAttachments(payload, out) {
     const disposition = header(payload, 'Content-Disposition').toLowerCase()
     const isInline = disposition.startsWith('inline')
     const isImage = (payload.mimeType || '').startsWith('image/')
-    if (!(isInline && isImage)) {
+    const size = payload.body?.size || 0
+    const isInlineLogo = isInline && isImage && size <= INLINE_LOGO_MAX_BYTES
+    if (!isInlineLogo) {
       out.push({
         filename,
         mimeType: payload.mimeType || 'application/octet-stream',
-        size: payload.body?.size || 0,
+        size,
         attachmentId,
       })
     }
