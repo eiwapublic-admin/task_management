@@ -9,6 +9,8 @@
 //   4) 新 SW が無ければそのままリロード
 //
 // 生成 SW(scripts/generate-sw.mjs)は message で SKIP_WAITING を受けて skipWaiting() する。
+// リロード後の遷移先はトップページ(/)固定（2026-07-22。設定画面等どのページから
+// タップしても、最新化後は必ずメイン画面に戻るようにするため）。
 
 export async function reloadApp(options = {}) {
   const { fallbackMs = 3000 } = options
@@ -21,7 +23,7 @@ export async function reloadApp(options = {}) {
       const reloadOnce = () => {
         if (reloaded) return
         reloaded = true
-        window.location.reload()
+        window.location.assign('/')
       }
       const activate = (sw) => {
         navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, {
@@ -49,5 +51,5 @@ export async function reloadApp(options = {}) {
   } catch {
     /* 失敗してもリロードは行う */
   }
-  window.location.reload()
+  window.location.assign('/')
 }
