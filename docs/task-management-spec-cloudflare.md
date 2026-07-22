@@ -232,7 +232,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 ### 4-5. 添付ファイル表示・ダウンロード
 
-- メール由来タスクの詳細画面を開くと、`GET /api/attachments?thread_id=…` で**スレッド全体の添付一覧をその場で Gmail から取得**して表示する（`gmail.js` が各メッセージの payload を再帰的に辿り、`filename` と `body.attachmentId` を持つパートを抽出。署名等に埋め込まれたインライン画像 = `Content-Disposition: inline` の image/* は除外）。
+- メール由来タスクの詳細画面を開くと、`GET /api/attachments?thread_id=…` で**スレッド全体の添付一覧をその場で Gmail から取得**して表示する（`gmail.js` が各メッセージの payload を再帰的に辿り、`filename` と `body.attachmentId` を持つパートを抽出。署名等に埋め込まれたインライン画像 = `Content-Disposition: inline` の image/* は除外）。**ただしサイズが `INLINE_LOGO_MAX_BYTES`（20KB）を超えるインライン画像は除外しない**（2026-07-22。iPhone等のメールアプリで本文に直接貼り付けられた写真は`cid:`参照のインライン画像として送られるが、数百KB〜数MBあるため、数KB程度の署名ロゴ画像とサイズで区別する。「旧本社通用扉のノブに付けられた器具の報告」タスクの写真がこの除外条件に該当しダウンロードできなかった事象を受けて調整）。ダウンロード対応はPDFに限定されておらず、Gmailの実ファイル添付であれば画像を含め元々どの形式でも対象。
 - **スレッド集約**: 返信で本文が上書きされても最初・途中の返信の添付が失われないよう、スレッド内の全メッセージの添付を集約する（同一ファイル=名前+サイズ+MIME は1件に集約）。ただし同一件名で複数顧客が1スレッドにまとまる場合に別顧客宛の添付が混ざるのを防ぐため、**対象タスクの顧客(counterpart)が参加している（From/To/Cc に含む）メッセージの添付だけ**に絞り込む（counterpart は `mail-utils.js` で特定）。各添付は所属 `messageId` を持ち、ダウンロード時に使う。
 - **FAX の例外（2026-07-17）**: `channel='fax'` のタスクはスレッド集約を行わず、タスクの元メッセージ（`gmail_message_id`）単体の添付だけを返す。FAXは件名共通で複数が1スレッドに混在し、送信元も共通で counterpart 絞り込みが効かないため。
 - 各ファイルの [ダウンロード] は `GET /api/attachment` を叩き、Worker が Gmail の `messages/{id}/attachments/{attachmentId}` から本体（base64url）を取得してバイト列で返す。フロントは Bearer 付き fetch → Blob 化してダウンロードを起動する。
