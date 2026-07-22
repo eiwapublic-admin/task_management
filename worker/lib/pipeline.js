@@ -537,9 +537,33 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         ? result.due_date
         : null
 
+      // 添付（FAX/PDF/画像）から Claude が読み取った要約。title を先に必要とするため
+      // ここで計算する（本文用の再利用は下記 docSummary 参照箇所を参照）。
+      const docSummary =
+        !isFaxReadFailure && typeof result.document_summary === 'string' && result.document_summary.trim()
+          ? result.document_summary.trim()
+          : null
+
+      // Claude が title を埋めなかった場合の保険。特に「業務外」判定のFAX等で
+      // title が空のまま email.subject（FAX共通の定型件名「Attached Image」等）に
+      // フォールバックし、内容が分かるのに意味の無いタイトルになる事例があったため、
+      // document_summary の冒頭から簡潔な代替タイトルを組み立てる。
+      const fallbackTitleFromSummary = docSummary
+        ? (() => {
+            const firstSentence = docSummary.split(/[。\n]/)[0].trim()
+            if (!firstSentence) return null
+            return firstSentence.length > 30 ? `${firstSentence.slice(0, 30)}…` : firstSentence
+          })()
+        : null
+
       const title = isFaxReadFailure
         ? '（FAX内容の読み取り失敗）'
-        : (result.title || email.subject || '（件名なし）').slice(0, 120)
+        : (
+            (typeof result.title === 'string' && result.title.trim()) ||
+            fallbackTitleFromSummary ||
+            email.subject ||
+            '（件名なし）'
+          ).slice(0, 120)
 
       // 自社の社員が社外の宛先へ新規に送ったメールは、こちらから既に連絡済みのため
       // 初めから「返信済み」で登録する。差出人が自社（共有アドレス/自社ドメイン）かつ
@@ -573,14 +597,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         ? extractEmail(email.replyTo) || extractEmail(email.from)
         : extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
 
-      // 添付（FAX/PDF/画像）から Claude が読み取った要約。FAX 転送メールは本文が
-      // ほぼ無いため、この要約を本文として表示する。通常メールで本文もある場合は
-      // 本文の後ろに添付内容を追記する。FAX読み取り失敗時は要約自体が信頼できない
-      // ため使わず、失敗理由を代わりに表示する。
-      const docSummary =
-        !isFaxReadFailure && typeof result.document_summary === 'string' && result.document_summary.trim()
-          ? result.document_summary.trim()
-          : null
+      // docSummary は title の直前で計算済み（FAX 転送メールは本文がほぼ無いため、
+      // この要約を本文としても表示する。通常メールで本文もある場合は本文の後ろに
+      // 添付内容を追記する。FAX読み取り失敗時は要約自体が信頼できないため使わず、
+      // 失敗理由を代わりに表示する）。
       const emailBody = compactBody(email.body)
       let bodyPreview
       if (isFaxReadFailure) {
