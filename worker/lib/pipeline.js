@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, getProfile, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
+import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 import { notifyNewTask } from './push.js'
@@ -285,36 +285,6 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   const messageRefs = await listMessageIds(accessToken, query, MAX_MESSAGES)
   summary.fetched = messageRefs.length
-
-  // 診断用（2026-07-22）: メール取得が0件になる不具合の調査のため、以下を settings の
-  // `_gmail_diag` 行にJSONで書き出し、Supabaseから直接読めるようにする（Cloudflare
-  // ログを読まずに済ませるため）。原因判明後に削除予定。
-  //  - profile: Workerのトークンが実際に見ているメールボックスのアドレスと総数
-  //  - probe: last_fetch_atに依存しない固定クエリ `in:inbox newer_than:2d` の件数
-  //    （実際のクエリが0件でも、受信箱そのものが見えているかを切り分けるため）
-  try {
-    const diag = { at: new Date().toISOString(), actualQuery: query, actualCount: messageRefs.length }
-    try {
-      const profile = await getProfile(accessToken)
-      diag.profile = {
-        emailAddress: profile.emailAddress,
-        messagesTotal: profile.messagesTotal,
-        threadsTotal: profile.threadsTotal,
-      }
-    } catch (e) {
-      diag.profileError = String(e.message || e)
-    }
-    try {
-      const probeRefs = await listMessageIds(accessToken, 'in:inbox newer_than:2d', 50)
-      diag.probeQuery = 'in:inbox newer_than:2d'
-      diag.probeCount = probeRefs.length
-    } catch (e) {
-      diag.probeError = String(e.message || e)
-    }
-    await supabase.from('settings').upsert({ key: '_gmail_diag', value: JSON.stringify(diag) }, { onConflict: 'key' })
-  } catch (err) {
-    console.error('gmail 診断の記録に失敗:', err)
-  }
 
   // 既にDBにあるスレッドはスキップ
   const { data: existingRows } = await supabase.from('tasks').select('gmail_thread_id')
