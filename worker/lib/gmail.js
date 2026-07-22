@@ -41,10 +41,22 @@ async function apiGet(accessToken, path) {
   return res.json()
 }
 
+// 診断用（2026-07-22）: アクセストークンがどのメールボックスに紐づいているか確認する。
+// メール取得が0件になる不具合の調査のため、実際に参照しているアカウントの
+// メールアドレスとメッセージ総数をログに記録する。原因判明後に削除予定。
+export async function getProfile(accessToken) {
+  return apiGet(accessToken, '/profile')
+}
+
 // クエリに一致するメッセージ ID の一覧を取得する。
 export async function listMessageIds(accessToken, query, maxResults = 50) {
   const params = new URLSearchParams({ q: query, maxResults: String(maxResults) })
   const data = await apiGet(accessToken, `/messages?${params}`)
+  // 診断用（2026-07-22）: メール取得が0件になる不具合の調査のため、実際に送信した
+  // クエリと件数見積り(resultSizeEstimate)を記録する。原因判明後に削除予定。
+  console.log(
+    `gmail listMessageIds: query="${query}" resultSizeEstimate=${data.resultSizeEstimate ?? 'なし'} messages=${(data.messages || []).length}`
+  )
   return data.messages || []
 }
 
