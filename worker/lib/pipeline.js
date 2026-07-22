@@ -511,9 +511,20 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 誤った情報でタスクを作らず、タイトルに読み取り失敗を明記して人が添付を直接
       // 確認できるようにする。is_business_task の判定自体も読み取り失敗時は信頼できない
       // ため、判定によらず必ずタスク化する。
-      const isFaxReadFailure = channel === 'fax' && result.document_readable === false
+      const isFax = channel === 'fax'
+      const isFaxReadFailure = isFax && result.document_readable === false
 
-      if (!isFaxReadFailure && !result.is_business_task) {
+      // FAXは業務外(is_business_task=false)判定でも必ずタスク化する（2026-07-22）。
+      // 調査中、本日08:51着のFAX（読み取り自体は失敗していない=document_readable）が
+      // is_business_task=false と判定され、タスクにも操作ログにも痕跡を残さず
+      // 静かに捨てられていた事象を発見した（該当FAXが実際に業務用件だったかは未確認だが、
+      // 少なくとも人が気づける手段が一切無いのは望ましくない）。FAXはメール全般と違って
+      // 件数が少なく誤検知の実害（無関係なタスクが1件増える程度）が小さい一方、
+      // 見落としの実害（顧客対応漏れ）が大きいため、通常メールとは異なり判定によらず
+      // 必ずタスク化する方針にする（読み取り失敗時と同様の扱い）。
+      const isFaxNonBusinessOverride = isFax && !isFaxReadFailure && !result.is_business_task
+
+      if (!isFax && !result.is_business_task) {
         summary.nonBusiness += 1
         continue
       }
@@ -597,8 +608,13 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const faxFailureNote = isFaxReadFailure
         ? '添付の内容を自信を持って判読できなかったため、内容を推測せずタスク化しました。担当者は添付を直接確認してください。'
         : null
+      const faxNonBusinessNote = isFaxNonBusinessOverride
+        ? 'AIは業務外の可能性があると判定しましたが、FAXは見落とし防止のため必ずタスク化しています。内容をご確認のうえ、不要であれば完了にしてください。'
+        : null
       const classificationNote =
-        [faxFailureNote, result.reason || null, outboundNote, docNote].filter(Boolean).join('\n') || null
+        [faxFailureNote, faxNonBusinessNote, result.reason || null, outboundNote, docNote]
+          .filter(Boolean)
+          .join('\n') || null
 
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
