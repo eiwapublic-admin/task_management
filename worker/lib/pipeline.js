@@ -27,6 +27,18 @@ function isFormSubmission(email) {
   return subject.includes(FORM_SUBJECT_MARKER) || body.includes(FORM_BODY_MARKER)
 }
 
+// 實守紙業（取引先）から定期的に届く「数量報告」メール。org_contextに
+// 「實守紙業の数量報告は西川が担当」と明記された既知の業務メールだが、
+// 2026-07-07・07-22に is_business_task=false と誤判定されタスク化されず
+// 見落とされる事象が実際に発生した（本文がほぼ定型文のみで、Claudeの
+// 業務判定が安定しないと見られる）。フォーム自動送信メールの判定と同様に、
+// Claudeの判断に頼らずここで確実に業務メールとして扱う。
+const JITSUMORI_SENDER_RE = /jitsumori\.co\.jp/i
+const JITSUMORI_SUBJECT_MARKER = '数量報告'
+function isJitsumoriQuantityReport(email) {
+  return JITSUMORI_SENDER_RE.test(email.from || '') && (email.subject || '').includes(JITSUMORI_SUBJECT_MARKER)
+}
+
 // タスクタイトルのキーワード一致による返信先の絞り込み（フォームタスクの返信検知）で、
 // ほぼ全てのタイトルに現れて識別力の無い定型語をノイズとして除外する。
 const KEYWORD_STOPWORDS = new Set([
@@ -524,13 +536,18 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 必ずタスク化する方針にする（読み取り失敗時と同様の扱い）。
       const isFaxNonBusinessOverride = isFax && !isFaxReadFailure && !result.is_business_task
 
-      if (!isFax && !result.is_business_task) {
+      const isJitsumoriReport = isJitsumoriQuantityReport(email)
+
+      if (!isFax && !isJitsumoriReport && !result.is_business_task) {
         summary.nonBusiness += 1
         continue
       }
 
-      // 担当者の正規化（不明・範囲外は「（担当未設定）」にして画面で警告表示させる）
+      // 担当者の正規化（不明・範囲外は「（担当未設定）」にして画面で警告表示させる）。
+      // 實守紙業の数量報告はorg_contextのルールにより西川固定のため、Claudeが
+      // 正しく割り当てられなかった場合のフォールバックとして西川を優先する。
       let assignee = isFaxReadFailure ? null : result.assignee
+      if (isJitsumoriReport && (!assignee || !assignees.includes(assignee))) assignee = '西川'
       if (!assignee || !assignees.includes(assignee)) assignee = UNASSIGNED
 
       const dueDate = !isFaxReadFailure && typeof result.due_date === 'string' && DUE_RE.test(result.due_date)
@@ -640,8 +657,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const faxNonBusinessNote = isFaxNonBusinessOverride
         ? 'AIは業務外の可能性があると判定しましたが、FAXは見落とし防止のため必ずタスク化しています。内容をご確認のうえ、不要であれば完了にしてください。'
         : null
+      const jitsumoriNote =
+        isJitsumoriReport && !result.is_business_task
+          ? 'AIは業務外と判定しましたが、實守紙業の数量報告は既知の業務メールのため必ずタスク化しています。'
+          : null
       const classificationNote =
-        [faxFailureNote, faxNonBusinessNote, result.reason || null, outboundNote, docNote]
+        [faxFailureNote, faxNonBusinessNote, jitsumoriNote, result.reason || null, outboundNote, docNote]
           .filter(Boolean)
           .join('\n') || null
 
