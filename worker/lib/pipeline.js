@@ -1,5 +1,5 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
+import { getAccessToken, getProfile, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 import { notifyNewTask } from './push.js'
@@ -273,6 +273,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   let billingError = null
 
   const accessToken = await getAccessToken()
+
+  // 診断用（2026-07-22）: メール取得が0件になる不具合の調査のため、アクセストークンが
+  // どのメールボックス（アドレス）に紐づいているかをログに記録する。原因判明後に削除予定。
+  try {
+    const profile = await getProfile(accessToken)
+    console.log(
+      `gmail profile: emailAddress=${profile.emailAddress} messagesTotal=${profile.messagesTotal} threadsTotal=${profile.threadsTotal}`
+    )
+  } catch (err) {
+    console.error('gmail profile 取得失敗:', err)
+  }
 
   // 1) 新着メールの取得クエリを組み立てる
   let query = 'in:inbox'
