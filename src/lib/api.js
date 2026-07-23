@@ -71,6 +71,26 @@ export function listAttachments(threadId) {
   return authFetch(`/api/attachments?thread_id=${encodeURIComponent(threadId)}`)
 }
 
+// PDFのアプリ内プレビュー用に、短時間（120秒）だけ有効な直接アクセスURLを発行する
+// （/api/attachment/preview-token）。SafariはBlob URLのPDFをiframe内に正しく描画
+// できないことがあるため、PDFのプレビューはBlobではなくこのURLへの直接ナビゲーション
+// で表示する（画像は従来通りfetchAttachmentBlobでBlob表示する。Safariでも問題ない）。
+export async function getAttachmentPreviewUrl({ threadId, messageId, attachmentId, filename, mimeType }) {
+  const { token } = await authFetch('/api/attachment/preview-token', {
+    method: 'POST',
+    body: JSON.stringify({ thread_id: threadId, message_id: messageId, attachment_id: attachmentId }),
+  })
+  const params = new URLSearchParams({
+    thread_id: threadId,
+    message_id: messageId,
+    attachment_id: attachmentId,
+    filename: filename || 'attachment',
+    mime: mimeType || 'application/octet-stream',
+    preview_token: token,
+  })
+  return `/api/attachment?${params.toString()}`
+}
+
 // 添付ファイルの実体（Blob）を Gmail 経由で取得する（/api/attachment）。
 // バイナリを扱うため authFetch は使わない。ダウンロード・プレビューの両方の
 // 基礎として使う共通関数。thread_id はタスク所属の検証に使う（サーバー側で
