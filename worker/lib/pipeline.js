@@ -466,18 +466,23 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
       // TEMP診断（2026-07-23 FAX取りこぼし調査）: FAX候補メッセージについて、workerが
       // 実際に見ている From/件名/本文の実値と isFaxGatewayEmail の結果を操作ログに記録する。
-      // 原因確定後に削除する。activity_logs は保持期間で自動pruneされる。
+      // 末尾のバッチ書き込みは実行が打ち切られると失われるため、検知した時点で即時に
+      // 個別insertする（log_type は制約上 'fetch' を使う）。原因確定後に削除する。
       if (
         /attached image/i.test(email.subject || '') ||
         (email.from || '').toLowerCase().includes('eiwa-up.com') ||
         /RJOBNUM/i.test(email.body || '')
       ) {
-        logRows.push({
-          log_type: 'diag',
-          actor: 'diag',
-          message: `DIAG id=${email.id} fax=${isFaxGatewayEmail(email)} from=${JSON.stringify(email.from)} subj=${JSON.stringify(email.subject)} bodyLen=${(email.body || '').length} bodyHead=${JSON.stringify((email.body || '').slice(0, 120))}`,
-          detail: { id: email.id },
-        })
+        try {
+          await supabase.from('activity_logs').insert({
+            log_type: 'fetch',
+            actor: 'diag',
+            message: `DIAG id=${email.id} fax=${isFaxGatewayEmail(email)} from=${JSON.stringify(email.from)} subj=${JSON.stringify(email.subject)} bodyLen=${(email.body || '').length} bodyHead=${JSON.stringify((email.body || '').slice(0, 140))}`,
+            detail: { id: email.id },
+          })
+        } catch (e) {
+          console.error('diag insert failed', e)
+        }
       }
 
       // 件名ベースの返信検知: 未処理タスクと同じ件名（Re: 等を除く）のメールが
