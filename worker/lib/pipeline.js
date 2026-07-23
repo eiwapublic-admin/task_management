@@ -48,15 +48,18 @@ function isJitsumoriQuantityReport(email) {
 //      14:42着FAXの見落としで判明）。
 //  (2) channel を決定的に 'fax' に固定する（下記）。これによりClaudeのchannel判定に
 //      依らず「FAXは業務外でも必ずタスク化」の保護が効く。
-// 判定は、FAXゲートウェイの受信情報ヘッダに必ず含まれる「RJOBNUM=」（受信ジョブ番号）で行う。
-// これは複合機固有のトークンで通常の業務メール本文には現れないため、本文中のどこに
-// あってもFAXと見なせる。※当初は行頭一致（/^RJOBNUM=/m）にしていたが、メール本文の
-// 抽出結果は経路（text/plain / HTMLからのタグ除去 / snippetフォールバック）により
-// 改行が保たれず1行に潰れることがあり、その場合に行頭一致が外れてFAXを取りこぼした
-// （2026-07-23、14:42着FAXの再取得で判明）。行構造に依存しない「どこでも一致」に変更した。
+// 判定は送信元を主にする。全FAXは複合機の固定アドレス（FAX_GATEWAY_SENDER）から
+// 届くため、これがもっとも確実。ヘッダ（From）はメール本文の抽出処理の影響を受けない。
+// 補助として、本文にFAXゲートウェイ固有の「RJOBNUM=」（受信ジョブ番号）トークンを含む
+// 場合もFAXと見なす（将来、転送元アドレスが変わっても本文で拾えるように）。
+// ※当初は本文の行頭一致（/^RJOBNUM=/m）だけで判定していたが、メール本文の抽出結果は
+// 経路（text/plain / HTMLからのタグ除去 / snippetフォールバック）により内容が想定と
+// 変わることがあり、RJOBNUM文字列を含まない本文になってFAXを取りこぼした（2026-07-23、
+// 14:42着FAXの再取得で判明。本文依存の判定は脆いと判断し、送信元判定を主にした）。
+const FAX_GATEWAY_SENDER = 'mimi@eiwa-up.com'
 const FAX_GATEWAY_RE = /RJOBNUM=/i
 function isFaxGatewayEmail(email) {
-  return FAX_GATEWAY_RE.test(email.body || '')
+  return (email.from || '').toLowerCase().includes(FAX_GATEWAY_SENDER) || FAX_GATEWAY_RE.test(email.body || '')
 }
 
 // タスクタイトルのキーワード一致による返信先の絞り込み（フォームタスクの返信検知）で、
