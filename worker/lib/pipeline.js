@@ -40,17 +40,21 @@ function isJitsumoriQuantityReport(email) {
 }
 
 // FAXゲートウェイ（複合機）から転送されてくる受信メールか。分類器（Claude）を
-// 通す前に、メール本文だけで判定できる手掛かりで見分ける。
-// FAXは全て同じ送信元・同じ定型件名（「Attached Image」）で届くため、Gmailが
-// 連続して届いたFAXを1つの会話（スレッド）に束ねてしまう。後段の重複判定は
-// スレッド単位（既にそのスレッドからタスクを作っていればスキップ）のため、
-// 束ねられた2通目以降のFAXが「処理済みスレッド」と誤判定され、分類も操作ログも
-// 残さず捨てられていた（2026-07-23、14:42着FAXの見落としで判明）。これを避けるため、
-// FAXはスレッド単位ではなくメッセージ単位で重複判定する（下記メインループ参照）。
-// 判定は、FAXゲートウェイの受信情報ヘッダに必ず含まれる RJOBNUM 行（受信ジョブ番号）で行う。
-// 通常のメール本文が行頭に「RJOBNUM=」を持つことはまず無く、既存のFAX本文整形
-// （faxJobNumberLine）でも同じ signal を使っているため一貫している。
-const FAX_GATEWAY_RE = /^RJOBNUM=/m
+// 通す前に、メール本文だけで確実に判定できる手掛かりで見分ける。用途は2つ:
+//  (1) 重複判定をスレッド単位ではなくメッセージ単位にする（下記メインループ）。
+//      FAXは全て同じ送信元・同じ定型件名（「Attached Image」）で届くため、Gmailが
+//      連続して届いたFAXを1つの会話（スレッド）に束ねてしまい、スレッド単位だと
+//      束ねられた2通目以降が「処理済みスレッド」扱いで捨てられる（2026-07-23、
+//      14:42着FAXの見落としで判明）。
+//  (2) channel を決定的に 'fax' に固定する（下記）。これによりClaudeのchannel判定に
+//      依らず「FAXは業務外でも必ずタスク化」の保護が効く。
+// 判定は、FAXゲートウェイの受信情報ヘッダに必ず含まれる「RJOBNUM=」（受信ジョブ番号）で行う。
+// これは複合機固有のトークンで通常の業務メール本文には現れないため、本文中のどこに
+// あってもFAXと見なせる。※当初は行頭一致（/^RJOBNUM=/m）にしていたが、メール本文の
+// 抽出結果は経路（text/plain / HTMLからのタグ除去 / snippetフォールバック）により
+// 改行が保たれず1行に潰れることがあり、その場合に行頭一致が外れてFAXを取りこぼした
+// （2026-07-23、14:42着FAXの再取得で判明）。行構造に依存しない「どこでも一致」に変更した。
+const FAX_GATEWAY_RE = /RJOBNUM=/i
 function isFaxGatewayEmail(email) {
   return FAX_GATEWAY_RE.test(email.body || '')
 }
@@ -538,13 +542,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
       // カード・詳細画面のアイコン表示用（メール/フォーム/FAX の区別）。
       // 分類できない・想定外の値は既定の "email" にする。
-      // フォームの自動送信メールは定型文で確実に判定できるため、Claude の
-      // 判定結果より優先する（分類漏れで "email" になるのを防ぐ）。
+      // フォームの自動送信メール・FAXゲートウェイ受信メールは本文から確実に判定できるため、
+      // Claude の判定結果より優先する（分類漏れで "email" になるのを防ぐ）。特にFAXは、
+      // channel が 'fax' でないと下流の「業務外でも必ずタスク化」の保護（isFaxNonBusinessOverride）が
+      // 効かず、広告的なFAXが業務外として静かに捨てられてしまうため、ここで決定的に固定するのが重要。
       const channel = isFormSubmission(email)
         ? 'form'
-        : CHANNEL_VALUES.has(result.channel)
-          ? result.channel
-          : 'email'
+        : isFaxGatewayEmail(email)
+          ? 'fax'
+          : CHANNEL_VALUES.has(result.channel)
+            ? result.channel
+            : 'email'
 
       // FAXの読み取り失敗（ハルシネーション対策）: 添付の判読に自信が持てない場合、
       // Claudeは document_readable=false を返す（プロンプトで明示的に禁止しているため、
@@ -650,9 +658,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const emailBody = compactBody(email.body)
       // FAXゲートウェイの本文は FROM=/TO=/DATE=/TIME=/TIMEZONE=/FCODE=/RJOBNUM= という
       // 受信情報のみで業務内容を含まない。このうち RJOBNUM（受信ジョブ番号。複合機側で
-      // 受信書類を特定する際に使う）だけは残す価値があるため、FAXの場合は本文全体では
-      // なくこの行だけを抽出して使う。
-      const faxJobNumberLine = isFax ? (email.body || '').match(/^RJOBNUM=.*/m)?.[0]?.trim() || null : null
+      // 受信書類を特定する際に使う）だけは残す価値があるため、FAXの場合はこの部分だけを
+      // 抽出して使う。本文が1行に潰れている場合（HTML由来・snippetフォールバック）でも
+      // 拾えるよう、行頭限定ではなく「RJOBNUM=<値>」のトークンを本文中から抽出する。
+      const faxJobNumberLine = isFax ? (email.body || '').match(/RJOBNUM=\S+/i)?.[0]?.trim() || null : null
       let bodyPreview
       if (isFaxReadFailure) {
         const issue =
