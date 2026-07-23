@@ -464,6 +464,22 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       const email = await getMessage(accessToken, ref.id)
       if (!email.threadId) continue
 
+      // TEMP診断（2026-07-23 FAX取りこぼし調査）: FAX候補メッセージについて、workerが
+      // 実際に見ている From/件名/本文の実値と isFaxGatewayEmail の結果を操作ログに記録する。
+      // 原因確定後に削除する。activity_logs は保持期間で自動pruneされる。
+      if (
+        /attached image/i.test(email.subject || '') ||
+        (email.from || '').toLowerCase().includes('eiwa-up.com') ||
+        /RJOBNUM/i.test(email.body || '')
+      ) {
+        logRows.push({
+          log_type: 'diag',
+          actor: 'diag',
+          message: `DIAG id=${email.id} fax=${isFaxGatewayEmail(email)} from=${JSON.stringify(email.from)} subj=${JSON.stringify(email.subject)} bodyLen=${(email.body || '').length} bodyHead=${JSON.stringify((email.body || '').slice(0, 120))}`,
+          detail: { id: email.id },
+        })
+      }
+
       // 件名ベースの返信検知: 未処理タスクと同じ件名（Re: 等を除く）のメールが
       // 自社側（共有アドレス・自社ドメイン）から、かつ元の送信者（顧客）宛てに
       // 送られたものであれば、そのタスクへの返信とみなす（Claude 分類はスキップ）。
