@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth, withSecurityHeaders } from './lib/http.js'
-import { signJwt } from './lib/jwt.js'
+import { signJwt, verifyJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
 import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
 import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
@@ -535,18 +535,90 @@ function base64UrlToBytes(data) {
   return new Uint8Array(Buffer.from(normalized, 'base64'))
 }
 
-// GET /api/attachment?thread_id=..&message_id=..&attachment_id=..&filename=..&mime=..
+// POST /api/attachment/preview-token — PDFのアプリ内プレビュー用、短時間（120秒）だけ
+// 有効な直接アクセストークンを発行する。ログイン必須。
+//
+// 背景: SafariはBlob URL（アプリ内でfetchして生成する一時URL）のPDFをiframe内に正しく
+// 描画できないことがある（WebKitの既知の問題。真っ白になる・1ページ目しか出ない等）。
+// 画像はBlob URLで問題なく表示できるためこのままとし、PDFだけ<iframe>にこのトークン
+// 付きの/api/attachmentへ直接ナビゲーションさせることで、Safariでも動く通常のHTTPレスポンス
+// として（Content-Disposition: inlineで）PDFを返す。
+//
+// 通常の /api/attachment はAuthorizationヘッダ必須だが、iframeのsrc属性ではヘッダを
+// 送れないため、ここで発行する短時間有効なトークンをクエリ文字列で代わりに使う。
+// 対象の添付ファイル（thread_id/message_id/attachment_id）に紐づけて署名するため、
+// 他の添付ファイルの取得には転用できない。
+async function handleAttachmentPreviewToken(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const payload = await req.json().catch(() => null)
+    const threadId = typeof payload?.thread_id === 'string' ? payload.thread_id : ''
+    const messageId = typeof payload?.message_id === 'string' ? payload.message_id : ''
+    const attachmentId = typeof payload?.attachment_id === 'string' ? payload.attachment_id : ''
+    if (!threadId || !GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が必要です' }, 400)
+    if (!GMAIL_ID_RE.test(messageId)) return json({ error: 'message_id が不正です' }, 400)
+    if (!attachmentId) return json({ error: 'attachment_id が必要です' }, 400)
+
+    const supabase = getAdminClient()
+    const task = await findTaskByThreadId(supabase, threadId)
+    if (!task) return json({ error: '対象が見つかりません' }, 404)
+
+    const accessToken = await getAccessToken()
+    const threadMeta = await getThreadMessages(accessToken, threadId)
+    if (!threadMeta.some((m) => m.id === messageId)) {
+      return json({ error: '対象が見つかりません' }, 404)
+    }
+
+    const { SESSION_SECRET } = process.env
+    if (!SESSION_SECRET) {
+      console.error('attachment-preview-token: SESSION_SECRET が設定されていません')
+      return json({ error: 'サーバー設定エラーが発生しました' }, 500)
+    }
+    const token = await signJwt(
+      { purpose: 'attachment-preview', threadId, messageId, attachmentId },
+      SESSION_SECRET,
+      120
+    )
+    return json({ token })
+  } catch (err) {
+    console.error('attachment-preview-token 失敗:', err)
+    return json({ error: 'プレビュー用URLの発行に失敗しました' }, 500)
+  }
+}
+
+// GET /api/attachment?thread_id=..&message_id=..&attachment_id=..&filename=..&mime=..[&preview_token=..]
 //   添付ファイル本体を返す。ログイン必須。
 //   thread_id がタスクに紐づくこと・message_id がそのスレッドに実在することを
 //   検証してから取得する（タスク化されていない共有Gmailの任意メッセージを
 //   JWTだけで引けてしまわないようにするため）。
+//   preview_token（上記handleAttachmentPreviewTokenが発行）が有効かつ対象の
+//   thread_id/message_id/attachment_idと一致する場合は、通常のBearer認証の
+//   代わりとして受け付ける（iframeのsrc属性はAuthorizationヘッダを送れないため）。
+//   その場合はContent-Dispositionをinlineにしてブラウザ内で直接表示できるようにする。
 async function handleDownloadAttachment(req) {
-  if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
+  const params = new URL(req.url).searchParams
+  const threadId = params.get('thread_id') || ''
+  const messageId = params.get('message_id') || ''
+  const attachmentId = params.get('attachment_id') || ''
+  const previewToken = params.get('preview_token') || ''
+
+  let viaPreviewToken = false
+  if (previewToken) {
+    const { SESSION_SECRET } = process.env
+    const claims = SESSION_SECRET ? await verifyJwt(previewToken, SESSION_SECRET) : null
+    viaPreviewToken =
+      !!claims &&
+      claims.purpose === 'attachment-preview' &&
+      claims.threadId === threadId &&
+      claims.messageId === messageId &&
+      claims.attachmentId === attachmentId
+  }
+  if (!viaPreviewToken && !(await verifyRequestAuth(req))) {
+    return json({ error: '認証が必要です' }, 401)
+  }
+
   try {
-    const params = new URL(req.url).searchParams
-    const threadId = params.get('thread_id') || ''
-    const messageId = params.get('message_id') || ''
-    const attachmentId = params.get('attachment_id') || ''
     const filename = (params.get('filename') || 'attachment').slice(0, 255)
     const mimeType = params.get('mime') || 'application/octet-stream'
     if (!threadId || !GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が必要です' }, 400)
@@ -569,10 +641,11 @@ async function handleDownloadAttachment(req) {
     // Content-Disposition のファイル名: ASCII フォールバック + RFC 5987 の UTF-8 指定を併記
     const asciiName = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_')
     const encodedName = encodeURIComponent(filename)
+    const disposition = viaPreviewToken ? 'inline' : 'attachment'
     return new Response(bytes, {
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+        'Content-Disposition': `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
         'Cache-Control': 'private, no-store',
       },
     })
@@ -687,6 +760,9 @@ async function route(req, env) {
   }
   if (pathname === '/api/attachment') {
     return req.method === 'GET' ? handleDownloadAttachment(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/attachment/preview-token') {
+    return req.method === 'POST' ? handleAttachmentPreviewToken(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/push/public-key') {
     return req.method === 'GET' ? handlePushPublicKey(req) : json({ error: 'Method Not Allowed' }, 405)

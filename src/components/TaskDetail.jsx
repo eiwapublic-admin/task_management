@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import { formatDateTime } from '../lib/format'
 import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
-import { listAttachments, downloadAttachment, fetchAttachmentBlob } from '../lib/api'
+import { listAttachments, downloadAttachment, fetchAttachmentBlob, getAttachmentPreviewUrl } from '../lib/api'
 import { channelIconSrc, channelLabel } from '../lib/channel'
 import AttachmentPreview from './AttachmentPreview'
 
@@ -65,9 +65,10 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setAttError('')
     setDownloadError('')
     setDownloadingId('')
-    // タスクが切り替わったら開いていたプレビューも閉じる（Blob URLを解放）
+    // タスクが切り替わったら開いていたプレビューも閉じる（Blob URLなら解放。
+    // PDFの直接URLはBlobではないため revokeObjectURL の対象外）
     previewOpenRef.current = false
-    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    if (previewUrlRef.current?.startsWith('blob:')) URL.revokeObjectURL(previewUrlRef.current)
     previewUrlRef.current = ''
     setPreviewAtt(null)
     setPreviewUrl('')
@@ -197,18 +198,31 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   }
 
   // 画像・PDFをアプリ内でプレビュー表示する（さっと内容を確認したい用途）。
+  // 画像はBlob URLで表示するが、PDFはBlob URLだとSafariのiframeで正しく描画
+  // できないことがあるため、短時間有効な直接URL（getAttachmentPreviewUrl）へ
+  // ナビゲーションする方式にする（Blobではないため閉じる際に解放は不要）。
   async function handlePreview(att) {
     setPreviewingId(att.attachmentId)
     setDownloadError('')
     try {
-      const blob = await fetchAttachmentBlob({
-        threadId: task.gmail_thread_id,
-        messageId: att.messageId || task.gmail_message_id,
-        attachmentId: att.attachmentId,
-        filename: att.filename,
-        mimeType: att.mimeType,
-      })
-      const url = URL.createObjectURL(blob)
+      const isPdf = att.mimeType === 'application/pdf'
+      const url = isPdf
+        ? await getAttachmentPreviewUrl({
+            threadId: task.gmail_thread_id,
+            messageId: att.messageId || task.gmail_message_id,
+            attachmentId: att.attachmentId,
+            filename: att.filename,
+            mimeType: att.mimeType,
+          })
+        : URL.createObjectURL(
+            await fetchAttachmentBlob({
+              threadId: task.gmail_thread_id,
+              messageId: att.messageId || task.gmail_message_id,
+              attachmentId: att.attachmentId,
+              filename: att.filename,
+              mimeType: att.mimeType,
+            })
+          )
       previewOpenRef.current = true
       previewUrlRef.current = url
       setPreviewAtt(att)
@@ -222,7 +236,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
 
   function closePreview() {
     previewOpenRef.current = false
-    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    if (previewUrlRef.current?.startsWith('blob:')) URL.revokeObjectURL(previewUrlRef.current)
     previewUrlRef.current = ''
     setPreviewAtt(null)
     setPreviewUrl('')
