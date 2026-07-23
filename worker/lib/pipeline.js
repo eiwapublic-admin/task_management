@@ -39,6 +39,22 @@ function isJitsumoriQuantityReport(email) {
   return JITSUMORI_SENDER_RE.test(email.from || '') && (email.subject || '').includes(JITSUMORI_SUBJECT_MARKER)
 }
 
+// FAXゲートウェイ（複合機）から転送されてくる受信メールか。分類器（Claude）を
+// 通す前に、メール本文だけで判定できる手掛かりで見分ける。
+// FAXは全て同じ送信元・同じ定型件名（「Attached Image」）で届くため、Gmailが
+// 連続して届いたFAXを1つの会話（スレッド）に束ねてしまう。後段の重複判定は
+// スレッド単位（既にそのスレッドからタスクを作っていればスキップ）のため、
+// 束ねられた2通目以降のFAXが「処理済みスレッド」と誤判定され、分類も操作ログも
+// 残さず捨てられていた（2026-07-23、14:42着FAXの見落としで判明）。これを避けるため、
+// FAXはスレッド単位ではなくメッセージ単位で重複判定する（下記メインループ参照）。
+// 判定は、FAXゲートウェイの受信情報ヘッダに必ず含まれる RJOBNUM 行（受信ジョブ番号）で行う。
+// 通常のメール本文が行頭に「RJOBNUM=」を持つことはまず無く、既存のFAX本文整形
+// （faxJobNumberLine）でも同じ signal を使っているため一貫している。
+const FAX_GATEWAY_RE = /^RJOBNUM=/m
+function isFaxGatewayEmail(email) {
+  return FAX_GATEWAY_RE.test(email.body || '')
+}
+
 // タスクタイトルのキーワード一致による返信先の絞り込み（フォームタスクの返信検知）で、
 // ほぼ全てのタイトルに現れて識別力の無い定型語をノイズとして除外する。
 const KEYWORD_STOPWORDS = new Set([
@@ -286,10 +302,14 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const messageRefs = await listMessageIds(accessToken, query, MAX_MESSAGES)
   summary.fetched = messageRefs.length
 
-  // 既にDBにあるスレッドはスキップ
-  const { data: existingRows } = await supabase.from('tasks').select('gmail_thread_id')
+  // 既にDBにあるスレッドはスキップ（通常メール用のスレッド単位の重複判定）。
+  // FAXは同一件名・同一送信元でGmailに束ねられるため、スレッドではなく
+  // メッセージ単位で重複判定する。そのため gmail_message_id も取得しておく。
+  const { data: existingRows } = await supabase.from('tasks').select('gmail_thread_id, gmail_message_id')
   const existingThreads = new Set((existingRows || []).map((r) => r.gmail_thread_id))
+  const existingMessages = new Set((existingRows || []).map((r) => r.gmail_message_id))
   const processedThreads = new Set()
+  const processedMessages = new Set()
 
   const context = { assignees, orgContext, businessKeywords, today: todayJST() }
 
@@ -486,8 +506,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         }
       }
 
-      if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
-      processedThreads.add(email.threadId)
+      // 重複判定。FAXは同一件名・同一送信元でGmailが別々のFAXを1スレッドに束ねるため、
+      // スレッド単位だと2通目以降を取りこぼす。FAXはメッセージ単位（このメッセージから
+      // 既にタスクを作っていない限り処理）で判定し、通常メールは従来通りスレッド単位で判定する。
+      // ※FAXは送信元が自社ドメイン外のため、上の件名/フォーム返信検知には掛からない。
+      if (isFaxGatewayEmail(email)) {
+        if (existingMessages.has(email.id) || processedMessages.has(email.id)) continue
+        processedMessages.add(email.id)
+      } else {
+        if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
+        processedThreads.add(email.threadId)
+      }
 
       // 添付（PDF/画像）があれば分類器に読ませる。FAX 転送メールや見積書等に対応。
       let documents = []
