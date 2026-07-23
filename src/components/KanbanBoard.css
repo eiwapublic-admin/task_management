@@ -790,16 +790,51 @@ select.task-detail-input.is-unassigned {
 .attachment-preview-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .attachment-preview-filename {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   color: var(--text-strong);
   word-break: break-all;
+}
+
+.attachment-preview-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.attachment-preview-zoom-controls button {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.attachment-preview-zoom-controls button[aria-label='ズームをリセット'] {
+  width: auto;
+  padding: 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attachment-preview-zoom-level {
+  min-width: 3.5em;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .attachment-preview-close {
@@ -820,14 +855,17 @@ select.task-detail-input.is-unassigned {
   align-items: center;
   justify-content: center;
   padding: var(--space-3);
-  overflow: auto;
+  overflow: hidden;
   background: #111;
+  touch-action: none;
 }
 
 .attachment-preview-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  touch-action: none;
+  transition: transform 60ms ease-out;
 }
 
 .attachment-preview-pdf {
