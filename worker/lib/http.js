@@ -36,7 +36,13 @@ const CONTENT_SECURITY_POLICY = [
 // 新しい Headers にコピーしてから追記する（元レスポンスの body/status は維持）。
 export function withSecurityHeaders(response) {
   const headers = new Headers(response.headers)
-  headers.set('X-Frame-Options', 'DENY')
+  // 既定はフレーム埋め込み全面禁止（クリックジャッキング対策）。ただしレスポンス側で
+  // 明示的に X-Frame-Options / CSP を設定済みの場合は尊重する（添付ファイルの
+  // アプリ内PDFプレビューだけは同一オリジンのiframe埋め込みを許可するため、
+  // handleDownloadAttachment が SAMEORIGIN / frame-ancestors 'self' を先に設定する）。
+  if (!headers.has('X-Frame-Options')) {
+    headers.set('X-Frame-Options', 'DENY')
+  }
   headers.set('X-Content-Type-Options', 'nosniff')
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   if (!headers.has('Content-Security-Policy')) {
