@@ -642,13 +642,23 @@ async function handleDownloadAttachment(req) {
     const asciiName = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_')
     const encodedName = encodeURIComponent(filename)
     const disposition = viaPreviewToken ? 'inline' : 'attachment'
-    return new Response(bytes, {
-      headers: {
-        'Content-Type': mimeType,
-        'Content-Disposition': `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
-        'Cache-Control': 'private, no-store',
-      },
-    })
+    const headers = {
+      'Content-Type': mimeType,
+      'Content-Disposition': `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+      'Cache-Control': 'private, no-store',
+    }
+    // preview_token経由（アプリ内PDFプレビュー）のときだけ、このレスポンスを
+    // 同一オリジンの<iframe>に埋め込めるようにする。通常のレスポンスは
+    // withSecurityHeaders が X-Frame-Options: DENY / CSP frame-ancestors 'none' を
+    // 付けてフレーム埋め込みを一切禁止するが、それだと自サイト内のプレビューiframeも
+    // ブロックされ「接続が拒否されました」になる。ここで自オリジン限定に緩めるヘッダを
+    // 事前設定しておくと、withSecurityHeaders 側は既存値を上書きしない（同一オリジン
+    // のみ許可＝他サイトからのクリックジャッキングは引き続き防止される）。
+    if (viaPreviewToken) {
+      headers['X-Frame-Options'] = 'SAMEORIGIN'
+      headers['Content-Security-Policy'] = "frame-ancestors 'self'"
+    }
+    return new Response(bytes, { headers })
   } catch (err) {
     console.error('attachment ダウンロード失敗:', err)
     return json({ error: '添付ファイルの取得に失敗しました' }, 500)
