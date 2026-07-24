@@ -6,8 +6,12 @@ create extension if not exists pgcrypto;
 -- tasks: メインのタスク情報
 create table if not exists tasks (
   id               uuid primary key default gen_random_uuid(),
-  gmail_thread_id  text not null unique,
-  gmail_message_id text not null,
+  -- 一意性はスレッドではなくメッセージ（元メール）単位。FAXは同一件名・同一送信元で
+  -- Gmailが複数を1スレッドに束ねるため、gmail_thread_id を unique にすると2通目以降の
+  -- FAXが取り込めない（insertが弾かれる）。gmail_message_id は全チャネルで一意なので、
+  -- 真の重複（同一メールから複数タスク）は防ぎつつ1スレッド複数FAXを許容できる（2026-07-24）。
+  gmail_thread_id  text not null,
+  gmail_message_id text not null unique,
   title            text not null,
   assignee         text not null,
   status           text not null default '未処理'
