@@ -81,7 +81,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     }
     let cancelled = false
     setAttLoading(true)
-    listAttachments(task.gmail_thread_id)
+    listAttachments(task.gmail_thread_id, task.gmail_message_id)
       .then((res) => {
         if (!cancelled) setAttachments(res.attachments || [])
       })

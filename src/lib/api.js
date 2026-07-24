@@ -67,8 +67,13 @@ export function unsubscribePush(endpoint) {
 // スレッド内の全メッセージの添付ファイル一覧（メタ情報）を取得する（/api/attachments）。
 // 返信で本文が上書きされても最初・途中の添付が失われないよう、スレッド単位で集約して取得する。
 // { attachments: [{ filename, mimeType, size, attachmentId, messageId }, ...] } を返す。
-export function listAttachments(threadId) {
-  return authFetch(`/api/attachments?thread_id=${encodeURIComponent(threadId)}`)
+export function listAttachments(threadId, messageId) {
+  const params = new URLSearchParams({ thread_id: threadId })
+  // message_id も渡す。FAXは同一送信元・同一件名でGmailが複数を1スレッドに束ねるため、
+  // スレッドに複数タスクが並ぶ。その場合にどのタスク（＝どのメッセージ）の添付かを
+  // サーバー側が一意に特定できるようにする（thread_id だけだと引き当てが曖昧になる）。
+  if (messageId) params.set('message_id', messageId)
+  return authFetch(`/api/attachments?${params.toString()}`)
 }
 
 // PDFのアプリ内プレビュー用に、短時間（120秒）だけ有効な直接アクセスURLを発行する
