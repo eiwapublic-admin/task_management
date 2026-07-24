@@ -216,7 +216,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
 | GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、および2026-07-18よりFAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を含む） |
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
-| GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み |
+| GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み。`message_id=…`（任意）も受け取り、一意キー `gmail_message_id` で対象タスクを特定する（FAXのように同一スレッドに複数タスクが並ぶ場合の取り違え・空振りを防ぐ。2026-07-24追加）。FAX（`channel='fax'`）は当該メッセージ単体の添付のみを返す |
 | GET `/api/attachment` | JWT（または`preview_token`） | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）。クエリに対象と一致する有効な`preview_token`（下記発行）があれば、通常のBearer認証の代わりとして受け付け、`Content-Disposition: inline`で返す（PDFプレビュー用） |
 | POST `/api/attachment/preview-token` | JWT | PDFのアプリ内プレビュー用に、対象の`thread_id`/`message_id`/`attachment_id`に紐付けた120秒だけ有効なトークンを発行する（4-5参照） |
 | GET `/api/push/public-key` | JWT | Web Push購読作成用のVAPID公開鍵を返す（4-9参照）。未設定時は404 |

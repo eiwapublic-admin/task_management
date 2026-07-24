@@ -460,10 +460,25 @@ const GMAIL_ID_RE = /^[A-Za-z0-9_-]+$/
 // 存在しなければ null を返す（タスク化されていない共有メールボックスの
 // 任意メッセージまで JWT だけで読めてしまわないよう、常にタスク所属を要求する）。
 async function findTaskByThreadId(supabase, threadId) {
+  // 同一スレッドに複数タスクが並ぶことがある（FAXは同一送信元・同一件名でGmailが複数を
+  // 1スレッドに束ねるため。一意性は gmail_thread_id ではなく gmail_message_id で担保）。
+  // そのため maybeSingle（2件以上でエラーになる）ではなく先頭1件を返す。用途はスレッドが
+  // いずれかのタスクに属することの確認（認可）と、通常メールの counterpart 解決。
   const { data } = await supabase
     .from('tasks')
     .select('sender, sender_email, gmail_message_id, channel')
     .eq('gmail_thread_id', threadId)
+    .limit(1)
+  return (data && data[0]) || null
+}
+
+// gmail_message_id（現在の一意キー）でタスクを引く。スレッドに複数タスクが並ぶ場合でも
+// 対象のメッセージ（＝タスク）を一意に特定できる。
+async function findTaskByMessageId(supabase, messageId) {
+  const { data } = await supabase
+    .from('tasks')
+    .select('sender, sender_email, gmail_message_id, gmail_thread_id, channel')
+    .eq('gmail_message_id', messageId)
     .maybeSingle()
   return data || null
 }
@@ -476,10 +491,17 @@ async function handleListAttachments(req) {
   try {
     const params = new URL(req.url).searchParams
     const threadId = params.get('thread_id') || ''
+    const messageId = params.get('message_id') || ''
     if (!threadId || !GMAIL_ID_RE.test(threadId)) return json({ error: 'thread_id が必要です' }, 400)
 
     const supabase = getAdminClient()
-    const task = await findTaskByThreadId(supabase, threadId)
+    // まず message_id（一意）でタスクを特定する。FAXは同一スレッドに複数タスクが並ぶため、
+    // thread_id だけで引くと対象を一意に定められない（旧 maybeSingle は複数一致でエラーになり
+    // 「対象が見つかりません」になっていた）。message_id 未指定の旧クライアント向けに
+    // thread_id 経由のフォールバックも残す。
+    const task =
+      (messageId && GMAIL_ID_RE.test(messageId) ? await findTaskByMessageId(supabase, messageId) : null) ||
+      (await findTaskByThreadId(supabase, threadId))
     if (!task) return json({ error: '対象が見つかりません' }, 404)
 
     const accessToken = await getAccessToken()
