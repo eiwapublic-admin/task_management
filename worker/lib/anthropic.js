@@ -5,6 +5,18 @@
 const API_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 const DEFAULT_MODEL = 'claude-haiku-4-5'
 
+// 一時的なエラー（過負荷・レート制限・単発の拒否等）とみなして再試行するステータス。
+// 401/404等の設定不備や、402/クレジット不足は再試行しても無意味なため対象外
+// （クレジット不足は下の isBillingError 判定で別途扱う）。
+// 2026-07-27、単発の 403「Request not allowed」でFAX1件の分類が失敗し、その後
+// last_fetch_at が前進したことで永久に再取得の機会を失う事象が発生した。同じ実行内の
+// 他のメッセージは正常処理できていたため、アカウント/権限レベルの恒久的な問題ではなく
+// 単発の一時的な現象と判断し、再試行の対象に加えた。
+const RETRYABLE_STATUS = new Set([403, 408, 409, 429, 500, 502, 503, 504, 529])
+const MAX_ATTEMPTS = 3
+const RETRY_DELAY_MS = [800, 2000]
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 // 応答テキストから最初の JSON オブジェクトを頑健に取り出す。
 function extractJson(text) {
   if (!text) return null
@@ -115,30 +127,38 @@ export async function classifyEmail(email, context, documents = []) {
   // 添付を読ませる場合は要約分の出力トークンを多めに確保する。
   const hasDocs = content.length > 1
 
-  const res = await fetch(API_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: hasDocs ? 1500 : 400,
-      system,
-      messages: [{ role: 'user', content }],
-    }),
-  })
+  let res
+  let lastErr
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: hasDocs ? 1500 : 400,
+        system,
+        messages: [{ role: 'user', content }],
+      }),
+    })
+    if (res.ok) break
 
-  if (!res.ok) {
     const text = await res.text()
     const err = new Error(`Claude API エラー (${res.status}): ${text}`)
     // クレジット残高不足の検知（残高ゼロ時は 400 で "credit balance is too low" 等が返る）
     if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
       err.isBillingError = true
+      throw err
     }
-    throw err
+    lastErr = err
+    const isLastAttempt = attempt === MAX_ATTEMPTS - 1
+    if (!RETRYABLE_STATUS.has(res.status) || isLastAttempt) throw err
+    await sleep(RETRY_DELAY_MS[attempt] || RETRY_DELAY_MS[RETRY_DELAY_MS.length - 1])
   }
+  if (!res.ok) throw lastErr
 
   const data = await res.json()
   const text = (data.content || []).map((b) => b.text || '').join('')
