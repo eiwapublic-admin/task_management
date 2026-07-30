@@ -2,7 +2,7 @@ import { useState } from 'react'
 import TaskCard from './TaskCard'
 import { STATUS_META } from '../lib/status'
 
-export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCardClick, onAdd, onSpam }) {
+export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCardClick, onAdd }) {
   const [isOver, setIsOver] = useState(false)
   const accent = STATUS_META[status]?.color
 
@@ -49,13 +49,7 @@ export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCar
       </div>
       <div className="kanban-column-body">
         {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onDragStart={onDragStart}
-            onClick={onCardClick}
-            onSpam={onSpam}
-          />
+          <TaskCard key={task.id} task={task} onDragStart={onDragStart} onClick={onCardClick} />
         ))}
         {tasks.length === 0 && <div className="kanban-column-empty">ここにドロップ</div>}
       </div>
