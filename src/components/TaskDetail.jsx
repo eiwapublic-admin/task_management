@@ -299,7 +299,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             ×
           </button>
         </div>
-        {/* 1行目: 担当者・受信日時・期限を横並び（ステータスはフッタにあるため省略） */}
+        {/* 1行目: 担当者・期限・受信日時を横並び（ステータスはフッタにあるため省略） */}
         <div className="task-detail-toprow">
           <div className="task-detail-topitem">
             <span className="task-detail-topitem-label">担当者</span>
@@ -316,12 +316,6 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             </select>
             {isUnassigned && <span className="task-detail-warn">⚠ 未設定</span>}
           </div>
-          {/* 受信日時は「2026/07/29 08:20 受信」と後置きにして、1行目（担当者・期限・
-              スパム・保存）に収まる幅にする（2026-07-31。従来は「受信日時 ○○」の前置き） */}
-          <div className="task-detail-topitem">
-            <span>{formatDateTime(task.received_at) ?? '不明'}</span>
-            <span className="task-detail-topitem-label">受信</span>
-          </div>
           <div className="task-detail-topitem">
             <span className="task-detail-topitem-label">期限</span>
             <input
@@ -330,6 +324,12 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
+          </div>
+          {/* 受信日時は「2026/07/29 08:20 受信」と後置きにして、1行目（担当者・期限・
+              スパム・保存）に収まる幅にする（2026-07-31。従来は「受信日時 ○○」の前置き） */}
+          <div className="task-detail-topitem">
+            <span>{formatDateTime(task.received_at) ?? '不明'}</span>
+            <span className="task-detail-topitem-label">受信</span>
           </div>
           <div className="task-detail-save-group">
             {saveError && <span className="task-detail-save-error">{saveError}</span>}
