@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import TaskDetail from '../components/TaskDetail'
-import { fetchArchive, fetchSettings, updateTaskStatus } from '../lib/tasks'
+import { fetchArchive, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
 import { updateTask } from '../lib/api'
 import { formatDate, formatDateTime } from '../lib/format'
 import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
 import { formatTaskId } from '../lib/taskId'
-import { UNASSIGNED } from '../lib/status'
+import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import './Dashboard.css'
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
@@ -78,6 +78,32 @@ export default function Archive() {
       } else {
         setSelectedTask(null)
       }
+      reload()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // スパム判定だけを外す。アーカイブ済みであることは変えない（誤判定の訂正が目的で、
+  // カンバンへ戻すかどうかは別途「復帰」で選べるようにするため）。
+  async function handleUnspam(task) {
+    try {
+      await setTaskSpam(task.id, false)
+      setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, is_spam: false } : prev))
+      reload()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // アーカイブから任意のステータスへ復帰させる。完了以外に変更すると
+  // サーバー側で completed_at・archived_at がクリアされ、カンバンに戻る。
+  // スパム判定が付いたままだと復帰後もスパム扱いになるので同時に外す。
+  async function handleRestore(task, status) {
+    try {
+      if (task.is_spam) await setTaskSpam(task.id, false)
+      await updateTaskStatus(task.id, status)
+      setSelectedTask((prev) => (prev && prev.id === task.id ? null : prev))
       reload()
     } catch (err) {
       setError(err.message)
@@ -157,6 +183,7 @@ export default function Archive() {
                 <th>期限</th>
                 <th>受信日時</th>
                 <th>アーカイブ日</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -182,11 +209,50 @@ export default function Archive() {
                     />
                   </td>
                   <td className="archive-task-id">{formatTaskId(task) || '—'}</td>
-                  <td className="archive-title">{task.title}</td>
+                  <td className="archive-title">
+                    {task.is_spam && <span className="archive-spam-badge">スパム</span>}
+                    {task.title}
+                  </td>
                   <td>{task.assignee}</td>
                   <td>{formatDate(task.due_date) ?? '—'}</td>
                   <td className="logs-time">{formatDateTime(task.received_at) ?? '—'}</td>
                   <td className="logs-time">{formatDateTime(task.archived_at) ?? '—'}</td>
+                  {/* 行タップで詳細が開くため、操作セル内のクリックは伝播させない */}
+                  <td
+                    className="archive-actions"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {task.is_spam && (
+                      <button
+                        type="button"
+                        className="archive-action-btn"
+                        onClick={() => handleUnspam(task)}
+                        title="スパム判定を外す（アーカイブには残ります）"
+                      >
+                        スパム解除
+                      </button>
+                    )}
+                    {/* 任意のステータスへ復帰。完了以外を選ぶとサーバー側で
+                        archived_at がクリアされ、カンバンへ戻る。 */}
+                    <select
+                      className="archive-action-select"
+                      value=""
+                      onChange={(e) => {
+                        const next = e.target.value
+                        e.target.value = ''
+                        if (next) handleRestore(task, next)
+                      }}
+                      aria-label={`${task.title} のステータスを変更して復帰`}
+                    >
+                      <option value="">復帰…</option>
+                      {STATUS_LIST.filter((s) => s !== '完了').map((s) => (
+                        <option key={s} value={s}>
+                          {s}へ戻す
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -204,6 +270,7 @@ export default function Archive() {
         sharedGmail={sharedGmail}
         assignees={assignees}
         onUpdateTask={handleUpdateTask}
+        onUnspam={handleUnspam}
       />
     </div>
   )

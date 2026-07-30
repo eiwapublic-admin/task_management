@@ -142,7 +142,7 @@ export default function AppHeader() {
                       : undefined
                   }
                 >
-                  {pushStatus === 'subscribed' && '🔔 通知をオフにする'}
+                  {pushStatus === 'subscribed' && '🔔 通知をオフに'}
                   {pushStatus === 'unsubscribed' && '通知をオンにする'}
                   {pushStatus === 'denied' && '通知がブロックされています'}
                   {pushStatus === 'loading' && '通知'}
@@ -154,7 +154,7 @@ export default function AppHeader() {
                   setAboutOpen(true)
                 }}
               >
-                このシステムについて
+                当システムについて
               </button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
             </div>

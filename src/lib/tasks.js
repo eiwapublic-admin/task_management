@@ -15,6 +15,17 @@ export async function updateTaskStatus(id, status) {
   await authFetch('/api/tasks', { method: 'PATCH', body: JSON.stringify({ id, status }) })
 }
 
+// スパム判定の付与・解除（/api/tasks の PATCH）。
+// 付与時はサーバー側で「完了」にしてアーカイブへ即移動する（カンバンから外すのが目的）。
+// 解除はフラグだけ戻す（アーカイブから戻すかどうかはステータス変更で選べる）。
+export async function setTaskSpam(id, isSpam) {
+  const data = await authFetch('/api/tasks', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, is_spam: isSpam }),
+  })
+  return data.task || null
+}
+
 // 操作ログを新しい順に取得する。
 export async function fetchLogs() {
   const data = await authFetch('/api/logs')

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import AppHeader from '../components/AppHeader'
-import { fetchTasks, fetchSettings, updateTaskStatus } from '../lib/tasks'
+import { fetchTasks, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
 import { createTask, updateTask } from '../lib/api'
 import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
@@ -104,6 +104,23 @@ export default function Dashboard() {
     }
   }
 
+  // カードの「スパム」ボタン。スパムフラグを立てると、サーバー側で完了＋アーカイブへ
+  // 移すため、カンバンからは即座に消す。移動先を確認できるようアーカイブ画面へ遷移する。
+  async function handleSpamTask(task) {
+    const prev = tasks
+    setTasks((list) => list.filter((t) => t.id !== task.id))
+    pendingWrites.current += 1
+    try {
+      await setTaskSpam(task.id, true)
+      navigate('/archive')
+    } catch (err) {
+      setTasks(prev)
+      setError(err.message)
+    } finally {
+      pendingWrites.current -= 1
+    }
+  }
+
   // タスクの手動登録（未処理列の「＋」から）。登録後に一覧を再取得する。
   async function handleCreateTask(values) {
     const res = await createTask(values)
@@ -165,6 +182,7 @@ export default function Dashboard() {
           onCreateTask={handleCreateTask}
           onUpdateTask={handleUpdateTask}
           onOpenArchive={() => navigate('/archive')}
+          onSpamTask={handleSpamTask}
           lastFetchAt={lastFetchAt}
           sharedGmail={sharedGmail}
         />

@@ -278,7 +278,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-1);
+  /* 項目同士は詰めて一覧性を上げる（2026-07-30。従来 var(--space-1)=4px） */
+  gap: 1px;
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
@@ -291,11 +292,14 @@
   z-index: 20;
 }
 
-/* ドロップダウン内のボタンは全幅・左寄せで押しやすく */
+/* ドロップダウン内のボタンは全幅・左寄せで押しやすく。
+   文字は読みやすさ優先で少し大きく・濃くし、高さを詰めて項目間を狭める（2026-07-30） */
 .dashboard-actions.is-open button {
   width: 100%;
-  height: 40px;
+  height: 36px;
   justify-content: flex-start;
+  font-size: 15px;
+  color: var(--text-strong);
 }
 
 .dashboard-actions.is-open button:disabled {
@@ -306,7 +310,7 @@
 /* メニュー項目の区切り線（処理ログ / 今すぐ取得の間など） */
 .dashboard-menu-divider {
   height: 1px;
-  margin: var(--space-1) 0;
+  margin: 3px 0;
   background: var(--border);
 }
 
@@ -604,6 +608,55 @@
 .archive-title {
   font-weight: 600;
   color: var(--text-strong);
+}
+
+/* スパムと判定済みであることの目印。誤判定を見つけて解除できるよう一覧で明示する */
+.archive-spam-badge {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: #fecaca;
+  border: 1px solid #f87171;
+  color: #7f1d1d;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* 操作列（スパム解除・ステータス復帰） */
+.archive-actions {
+  white-space: nowrap;
+}
+
+.archive-actions > * + * {
+  margin-left: var(--space-2);
+}
+
+.archive-action-btn {
+  font-size: 11px;
+  color: var(--text-base);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.archive-action-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.archive-action-select {
+  font-size: 11px;
+  padding: 3px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-base);
+  cursor: pointer;
 }
 
 /* 日付が切り替わる行に太い区切り線を入れて日の境界を目立たせる */

@@ -14,6 +14,7 @@ export default function KanbanBoard({
   onCreateTask,
   onUpdateTask,
   onOpenArchive,
+  onSpamTask,
   lastFetchAt,
   sharedGmail,
 }) {
@@ -80,6 +81,7 @@ export default function KanbanBoard({
             onDrop={handleDrop}
             onCardClick={setSelectedTask}
             onAdd={status === '未処理' && onCreateTask ? () => setShowForm(true) : undefined}
+            onSpam={onSpamTask}
           />
         ))}
       </div>
