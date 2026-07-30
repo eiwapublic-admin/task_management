@@ -104,15 +104,15 @@ export default function Dashboard() {
     }
   }
 
-  // カードの「スパム」ボタン。スパムフラグを立てると、サーバー側で完了＋アーカイブへ
-  // 移すため、カンバンからは即座に消す。移動先を確認できるようアーカイブ画面へ遷移する。
+  // タスク詳細の「スパム」ボタン。スパムフラグを立てるとサーバー側で完了＋アーカイブへ
+  // 移るため、カンバンからは即座に消す。続けて他のタスクを処理できるよう、画面は
+  // メイン（カンバン）に留まる（2026-07-31。従来はアーカイブ画面へ遷移していた）。
   async function handleSpamTask(task) {
     const prev = tasks
     setTasks((list) => list.filter((t) => t.id !== task.id))
     pendingWrites.current += 1
     try {
       await setTaskSpam(task.id, true)
-      navigate('/archive')
     } catch (err) {
       setTasks(prev)
       setError(err.message)

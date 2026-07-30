@@ -316,9 +316,11 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             </select>
             {isUnassigned && <span className="task-detail-warn">⚠ 未設定</span>}
           </div>
+          {/* 受信日時は「2026/07/29 08:20 受信」と後置きにして、1行目（担当者・期限・
+              スパム・保存）に収まる幅にする（2026-07-31。従来は「受信日時 ○○」の前置き） */}
           <div className="task-detail-topitem">
-            <span className="task-detail-topitem-label">受信日時</span>
             <span>{formatDateTime(task.received_at) ?? '不明'}</span>
+            <span className="task-detail-topitem-label">受信</span>
           </div>
           <div className="task-detail-topitem">
             <span className="task-detail-topitem-label">期限</span>

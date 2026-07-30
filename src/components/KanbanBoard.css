@@ -531,11 +531,14 @@
 }
 
 /* 1行目: 担当者・受信日時・期限を横並びにする行 */
+/* 1行目（担当者・受信日時・期限・スパム・保存）。要素が多いので横の余白は控えめにし、
+   PC幅では1行に収まるようにする（2026-07-31。従来 gap は var(--space-5)=24px）。
+   モバイル等で入り切らない場合だけ折り返す。 */
 .task-detail-toprow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3) var(--space-5);
+  gap: var(--space-2) var(--space-3);
   margin: var(--space-4) 0;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border);
@@ -559,7 +562,7 @@
 .task-detail-save-group {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
   margin-left: auto;
 }
@@ -702,6 +705,12 @@
 }
 
 /* ---------- 詳細画面の編集フォーム（担当者・期限・留意事項） ---------- */
+/* 期限の日付入力は既定幅が広く1行目を圧迫するため、内容に合う幅に抑える（2026-07-31） */
+.task-detail-topitem input[type='date'].task-detail-input {
+  width: auto;
+  min-width: 0;
+}
+
 .task-detail-input {
   font-family: inherit;
   font-size: 15px;
