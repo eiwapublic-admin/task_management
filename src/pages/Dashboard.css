@@ -610,15 +610,16 @@
   color: var(--text-strong);
 }
 
-/* スパムと判定済みであることの目印。誤判定を見つけて解除できるよう一覧で明示する */
+/* スパムと判定済みであることの目印。誤判定を見つけて解除できるよう一覧で明示する。
+   アーカイブ済み＝対応が終わった情報なので、警告色ではなくグレー系にする（2026-07-31） */
 .archive-spam-badge {
   display: inline-block;
   margin-right: var(--space-2);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  background: #fecaca;
-  border: 1px solid #f87171;
-  color: #7f1d1d;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
   vertical-align: middle;

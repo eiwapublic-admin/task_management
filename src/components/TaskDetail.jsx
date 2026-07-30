@@ -20,7 +20,7 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam }) {
+export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam }) {
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
   // プレビューが開いている間はタスク詳細側のEscape/Tab処理を無効化する
@@ -37,6 +37,8 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState(false)
+  // スパム判定の確認表示（押し間違いでタスクがアーカイブへ消えるのを防ぐ）
+  const [confirmingSpam, setConfirmingSpam] = useState(false)
 
   // 添付ファイル（元メールから都度取得）
   const [attachments, setAttachments] = useState([])
@@ -58,6 +60,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setRemarks(task.remarks || '')
     setSaveError('')
     setSaved(false)
+    setConfirmingSpam(false)
   }, [task])
 
   // メール由来のタスクは、開いたときに元メールの添付ファイル一覧を取得する
@@ -329,6 +332,42 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
           <div className="task-detail-save-group">
             {saveError && <span className="task-detail-save-error">{saveError}</span>}
             {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
+            {/* スパム判定は保存ボタンの左。誤操作でタスクが視界から消えるため確認を挟む。
+                アーカイブ済み・スパム済みのタスクには出さない（解除はタイトル横のバッジから）。 */}
+            {onSpam && !task.is_spam && !task.archived_at && (
+              confirmingSpam ? (
+                <span className="task-detail-spam-confirm" role="group" aria-label="スパム判定の確認">
+                  <span className="task-detail-spam-message">
+                    スパムと判定してすぐにアーカイブへ移動します。
+                  </span>
+                  <button
+                    type="button"
+                    className="task-detail-spam-go"
+                    onClick={() => {
+                      setConfirmingSpam(false)
+                      onSpam(task)
+                    }}
+                  >
+                    移動
+                  </button>
+                  <button
+                    type="button"
+                    className="task-detail-spam-cancel"
+                    onClick={() => setConfirmingSpam(false)}
+                  >
+                    キャンセル
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="task-detail-spam-btn"
+                  onClick={() => setConfirmingSpam(true)}
+                >
+                  スパム
+                </button>
+              )
+            )}
             <button
               type="button"
               className="task-action-btn task-action-reply"

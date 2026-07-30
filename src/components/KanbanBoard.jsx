@@ -44,6 +44,12 @@ export default function KanbanBoard({
     setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, status } : prev))
   }
 
+  // 詳細画面の「スパム」。実行するとサーバー側でアーカイブへ移るため、モーダルを閉じる。
+  async function handleSpam(task) {
+    setSelectedTask(null)
+    await onSpamTask(task)
+  }
+
   // 詳細画面での編集保存。保存後は最新のタスク内容でモーダル表示も更新する。
   async function handleUpdateTask(id, values) {
     const updated = await onUpdateTask(id, values)
@@ -81,7 +87,6 @@ export default function KanbanBoard({
             onDrop={handleDrop}
             onCardClick={setSelectedTask}
             onAdd={status === '未処理' && onCreateTask ? () => setShowForm(true) : undefined}
-            onSpam={onSpamTask}
           />
         ))}
       </div>
@@ -92,6 +97,7 @@ export default function KanbanBoard({
         sharedGmail={sharedGmail}
         assignees={assignees}
         onUpdateTask={onUpdateTask ? handleUpdateTask : undefined}
+        onSpam={onSpamTask ? handleSpam : undefined}
       />
       {showForm && (
         <TaskForm

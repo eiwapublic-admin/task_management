@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
 import { STATUS_DONE, UNASSIGNED } from '../lib/status'
 import { channelIconSrc, channelLabel } from '../lib/channel'
@@ -26,13 +25,11 @@ function isRecentlyUpdated(task) {
   return Date.now() - updatedAt < NEW_BADGE_MS
 }
 
-export default function TaskCard({ task, onDragStart, onClick, onSpam }) {
+export default function TaskCard({ task, onDragStart, onClick }) {
   const due = dueStatus(task.due_date)
   const isUnassigned = task.assignee === UNASSIGNED
   const isNew = isRecentlyUpdated(task)
   const isDone = task.status === STATUS_DONE
-  // スパムボタンは押し間違いでタスクが視界から消えるため、カード内で確認を挟む
-  const [confirmingSpam, setConfirmingSpam] = useState(false)
 
   function handleKeyDown(e) {
     // カード全体をキーボードで開けるようにする（Enter / Space）
@@ -40,11 +37,6 @@ export default function TaskCard({ task, onDragStart, onClick, onSpam }) {
       e.preventDefault()
       onClick(task)
     }
-  }
-
-  // 確認UI内のクリックはカード全体（詳細を開く）へ伝播させない
-  function stop(e) {
-    e.stopPropagation()
   }
 
   return (
@@ -102,47 +94,6 @@ export default function TaskCard({ task, onDragStart, onClick, onSpam }) {
 
       {task.remarks && <div className="task-card-remarks">{task.remarks}</div>}
 
-      {/* スパム判定。誤操作でタスクが視界から消えないよう、その場で確認を挟む。
-          「移動」でスパムフラグを立てて完了＋アーカイブへ移し、アーカイブ画面へ遷移する。 */}
-      {onSpam && (
-        <div className="task-card-spam" onClick={stop} onKeyDown={stop}>
-          {confirmingSpam ? (
-            <div className="task-card-spam-confirm" role="group" aria-label="スパム判定の確認">
-              <span className="task-card-spam-message">
-                スパムと判定してすぐにアーカイブへ移動します。
-              </span>
-              <span className="task-card-spam-actions">
-                <button
-                  type="button"
-                  className="task-card-spam-go"
-                  onClick={() => {
-                    setConfirmingSpam(false)
-                    onSpam(task)
-                  }}
-                >
-                  移動
-                </button>
-                <button
-                  type="button"
-                  className="task-card-spam-cancel"
-                  onClick={() => setConfirmingSpam(false)}
-                >
-                  キャンセル
-                </button>
-              </span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="task-card-spam-btn"
-              onClick={() => setConfirmingSpam(true)}
-              aria-label={`${task.title} をスパムと判定`}
-            >
-              スパム
-            </button>
-          )}
-        </div>
-      )}
     </div>
   )
 }
