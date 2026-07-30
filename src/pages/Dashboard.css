@@ -592,6 +592,15 @@
   vertical-align: middle;
 }
 
+/* タスクID列（T-123）。等幅で桁を揃え、user-select: all でコピーしやすくする */
+.archive-task-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: all;
+}
+
 .archive-title {
   font-weight: 600;
   color: var(--text-strong);

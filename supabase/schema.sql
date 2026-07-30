@@ -3,9 +3,15 @@
 
 create extension if not exists pgcrypto;
 
+-- tasks.task_no（人が扱いやすい短い連番）の採番用。テーブル定義より先に作る必要がある。
+create sequence if not exists tasks_task_no_seq;
+
 -- tasks: メインのタスク情報
 create table if not exists tasks (
   id               uuid primary key default gen_random_uuid(),
+  -- 人がタスクを口頭・文面で特定しやすくするための短い連番（画面上は「T-123」と表示）。
+  -- 主キーのUUIDは長く会話や依頼文で扱いにくいため別途持たせる（2026-07-29）。
+  task_no          bigint not null unique default nextval('tasks_task_no_seq'),
   -- 一意性はスレッドではなくメッセージ（元メール）単位。FAXは同一件名・同一送信元で
   -- Gmailが複数を1スレッドに束ねるため、gmail_thread_id を unique にすると2通目以降の
   -- FAXが取り込めない（insertが弾かれる）。gmail_message_id は全チャネルで一意なので、

@@ -390,6 +390,43 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     return tied ? null : best
   }
 
+  // 顧客（社外）からの返信を取り込み、タスクを「未処理」に戻す。
+  // 自社が送信した内容でタスクが「返信済み」になっている状態に顧客から返答が来た場合、
+  // 次に動くべきは自社なので、本文を顧客の返信内容へ置き換えたうえで status を
+  // 「未処理」に戻して対応漏れを防ぐ（2026-07-29追加。従来は自社発メッセージのみを
+  // 返信として扱っていたため、顧客からの返答が一切反映されず見落としになっていた）。
+  // 完了・対応中のタスクは人が意図して設定した状態なので触らない（未処理/返信済みのみ対象）。
+  async function incorporateCustomerReply(task, via, reply) {
+    const newBody = reply && reply.body ? compactBody(reply.body).slice(0, MAX_BODY_PREVIEW) : null
+    const replyId = reply ? reply.id : null
+    if (!newBody) {
+      if (replyId && replyId !== task.last_reply_message_id) {
+        await supabase.from('tasks').update({ last_reply_message_id: replyId }).eq('id', task.id)
+      }
+      return false
+    }
+    const note = `【顧客からの返信】${via}（差出人: ${reply.from || '不明'}）。本文を顧客の返信内容に置き換え、対応が必要なためステータスを未処理に戻しました。`
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        status: '未処理',
+        body_preview: newBody,
+        last_reply_message_id: replyId,
+        classification_note: task.classification_note ? `${task.classification_note}\n${note}` : note,
+      })
+      .eq('id', task.id)
+      .in('status', ['未処理', '返信済み'])
+    if (error) return false
+    summary.updated += 1
+    logRows.push({
+      log_type: 'status_change',
+      actor: 'システム（自動）',
+      message: `「${task.title}」に顧客からの返信を検知し、ステータスを ${task.status} → 未処理 に変更（${via}）`,
+      detail: { task_id: task.id },
+    })
+    return true
+  }
+
   // 返信を検知したタスクを更新する（返信検知の共通処理）。
   // - 未処理タスク: ステータスを「返信済み」にし、本文を返信内容へ置き換える（初回検知）。
   //   元のメール内容は返信内の引用として残っている想定。
@@ -788,15 +825,30 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         //  - タスク登録の元メール自体は除外
         //  - 宛先(To/Cc)に顧客(counterpart)を含むこと（同一件名で複数顧客が
         //    スレッドにまとまる場合の混線防止。正当な返信は必ず顧客宛て）
+        // スレッド内の「タスク登録の元メール以外で最も新しい関連メッセージ」を探す。
+        // 自社発なら従来通りの返信検知（未処理→返信済み）、顧客発なら顧客返信として扱い
+        // ステータスを未処理へ戻す（2026-07-29。従来は自社発のみを対象にしていたため、
+        // 自社発信で登録されたタスクに顧客が返答しても一切反映されず見落としになっていた）。
         let reply = null
+        let replyIsFromCustomer = false
         for (let i = messages.length - 1; i >= 0; i--) {
           const m = messages[i]
-          const from = (extractEmail(m.from) || '').toLowerCase()
-          if (!isCompanyAddress(from)) continue
           if (m.id === task.gmail_message_id) continue
+          const from = (extractEmail(m.from) || '').toLowerCase()
           const recipients = `${m.to || ''} ${m.cc || ''}`.toLowerCase()
-          if (!recipients.includes(counterpart)) continue
+          if (isCompanyAddress(from)) {
+            // 自社発の返信: 宛先に顧客を含むこと（同一件名で複数顧客がスレッドに
+            // まとまる場合の混線防止。正当な返信は必ず顧客宛て）
+            if (!recipients.includes(counterpart)) continue
+            reply = m
+            replyIsFromCustomer = false
+            break
+          }
+          // 顧客発の返信: 差出人がこのタスクの顧客(counterpart)本人であることを要件にする
+          // （別顧客のメッセージが同一スレッドに混在した場合の誤反映を防ぐ）
+          if (from !== counterpart) continue
           reply = m
+          replyIsFromCustomer = true
           break
         }
         if (!reply) continue
@@ -805,7 +857,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         if (reply.id === task.last_reply_message_id) continue
         // 返信の本文でタスク詳細を更新するため、対象メッセージ全体を取得する
         const replyEmail = await getMessage(accessToken, reply.id)
-        await incorporateReply(task, 'スレッドで返信を検知', replyEmail)
+        if (replyIsFromCustomer) {
+          await incorporateCustomerReply(task, 'スレッドで顧客からの返信を検知', replyEmail)
+        } else {
+          await incorporateReply(task, 'スレッドで返信を検知', replyEmail)
+        }
       } catch (err) {
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
       }
