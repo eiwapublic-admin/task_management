@@ -403,6 +403,20 @@ async function handleTaskUpdate(req) {
     if (typeof payload.status === 'string' && VALID_STATUSES.has(payload.status)) {
       fields.status = payload.status
     }
+    // スパム判定。true にした時点で「完了」にしてアーカイブへ即移動する（カードの
+    // 「スパム」ボタン用。カンバンから消して視界から外すのが目的のため、ステータス変更と
+    // アーカイブをまとめてサーバー側で行う）。false（解除）はフラグだけ戻し、
+    // アーカイブから戻すかどうかは利用者がステータス変更で選べるようにする。
+    const spamRequested = typeof payload.is_spam === 'boolean' ? payload.is_spam : null
+    if (spamRequested !== null) {
+      fields.is_spam = spamRequested
+      if (spamRequested) {
+        const now = new Date().toISOString()
+        fields.status = '完了'
+        fields.completed_at = now
+        fields.archived_at = now
+      }
+    }
     if (Object.keys(fields).length === 0) {
       return json({ error: '更新できる項目がありません' }, 400)
     }
@@ -436,10 +450,22 @@ async function handleTaskUpdate(req) {
       return json({ error: 'タスクの更新に失敗しました' }, 500)
     }
 
-    if (fields.status && prevStatus && prevStatus !== fields.status) {
+    const actorName = auth.display_name || auth.username || '不明なユーザー'
+    // スパム判定の付与・解除は、単なるステータス変更とは意味が違うので専用のログを残す
+    // （後から「なぜアーカイブされたか」を追えるようにするため）。
+    if (spamRequested !== null) {
       await supabase.from('activity_logs').insert({
         log_type: 'status_change',
-        actor: auth.display_name || auth.username || '不明なユーザー',
+        actor: actorName,
+        message: spamRequested
+          ? `「${data.title}」をスパムと判定してアーカイブへ移動`
+          : `「${data.title}」のスパム判定を解除`,
+        detail: { task_id: id },
+      })
+    } else if (fields.status && prevStatus && prevStatus !== fields.status) {
+      await supabase.from('activity_logs').insert({
+        log_type: 'status_change',
+        actor: actorName,
         message: `「${data.title}」のステータスを ${prevStatus} → ${fields.status} に変更`,
         detail: { task_id: id },
       })

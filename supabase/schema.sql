@@ -30,6 +30,9 @@ create table if not exists tasks (
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   contact          text,           -- 先方担当者の宛名（会社・氏名＋様。返信メール冒頭に使う。Claude 抽出 or sender_display+様）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
+  -- スパム（迷惑メール・営業FAX等）と人が判定した目印。カードの「スパム」ボタンで
+  -- true にすると同時に完了＋アーカイブへ移る。アーカイブ画面で解除・復帰できる（2026-07-30）。
+  is_spam          boolean not null default false,
   remarks          text,           -- 留意事項（担当者が詳細画面で自由入力するメモ）
   last_reply_message_id text,       -- 最後に取り込んだ返信メールの Gmail message id（返信検知の冪等化・返信済みへの再返信で本文を上書きするため）
   source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー） / 'manual'（手動登録）
@@ -54,8 +57,11 @@ alter table tasks add column if not exists source text not null default 'email';
 alter table tasks add column if not exists channel text;
 alter table tasks add column if not exists completed_at timestamptz;
 alter table tasks add column if not exists archived_at timestamptz;
+alter table tasks add column if not exists is_spam boolean not null default false;
 
 create index if not exists idx_tasks_archived_at on tasks (archived_at);
+-- スパムだけを絞り込む用途（アーカイブ画面）。true の行だけの部分インデックス
+create index if not exists idx_tasks_is_spam on tasks (is_spam) where is_spam;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);

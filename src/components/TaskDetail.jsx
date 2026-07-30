@@ -20,7 +20,7 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask }) {
+export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam }) {
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
   // プレビューが開いている間はタスク詳細側のEscape/Tab処理を無効化する
@@ -273,6 +273,22 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             {hasAttachments && (
               <span className="task-detail-attach-badge" title="添付ファイルあり" aria-label="添付ファイルあり">
                 📎 添付あり
+              </span>
+            )}
+            {/* スパム判定済みの表示と解除。アーカイブ画面の一覧は横に長く、
+                モバイルでは操作列まで届きにくいため、詳細からも解除できるようにする */}
+            {task.is_spam && (
+              <span className="task-detail-spam-badge">
+                スパム
+                {onUnspam && (
+                  <button
+                    type="button"
+                    className="task-detail-spam-clear"
+                    onClick={() => onUnspam(task)}
+                  >
+                    解除
+                  </button>
+                )}
               </span>
             )}
           </h2>
