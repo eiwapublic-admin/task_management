@@ -155,17 +155,21 @@ async function handleArchiveList(req) {
     if (channel) query = query.eq('channel', channel)
     if (q) {
       const like = `%${q}%`
-      query = query.or(
-        [
-          `title.ilike.${like}`,
-          `subject.ilike.${like}`,
-          `body_preview.ilike.${like}`,
-          `sender.ilike.${like}`,
-          `sender_display.ilike.${like}`,
-          `contact.ilike.${like}`,
-          `remarks.ilike.${like}`,
-        ].join(',')
-      )
+      const conditions = [
+        `title.ilike.${like}`,
+        `subject.ilike.${like}`,
+        `body_preview.ilike.${like}`,
+        `sender.ilike.${like}`,
+        `sender_display.ilike.${like}`,
+        `contact.ilike.${like}`,
+        `remarks.ilike.${like}`,
+      ]
+      // タスクID（画面表示は「T-123」）での検索に対応する。「T-123」「t-123」「123」の
+      // いずれでも引けるよう、数値部分だけを取り出して task_no の完全一致を条件に加える
+      // （task_no は数値カラムなので ilike は使えない）。
+      const taskNo = /^\s*[tT]?-?(\d+)\s*$/.exec(q)?.[1]
+      if (taskNo) conditions.push(`task_no.eq.${taskNo}`)
+      query = query.or(conditions.join(','))
     }
     const { data, error } = await query
     if (error) {

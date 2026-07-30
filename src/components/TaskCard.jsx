@@ -1,6 +1,7 @@
 import { formatDate, formatDateTime, assigneeColor, assigneeInitial, dueStatus } from '../lib/format'
 import { UNASSIGNED } from '../lib/status'
 import { channelIconSrc, channelLabel } from '../lib/channel'
+import { formatTaskId } from '../lib/taskId'
 
 // カードに表示する発信元の名前。先方（顧客＝タスクのオーナー）の宛名 contact を最優先で表示する。
 // 自社発信・フォーム経由のタスクは sender_display が自社担当者になるため、contact があればそれを使う。
@@ -43,7 +44,7 @@ export default function TaskCard({ task, onDragStart, onClick }) {
       draggable
       role="button"
       tabIndex={0}
-      aria-label={`${task.title} / 担当 ${task.assignee}`}
+      aria-label={`${formatTaskId(task)} ${task.title} / 担当 ${task.assignee}`}
       onDragStart={(e) => onDragStart(e, task)}
       onClick={() => onClick(task)}
       onKeyDown={handleKeyDown}
@@ -62,6 +63,9 @@ export default function TaskCard({ task, onDragStart, onClick }) {
         />
         {task.title}
       </div>
+
+      {/* タスクID: 依頼・問い合わせの際にタスクを特定するための短い連番 */}
+      {formatTaskId(task) && <div className="task-card-task-id">{formatTaskId(task)}</div>}
 
       {senderLabel(task) && <div className="task-card-sender">{senderLabel(task)}</div>}
 

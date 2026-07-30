@@ -4,6 +4,7 @@ import { formatDateTime } from '../lib/format'
 import { gmailMessageUrl, buildReplyMailto } from '../lib/mail'
 import { listAttachments, downloadAttachment, fetchAttachmentBlob, getAttachmentPreviewUrl } from '../lib/api'
 import { channelIconSrc, channelLabel } from '../lib/channel'
+import { formatTaskId } from '../lib/taskId'
 import AttachmentPreview from './AttachmentPreview'
 
 // アプリ内プレビューに対応する形式（画像・PDF）。それ以外はダウンロードのみ。
@@ -262,6 +263,12 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
               alt={channelLabel(task)}
               title={channelLabel(task)}
             />
+            {/* タスクID: 問い合わせ・調査依頼の際にこのタスクを一意に指せるようにする */}
+            {formatTaskId(task) && (
+              <span className="task-detail-task-id" title="タスクID（問い合わせ時にご利用ください）">
+                {formatTaskId(task)}
+              </span>
+            )}
             {task.title}
             {hasAttachments && (
               <span className="task-detail-attach-badge" title="添付ファイルあり" aria-label="添付ファイルあり">

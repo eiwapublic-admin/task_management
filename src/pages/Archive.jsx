@@ -5,6 +5,7 @@ import { fetchArchive, fetchSettings, updateTaskStatus } from '../lib/tasks'
 import { updateTask } from '../lib/api'
 import { formatDate, formatDateTime } from '../lib/format'
 import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
+import { formatTaskId } from '../lib/taskId'
 import { UNASSIGNED } from '../lib/status'
 import './Dashboard.css'
 
@@ -150,6 +151,7 @@ export default function Archive() {
             <thead>
               <tr>
                 <th>情報源</th>
+                <th>タスクID</th>
                 <th>タイトル</th>
                 <th>担当者</th>
                 <th>期限</th>
@@ -179,6 +181,7 @@ export default function Archive() {
                       title={channelLabel(task)}
                     />
                   </td>
+                  <td className="archive-task-id">{formatTaskId(task) || '—'}</td>
                   <td className="archive-title">{task.title}</td>
                   <td>{task.assignee}</td>
                   <td>{formatDate(task.due_date) ?? '—'}</td>

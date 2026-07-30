@@ -266,6 +266,17 @@
   object-fit: contain;
 }
 
+/* タスクID（T-123）。問い合わせ・調査依頼でタスクを特定するための短い連番。
+   本文情報より優先度が低いので、等幅・小さめ・淡色で控えめに見せる。
+   user-select: all でクリック（ダブルクリック）だけで全選択・コピーしやすくする。 */
+.task-card-task-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+  user-select: all;
+}
+
 /* 送信元の会社・氏名 */
 .task-card-sender {
   font-size: 12px;
@@ -668,6 +679,25 @@ select.task-detail-input.is-unassigned {
 }
 
 /* ---------- 添付ファイル ---------- */
+/* タイトル前のタスクID（T-123）。問い合わせ時にこのタスクを一意に指すために表示する。
+   タイトルの読みやすさを損なわないよう淡いグレーのバッジにし、user-select: all で
+   クリック（ダブルクリック）だけで全選択してコピーできるようにする。 */
+.task-detail-task-id {
+  display: inline-block;
+  margin-right: var(--space-2);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-strong);
+  color: var(--text-base);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+  user-select: all;
+}
+
 /* タイトル横の「📎 添付あり」バッジ */
 .task-detail-attach-badge {
   display: inline-flex;
