@@ -1,6 +1,6 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-21
+最終更新: 2026-07-31
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
 リポジトリ: `eiwapublic-admin/task_management`（**非公開（Private）**。2026-07-16 にPrivate化）
 
