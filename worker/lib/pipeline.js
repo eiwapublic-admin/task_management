@@ -308,6 +308,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   const messageRefs = await listMessageIds(accessToken, query, MAX_MESSAGES)
   summary.fetched = messageRefs.length
+  // Gmail APIは新しい順に返すため、古い順に処理する。同一スレッドの元メールと返信が
+  // 同じ取得サイクルに入った場合、新しい方（＝返信）が先にタスク化され、後から来た
+  // 元メールは「同一スレッド処理済み」でスキップされてしまう。その結果、送信者が
+  // 自社担当者のタスクができ、返信も反映されない状態になっていた（2026-08-03。T-88の事例）。
+  // 古い順なら顧客の元メールがタスクになり、後続の自社発は返信として正しく扱える。
+  messageRefs.reverse()
 
   // 既にDBにあるスレッドはスキップ（通常メール用のスレッド単位の重複判定）。
   // FAXは同一件名・同一送信元でGmailに束ねられるため、スレッドではなく
@@ -829,9 +835,16 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         // 自社発なら従来通りの返信検知（未処理→返信済み）、顧客発なら顧客返信として扱い
         // ステータスを未処理へ戻す（2026-07-29。従来は自社発のみを対象にしていたため、
         // 自社発信で登録されたタスクに顧客が返答しても一切反映されず見落としになっていた）。
+        // 返信は定義上、タスク登録の元メールより「後」に来たもの。getThreadMessages は
+        // 古い順に返すため、元メールの位置より後ろのメッセージだけを候補にする。
+        // このガードが無いと、元メールより古いメッセージを返信と誤認する。実際、元メールと
+        // 返信が逆転して取り込まれたタスクで、過去の顧客メールを「顧客からの返信」と誤認して
+        // ステータスを未処理に戻す事象が起きた（2026-08-03。T-88の事例）。
+        // 元メールがスレッド内に見つからない場合（-1）は従来通り全件を候補にする。
+        const originIndex = messages.findIndex((m) => m.id === task.gmail_message_id)
         let reply = null
         let replyIsFromCustomer = false
-        for (let i = messages.length - 1; i >= 0; i--) {
+        for (let i = messages.length - 1; i > originIndex; i--) {
           const m = messages[i]
           if (m.id === task.gmail_message_id) continue
           const from = (extractEmail(m.from) || '').toLowerCase()
