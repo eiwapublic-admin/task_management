@@ -154,7 +154,8 @@
 /* 従量課金事項ページの本文コンテナ */
 .usage-container {
   padding: var(--space-4) var(--space-5);
-  max-width: 720px;
+  /* 月別の内訳テーブル（6列）が窮屈にならない幅にする（2026-08-03） */
+  max-width: 860px;
 }
 
 /* 独立画面用のカード */
@@ -212,6 +213,100 @@
   font-weight: 400;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* 期間切替（今月 / 先月 / 累計）。2026-08-03 */
+.usage-range {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.usage-range-btn {
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+}
+
+.usage-range-btn:hover {
+  color: var(--text-strong);
+  border-color: var(--text-muted);
+}
+
+.usage-range-btn.is-active {
+  color: #fff;
+  background: #33604d;
+  border-color: #33604d;
+}
+
+/* 月別の内訳テーブル */
+.usage-subtitle {
+  font-size: 15px;
+  color: var(--text-strong);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+/* 狭い画面では表だけを横スクロールさせ、ページ本体は横に溢れさせない */
+.usage-table-wrap {
+  overflow-x: auto;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-table thead th {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.usage-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table tbody th {
+  font-weight: 600;
+  color: var(--text-base);
+}
+
+.usage-table tbody tr.is-current {
+  background: rgba(51, 96, 77, 0.06);
+}
+
+.usage-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #33604d;
+  background: rgba(51, 96, 77, 0.12);
+  border-radius: 999px;
+}
+
+.usage-table tfoot th,
+.usage-table tfoot td {
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
 /* 支払い設定ボタンは利用状況カードの下に配置する */

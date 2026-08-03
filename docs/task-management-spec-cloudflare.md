@@ -209,7 +209,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 
 **従量課金事項画面（/usage）**:
 - 共通ヘッダー＋ページタイトル。ハンバーガーメニューの「従量課金事項」（設定の下）から遷移
-- 「今月の Anthropic API 利用状況」（対象月・**分類したメール件数・分類したFAX件数**・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
+- 「Anthropic API 利用状況」（対象月・**分類したメール件数・分類したFAX件数**・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
+  - **期間の切替と月別内訳（2026-08-03）**: 見出しを「今月の〜」から「Anthropic API 利用状況」に変更し、**「今月 / 先月 / 累計」の切替ボタン**を追加。累計は全期間の合計（対象期間も表示）。さらに下部に**月別の内訳テーブル**（月・メール・FAX・入出力トークン・推定コスト＋累計行）を置き、課金開始からの消費推移を一覧できるようにした。フロントは `GET /api/usage`（month 省略）で全期間を1回取得し、今月・先月・累計をクライアント側で集計する（月ごとに個別リクエストしない）。データが無い月は0件・$0として扱う。テーブルは狭い画面で `overflow-x: auto` により表だけ横スクロールさせ、ページ本体は横に溢れさせない
   - **FAXの内訳を分離表示（2026-07-18）**: FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える可能性があるため、「分類したメール」件数はFAXを除いた件数、別行で「分類したFAX」件数を表示する。トークン数・推定コストは現状メール/FAX合算のまま（内訳データは `api_usage` に保持済み。単価別コスト試算はまだ未実装。5章参照）
 - 最下部に「Anthropic API 支払設定」ボタン（赤。以前は設定画面ヘッダーにあったものを移設）
 
@@ -227,7 +228,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/settings` | JWT | 設定一覧（`{key: value}`） |
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert |
 | GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
-| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、および2026-07-18よりFAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を含む） |
+| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、および2026-07-18よりFAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を含む）。**`month` を省略すると全期間の月別データを新しい順で返す**（`{months:[...]}`。今月・先月・累計の表示に使う。2026-08-03追加。データは月単位で増え方が緩やかなため全件返しても軽い） |
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
 | GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み。`message_id=…`（任意）も受け取り、一意キー `gmail_message_id` で対象タスクを特定する（FAXのように同一スレッドに複数タスクが並ぶ場合の取り違え・空振りを防ぐ。2026-07-24追加）。FAX（`channel='fax'`）は当該メッセージ単体の添付のみを返す |
 | GET `/api/attachment` | JWT（または`preview_token`） | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）。クエリに対象と一致する有効な`preview_token`（下記発行）があれば、通常のBearer認証の代わりとして受け付け、`Content-Disposition: inline`で返す（PDFプレビュー用） |
