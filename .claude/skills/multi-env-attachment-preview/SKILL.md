@@ -129,12 +129,13 @@ Content-Security-Policy: frame-ancestors 'self'
 - 署名トークンの検証（正しい対象は通る/期限切れ・別対象・別シークレットは弾く）は、
   Web Crypto API だけで書いてあれば Node 20+ 単体で round-trip テストできる。
 
-## 検証状況（このスキル登録時点）
+## 検証状況（2026-08-03 時点）
 
-実機で**表示OK確認済み**: iOS Safari / Mac Safari / Mac Chrome（PDF・画像とも）。
-**未検証**: Windows（Chrome/Edge/Firefox）、Android（Chrome）。
+実機で**表示OK確認済み**: iOS Safari / Mac Safari / Mac Chrome / Windows（PDF・画像とも）。
+**未検証**: Android（Chrome）。
 未検証環境で不具合報告が来たら、上のマトリクスに症状・原因・対処を追記して育てること。
-特に Firefox は PDF を pdf.js で内蔵描画する等、エンジンが違うので要注意。
+なお Firefox は PDF を pdf.js で内蔵描画する等エンジンが違うため、Windows で確認した
+ブラウザに Firefox が含まれていない場合は、機会があれば併せて確認しておきたい。
 
 ## この構成の参照実装（このリポジトリ内）
 
