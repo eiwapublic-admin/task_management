@@ -228,13 +228,24 @@ async function handleUsage(req) {
   if (!(await verifyRequestAuth(req))) return json({ error: '認証が必要です' }, 401)
   try {
     const month = new URL(req.url).searchParams.get('month') || ''
-    if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
     const supabase = getAdminClient()
-    const { data, error } = await supabase
-      .from('api_usage')
-      .select('month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, updated_at')
-      .eq('month', month)
-      .maybeSingle()
+    const columns =
+      'month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, updated_at'
+    // month 未指定なら全期間の月別データを新しい順で返す（今月・先月・累計の
+    // 表示に使う。2026-08-03）。件数は月単位のため増え方が緩やかで、全件返しても軽い。
+    if (!month) {
+      const { data, error } = await supabase
+        .from('api_usage')
+        .select(columns)
+        .order('month', { ascending: false })
+      if (error) {
+        console.error('usage(all):', error.message)
+        return json({ error: '利用量の取得に失敗しました' }, 500)
+      }
+      return json({ months: data || [] })
+    }
+    if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
+    const { data, error } = await supabase.from('api_usage').select(columns).eq('month', month).maybeSingle()
     if (error) {
       console.error('usage:', error.message)
       return json({ error: '利用量の取得に失敗しました' }, 500)

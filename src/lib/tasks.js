@@ -55,3 +55,9 @@ export async function fetchUsage(month) {
   const data = await authFetch(`/api/usage?month=${encodeURIComponent(month)}`)
   return data.usage || null
 }
+
+// 全期間の月別利用量（新しい順）。今月・先月・累計の表示に使う。
+export async function fetchUsageMonths() {
+  const data = await authFetch('/api/usage')
+  return data.months || []
+}
