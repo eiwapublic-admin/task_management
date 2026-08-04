@@ -21,6 +21,9 @@ import {
   handlePhotoUpdate,
   handlePhotoDelete,
   handleStorageUsage,
+  handleInspectionList,
+  handleInspectionSave,
+  handleInspectionDelete,
 } from './lib/reports.js'
 
 // Cloudflare Worker 本体。
@@ -904,6 +907,12 @@ async function route(req, env) {
   }
   if (pathname === '/api/report/storage') {
     return req.method === 'GET' ? handleStorageUsage(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/inspections') {
+    if (req.method === 'GET') return handleInspectionList(req)
+    if (req.method === 'POST') return handleInspectionSave(req)
+    if (req.method === 'DELETE') return handleInspectionDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

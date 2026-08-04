@@ -169,3 +169,70 @@ export async function fetchPhotoObjectUrl(id, { thumb = false } = {}) {
 export async function fetchStorageUsage() {
   return authFetch('/api/report/storage')
 }
+
+// ---- 自主検査表（Phase 3。2026-08-04〜）----
+
+// 紙の様式に並ぶ検査項目（順序も紙に合わせる）。判定は ok=良 / ng=不良 / fixed=即時改修。
+// 「避難通路」「喫煙場所」は紙でも2行あるため、キーだけ分けて表示名は同じにする。
+export const INSPECTION_ITEMS = [
+  { key: '防火区画', label: '防火区画', group: '防火管理・避難管理' },
+  { key: '避難通路1', label: '避難通路', group: '防火管理・避難管理' },
+  { key: '避難通路2', label: '避難通路', group: '防火管理・避難管理' },
+  { key: '通路非常照明', label: '通路非常照明', group: '防火管理・避難管理' },
+  { key: '階段・防火戸', label: '階段・防火戸', group: '防火管理・避難管理' },
+  { key: '階段非常照明', label: '階段非常照明', group: '防火管理・避難管理' },
+  { key: '非常用進入口', label: '非常用進入口', group: '防火管理・避難管理' },
+  { key: 'カーテンじゅうたん等', label: 'カーテンじゅうたん等', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '喫煙場所1', label: '喫煙場所', group: '防火・火気使用・電気器具・喫煙' },
+  { key: 'フード・ダクト', label: 'フード・ダクト', group: '防火・火気使用・電気器具・喫煙' },
+  { key: 'ガス設備・器具', label: 'ガス設備・器具', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '喫煙場所2', label: '喫煙場所', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '危険物等', label: '危険物等', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '消防用設備', label: '消防用設備', group: '防火・火気使用・電気器具・喫煙' },
+]
+
+// 対象のビル。BKB＝備後町コイズミビルの略称
+export const INSPECTION_BUILDINGS = ['BKB', '小泉本社']
+
+// 紙の凡例に対応する表示記号
+export const JUDGEMENT_MARKS = { ok: '○', ng: '×', fixed: '◎' }
+export const JUDGEMENT_LABELS = { ok: '良', ng: '不良', fixed: '即時改修' }
+
+export async function fetchInspections({ month, date } = {}) {
+  const qs = new URLSearchParams()
+  if (month) qs.set('month', month)
+  if (date) qs.set('date', date)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const data = await authFetch(`/api/report/inspections${suffix}`)
+  return data.inspections || []
+}
+
+export async function saveInspection(payload) {
+  const data = await authFetch('/api/report/inspections', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return data.inspection
+}
+
+export async function deleteInspection(id) {
+  await authFetch(`/api/report/inspections?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 'YYYY-MM'（JST基準の当月）
+export function currentMonthJST() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)
+}
+
+// 'YYYY-MM' を n か月ずらす
+export function shiftMonth(month, delta) {
+  const [y, m] = month.split('-').map(Number)
+  const total = y * 12 + (m - 1) + delta
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+// 'YYYY-MM' の日数
+export function daysInMonth(month) {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0)).getUTCDate()
+}

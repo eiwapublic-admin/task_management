@@ -324,3 +324,32 @@ create trigger report_photos_set_updated_at before update on report_photos
 
 alter table report_photos enable row level security;
 revoke all on report_photos from anon, authenticated;
+
+-- 自主検査表（日常）。Phase 3。2026-08-04。紙の様式の置き換え。
+-- 紙の記入ルール「不備が有る場合は項目に×とし、良好の場合は確認箇所一斉に○とすること」に
+-- 合わせ、通常は all_clear=true だけで済み、不備のある項目だけ items に持つ。
+create table if not exists fire_inspections (
+  id           uuid primary key default gen_random_uuid(),
+  building     text not null,           -- BKB（＝備後町コイズミビル）/ 小泉本社
+  inspected_on date not null,
+  inspector    text,
+  all_clear    boolean not null default false,  -- 「点検箇所一斉」に○＝全項目良好
+  -- 不備のある項目だけを持つ {"防火区画":"ng"}。ok=良 / ng=不良 / fixed=即時改修（紙の ○×◎）
+  items        jsonb not null default '{}'::jsonb,
+  note         text,
+  -- 6月・12月の定期点検結果。ok=支障無し / ng=支障有り
+  periodic_result text check (periodic_result in ('ok','ng')),
+  confirmed_by text,
+  created_by   uuid references users(id),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  constraint fire_inspections_building_date_key unique (building, inspected_on)
+);
+create index if not exists fire_inspections_date_idx on fire_inspections (inspected_on desc, building);
+
+drop trigger if exists fire_inspections_set_updated_at on fire_inspections;
+create trigger fire_inspections_set_updated_at before update on fire_inspections
+  for each row execute function set_updated_at();
+
+alter table fire_inspections enable row level security;
+revoke all on fire_inspections from anon, authenticated;

@@ -656,3 +656,155 @@ export async function handleStorageUsage(req) {
     return json({ error: '使用量の取得に失敗しました' }, 500)
   }
 }
+
+// ============================================================
+// 自主検査表（Phase 3。2026-08-04〜）
+// 紙の様式「自主検査表(日常)」をそのまま置き換える。記入ルールは紙と同じで、
+// 良好なら「点検箇所一斉」に○（all_clear=true）、不備のある項目だけ items に持つ。
+// ============================================================
+
+const INSPECTION_COLUMNS =
+  'id, building, inspected_on, inspector, all_clear, items, note, periodic_result, confirmed_by, created_at, updated_at'
+
+// 紙の様式に並ぶ検査項目（順序も紙に合わせる）。判定値は ok=良 / ng=不良 / fixed=即時改修。
+// 「避難通路」「喫煙場所」は紙でも2行あるため区別してキーを分ける。
+export const INSPECTION_ITEMS = [
+  { key: '防火区画', group: '防火管理・避難管理' },
+  { key: '避難通路1', label: '避難通路', group: '防火管理・避難管理' },
+  { key: '避難通路2', label: '避難通路', group: '防火管理・避難管理' },
+  { key: '通路非常照明', group: '防火管理・避難管理' },
+  { key: '階段・防火戸', group: '防火管理・避難管理' },
+  { key: '階段非常照明', group: '防火管理・避難管理' },
+  { key: '非常用進入口', group: '防火管理・避難管理' },
+  { key: 'カーテンじゅうたん等', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '喫煙場所1', label: '喫煙場所', group: '防火・火気使用・電気器具・喫煙' },
+  { key: 'フード・ダクト', group: '防火・火気使用・電気器具・喫煙' },
+  { key: 'ガス設備・器具', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '喫煙場所2', label: '喫煙場所', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '危険物等', group: '防火・火気使用・電気器具・喫煙' },
+  { key: '消防用設備', group: '防火・火気使用・電気器具・喫煙' },
+]
+
+const ITEM_KEYS = new Set(INSPECTION_ITEMS.map((i) => i.key))
+const VALID_JUDGEMENTS = new Set(['ok', 'ng', 'fixed'])
+// 対象のビル。BKB＝備後町コイズミビルの略称
+const VALID_BUILDINGS = new Set(['BKB', '小泉本社'])
+
+// items は「不備のある項目だけ」を持つ。想定外のキー・値は落とす（画面の改造で
+// 不正な値が混ざっても保存側で弾く）
+function sanitizeItems(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (!ITEM_KEYS.has(key)) continue
+    if (!VALID_JUDGEMENTS.has(value)) continue
+    // ok は既定なので保存しない（不備だけを持つ方針。記録が小さく済む）
+    if (value === 'ok') continue
+    out[key] = value
+  }
+  return out
+}
+
+// GET /api/report/inspections?month=YYYY-MM または ?date=&building=
+export async function handleInspectionList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const params = new URL(req.url).searchParams
+    const month = params.get('month') || ''
+    const date = params.get('date') || ''
+
+    const supabase = getAdminClient()
+    let query = supabase.from('fire_inspections').select(INSPECTION_COLUMNS)
+
+    if (date) {
+      if (!isValidDate(date)) return json({ error: 'date が不正です' }, 400)
+      query = query.eq('inspected_on', date)
+    } else if (month) {
+      if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
+      // その月の1日から翌月1日の手前まで
+      const [y, m] = month.split('-').map(Number)
+      const from = `${month}-01`
+      const to = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+      query = query.gte('inspected_on', from).lt('inspected_on', to)
+    } else {
+      // 指定が無ければ直近60日分（一覧の初期表示用）
+      query = query.order('inspected_on', { ascending: false }).limit(120)
+    }
+
+    const { data, error: err } = await query.order('inspected_on', { ascending: false })
+    if (err) {
+      console.error('inspection-list:', err.message)
+      return json({ error: '自主検査表の取得に失敗しました' }, 500)
+    }
+    return json({ inspections: data || [] })
+  } catch (err) {
+    console.error('inspection-list 失敗:', err)
+    return json({ error: '自主検査表の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/inspections — 実施記録の作成/更新（同じビル・同じ日は上書き）
+export async function handleInspectionSave(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const building = String(payload?.building || '')
+    const date = payload?.inspected_on
+    if (!VALID_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
+    if (!isValidDate(date)) return json({ error: 'inspected_on が不正です' }, 400)
+
+    const items = sanitizeItems(payload?.items)
+    // 不備が1件でもあるなら「一斉に○」は成立しない。画面側の指定によらずサーバーで確定させる
+    const allClear = Object.keys(items).length === 0 && payload?.all_clear !== false
+
+    const periodic = payload?.periodic_result
+    const row = {
+      building,
+      inspected_on: date,
+      inspector: trimOrNull(payload?.inspector, 50),
+      all_clear: allClear,
+      items,
+      note: typeof payload?.note === 'string' ? payload.note.trim().slice(0, 1000) || null : null,
+      periodic_result: periodic === 'ok' || periodic === 'ng' ? periodic : null,
+      confirmed_by: trimOrNull(payload?.confirmed_by, 50),
+      created_by: auth.sub,
+    }
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('fire_inspections')
+      .upsert(row, { onConflict: 'building,inspected_on' })
+      .select(INSPECTION_COLUMNS)
+      .single()
+    if (err) {
+      console.error('inspection-save:', err.message)
+      return json({ error: '自主検査表の保存に失敗しました' }, 500)
+    }
+    return json({ inspection: data })
+  } catch (err) {
+    console.error('inspection-save 失敗:', err)
+    return json({ error: '自主検査表の保存に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/inspections?id=… — 実施記録の取り消し
+export async function handleInspectionDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const supabase = getAdminClient()
+    const { error: err } = await supabase.from('fire_inspections').delete().eq('id', id)
+    if (err) {
+      console.error('inspection-delete:', err.message)
+      return json({ error: '自主検査表の削除に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('inspection-delete 失敗:', err)
+    return json({ error: '自主検査表の削除に失敗しました' }, 500)
+  }
+}

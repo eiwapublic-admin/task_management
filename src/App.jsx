@@ -8,6 +8,7 @@ import Usage from './pages/Usage'
 import ReportList from './pages/ReportList'
 import ReportDetail from './pages/ReportDetail'
 import ReportTemplates from './pages/ReportTemplates'
+import Inspections from './pages/Inspections'
 import { isAuthenticated, getCurrentUser } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -87,6 +88,14 @@ function App() {
             <RequireStaff>
               <ReportTemplates />
             </RequireStaff>
+          }
+        />
+        <Route
+          path="/reports/inspections"
+          element={
+            <RequireAuth>
+              <Inspections />
+            </RequireAuth>
           }
         />
         <Route

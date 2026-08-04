@@ -154,6 +154,7 @@ export default function AppHeader() {
               {inReports || isOwner ? (
                 <>
                   <button onClick={() => goTo('/reports')}>日報一覧</button>
+                  <button onClick={() => goTo('/reports/inspections')}>自主検査表</button>
                   {!isOwner && (
                     <button className="btn-settings" onClick={() => goTo('/reports/templates')}>
                       定型文の設定
