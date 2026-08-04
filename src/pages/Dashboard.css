@@ -1160,3 +1160,142 @@
     font-size: 16px;
   }
 }
+
+/* --- 日報の写真（Phase 2。2026-08-04〜） --- */
+.photo-grid {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.photo-item { display: flex; flex-direction: column; gap: 6px; }
+
+.photo-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-thumb:hover { border-color: #33604d; }
+
+.photo-loading, .photo-uploading { font-size: 12px; color: var(--text-muted); }
+.photo-uploading { cursor: default; }
+
+.photo-comment {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
+}
+
+.photo-delete {
+  align-self: flex-start;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.photo-delete:hover { color: #c81021; border-color: #c81021; }
+
+.photo-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.photo-hint { margin: 0; }
+
+/* 拡大表示。タスク詳細モーダル(z-index:50)より前面に出す */
+.photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4)
+           calc(var(--space-4) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.photo-overlay-inner {
+  position: relative;
+  max-width: 1000px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.photo-overlay-inner img {
+  max-width: 100%;
+  /* iOS Safari はアドレスバーで vh の基準が変わるため dvh も指定する */
+  max-height: 80vh;
+  max-height: 80dvh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.photo-overlay-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 36px;
+  height: 36px;
+  font-size: 22px;
+  line-height: 1;
+  color: #333;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.photo-overlay-caption { color: #fff; font-size: 14px; margin: 0; text-align: center; }
+
+@media (max-width: 640px) {
+  .photo-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .photo-comment { font-size: 16px; } /* iOSのフォーカス時ズームを抑止 */
+}
+
+/* ストレージ使用量のバー（従量課金事項画面。2026-08-04） */
+.storage-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.storage-bar-fill {
+  height: 100%;
+  background: #33604d;
+  border-radius: 999px;
+  transition: width var(--transition);
+}

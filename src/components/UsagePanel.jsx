@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchUsageMonths } from '../lib/tasks'
+import { fetchStorageUsage } from '../lib/reports'
 import { estimateCostUSD, formatUSD, formatJPY } from '../lib/pricing'
+import { formatBytes } from '../lib/imageResize'
 
 function currentMonthJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)
@@ -34,6 +36,8 @@ export default function UsagePanel() {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
   const [range, setRange] = useState('current')
+  // 日報の写真によるストレージ使用量（2026-08-04）。無料枠1GBに対する余裕を常に見えるようにする
+  const [storage, setStorage] = useState(null)
   const thisMonth = currentMonthJST()
   const lastMonth = previousMonth(thisMonth)
 
@@ -42,6 +46,10 @@ export default function UsagePanel() {
       .then((rows) => setMonths(rows))
       .catch((err) => setError(err.message))
       .finally(() => setLoaded(true))
+    // 取得に失敗しても API 利用状況の表示は妨げない
+    fetchStorageUsage()
+      .then(setStorage)
+      .catch(() => setStorage(null))
   }, [])
 
   const views = useMemo(() => {
@@ -168,6 +176,41 @@ export default function UsagePanel() {
         当システムが計測したトークン数から Claude（claude-haiku-4-5）の料金で試算した目安です。
         実際の請求額は Anthropic の確定値が正となります。
       </p>
+
+      {storage && (
+        <>
+          <h3 className="usage-subtitle">日報の写真ストレージ</h3>
+          <dl className="usage-fields">
+            <div className="usage-item">
+              <dt>保存枚数</dt>
+              <dd>{(storage.count || 0).toLocaleString('ja-JP')} 枚</dd>
+            </div>
+            <div className="usage-item">
+              <dt>使用量</dt>
+              <dd className="usage-cost">
+                {formatBytes(storage.total_bytes || 0)}
+                <span className="usage-jpy">
+                  {' '}
+                  / {formatBytes(storage.quota_bytes || 0)}（
+                  {((storage.total_bytes / (storage.quota_bytes || 1)) * 100).toFixed(2)}%）
+                </span>
+              </dd>
+            </div>
+          </dl>
+          <div className="storage-bar" aria-hidden="true">
+            <div
+              className="storage-bar-fill"
+              style={{
+                width: `${Math.min((storage.total_bytes / (storage.quota_bytes || 1)) * 100, 100)}%`,
+              }}
+            />
+          </div>
+          <p className="settings-hint">
+            Supabase 無料プランの上限は 1GB です。写真は保存時に自動で縮小しており、
+            現在のペースなら長期間この枠に収まります。
+          </p>
+        </>
+      )}
     </section>
   )
 }

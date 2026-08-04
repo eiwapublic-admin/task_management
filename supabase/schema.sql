@@ -284,3 +284,43 @@ alter table routine_templates enable row level security;
 revoke all on daily_reports     from anon, authenticated;
 revoke all on report_entries    from anon, authenticated;
 revoke all on routine_templates from anon, authenticated;
+
+-- 日報の写真（Phase 2。2026-08-04）。実体は Supabase Storage の非公開バケット
+-- `report-photos` に置き、DB にはメタ情報のみ持つ。取得は必ず Worker(service role)経由。
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('report-photos', 'report-photos', false, 10485760,
+        array['image/jpeg','image/png','image/webp','application/pdf'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists report_photos (
+  id          uuid primary key default gen_random_uuid(),
+  report_id   uuid not null references daily_reports(id) on delete cascade,
+  -- 用途ごとに保存解像度を変えるため区別する（work=720px / parking=1280px）
+  category    text not null default 'work' check (category in ('work','parking','chlorine')),
+  -- 保管先のオブジェクトキー。保管先を差し替えられるようURLではなくキーだけを持つ
+  storage_key text not null unique,
+  -- 一覧に写真が並ぶ用途（不正駐車）だけサムネイルを持つ。無ければ本体で代替する
+  thumb_key   text unique,
+  filename    text,
+  mime        text,
+  size        integer,
+  width       integer,
+  height      integer,
+  comment     text,
+  taken_at    timestamptz,
+  sort_order  integer not null default 0,
+  created_by  uuid references users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists report_photos_report_idx on report_photos (report_id, category, sort_order);
+
+drop trigger if exists report_photos_set_updated_at on report_photos;
+create trigger report_photos_set_updated_at before update on report_photos
+  for each row execute function set_updated_at();
+
+alter table report_photos enable row level security;
+revoke all on report_photos from anon, authenticated;

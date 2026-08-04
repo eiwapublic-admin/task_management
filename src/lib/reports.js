@@ -2,6 +2,7 @@
 // タスク管理側の src/lib/tasks.js と同じく authFetch（Bearer 付き）経由で Worker を呼ぶ。
 
 import { authFetch } from './api'
+import { getToken } from './auth'
 
 // 日報一覧（日付の新しい順。作業記録の抜粋つき）
 export async function fetchReports() {
@@ -97,7 +98,9 @@ export function toHHMM(value) {
   return m ? `${m[1]}:${m[2]}` : ''
 }
 
-// 現在時刻（JST）を 'HH:MM' で返す。作業記録の追加時に既定値として使う
+// 現在時刻（JST）を 'HH:MM' で返す。
+// ※ 作業記録の時刻の既定値としては使わない（2026-08-04。後からまとめて入力する運用で
+//    実際の作業時刻と食い違うため空欄にした）。撮影時刻の補完など別用途で使う想定。
 export function nowHHMM() {
   return new Date().toLocaleTimeString('ja-JP', {
     timeZone: 'Asia/Tokyo',
@@ -105,4 +108,64 @@ export function nowHHMM() {
     minute: '2-digit',
     hour12: false,
   })
+}
+
+// ---- 写真（Phase 2。2026-08-04〜）----
+
+
+export async function fetchPhotos(reportId) {
+  const data = await authFetch(`/api/report/photos?report_id=${encodeURIComponent(reportId)}`)
+  return data.photos || []
+}
+
+// 写真のアップロード。縮小は呼び出し側（imageResize.prepareImage）で済ませてから渡す。
+// FormData を送るため authFetch は使わず、ここで Bearer を付ける
+// （authFetch は Content-Type: application/json を付けてしまうため）。
+export async function uploadPhoto({ reportId, category, file, thumb, filename, width, height, takenAt, comment }) {
+  const form = new FormData()
+  form.append('report_id', reportId)
+  form.append('category', category || 'work')
+  form.append('file', file, filename || 'photo.jpg')
+  if (thumb) form.append('thumb', thumb, 'thumb.jpg')
+  if (filename) form.append('filename', filename)
+  if (width) form.append('width', String(width))
+  if (height) form.append('height', String(height))
+  if (takenAt) form.append('taken_at', takenAt)
+  if (comment) form.append('comment', comment)
+
+  const res = await fetch('/api/report/photos', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || '写真の保存に失敗しました')
+  return data.photo
+}
+
+export async function updatePhotoComment(id, comment) {
+  const data = await authFetch('/api/report/photos', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, comment }),
+  })
+  return data.photo
+}
+
+export async function deletePhoto(id) {
+  await authFetch(`/api/report/photos?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 写真の本体を取得して Blob URL を作る。バケットは非公開なので必ずこの経路を通す。
+// 呼び出し側は使い終わったら URL.revokeObjectURL で解放すること。
+export async function fetchPhotoObjectUrl(id, { thumb = false } = {}) {
+  const res = await fetch(`/api/report/photo?id=${encodeURIComponent(id)}${thumb ? '&thumb=1' : ''}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) throw new Error('写真を取得できませんでした')
+  return URL.createObjectURL(await res.blob())
+}
+
+// ストレージ使用量（「従量課金事項」画面で表示する）
+export async function fetchStorageUsage() {
+  return authFetch('/api/report/storage')
 }

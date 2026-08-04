@@ -5,6 +5,7 @@
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
+import { putObject, getObject, deleteObject } from './storage.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
 const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
@@ -382,5 +383,276 @@ export async function handleTemplateSave(req) {
   } catch (err) {
     console.error('template-save 失敗:', err)
     return json({ error: '定型文の保存に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 写真（Phase 2。2026-08-04〜）
+// 保管は Supabase Storage の非公開バケット。取得は必ずこの API を通す。
+// ============================================================
+
+const PHOTO_COLUMNS =
+  'id, report_id, category, storage_key, thumb_key, filename, mime, size, width, height, comment, taken_at, sort_order, created_at'
+
+// 用途ごとの想定解像度（縮小はクライアント側で行う。ここは上限の検証用）。
+// work=作業エビデンス720px / parking=不正駐車1280px（ナンバーの判読性を確保）
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 1ファイル10MB（縮小後は80KB程度の想定）
+const VALID_CATEGORIES = new Set(['work', 'parking', 'chlorine'])
+const VALID_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+
+// 保管キーを組み立てる。日付で階層を切り、後から年単位で退避しやすくしておく
+function buildStorageKey(reportDate, category, ext) {
+  const uuid = crypto.randomUUID()
+  return `${reportDate}/${category}/${uuid}.${ext}`
+}
+
+function extFromMime(mime) {
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'application/pdf') return 'pdf'
+  return 'jpg'
+}
+
+// GET /api/report/photos?report_id=… — 指定日報の写真メタ一覧
+export async function handlePhotoList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const reportId = new URL(req.url).searchParams.get('report_id') || ''
+    if (!reportId) return json({ error: 'report_id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('report_photos')
+      .select(PHOTO_COLUMNS)
+      .eq('report_id', reportId)
+      .order('sort_order', { ascending: true })
+    if (err) {
+      console.error('photo-list:', err.message)
+      return json({ error: '写真の取得に失敗しました' }, 500)
+    }
+    return json({ photos: data || [] })
+  } catch (err) {
+    console.error('photo-list 失敗:', err)
+    return json({ error: '写真の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/photos — 写真のアップロード（multipart/form-data）。
+// クライアント側で既に縮小済みのものを受け取る（通信量も抑えるため）。
+export async function handlePhotoUpload(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const form = await req.formData().catch(() => null)
+    if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
+
+    const reportId = String(form.get('report_id') || '')
+    const category = String(form.get('category') || 'work')
+    const file = form.get('file')
+    const thumb = form.get('thumb') // 一覧に写真が並ぶ用途のみ付く（任意）
+    if (!reportId) return json({ error: 'report_id は必須です' }, 400)
+    if (!VALID_CATEGORIES.has(category)) return json({ error: 'category が不正です' }, 400)
+    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
+    if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（10MBまで）' }, 413)
+    if (!VALID_MIME.has(file.type)) return json({ error: '対応していない形式です' }, 415)
+
+    const supabase = getAdminClient()
+    // 対象の日報が実在することを確認してから保存する
+    const { data: report } = await supabase
+      .from('daily_reports')
+      .select('id, report_date')
+      .eq('id', reportId)
+      .maybeSingle()
+    if (!report) return json({ error: '日報が見つかりません' }, 404)
+
+    const key = buildStorageKey(report.report_date, category, extFromMime(file.type))
+    await putObject(key, file.stream(), file.type)
+
+    // サムネイルは任意。保存に失敗しても本体は残す（一覧表示が本体で代替できるため）
+    let thumbKey = null
+    if (thumb && typeof thumb !== 'string' && thumb.size > 0 && VALID_MIME.has(thumb.type)) {
+      try {
+        thumbKey = await putObject(`${key}.thumb.jpg`, thumb.stream(), thumb.type)
+      } catch (e) {
+        console.error('thumb put 失敗（本体は保存済み）:', e)
+      }
+    }
+
+    const { data: last } = await supabase
+      .from('report_photos')
+      .select('sort_order')
+      .eq('report_id', reportId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const takenAt = String(form.get('taken_at') || '')
+    const row = {
+      report_id: reportId,
+      category,
+      storage_key: key,
+      thumb_key: thumbKey,
+      filename: String(form.get('filename') || file.name || '').slice(0, 255) || null,
+      mime: file.type,
+      size: file.size,
+      width: Number(form.get('width')) || null,
+      height: Number(form.get('height')) || null,
+      comment: String(form.get('comment') || '').trim().slice(0, 500) || null,
+      taken_at: takenAt && !Number.isNaN(Date.parse(takenAt)) ? takenAt : null,
+      sort_order: (last?.sort_order ?? -1) + 1,
+      created_by: auth.sub,
+    }
+    const { data, error: err } = await supabase
+      .from('report_photos')
+      .insert(row)
+      .select(PHOTO_COLUMNS)
+      .single()
+    if (err) {
+      // DB に入らなかった場合は保管したオブジェクトを消して孤児を残さない
+      await deleteObject(key)
+      if (thumbKey) await deleteObject(thumbKey)
+      console.error('photo-upload:', err.message)
+      return json({ error: '写真の保存に失敗しました' }, 500)
+    }
+    return json({ photo: data })
+  } catch (err) {
+    console.error('photo-upload 失敗:', err)
+    return json({ error: '写真の保存に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report/photo?id=…&thumb=1 — 写真の本体を返す。
+// バケットは非公開なので、この経路（JWT 認証済み）以外からは取得できない。
+export async function handlePhotoGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const params = new URL(req.url).searchParams
+    const id = params.get('id') || ''
+    const wantThumb = params.get('thumb') === '1'
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: photo } = await supabase
+      .from('report_photos')
+      .select('storage_key, thumb_key, mime, filename')
+      .eq('id', id)
+      .maybeSingle()
+    if (!photo) return json({ error: '写真が見つかりません' }, 404)
+
+    // サムネイル要求でも無ければ本体で代替する（表示が欠けないようにする）
+    const key = wantThumb && photo.thumb_key ? photo.thumb_key : photo.storage_key
+    const res = await getObject(key)
+    if (!res.ok) {
+      console.error('photo-get: storage が', res.status, 'を返した')
+      return json({ error: '写真の取得に失敗しました' }, 404)
+    }
+    return new Response(res.body, {
+      status: 200,
+      headers: {
+        'Content-Type': wantThumb && photo.thumb_key ? 'image/jpeg' : photo.mime || 'application/octet-stream',
+        // 認証必須の内容なのでブラウザ共有キャッシュには載せない
+        'Cache-Control': 'private, max-age=3600',
+      },
+    })
+  } catch (err) {
+    console.error('photo-get 失敗:', err)
+    return json({ error: '写真の取得に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/report/photos — コメントの更新
+export async function handlePhotoUpdate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = payload?.id
+    if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
+    if (!('comment' in payload)) return json({ error: '更新する項目がありません' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('report_photos')
+      .update({ comment: String(payload.comment || '').trim().slice(0, 500) || null })
+      .eq('id', id)
+      .select(PHOTO_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('photo-update:', err.message)
+      return json({ error: 'コメントの保存に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '写真が見つかりません' }, 404)
+    return json({ photo: data })
+  } catch (err) {
+    console.error('photo-update 失敗:', err)
+    return json({ error: 'コメントの保存に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/photos?id=… — 写真の削除（保管したオブジェクトも消す）
+export async function handlePhotoDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: photo } = await supabase
+      .from('report_photos')
+      .select('storage_key, thumb_key')
+      .eq('id', id)
+      .maybeSingle()
+    if (!photo) return json({ ok: true }) // 既に無い場合も成功扱い（冪等）
+
+    const { error: err } = await supabase.from('report_photos').delete().eq('id', id)
+    if (err) {
+      console.error('photo-delete:', err.message)
+      return json({ error: '写真の削除に失敗しました' }, 500)
+    }
+    // DB から消えた後に実体を消す（順序が逆だと、実体だけ消えた孤児レコードが残りうる）
+    await deleteObject(photo.storage_key)
+    if (photo.thumb_key) await deleteObject(photo.thumb_key)
+    return json({ ok: true })
+  } catch (err) {
+    console.error('photo-delete 失敗:', err)
+    return json({ error: '写真の削除に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report/storage — ストレージ使用量（「従量課金事項」画面に表示する）
+export async function handleStorageUsage(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('report_photos')
+      .select('size, category')
+    if (err) {
+      console.error('storage-usage:', err.message)
+      return json({ error: '使用量の取得に失敗しました' }, 500)
+    }
+    const rows = data || []
+    const totalBytes = rows.reduce((sum, r) => sum + (r.size || 0), 0)
+    const byCategory = {}
+    for (const r of rows) {
+      const c = r.category || 'work'
+      if (!byCategory[c]) byCategory[c] = { count: 0, bytes: 0 }
+      byCategory[c].count += 1
+      byCategory[c].bytes += r.size || 0
+    }
+    return json({
+      count: rows.length,
+      total_bytes: totalBytes,
+      // Supabase 無料プランの Storage 上限（1GB）。使用率の表示に使う
+      quota_bytes: 1024 * 1024 * 1024,
+      by_category: byCategory,
+    })
+  } catch (err) {
+    console.error('storage-usage 失敗:', err)
+    return json({ error: '使用量の取得に失敗しました' }, 500)
   }
 }
