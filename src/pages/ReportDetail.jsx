@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import ReportPhotos from '../components/ReportPhotos'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -14,7 +15,6 @@ import {
   todayJST,
   formatReportDate,
   toHHMM,
-  nowHHMM,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -104,7 +104,9 @@ export default function ReportDetail() {
     if (!report || readOnly) return
     setError('')
     try {
-      const entry = await addEntry(report.id, { entry_time: nowHHMM(), content })
+      // 時刻は空欄で追加する（2026-08-04）。後からまとめて入力する運用が中心で、
+      // 記録した時刻（現在時刻）を既定値にすると実際の作業時刻と食い違うため。
+      const entry = await addEntry(report.id, { content })
       setEntries((prev) => [...prev, entry])
       markSaved()
     } catch (err) {
@@ -307,6 +309,8 @@ export default function ReportDetail() {
                 </div>
               )}
             </section>
+
+            <ReportPhotos reportId={report.id} readOnly={readOnly} />
           </>
         )}
       </div>

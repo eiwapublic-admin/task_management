@@ -243,6 +243,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | POST/PATCH/DELETE `/api/report/entries` | JWT（owner不可） | 作業記録の明細の追加・更新・削除。追加時は既存の最大 `sort_order`+1 を採番して末尾に置く。タスクからの転記は `source_task_id` を伴う |
 | GET `/api/report/templates` | JWT | 定型文（有効なもののみ・並び順） |
 | PUT `/api/report/templates` | JWT（owner不可） | 定型文を丸ごと差し替え（配列の順序＝`sort_order`） |
+| GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。POST は multipart/form-data（縮小はクライアント側で済ませてから送る）。DELETE は保管したオブジェクトも消す |
+| GET `/api/report/photo` | JWT | 写真の本体を返す（`thumb=1` でサムネイル。無ければ本体で代替）。バケットは非公開なのでこの経路以外からは取得できない |
+| GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -340,6 +343,23 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   明細の編集は入力の都度ではなく**0.8秒待ってから自動保存**し、保存されたら「保存しました」を出す（保存ボタンを押す手間をなくす）
 - **データ**: `daily_reports`（1日1件。`report_date` unique）／ `report_entries`（時刻＋内容。`source_task_id` でタスクからの転記元を保持）／
   `routine_templates`（定型文）。いずれも service role 経由のみ（anon/authenticated へのGRANTなし）で既存方針を踏襲
+
+### 4-11. 日報の写真（2026-08-04。Phase 2）
+
+- **保管先**: Supabase Storage の**非公開バケット** `report-photos`。R2 はクレジットカード登録が必要で
+  承認が得られなかったため見送った（経緯は `docs/daily-report-plan.md` 4-2）。
+  バケットは `public=false`、`storage.objects` にポリシーを一切作らないため**匿名では読めない**。
+  取得は必ず `GET /api/report/photo`（JWT必須・service role で取得して返す）を通る
+- **送信前の縮小（`src/lib/imageResize.js`）**: 無料枠1GBで長く運用するため、**ブラウザ側の Canvas API で縮小してから送る**。
+  用途ごとに解像度を変える: **作業エビデンス720px / 不正駐車1280px**（ナンバーの判読が目的のため高め）/ サムネイル320px。
+  iPhone の 4032×3024 は 720px で**画素数が31分の1**になる。元が小さい画像は拡大しない。
+  デコードできない形式（変換されなかったHEIC等）は**縮小を諦めて原本のまま送る**（写真がまったく残せなくなる事態を避けるため）
+- **サムネイル**: 一覧に写真が並ぶ用途（不正駐車）だけ作る。日報の写真はグリッド表示で本体（720px・約80KB）をそのまま使う
+- **撮影**: `<input type="file" accept="image/*" capture="environment">` でスマホのカメラを直接起動する（PCではファイル選択になる）
+- **表示**: Worker 経由で取得した Blob URL を使う（既存の添付プレビューと同じ方式。Safari を含め検証済み）。
+  アンマウント時に `URL.revokeObjectURL` でまとめて解放する
+- **使用量の可視化**: 「従量課金事項」画面に写真の保存枚数・使用量・無料枠1GBに対する使用率をバーで表示し、逼迫する前に気付けるようにした
+- **動画(mov)は当面対象外**（1本30MBで写真5か月分を消費するため。4-2参照）
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
