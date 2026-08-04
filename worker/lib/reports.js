@@ -1,0 +1,386 @@
+// 日報機能の API ハンドラ（2026-08-04〜）。
+// タスク管理側のコードには手を入れず、このファイルに閉じて追加していく。
+// 権限: staff/admin は読み書き、owner は GET のみ（日報を全て閲覧できるが書き込み不可）。
+// 詳細は docs/daily-report-plan.md を参照。
+
+import { json, verifyRequestAuth, canWrite } from './http.js'
+import { getAdminClient } from './supabase-admin.js'
+
+// 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
+const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
+const ENTRY_COLUMNS = 'id, report_id, entry_time, content, source_task_id, sort_order'
+
+// 一覧の取得上限。日報は1日1件なので 400 件で1年半以上を賄える
+const LIST_LIMIT = 400
+
+// 'YYYY-MM-DD' 形式かを検証する。日付は主キー相当なので厳格に見る
+function isValidDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const d = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value
+}
+
+// 'HH:MM' / 'HH:MM:SS' を 'HH:MM:SS' に正規化する。空文字・不正値は null（未入力）
+function normalizeTime(value) {
+  if (typeof value !== 'string') return null
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim())
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  const sec = Number(m[3] ?? 0)
+  if (h > 23 || min > 59 || sec > 59) return null
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
+function trimOrNull(value, max = 200) {
+  if (typeof value !== 'string') return null
+  const t = value.trim()
+  return t ? t.slice(0, max) : null
+}
+
+// 認証と書き込み権限をまとめて確認する。
+// 戻り値が Response ならそれをそのまま返す（呼び出し側で早期 return する）
+async function requireAuth(req, { write = false } = {}) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return { error: json({ error: '認証が必要です' }, 401) }
+  if (write && !canWrite(auth)) {
+    // owner は閲覧のみ。UI 側でも書き込み操作を無効化するが、サーバー側でも必ず拒否する
+    return { error: json({ error: 'この操作を行う権限がありません' }, 403) }
+  }
+  return { auth }
+}
+
+// GET /api/reports — 日報一覧（日付の新しい順）。一覧表示用に明細の抜粋も返す。
+export async function handleReportList(req) {
+  const { auth, error } = await requireAuth(req)
+  if (error) return error
+  void auth
+  try {
+    const supabase = getAdminClient()
+    const { data: reports, error: err } = await supabase
+      .from('daily_reports')
+      .select(REPORT_COLUMNS)
+      .order('report_date', { ascending: false })
+      .limit(LIST_LIMIT)
+    if (err) {
+      console.error('report-list:', err.message)
+      return json({ error: '日報の取得に失敗しました' }, 500)
+    }
+    const list = reports || []
+    if (list.length === 0) return json({ reports: [] })
+
+    // 一覧に作業記録の抜粋を出すため、対象日報の明細をまとめて1回で取る（N+1を避ける）
+    const { data: entries, error: entErr } = await supabase
+      .from('report_entries')
+      .select(ENTRY_COLUMNS)
+      .in('report_id', list.map((r) => r.id))
+      .order('sort_order', { ascending: true })
+    if (entErr) {
+      console.error('report-list(entries):', entErr.message)
+      return json({ error: '日報の取得に失敗しました' }, 500)
+    }
+    const byReport = new Map()
+    for (const e of entries || []) {
+      if (!byReport.has(e.report_id)) byReport.set(e.report_id, [])
+      byReport.get(e.report_id).push(e)
+    }
+    return json({
+      reports: list.map((r) => ({ ...r, entries: byReport.get(r.id) || [] })),
+    })
+  } catch (err) {
+    console.error('report-list 失敗:', err)
+    return json({ error: '日報の取得に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report?date=YYYY-MM-DD — 指定日の日報1件（明細つき）。
+// 未作成の日は 404 ではなく report:null を返す（画面側で新規作成の導線を出すため）。
+export async function handleReportGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const date = new URL(req.url).searchParams.get('date') || ''
+    if (!isValidDate(date)) return json({ error: 'date が不正です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: report, error: err } = await supabase
+      .from('daily_reports')
+      .select(REPORT_COLUMNS)
+      .eq('report_date', date)
+      .maybeSingle()
+    if (err) {
+      console.error('report-get:', err.message)
+      return json({ error: '日報の取得に失敗しました' }, 500)
+    }
+    if (!report) return json({ report: null })
+
+    const { data: entries, error: entErr } = await supabase
+      .from('report_entries')
+      .select(ENTRY_COLUMNS)
+      .eq('report_id', report.id)
+      .order('sort_order', { ascending: true })
+    if (entErr) {
+      console.error('report-get(entries):', entErr.message)
+      return json({ error: '日報の取得に失敗しました' }, 500)
+    }
+    return json({ report: { ...report, entries: entries || [] } })
+  } catch (err) {
+    console.error('report-get 失敗:', err)
+    return json({ error: '日報の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report — 指定日の日報を作成する。既にあればそれを返す（冪等）。
+export async function handleReportCreate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const date = payload?.report_date
+    if (!isValidDate(date)) return json({ error: 'report_date が不正です' }, 400)
+
+    const supabase = getAdminClient()
+    // 同じ日に二重作成されないよう、まず既存を確認する（report_date は unique だが、
+    // 競合時にエラーを返すより既存を返すほうが画面側の扱いが単純になる）
+    const { data: existing } = await supabase
+      .from('daily_reports')
+      .select(REPORT_COLUMNS)
+      .eq('report_date', date)
+      .maybeSingle()
+    if (existing) return json({ report: { ...existing, entries: [] } })
+
+    const row = {
+      report_date: date,
+      worker_am: trimOrNull(payload?.worker_am, 50),
+      worker_pm: trimOrNull(payload?.worker_pm, 50),
+      work_start: normalizeTime(payload?.work_start) ?? '09:00:00',
+      work_end: normalizeTime(payload?.work_end) ?? '18:00:00',
+      created_by: auth.sub,
+    }
+    const { data, error: err } = await supabase
+      .from('daily_reports')
+      .insert(row)
+      .select(REPORT_COLUMNS)
+      .single()
+    if (err) {
+      // unique 違反（同時作成）は既存を読み直して返す
+      const { data: raced } = await supabase
+        .from('daily_reports')
+        .select(REPORT_COLUMNS)
+        .eq('report_date', date)
+        .maybeSingle()
+      if (raced) return json({ report: { ...raced, entries: [] } })
+      console.error('report-create:', err.message)
+      return json({ error: '日報の作成に失敗しました' }, 500)
+    }
+    return json({ report: { ...data, entries: [] } })
+  } catch (err) {
+    console.error('report-create 失敗:', err)
+    return json({ error: '日報の作成に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/report — 日報ヘッダ（作業者・作業時間）の更新。
+export async function handleReportUpdate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = payload?.id
+    if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
+
+    const patch = {}
+    if ('worker_am' in payload) patch.worker_am = trimOrNull(payload.worker_am, 50)
+    if ('worker_pm' in payload) patch.worker_pm = trimOrNull(payload.worker_pm, 50)
+    if ('work_start' in payload) patch.work_start = normalizeTime(payload.work_start)
+    if ('work_end' in payload) patch.work_end = normalizeTime(payload.work_end)
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('daily_reports')
+      .update(patch)
+      .eq('id', id)
+      .select(REPORT_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('report-update:', err.message)
+      return json({ error: '日報の更新に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '日報が見つかりません' }, 404)
+    return json({ report: data })
+  } catch (err) {
+    console.error('report-update 失敗:', err)
+    return json({ error: '日報の更新に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/entries — 作業記録の明細を追加する。
+// タスク管理からの転記（source_task_id つき）もこの経路を使う。
+export async function handleEntryCreate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const reportId = payload?.report_id
+    if (typeof reportId !== 'string' || !reportId) return json({ error: 'report_id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    // 対象の日報が実在することを確認してから追加する（存在しないIDでの作成を防ぐ）
+    const { data: report } = await supabase
+      .from('daily_reports')
+      .select('id')
+      .eq('id', reportId)
+      .maybeSingle()
+    if (!report) return json({ error: '日報が見つかりません' }, 404)
+
+    // 末尾に追加する。既存の最大 sort_order の次を採番する
+    const { data: last } = await supabase
+      .from('report_entries')
+      .select('sort_order')
+      .eq('report_id', reportId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const row = {
+      report_id: reportId,
+      entry_time: normalizeTime(payload?.entry_time),
+      content: typeof payload?.content === 'string' ? payload.content.trim().slice(0, 2000) : '',
+      source_task_id: typeof payload?.source_task_id === 'string' ? payload.source_task_id : null,
+      sort_order: (last?.sort_order ?? -1) + 1,
+    }
+    const { data, error: err } = await supabase
+      .from('report_entries')
+      .insert(row)
+      .select(ENTRY_COLUMNS)
+      .single()
+    if (err) {
+      console.error('entry-create:', err.message)
+      return json({ error: '作業記録の追加に失敗しました' }, 500)
+    }
+    return json({ entry: data })
+  } catch (err) {
+    console.error('entry-create 失敗:', err)
+    return json({ error: '作業記録の追加に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/report/entries — 明細の更新（時刻・内容・並び順）。
+export async function handleEntryUpdate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = payload?.id
+    if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
+
+    const patch = {}
+    if ('entry_time' in payload) patch.entry_time = normalizeTime(payload.entry_time)
+    if ('content' in payload) {
+      patch.content = typeof payload.content === 'string' ? payload.content.trim().slice(0, 2000) : ''
+    }
+    if ('sort_order' in payload && Number.isInteger(payload.sort_order)) {
+      patch.sort_order = payload.sort_order
+    }
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('report_entries')
+      .update(patch)
+      .eq('id', id)
+      .select(ENTRY_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('entry-update:', err.message)
+      return json({ error: '作業記録の更新に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '作業記録が見つかりません' }, 404)
+    return json({ entry: data })
+  } catch (err) {
+    console.error('entry-update 失敗:', err)
+    return json({ error: '作業記録の更新に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/entries?id=… — 明細の削除。
+export async function handleEntryDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { error: err } = await supabase.from('report_entries').delete().eq('id', id)
+    if (err) {
+      console.error('entry-delete:', err.message)
+      return json({ error: '作業記録の削除に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('entry-delete 失敗:', err)
+    return json({ error: '作業記録の削除に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report/templates — 定型文の一覧（有効なもののみ・並び順）。
+export async function handleTemplateList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('routine_templates')
+      .select('id, label, sort_order, is_active')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    if (err) {
+      console.error('template-list:', err.message)
+      return json({ error: '定型文の取得に失敗しました' }, 500)
+    }
+    return json({ templates: data || [] })
+  } catch (err) {
+    console.error('template-list 失敗:', err)
+    return json({ error: '定型文の取得に失敗しました' }, 500)
+  }
+}
+
+// PUT /api/report/templates — 定型文を丸ごと差し替える（設定画面からの保存）。
+// 受け取った配列の順序をそのまま sort_order にする。
+export async function handleTemplateSave(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const labels = Array.isArray(payload?.labels) ? payload.labels : null
+    if (!labels) return json({ error: 'labels は配列で指定してください' }, 400)
+    if (labels.length > 200) return json({ error: '定型文が多すぎます（200件まで）' }, 400)
+
+    const rows = labels
+      .map((l) => (typeof l === 'string' ? l.trim() : ''))
+      .filter(Boolean)
+      .map((label, i) => ({ label: label.slice(0, 500), sort_order: i, is_active: true }))
+
+    const supabase = getAdminClient()
+    // 全消し→再作成にする。件数が少なく（数十件）、並び順の維持が単純になるため。
+    // 明細側は定型文を「文字列としてコピー」して保持しているので、消しても過去の記録は壊れない。
+    const { error: delErr } = await supabase.from('routine_templates').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (delErr) {
+      console.error('template-save(delete):', delErr.message)
+      return json({ error: '定型文の保存に失敗しました' }, 500)
+    }
+    if (rows.length > 0) {
+      const { error: insErr } = await supabase.from('routine_templates').insert(rows)
+      if (insErr) {
+        console.error('template-save(insert):', insErr.message)
+        return json({ error: '定型文の保存に失敗しました' }, 500)
+      }
+    }
+    return json({ ok: true, count: rows.length })
+  } catch (err) {
+    console.error('template-save 失敗:', err)
+    return json({ error: '定型文の保存に失敗しました' }, 500)
+  }
+}

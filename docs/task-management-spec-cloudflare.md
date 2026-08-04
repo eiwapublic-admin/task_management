@@ -236,6 +236,13 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/push/public-key` | JWT | Web Push購読作成用のVAPID公開鍵を返す（4-9参照）。未設定時は404 |
 | POST `/api/push/subscribe` | JWT | ブラウザの`PushSubscription`（`endpoint`/`keys.p256dh`/`keys.auth`）を`push_subscriptions`に保存（`endpoint`で upsert） |
 | POST `/api/push/unsubscribe` | JWT | 指定`endpoint`の購読を削除（自分（トークンのuser_id）に紐づくもののみ） |
+| GET `/api/reports` | JWT | 日報一覧（日付の新しい順・上限400）。一覧表示用に各日の作業記録も含めて返す（明細は1回のクエリでまとめて取得しN+1を避ける） |
+| GET `/api/report` | JWT | `date=YYYY-MM-DD` の日報1件（明細つき）。未作成の日は404ではなく `report:null` を返す（画面側で新規作成の導線を出すため） |
+| POST `/api/report` | JWT（owner不可） | 指定日の日報を作成。既にあればそれを返す（冪等）。同時作成のunique違反時も既存を読み直して返す |
+| PATCH `/api/report` | JWT（owner不可） | 日報ヘッダ（作業者AM/PM・作業開始/終了）の更新 |
+| POST/PATCH/DELETE `/api/report/entries` | JWT（owner不可） | 作業記録の明細の追加・更新・削除。追加時は既存の最大 `sort_order`+1 を採番して末尾に置く。タスクからの転記は `source_task_id` を伴う |
+| GET `/api/report/templates` | JWT | 定型文（有効なもののみ・並び順） |
+| PUT `/api/report/templates` | JWT（owner不可） | 定型文を丸ごと差し替え（配列の順序＝`sort_order`） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -314,6 +321,25 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **カンバンからの除外**: `GET /api/tasks` は `archived_at` 非NULLを除外する。
 - **アーカイブ画面（`/archive`）**: `GET /api/archive` で取得。担当者・情報源での絞り込みと、フリーワード全文検索（タイトル・件名・本文・送信者・宛名・留意事項をサーバー側 ilike で横断。タスクID「T-123」形式での検索にも対応）。一覧には「タスクID」列を表示。行タップで既存のタスク詳細モーダルを開く（編集・ステータス変更も可能）。**「操作」列**（2026-07-30追加）でスパム行は「スパム解除」、全行は「復帰…」セレクト（未処理／返信済み／対応中へ戻す）を実行できる。復帰するとサーバー側で `completed_at`・`archived_at` がクリアされカンバンへ戻る（スパム判定も同時に解除）。一覧の操作列はモバイルで横スクロールしないと届かないため、タスク詳細モーダルにもスパムバッジと解除ボタンを置いている。
 - **既存の完了タスクの扱い**: 導入時のマイグレーションで、既存の完了タスクは `updated_at` を `completed_at` の代替として補完済み。デプロイ後、次回のパイプライン実行時にまとめてアーカイブへ移る。
+
+### 4-10. 日報機能（2026-08-04〜。Phase 1）
+
+FileMaker で運用していた日報アプリ `koizumi-report` を統合したもの。計画の全体像は `docs/daily-report-plan.md` を参照。
+**Phase 1 の範囲は「権限ロール・セクション切替・日報の作業記録・定型文」**で、写真／自主検査表／不正駐車／残留塩素は後続フェーズ。
+
+- **セクション切替**: 共通ヘッダに `[ タスク ｜ 日報 ]` のセグメントを置く（`AppHeader.jsx` の `.app-switch`）。
+  現在位置は `useLocation()` で判定し（`/reports` 配下が日報）、ハンバーガーメニューの項目もセクションに応じて出し分ける。
+  タスク側は従来どおり（メイン/アーカイブ/設定/従量課金/処理ログ＋今すぐ取得）、日報側は日報一覧/定型文の設定
+- **権限ロール（`users.role`）**: `staff`（既定・従来どおり全機能）／`owner`（日報を全て閲覧できるがすべての書き込み不可）／`admin`（将来の分離用。当面 staff と同等）。
+  既存ユーザーは全員 `staff` になるため挙動は変わらない。**ロールは JWT に埋めた値ではなく `verifyRequestAuth` が毎回DBから引く**ため、
+  権限を下げた際に有効期限（30日）を待たず即反映される。owner にはフロントでも書き込みUIを出さないが、
+  **サーバー側でも日報系APIの書き込みを403で拒否**し、UIの無効化だけに依存しない（`worker/lib/http.js` の `canWrite`）
+- **画面**: 日報一覧（`/reports`）／日報詳細（`/reports/:date`）／定型文の設定（`/reports/templates`）。
+  タスク管理側の各ルートは `RequireStaff` で包み、owner が来たら `/reports` へ送る
+- **入力の設計**: 作業記録は「＋記録を追加」で行が増え、**時刻は現在時刻（JST）が既定値**。定型文はチップを1タップで内容入りの行を追加する。
+  明細の編集は入力の都度ではなく**0.8秒待ってから自動保存**し、保存されたら「保存しました」を出す（保存ボタンを押す手間をなくす）
+- **データ**: `daily_reports`（1日1件。`report_date` unique）／ `report_entries`（時刻＋内容。`source_task_id` でタスクからの転記元を保持）／
+  `routine_templates`（定型文）。いずれも service role 経由のみ（anon/authenticated へのGRANTなし）で既存方針を踏襲
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 

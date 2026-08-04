@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AboutModal from './AboutModal'
 import { getCurrentUser, logout } from '../lib/auth'
 import { reloadApp } from '../pwa/reloadApp'
@@ -17,6 +17,7 @@ export default function AppHeader() {
   const [pushStatus, setPushStatus] = useState('loading')
   const menuRef = useRef(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const user = getCurrentUser()
 
   useEffect(() => {
@@ -90,6 +91,13 @@ export default function AppHeader() {
     }
   }
 
+  // 現在どちらのセクションを見ているか（2026-08-04。日報機能の追加に伴う切替）。
+  // 日報系のパスは /reports 配下にまとめている。window.location ではなく useLocation を
+  // 使い、クライアント側遷移でも確実に再評価されるようにする。
+  const inReports = location.pathname.startsWith('/reports')
+  // owner（小泉産業様）は日報のみ。タスク管理のメニュー・切替は出さない
+  const isOwner = user?.role === 'owner'
+
   return (
     <>
       <header className="dashboard-header">
@@ -108,6 +116,26 @@ export default function AppHeader() {
             <h1>栄和　タスク管理システム</h1>
             <span className="dashboard-version">ver.{formatBuildTime()}</span>
           </div>
+          {!isOwner && (
+            <nav className="app-switch" aria-label="表示するセクション">
+              <button
+                type="button"
+                className={`app-switch-btn${inReports ? '' : ' is-active'}`}
+                aria-current={inReports ? undefined : 'page'}
+                onClick={() => goTo('/')}
+              >
+                タスク
+              </button>
+              <button
+                type="button"
+                className={`app-switch-btn${inReports ? ' is-active' : ''}`}
+                aria-current={inReports ? 'page' : undefined}
+                onClick={() => goTo('/reports')}
+              >
+                日報
+              </button>
+            </nav>
+          )}
         </div>
         <div className="dashboard-header-right">
           {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
@@ -123,15 +151,30 @@ export default function AppHeader() {
               <span className="dashboard-menu-icon" aria-hidden="true"></span>
             </button>
             <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
-              <button onClick={() => goTo('/')}>メイン</button>
-              <button onClick={() => goTo('/archive')}>アーカイブ</button>
-              <button className="btn-settings" onClick={() => goTo('/settings')}>設定</button>
-              <button onClick={() => goTo('/usage')}>従量課金事項</button>
-              <button onClick={() => goTo('/logs')}>処理ログ</button>
+              {inReports || isOwner ? (
+                <>
+                  <button onClick={() => goTo('/reports')}>日報一覧</button>
+                  {!isOwner && (
+                    <button className="btn-settings" onClick={() => goTo('/reports/templates')}>
+                      定型文の設定
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => goTo('/')}>メイン</button>
+                  <button onClick={() => goTo('/archive')}>アーカイブ</button>
+                  <button className="btn-settings" onClick={() => goTo('/settings')}>設定</button>
+                  <button onClick={() => goTo('/usage')}>従量課金事項</button>
+                  <button onClick={() => goTo('/logs')}>処理ログ</button>
+                </>
+              )}
               <div className="dashboard-menu-divider" role="separator" />
-              <button onClick={handleRunFetch} disabled={fetching}>
-                {fetching ? '取得中…' : '今すぐ取得'}
-              </button>
+              {!inReports && !isOwner && (
+                <button onClick={handleRunFetch} disabled={fetching}>
+                  {fetching ? '取得中…' : '今すぐ取得'}
+                </button>
+              )}
               {pushStatus !== 'unsupported' && (
                 <button
                   onClick={handleTogglePush}

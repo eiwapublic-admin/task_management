@@ -5,11 +5,23 @@ import Settings from './pages/Settings'
 import Logs from './pages/Logs'
 import Archive from './pages/Archive'
 import Usage from './pages/Usage'
-import { isAuthenticated } from './lib/auth'
+import ReportList from './pages/ReportList'
+import ReportDetail from './pages/ReportDetail'
+import ReportTemplates from './pages/ReportTemplates'
+import { isAuthenticated, getCurrentUser } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
 function RequireAuth({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />
+}
+
+// タスク管理セクション用のガード（2026-08-04）。
+// owner（小泉産業様）は日報のみを見られるので、タスク管理の各画面へ来たら日報へ送る。
+// ※これは画面上の誘導であり、権限の正はサーバー側（Worker の verifyRequestAuth）にある。
+function RequireStaff({ children }) {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />
+  if (getCurrentUser()?.role === 'owner') return <Navigate to="/reports" replace />
+  return children
 }
 
 function App() {
@@ -23,40 +35,65 @@ function App() {
         <Route
           path="/"
           element={
-            <RequireAuth>
+            <RequireStaff>
               <Dashboard />
-            </RequireAuth>
+            </RequireStaff>
           }
         />
         <Route
           path="/logs"
           element={
-            <RequireAuth>
+            <RequireStaff>
               <Logs />
-            </RequireAuth>
+            </RequireStaff>
           }
         />
         <Route
           path="/archive"
           element={
-            <RequireAuth>
+            <RequireStaff>
               <Archive />
-            </RequireAuth>
+            </RequireStaff>
           }
         />
         <Route
           path="/usage"
           element={
-            <RequireAuth>
+            <RequireStaff>
               <Usage />
-            </RequireAuth>
+            </RequireStaff>
           }
         />
         <Route
           path="/settings"
           element={
-            <RequireAuth>
+            <RequireStaff>
               <Settings />
+            </RequireStaff>
+          }
+        />
+        {/* 日報（2026-08-04〜）。owner も閲覧できるため RequireAuth のまま */}
+        <Route
+          path="/reports"
+          element={
+            <RequireAuth>
+              <ReportList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reports/templates"
+          element={
+            <RequireStaff>
+              <ReportTemplates />
+            </RequireStaff>
+          }
+        />
+        <Route
+          path="/reports/:date"
+          element={
+            <RequireAuth>
+              <ReportDetail />
             </RequireAuth>
           }
         />
