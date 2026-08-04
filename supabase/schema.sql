@@ -220,3 +220,67 @@ revoke all on function add_api_usage(text, bigint, bigint, integer, integer, big
 grant execute on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint) to service_role;
 
 -- users テーブルには anon 向けポリシーを一切作成しない（service role key のみが操作可能。従来どおり）
+
+-- ============================================================
+-- 日報機能（2026-08-04〜。Phase 1: 権限ロール + 日報ヘッダ/明細 + 定型文マスタ）
+-- 詳細は docs/daily-report-plan.md を参照
+-- ============================================================
+
+-- 権限ロール。staff=従来どおり全機能 / owner=日報の閲覧のみ（書き込み不可） / admin=将来の分離用
+-- 既存ユーザーは既定値 staff になるため、この追加による挙動の変化はない
+alter table users add column if not exists role text not null default 'staff';
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check check (role in ('staff', 'owner', 'admin'));
+
+-- 日報ヘッダ。1日1件（BKB＝備後町コイズミビルと小泉本社を1件にまとめる）
+create table if not exists daily_reports (
+  id          uuid primary key default gen_random_uuid(),
+  report_date date not null unique,
+  worker_am   text,
+  worker_pm   text,
+  work_start  time,
+  work_end    time,
+  created_by  uuid references users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists daily_reports_date_idx on daily_reports (report_date desc);
+
+-- 作業記録の明細（現行の「特記事項」。時刻＋内容）
+create table if not exists report_entries (
+  id             uuid primary key default gen_random_uuid(),
+  report_id      uuid not null references daily_reports(id) on delete cascade,
+  entry_time     time,
+  content        text not null default '',
+  -- タスク管理から転記した場合の元タスク。タスクが消えても明細自体は残す
+  source_task_id uuid references tasks(id) on delete set null,
+  sort_order     integer not null default 0,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create index if not exists report_entries_report_idx on report_entries (report_id, sort_order, entry_time);
+
+-- 定型文マスタ（ルーチン業務の文言。現行の「特記事項設定」に相当）
+create table if not exists routine_templates (
+  id         uuid primary key default gen_random_uuid(),
+  label      text not null,
+  sort_order integer not null default 0,
+  is_active  boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists routine_templates_order_idx on routine_templates (is_active, sort_order);
+
+drop trigger if exists daily_reports_set_updated_at on daily_reports;
+create trigger daily_reports_set_updated_at before update on daily_reports
+  for each row execute function set_updated_at();
+drop trigger if exists report_entries_set_updated_at on report_entries;
+create trigger report_entries_set_updated_at before update on report_entries
+  for each row execute function set_updated_at();
+
+-- 既存方針どおり anon/authenticated からは一切アクセス不可（service role のみ）
+alter table daily_reports     enable row level security;
+alter table report_entries    enable row level security;
+alter table routine_templates enable row level security;
+revoke all on daily_reports     from anon, authenticated;
+revoke all on report_entries    from anon, authenticated;
+revoke all on routine_templates from anon, authenticated;

@@ -73,7 +73,7 @@ export async function verifyRequestAuth(req) {
     const supabase = getAdminClient()
     const { data: user, error } = await supabase
       .from('users')
-      .select('token_version')
+      .select('token_version, role')
       .eq('id', payload.sub)
       .maybeSingle()
     // ユーザーが存在しない、または token_version が不一致（＝失効済み）なら無効
@@ -81,10 +81,34 @@ export async function verifyRequestAuth(req) {
     const currentVersion = user.token_version ?? 0
     const tokenVersion = payload.tv ?? 0
     if (currentVersion !== tokenVersion) return null
+    // ロールは常にDBの現在値を正とする（JWTに埋めた値ではなく毎回引く）。
+    // 権限を下げた時に有効期限（30日）を待たずに即反映させるため。
+    // role 列が無い場合や未設定は staff 扱い（後方互換）。
+    payload.role = user.role || 'staff'
   } catch (err) {
     console.error('verifyRequestAuth: token_version 突合に失敗', err)
     return null // フェイルクローズ（DB参照できない場合は無効扱い）
   }
 
   return payload
+}
+
+// ロール判定（2026-08-04。日報機能の追加に伴う権限分離）
+//  staff  : 従来どおり全機能
+//  owner  : 日報の閲覧のみ。書き込みとタスク管理系APIは不可（小泉産業様向け）
+//  admin  : staff と同等（将来の分離用）
+// role が未設定・不明な値のときは staff 扱いにはせず、最も制限の強い扱いにはしない。
+// 既存ユーザーは全員 role='staff' が入るため、この分岐で挙動が変わることはない。
+export function isOwner(auth) {
+  return (auth?.role || 'staff') === 'owner'
+}
+
+// 書き込みを許可してよいか（owner は読み取り専用）
+export function canWrite(auth) {
+  return Boolean(auth) && !isOwner(auth)
+}
+
+// タスク管理セクションを使ってよいか（owner は日報のみ）
+export function canUseTaskSection(auth) {
+  return Boolean(auth) && !isOwner(auth)
 }

@@ -5,6 +5,17 @@ import { signJwt, verifyJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
 import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
 import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
+import {
+  handleReportList,
+  handleReportGet,
+  handleReportCreate,
+  handleReportUpdate,
+  handleEntryCreate,
+  handleEntryUpdate,
+  handleEntryDelete,
+  handleTemplateList,
+  handleTemplateSave,
+} from './lib/reports.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -47,7 +58,7 @@ async function handleLogin(req, env) {
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('id, username, password_hash, display_name, token_version')
+      .select('id, username, password_hash, display_name, token_version, role')
       .eq('username', username)
       .maybeSingle()
 
@@ -85,7 +96,15 @@ async function handleLogin(req, env) {
 
     return json({
       token,
-      user: { id: user.id, username: user.username, display_name: user.display_name },
+      // role はフロントの画面出し分け（owner は日報のみ・読み取り専用）に使う。
+      // 権限判定の正はサーバー側（verifyRequestAuth が毎回DBから引く）で、
+      // ここで返す値は表示制御のためのもの。
+      user: {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        role: user.role || 'staff',
+      },
     })
   } catch (err) {
     console.error('login: 予期しないエラー', err)
@@ -846,6 +865,28 @@ async function route(req, env) {
   if (pathname === '/api/push/unsubscribe') {
     return req.method === 'POST' ? handlePushUnsubscribe(req) : json({ error: 'Method Not Allowed' }, 405)
   }
+  // --- 日報機能（2026-08-04〜。ハンドラは worker/lib/reports.js） ---
+  if (pathname === '/api/reports') {
+    return req.method === 'GET' ? handleReportList(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report') {
+    if (req.method === 'GET') return handleReportGet(req)
+    if (req.method === 'POST') return handleReportCreate(req)
+    if (req.method === 'PATCH') return handleReportUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/entries') {
+    if (req.method === 'POST') return handleEntryCreate(req)
+    if (req.method === 'PATCH') return handleEntryUpdate(req)
+    if (req.method === 'DELETE') return handleEntryDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/templates') {
+    if (req.method === 'GET') return handleTemplateList(req)
+    if (req.method === 'PUT') return handleTemplateSave(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+
   if (pathname.startsWith('/api/')) {
     return json({ error: 'Not Found' }, 404)
   }
