@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportPhotos from '../components/ReportPhotos'
-import { IconHome, IconChevronLeft, IconChevronRight, IconTrash } from '../components/Icons'
+import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
+import { IconHome, IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -288,15 +289,7 @@ export default function ReportDetail() {
                       </span>
                     )}
                     {!readOnly && (
-                      <button
-                        type="button"
-                        className="icon-btn-delete"
-                        onClick={() => handleDeleteEntry(e.id)}
-                        aria-label="この記録を削除"
-                        title="削除"
-                      >
-                        <IconTrash size={18} />
-                      </button>
+                      <ConfirmDeleteButton onConfirm={() => handleDeleteEntry(e.id)} label="この記録を削除" size={18} />
                     )}
                   </li>
                 ))}

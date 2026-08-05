@@ -8,7 +8,7 @@ import {
 } from '../lib/reports'
 import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
-import { IconTrash } from './Icons'
+import ConfirmDeleteButton from './ConfirmDeleteButton'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -195,15 +195,7 @@ export default function ReportPhotos({ reportId, readOnly }) {
                   aria-label="写真のコメント"
                 />
                 {!readOnly && (
-                  <button
-                    type="button"
-                    className="icon-btn-delete"
-                    onClick={() => handleDelete(p.id)}
-                    aria-label="この写真を削除"
-                    title="削除"
-                  >
-                    <IconTrash size={16} />
-                  </button>
+                  <ConfirmDeleteButton onConfirm={() => handleDelete(p.id)} label="この写真を削除" size={16} />
                 )}
               </li>
             ))}

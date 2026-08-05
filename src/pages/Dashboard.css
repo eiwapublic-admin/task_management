@@ -1749,6 +1749,29 @@
   background: color-mix(in srgb, var(--due-overdue) 8%, transparent);
 }
 
+/* 削除の確認（2026-08-05。誤操作防止）。タスク詳細の「スパム」確認と同じ考え方・見た目。 */
+.confirm-delete-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.confirm-delete-message { color: var(--due-overdue); font-weight: 600; white-space: nowrap; }
+
+.confirm-delete-go, .confirm-delete-cancel {
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.confirm-delete-go { color: #fff; background: var(--due-overdue); border: 1px solid var(--due-overdue); }
+.confirm-delete-cancel { color: var(--text-base); background: var(--bg-surface); border: 1px solid var(--border); }
+
 /* モーダル/オーバーレイの閉じる×。task-detail-close / attachment-preview-close と同じ見た目。 */
 .icon-btn-close {
   flex-shrink: 0;

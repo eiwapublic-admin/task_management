@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import { IconHome, IconChevronLeft, IconChevronRight, IconTrash } from '../components/Icons'
+import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
+import { IconHome, IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
@@ -444,15 +445,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
         <div className="inspection-modal-foot">
           <div className="inspection-modal-foot-left">
             {existing && (
-              <button
-                type="button"
-                className="icon-btn-delete"
-                onClick={() => onDelete(existing.id)}
-                aria-label="この記録を削除"
-                title="削除"
-              >
-                <IconTrash size={18} />
-              </button>
+              <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={18} />
             )}
             <label className="switch-field">
               <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
