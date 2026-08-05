@@ -20,7 +20,7 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam }) {
+export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam, onAddToReport }) {
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
   // プレビューが開いている間はタスク詳細側のEscape/Tab処理を無効化する
@@ -39,6 +39,9 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const [saved, setSaved] = useState(false)
   // スパム判定の確認表示（押し間違いでタスクがアーカイブへ消えるのを防ぐ）
   const [confirmingSpam, setConfirmingSpam] = useState(false)
+  // 「日報に追加」の処理中表示・エラー
+  const [addingToReport, setAddingToReport] = useState(false)
+  const [addReportError, setAddReportError] = useState('')
 
   // 添付ファイル（元メールから都度取得）
   const [attachments, setAttachments] = useState([])
@@ -61,6 +64,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setSaveError('')
     setSaved(false)
     setConfirmingSpam(false)
+    setAddReportError('')
   }, [task])
 
   // メール由来のタスクは、開いたときに元メールの添付ファイル一覧を取得する
@@ -235,6 +239,20 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
       setDownloadError(err.message || 'プレビューの取得に失敗しました')
     } finally {
       setPreviewingId('')
+    }
+  }
+
+  // 「日報に追加」。当日の日報の作業記録として、タスクのタイトルを内容に転記する。
+  // 実際の作成・遷移は呼び出し元（Dashboard/Archive）に任せる。
+  async function handleAddToReport() {
+    if (!onAddToReport || addingToReport) return
+    setAddingToReport(true)
+    setAddReportError('')
+    try {
+      await onAddToReport(task)
+    } catch (err) {
+      setAddReportError(err.message || '日報への追加に失敗しました')
+      setAddingToReport(false)
     }
   }
 
@@ -476,6 +494,17 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             ))}
           </div>
           <div className="task-detail-actions">
+            {addReportError && <span className="task-detail-save-error">{addReportError}</span>}
+            {onAddToReport && (
+              <button
+                type="button"
+                className="task-action-btn"
+                onClick={handleAddToReport}
+                disabled={addingToReport}
+              >
+                {addingToReport ? '追加中…' : '日報に追加'}
+              </button>
+            )}
             {mailUrl && (
               <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
                 メール参照

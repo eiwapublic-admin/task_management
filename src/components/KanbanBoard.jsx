@@ -15,6 +15,7 @@ export default function KanbanBoard({
   onUpdateTask,
   onOpenArchive,
   onSpamTask,
+  onAddToReport,
   lastFetchAt,
   sharedGmail,
 }) {
@@ -98,6 +99,7 @@ export default function KanbanBoard({
         assignees={assignees}
         onUpdateTask={onUpdateTask ? handleUpdateTask : undefined}
         onSpam={onSpamTask ? handleSpam : undefined}
+        onAddToReport={onAddToReport}
       />
       {showForm && (
         <TaskForm

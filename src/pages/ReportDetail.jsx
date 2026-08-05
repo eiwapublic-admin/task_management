@@ -166,7 +166,7 @@ export default function ReportDetail() {
             aria-label="日報一覧に戻る"
             title="日報一覧に戻る"
           >
-            <IconHome size={22} />
+            <IconHome size={32} />
           </button>
           <div className="report-nav">
             <button
@@ -303,36 +303,35 @@ export default function ReportDetail() {
               </ul>
 
               {!readOnly && (
-                <button
-                  type="button"
-                  className="icon-btn-add is-compact entry-add-trigger"
-                  onClick={() => handleAddEntry()}
-                  aria-label="記録を追加"
-                  title="記録を追加"
-                >
-                  ＋
-                </button>
-              )}
-
-              {!readOnly && templates.length > 0 && (
-                <div className="entry-templates">
-                  <select
-                    className="entry-template-select"
-                    value=""
-                    aria-label="定型文から追加"
-                    onChange={(e) => {
-                      const label = e.target.value
-                      e.target.value = ''
-                      if (label) handleAddEntry(label)
-                    }}
+                <div className="entry-add-row">
+                  <button
+                    type="button"
+                    className="icon-btn-add is-compact entry-add-trigger"
+                    onClick={() => handleAddEntry()}
+                    aria-label="記録を追加"
+                    title="記録を追加"
                   >
-                    <option value="">定型文から追加…</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.label}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
+                    ＋
+                  </button>
+                  {templates.length > 0 && (
+                    <select
+                      className="entry-template-select"
+                      value=""
+                      aria-label="定型文から追加"
+                      onChange={(e) => {
+                        const label = e.target.value
+                        e.target.value = ''
+                        if (label) handleAddEntry(label)
+                      }}
+                    >
+                      <option value="">定型文から追加…</option>
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.label}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </section>

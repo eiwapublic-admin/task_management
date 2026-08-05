@@ -1087,13 +1087,20 @@
   padding: 2px 8px;
 }
 
-/* 記録の追加ボタン。作業一覧の左端（データがある場合はその下）に置く（2026-08-05） */
-.entry-add-trigger { margin-bottom: var(--space-3); }
+/* 記録の追加ボタンと定型文からの追加を横並びにする。作業一覧の左端
+   （データがある場合はその下）に置く（2026-08-05。定型文の選択はこの行に統合） */
+.entry-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
 
-.entry-templates { display: flex; flex-direction: column; gap: 6px; }
+.entry-add-trigger { flex-shrink: 0; }
 
 /* 定型文はドロップダウンから選ぶとそのまま追加する（2026-08-05） */
 .entry-template-select {
+  flex: 1;
   max-width: 320px;
   padding: 7px 10px;
   font-size: 14px;
@@ -1163,6 +1170,16 @@
 
 .photo-loading, .photo-uploading { font-size: 12px; color: var(--text-muted); }
 .photo-uploading { cursor: default; }
+
+/* 縮小後のファイルサイズ・撮影/変更日時。写真の下に小さく表示する（2026-08-05） */
+.photo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
 
 .photo-comment {
   width: 100%;
@@ -1671,8 +1688,28 @@
 
 .icon-btn-nav:hover { color: var(--color-primary); }
 
-/* ホーム（一覧に戻る）。アイコンのみ・背景なしのフラットボタン。左上に置く（2026-08-05）。 */
+/* ホーム（一覧に戻る）。アイコンのみ・背景なしのフラットボタン。左上に置く（2026-08-05）。
+   よく使う操作のため大きめ・目立つ色にする（2026-08-05 追加調整）。 */
 .icon-btn-home {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-btn-home:hover { color: var(--color-primary-hover); }
+
+/* 定型文の設定など、滅多に使わない操作向けの歯車アイコンのみのボタン。
+   背景なしのフラットボタンで主要操作より控えめにする（2026-08-05）。 */
+.icon-btn-gear {
   flex-shrink: 0;
   width: 40px;
   height: 40px;
@@ -1687,7 +1724,7 @@
   padding: 0;
 }
 
-.icon-btn-home:hover { color: var(--color-primary); }
+.icon-btn-gear:hover { color: var(--color-primary); }
 
 /* 削除（ゴミ箱）。タスク詳細の閉じるボタンと同系（枠なし・ホバーで色が付く）。 */
 .icon-btn-delete {

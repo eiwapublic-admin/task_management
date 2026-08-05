@@ -110,7 +110,7 @@ export default function Inspections() {
             aria-label="日報一覧に戻る"
             title="日報一覧に戻る"
           >
-            <IconHome size={22} />
+            <IconHome size={32} />
           </button>
           <h2 className="page-title">自主検査表（日常）</h2>
         </div>

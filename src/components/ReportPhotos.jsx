@@ -6,7 +6,8 @@ import {
   deletePhoto,
   fetchPhotoObjectUrl,
 } from '../lib/reports'
-import { prepareImage, formatBytes } from '../lib/imageResize'
+import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
+import { formatDateTime } from '../lib/format'
 import { IconTrash } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
@@ -177,6 +178,13 @@ export default function ReportPhotos({ reportId, readOnly }) {
                     <span className="photo-loading">読み込み中…</span>
                   )}
                 </button>
+                {/* 縮小後のファイルサイズ（MB）と撮影/変更日時。写真の下に表示する（2026-08-05） */}
+                {(p.size > 0 || p.taken_at) && (
+                  <div className="photo-meta">
+                    {p.size > 0 && <span>{formatMB(p.size)}</span>}
+                    {p.taken_at && <span>{formatDateTime(p.taken_at)}</span>}
+                  </div>
+                )}
                 <input
                   className="photo-comment"
                   type="text"

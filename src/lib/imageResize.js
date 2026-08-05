@@ -111,6 +111,12 @@ export async function prepareImage(file, category = 'work') {
   return { file: blob, thumb, width, height, resized: true }
 }
 
+// バイト数をMB単位で整形する（写真の下に表示する縮小後サイズに使う）
+export function formatMB(bytes) {
+  if (!bytes) return null
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+}
+
 // バイト数を読みやすく整形する（使用量の表示に使う）
 export function formatBytes(bytes) {
   if (!bytes) return '0 B'

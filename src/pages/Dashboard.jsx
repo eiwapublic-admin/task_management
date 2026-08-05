@@ -4,6 +4,7 @@ import KanbanBoard from '../components/KanbanBoard'
 import AppHeader from '../components/AppHeader'
 import { fetchTasks, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
 import { createTask, updateTask } from '../lib/api'
+import { createReport, addEntry, todayJST, nowHHMM } from '../lib/reports'
 import { BILLING_URL } from '../lib/pricing'
 import './Dashboard.css'
 
@@ -128,6 +129,19 @@ export default function Dashboard() {
     return res.task
   }
 
+  // タスク詳細の「日報に追加」。当日の日報（未作成なら作成）に、タスクのタイトルを
+  // 内容とした作業記録を追加し、日報の該当日入力画面へ遷移する。
+  async function handleAddToReport(task) {
+    const today = todayJST()
+    const report = await createReport(today)
+    await addEntry(report.id, {
+      entry_time: nowHHMM(),
+      content: task.title,
+      source_task_id: task.id,
+    })
+    navigate(`/reports/${today}`)
+  }
+
   // 詳細画面での担当者・期限・留意事項の編集保存。更新後のタスクを返す。
   async function handleUpdateTask(id, values) {
     const res = await updateTask(id, values)
@@ -183,6 +197,7 @@ export default function Dashboard() {
           onUpdateTask={handleUpdateTask}
           onOpenArchive={() => navigate('/archive')}
           onSpamTask={handleSpamTask}
+          onAddToReport={handleAddToReport}
           lastFetchAt={lastFetchAt}
           sharedGmail={sharedGmail}
         />
