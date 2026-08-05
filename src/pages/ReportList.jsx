@@ -65,23 +65,31 @@ export default function ReportList() {
         <div className="reports-toolbar">
           <h2 className="page-title">日報</h2>
           <div className="reports-toolbar-actions">
-            {/* 自主検査表はハンバーガーメニューに入れず、この画面の見える位置に
-                置く（2026-08-05のご指摘）。定型文の設定は滅多に使わないため、
-                歯車アイコンのみにして「本日の日報を開く」の右隣に添える形にした
-                （2026-08-05 追加調整）。 */}
+            {/* 「本日の日報をつくる」は＋アイコンのみにして一番左端に置き、本日分が
+                未作成のときだけ表示する（2026-08-05）。iPhoneでもツールバーが1行に
+                収まるようにするため。自主検査表はハンバーガーメニューに入れず、この
+                画面の見える位置に置く（2026-08-05のご指摘）。定型文の設定は滅多に
+                使わないため、歯車アイコンのみにしている（2026-08-05 追加調整）。 */}
+            {!isOwner && !hasToday && (
+              <button
+                type="button"
+                className="icon-btn-add"
+                onClick={openToday}
+                disabled={creating}
+                aria-label="本日の日報をつくる"
+                title="本日の日報をつくる"
+              >
+                {creating ? '…' : '＋'}
+              </button>
+            )}
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/inspections')}>
               <IconClipboard size={18} />
               自主検査表
             </button>
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
               <IconCar size={18} />
-              違反車両一覧
+              違反車両
             </button>
-            {!isOwner && (
-              <button type="button" className="btn-primary" onClick={openToday} disabled={creating}>
-                {creating ? '準備中…' : hasToday ? '本日の日報を開く' : '＋ 本日の日報をつくる'}
-              </button>
-            )}
             {!isOwner && (
               <button
                 type="button"
@@ -123,7 +131,7 @@ export default function ReportList() {
                         <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
                         {r.report_date === today && <span className="report-today-badge">本日</span>}
                         <span className="report-workers">
-                          午前：{r.worker_am || '—'}　午後：{r.worker_pm || '—'}
+                          {r.worker_am || '—'} | {r.worker_pm || '—'}
                         </span>
                       </div>
                       <div className="report-row-body">
