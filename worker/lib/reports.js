@@ -1060,6 +1060,7 @@ export async function handleParkingRecognize(req) {
       p_fax_calls: 0,
       p_fax_input: 0,
       p_fax_output: 0,
+      p_parking_calls: 1,
     })
     if (usageErr) console.error('parking-recognize(usage):', usageErr.message)
 
