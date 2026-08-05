@@ -9,6 +9,7 @@ import {
 import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import { IconDownload } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -336,8 +337,14 @@ function PhotoPreview({ photo, onClose, onDelete }) {
           <div className="photo-overlay-actions">
             <div className="photo-overlay-actions-right">
               {url && (
-                <a className="btn-plain" href={url} download={photo.filename || 'photo.jpg'}>
-                  ダウンロード
+                <a
+                  className="icon-btn-download icon-btn-download-dark"
+                  href={url}
+                  download={photo.filename || 'photo.jpg'}
+                  aria-label="写真をダウンロード"
+                  title="ダウンロード"
+                >
+                  <IconDownload size={24} />
                 </a>
               )}
               {onDelete && <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={24} dark />}

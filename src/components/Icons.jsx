@@ -95,3 +95,13 @@ export function IconClip(props) {
     </Icon>
   )
 }
+
+export function IconDownload(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v12" />
+      <polyline points="7 10 12 15 17 10" />
+      <path d="M4 19h16" />
+    </Icon>
+  )
+}

@@ -184,6 +184,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
   - **送信者の右隣に発信元の宛名**（`contact`）を表示。`contact` が無ければ `sender_display`＋「様」で補う（生成前の既存タスク向けフォールバック）
   - **タイトル先頭に情報源アイコン**（上記）を表示
   - 担当者・期限・留意事項（remarks）は詳細画面で編集。**「保存」ボタンは1行目（期限の行）の右端**に青色で配置（`PATCH /api/tasks`）。担当者が「（担当未設定）」のときはオレンジで警告
+  - **保存・ステータス変更で詳細画面を自動的に閉じる（2026-08-05）**: 「保存」ボタンで保存に成功した時、およびフッタのステータスボタンを押した時は、そのまま詳細画面を閉じる（`onClose()`を続けて呼ぶ）。保存に失敗した場合は画面を閉じずエラーメッセージを表示する。Kanban・アーカイブどちらから開いた詳細画面でも共通の挙動
   - フッタの「ダウンロード」「返信」は黒背景ボタン
   - **添付ファイル**（メール由来タスクのみ）: 開いた時に**スレッド全体**の添付一覧を Gmail から取得（対象顧客宛メッセージのみ・別顧客分は除外）。ありなら「📎 添付あり」バッジ＋ファイル名・サイズ・[ダウンロード]ボタンを表示。返信で本文が上書きされても最初・途中の添付は残る。ダウンロードは Worker 経由で取得（後述 4-5）
   - **メール参照**: Gmail のウェブ画面で該当メールを開く（`https://mail.google.com/mail/?authuser=<共有アドレス>#all/<gmail_message_id>`。パスに `/u/<アドレス>` を埋め込む形式は 404 になることがあるため authuser クエリを使う。共有アカウントへのログインが必要）
@@ -208,11 +209,12 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **ウインドウ高さへの追従（2026-07-18）**: 幅900px超では画面全体をウインドウの高さに収め、ページ全体の縦スクロールバーを出さない（`.settings-page { height: 100vh; overflow: hidden }`）。左カラムは縦積みflexで項目間隔を詰め、収まらない場合は**左カラムのみ内部スクロール**する。右の「業務背景・振り分けルール」欄は幅・高さともに残りいっぱいまで伸縮する。左カラムの各入力欄は担当者名欄と同じ横幅に統一（`width: 100%`）。900px以下では従来どおり1カラム・ページ全体スクロールに戻る
 
 **従量課金事項画面（/usage）**:
-- 共通ヘッダー＋ページタイトル。ハンバーガーメニューの「従量課金事項」（設定の下）から遷移
-- 「Anthropic API 利用状況」（対象月・**分類したメール件数・分類したFAX件数**・入出力トークン・推定コストを縦並び・値のタブ位置を揃えて表示）＋試算の注釈
-  - **期間の切替と月別内訳（2026-08-03）**: 見出しを「今月の〜」から「Anthropic API 利用状況」に変更し、**「今月 / 先月 / 累計」の切替ボタン**を追加。累計は全期間の合計（対象期間も表示）。さらに下部に**月別の内訳テーブル**（月・メール・FAX・入出力トークン・推定コスト＋累計行）を置き、課金開始からの消費推移を一覧できるようにした。フロントは `GET /api/usage`（month 省略）で全期間を1回取得し、今月・先月・累計をクライアント側で集計する（月ごとに個別リクエストしない）。データが無い月は0件・$0として扱う。テーブルは狭い画面で `overflow-x: auto` により表だけ横スクロールさせ、ページ本体は横に溢れさせない
-  - **FAXの内訳を分離表示（2026-07-18）**: FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える可能性があるため、「分類したメール」件数はFAXを除いた件数、別行で「分類したFAX」件数を表示する。トークン数・推定コストは現状メール/FAX合算のまま（内訳データは `api_usage` に保持済み。単価別コスト試算はまだ未実装。5章参照）
-- 最下部に「Anthropic API 支払設定」ボタン（赤。以前は設定画面ヘッダーにあったものを移設）
+- 共通ヘッダー＋ページタイトル。ハンバーガーメニューの「従量課金事項」から遷移。**日報表示中（`/reports`配下）でも同じメニューから開ける**（オーナーは対象外。2026-08-05）
+- 「Anthropic API 利用状況」カードと「日報の写真ストレージ」カードを別枠に分け、両カードとも見出し行にグレーの塗りつぶしバー（`.usage-panel-title`）を敷いてメリハリを付けている（2026-08-05）
+- **一覧表のみに一本化（2026-08-05）**: 以前あった「今月 / 先月 / 累計」の切替ボタンと期間ごとの詳細表示（縦並びの値）は、月別の内訳テーブルと情報が重複するため廃止した。月別の内訳テーブル（列: 月・メール・FAX・**車両画像**・入出力トークン・推定コスト・**円換算（概算）**＋累計行）だけで完結させる。フロントは `GET /api/usage`（month 省略）で全期間を1回取得し、月ごとの表示値と累計行をクライアント側で集計する。データが無い月は0件・$0として扱う。テーブルは狭い画面で `overflow-x: auto` により表だけ横スクロールさせ、ページ本体は横に溢れさせない
+  - **FAX・車両画像の内訳を分離表示**: FAX（添付PDF/画像の読取を伴う分類。2026-07-18）と違反車両写真のAI読み取り（`recognizeVehicle`。2026-08-05）は通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える可能性があるため、「メール」件数はFAX・車両画像を除いた件数、別列で「FAX」「車両画像」件数を表示する。トークン数・推定コストは合算のまま（内訳データは `api_usage` に保持。単価別コスト試算はまだ未実装。5章参照）
+  - **円換算列（2026-08-05）**: 推定コスト（USD）に加え、行ごとに `formatJPY()`（目安レート `USD_JPY=155`）で円換算した概算額の列を追加した
+- 「Anthropic API 支払設定」ボタンは「Anthropic API 利用状況」カードの見出し行の右上に配置（2026-08-05。以前はカード下に赤ボタンで配置していたが、目立たせすぎる必要は薄いため黒背景に変更しつつ、関連するカードの中に収めた）
 
 ### 4-4. API エンドポイント（Worker）
 
@@ -228,7 +230,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/settings` | JWT | 設定一覧（`{key: value}`） |
 | PUT `/api/settings` | JWT | 許可キーのみ settings に upsert |
 | GET `/api/logs` | JWT | 操作ログ（新しい順・上限200） |
-| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、および2026-07-18よりFAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens` を含む）。**`month` を省略すると全期間の月別データを新しい順で返す**（`{months:[...]}`。今月・先月・累計の表示に使う。2026-08-03追加。データは月単位で増え方が緩やかなため全件返しても軽い） |
+| GET `/api/usage` | JWT | `month=YYYY-MM` の月次API利用量（入出力トークン・件数、FAX分の内訳 `fax_calls`/`fax_input_tokens`/`fax_output_tokens`（2026-07-18）、違反車両写真AI読み取り分の内訳 `parking_calls`（2026-08-05）を含む）。**`month` を省略すると全期間の月別データを新しい順で返す**（`{months:[...]}`。従量課金事項画面の月別内訳テーブルに使う。2026-08-03追加。データは月単位で増え方が緩やかなため全件返しても軽い） |
 | POST `/api/run-fetch` | JWT | パイプラインを force=true で即時実行 |
 | GET `/api/attachments` | JWT | `thread_id=…`（必須）でスレッド全体の添付一覧（ファイル名/MIME/サイズ/attachmentId/所属 message_id）を集約して返す。`thread_id` が `tasks.gmail_thread_id` に存在しないと404。対象タスクの顧客宛メッセージのみに絞り込み。`message_id=…`（任意）も受け取り、一意キー `gmail_message_id` で対象タスクを特定する（FAXのように同一スレッドに複数タスクが並ぶ場合の取り違え・空振りを防ぐ。2026-07-24追加）。FAX（`channel='fax'`）は当該メッセージ単体の添付のみを返す |
 | GET `/api/attachment` | JWT（または`preview_token`） | `thread_id`・`message_id`・`attachment_id` が必須。`thread_id` に対応するタスクが存在し、`message_id` がそのスレッドに実在することを検証してから本体を返す（`Content-Disposition: attachment`、日本語名は RFC5987 併記）。クエリに対象と一致する有効な`preview_token`（下記発行）があれば、通常のBearer認証の代わりとして受け付け、`Content-Disposition: inline`で返す（PDFプレビュー用） |
@@ -249,7 +251,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。`closed:true` を送ると点検データを持たない「休館日」マーカーとして保存する（4-12参照） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
-| POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は既存の`api_usage`に加算する（2026-08-05追加。4-13参照） |
+| POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（`plate_number`は数字4桁に正規化。判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は`api_usage`の`parking_calls`列に加算し、メール/FAXとは別内訳として従量課金事項画面に表示する（2026-08-05追加。4-13参照） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -427,7 +429,8 @@ FileMaker の「不正駐車記録」タブ・一覧画面に相当する機能�
   `POST /api/report/parking/recognize`（`{photo_id}`）がその写真をClaude（vision）に渡し、
   ナンバーの地域・番号・メーカー・車種を読み取って返す。**空欄の項目にだけ**反映し、既に入力済みの項目は上書きしない。
   FAX読み取りと同じ方針で、判読に自信が持てない項目は創作せず`null`を返させる。
-  利用量は既存の`api_usage`（`add_api_usage`）にそのまま加算する（専用の内訳列は設けていない。5章参照）
+  利用量は`api_usage`の`parking_calls`列（`add_api_usage`の`p_parking_calls`引数。2026-08-05追加）に加算し、
+  従量課金事項画面の内訳表で「車両画像」としてメール・FAXとは別に表示する（5章参照）
 - **リスト選択（2026-08-05）**: 地域・ナンバー・メーカー・車種・テナント名（所有会社）は、`<datalist>`により
   過去の全レコードから重複を除いた値を候補として選べる（自由入力も可能）。候補は`GET /api/report/parking`
   （`report_id`省略・全期間）を1回取得して生成する
@@ -451,6 +454,9 @@ FileMaker の「不正駐車記録」タブ・一覧画面に相当する機能�
   取得済みの本体画像からダウンロードできる`<a download>`リンクを追加した（読み取り専用時も表示。削除ボタンは
   読み取り専用時のみ非表示）。「写真から読み取る」ボタン（左）とダウンロード・削除ボタン（右）の間隔を空けるため、
   右側2つを`margin-left: auto`のグループ（`.photo-overlay-actions-right`）にまとめてモーダル右端へ揃えた
+- **ダウンロードのアイコン化（2026-08-05）**: 当初は「ダウンロード」のテキストリンクだったが、一般的な
+  「↓＋下線（トレイ）」の線画アイコン（`IconDownload`。`Icons.jsx`）に変更した（`.icon-btn-download` /
+  暗い背景向けの `.icon-btn-download-dark`。削除アイコンと同じ大きさ・配置ルール）
 - **削除アイコンの拡大（2026-08-05）**: 共通CSS `.icon-btn-delete` を34px→40pxに拡大し、各画面の
   `ConfirmDeleteButton`の`size`指定も合わせて引き上げた
 - **未実装**: 入力時に同一ナンバーの過去履歴・累計回数を自動表示する機能（一覧画面の「累計回数順」はあるが、
@@ -527,8 +533,8 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 | parking_violations | id / report_id(FK cascade) / checked_at / plate_region / plate_number / maker / model / owner_company / violations(text[]) / note | 違反車両。`daily_reports`とは独立したテーブルで、日を跨って一覧できるようにしている（`/reports/parking`。4-13参照）。`plate_region`+`plate_number`で過去履歴・累計回数を名寄せする |
 
 ### api_usage
-month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「分類したメール」「分類したFAX」の件数を分けて表示）
-> **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。
+month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / **parking_calls**（違反車両写真AI読み取り分の内訳。マイグレーション `add_parking_usage_breakdown`。2026-08-05） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）・違反車両写真のAI読み取りは通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「メール」「FAX」「車両画像」の件数を分けて表示）
+> **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。**`add_parking_usage_breakdown`（2026-08-05）ではこの教訓を踏まえ、`drop function if exists`（旧7引数版）→ `create function`（新8引数版）で単一シグネチャに保ち、`revoke`/`grant`も新シグネチャに対して明示的にやり直している**。
 
 ### push_subscriptions（2026-07-21。Web Push通知の購読情報）
 | 列 | 型 | 備考 |

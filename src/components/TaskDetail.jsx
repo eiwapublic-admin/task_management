@@ -180,6 +180,8 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
         remarks: remarks.trim() || null,
       })
       setSaved(true)
+      // 保存できたら詳細画面を閉じる（2026-08-05）
+      onClose()
     } catch (err) {
       setSaveError(err.message || '保存に失敗しました')
     } finally {
@@ -487,7 +489,11 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                 key={status}
                 className={status === task.status ? 'status-btn active' : 'status-btn'}
                 aria-pressed={status === task.status}
-                onClick={() => onStatusChange(task, status)}
+                onClick={() => {
+                  onStatusChange(task, status)
+                  // ステータス変更後は詳細画面を閉じる（2026-08-05）
+                  onClose()
+                }}
               >
                 {status}
               </button>
