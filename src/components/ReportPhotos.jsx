@@ -174,11 +174,12 @@ export default function ReportPhotos({ reportId, readOnly }) {
                 {!readOnly && (
                   <button
                     type="button"
-                    className="photo-delete"
+                    className="icon-btn-delete"
                     onClick={() => handleDelete(p.id)}
                     aria-label="この写真を削除"
+                    title="削除"
                   >
-                    削除
+                    🗑
                   </button>
                 )}
               </li>
@@ -274,6 +275,8 @@ function PhotoPreview({ photo, onClose }) {
   return (
     <div className="photo-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="photo-overlay-inner" onClick={(e) => e.stopPropagation()}>
+        {/* 暗い背景の上に載るボタンなので、明るい面の icon-btn-close ではなく
+            白丸に濃色の×を使う専用スタイル（photo-overlay-close）のままにする */}
         <button type="button" className="photo-overlay-close" onClick={onClose} aria-label="閉じる">
           ×
         </button>

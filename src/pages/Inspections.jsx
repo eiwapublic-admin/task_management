@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import { getCurrentUser } from '../lib/auth'
 import {
@@ -9,6 +10,8 @@ import {
   fetchInspections,
   saveInspection,
   deleteInspection,
+  fetchHolidays,
+  weekdayInfo,
   currentMonthJST,
   shiftMonth,
   daysInMonth,
@@ -21,12 +24,14 @@ import './Dashboard.css'
 // 紙の記入ルール「不備が有る場合は項目に×とし、良好の場合は確認箇所一斉に○とすること」に
 // 合わせ、通常は「すべて良好」1タップで済み、不備のある項目だけ×/◎に落とす。
 export default function Inspections() {
+  const navigate = useNavigate()
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
 
   const [month, setMonth] = useState(currentMonthJST())
   const [building, setBuilding] = useState(INSPECTION_BUILDINGS[0])
   const [rows, setRows] = useState([])
+  const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null) // 入力中の日付（'YYYY-MM-DD'）
@@ -47,6 +52,14 @@ export default function Inspections() {
     load()
   }, [load])
 
+  // 祝日一覧は月に依らず一度だけ取得する（データセット全体が小さいため）。
+  // 取得できなくても曜日の色分け（土曜/日曜）自体は機能させる。
+  useEffect(() => {
+    fetchHolidays()
+      .then(setHolidays)
+      .catch(() => setHolidays({}))
+  }, [])
+
   // 表示中のビル・月の記録を日付で引けるようにする
   const byDate = useMemo(() => {
     const map = new Map()
@@ -62,7 +75,6 @@ export default function Inspections() {
   }, [month])
 
   const today = todayJST()
-  const isCurrentMonth = month === currentMonthJST()
 
   async function handleSaved(inspection) {
     setRows((prev) => {
@@ -72,6 +84,7 @@ export default function Inspections() {
     setEditing(null)
   }
 
+  // 削除。「休館取り消し」も同じ経路（休館日マーカーを消せば未入力に戻る）。
   async function handleDelete(id) {
     setRows((prev) => prev.filter((r) => r.id !== id))
     try {
@@ -82,27 +95,55 @@ export default function Inspections() {
     }
   }
 
+  // 未入力の日を「休館日」としてマークする（点検データを持たないレコード）。
+  // 誤操作を想定し、行の右端の「休館取り消し」でいつでも元に戻せる。
+  async function handleMarkClosed(date) {
+    setError('')
+    try {
+      const saved = await saveInspection({ building, inspected_on: date, closed: true })
+      setRows((prev) => [...prev.filter((r) => r.id !== saved.id), saved])
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   return (
     <div className="reports-page">
       <AppHeader />
       <div className="reports-container inspections-container">
         <div className="reports-toolbar">
+          <button
+            type="button"
+            className="icon-btn-home"
+            onClick={() => navigate('/reports')}
+            aria-label="日報一覧に戻る"
+            title="日報一覧に戻る"
+          >
+            🏠 一覧へ
+          </button>
           <h2 className="page-title">自主検査表（日常）</h2>
-          {!readOnly && isCurrentMonth && !byDate.has(today) && (
-            <button type="button" className="btn-primary" onClick={() => setEditing(today)}>
-              ＋ 本日の点検を記録
-            </button>
-          )}
         </div>
 
         <div className="inspection-controls">
           <div className="inspection-month">
-            <button type="button" onClick={() => setMonth(shiftMonth(month, -1))}>
-              ‹ 前月
+            <button
+              type="button"
+              className="icon-btn-nav"
+              onClick={() => setMonth(shiftMonth(month, -1))}
+              aria-label="前月"
+              title="前月"
+            >
+              ‹
             </button>
             <span className="inspection-month-label">{month.replace('-', '年')}月</span>
-            <button type="button" onClick={() => setMonth(shiftMonth(month, 1))}>
-              翌月 ›
+            <button
+              type="button"
+              className="icon-btn-nav"
+              onClick={() => setMonth(shiftMonth(month, 1))}
+              aria-label="翌月"
+              title="翌月"
+            >
+              ›
             </button>
           </div>
           <div className="inspection-buildings" role="group" aria-label="ビル">
@@ -146,26 +187,34 @@ export default function Inspections() {
                   const day = Number(date.slice(-2))
                   const ngKeys = rec ? Object.keys(rec.items || {}) : []
                   const isFuture = date > today
+                  const closed = Boolean(rec?.closed)
+                  const wd = weekdayInfo(date, holidays)
+                  const rowClass = [date === today && 'is-today', closed && 'is-closed'].filter(Boolean).join(' ')
                   return (
-                    <tr key={date} className={date === today ? 'is-today' : undefined}>
-                      <th scope="row" className="inspection-day">
+                    <tr key={date} className={rowClass || undefined}>
+                      <th
+                        scope="row"
+                        className={`inspection-day ${wd.className}`}
+                        title={wd.holidayName || undefined}
+                      >
                         {day}
+                        <span className="inspection-weekday">({wd.label})</span>
                         {date === today && <span className="report-today-badge">本日</span>}
                       </th>
-                      <td>{rec?.inspector || (rec ? '—' : '')}</td>
+                      <td>{closed ? '—' : rec?.inspector || (rec ? '—' : '')}</td>
                       <td>
-                        {!rec ? (
+                        {closed ? (
+                          <span className="inspection-closed-label">休館日</span>
+                        ) : !rec ? (
                           <span className="inspection-empty">{isFuture ? '' : '未実施'}</span>
                         ) : rec.all_clear ? (
                           <span className="inspection-ok">○ 異常なし</span>
                         ) : (
-                          <span className="inspection-ng">
-                            {ngKeys.length} 件の不備
-                          </span>
+                          <span className="inspection-ng">{ngKeys.length} 件の不備</span>
                         )}
                       </td>
                       <td className="inspection-issues">
-                        {rec && ngKeys.length > 0 && (
+                        {!closed && rec && ngKeys.length > 0 && (
                           <span>
                             {ngKeys
                               .map((k) => {
@@ -175,23 +224,49 @@ export default function Inspections() {
                               .join('、')}
                           </span>
                         )}
-                        {rec?.note && <span className="inspection-note">{rec.note}</span>}
+                        {!closed && rec?.note && <span className="inspection-note">{rec.note}</span>}
                       </td>
                       <td className="inspection-actions">
-                        {!readOnly && !isFuture && (
-                          <button type="button" className="btn-plain" onClick={() => setEditing(date)}>
-                            {rec ? '編集' : '記録'}
+                        {readOnly ? null : closed ? (
+                          <button type="button" className="btn-plain" onClick={() => handleDelete(rec.id)}>
+                            休館取り消し
                           </button>
-                        )}
-                        {!readOnly && rec && (
-                          <button
-                            type="button"
-                            className="inspection-delete"
-                            onClick={() => handleDelete(rec.id)}
-                            aria-label="この記録を削除"
-                          >
-                            ×
-                          </button>
+                        ) : !rec ? (
+                          !isFuture && (
+                            <>
+                              <button
+                                type="button"
+                                className="icon-btn-add is-compact"
+                                onClick={() => setEditing(date)}
+                                aria-label="点検を記録"
+                                title="点検を記録"
+                              >
+                                ＋
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-plain"
+                                onClick={() => handleMarkClosed(date)}
+                              >
+                                休館日
+                              </button>
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <button type="button" className="btn-plain" onClick={() => setEditing(date)}>
+                              編集
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn-delete"
+                              onClick={() => handleDelete(rec.id)}
+                              aria-label="この記録を削除"
+                              title="削除"
+                            >
+                              🗑
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -285,7 +360,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
           <h3>
             {formatReportDate(date)}　{building}
           </h3>
-          <button type="button" className="inspection-close" onClick={onClose} aria-label="閉じる">
+          <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
         </div>

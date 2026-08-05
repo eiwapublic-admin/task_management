@@ -153,13 +153,9 @@ export default function AppHeader() {
             <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
               {inReports || isOwner ? (
                 <>
+                  {/* 自主検査表・定型文の設定は日報一覧画面の見える位置に移動済み（2026-08-05）。
+                      ここには日報セクションへ戻る導線だけを残す */}
                   <button onClick={() => goTo('/reports')}>日報一覧</button>
-                  <button onClick={() => goTo('/reports/inspections')}>自主検査表</button>
-                  {!isOwner && (
-                    <button className="btn-settings" onClick={() => goTo('/reports/templates')}>
-                      定型文の設定
-                    </button>
-                  )}
                 </>
               ) : (
                 <>

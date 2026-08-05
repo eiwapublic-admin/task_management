@@ -6,6 +6,7 @@
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
+import { fetchHolidays } from './holidays.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
 const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
@@ -150,10 +151,14 @@ export async function handleReportCreate(req) {
       .maybeSingle()
     if (existing) return json({ report: { ...existing, entries: [] } })
 
+    // 作業者（午前/午後）は指定が無ければ入力者本人の名前を既定値にする（2026-08-05）。
+    // 実際には入力者本人が作業していることが多く、選び直す手間を省くため。
+    // 明示的に空文字を送ってきた場合（担当者を空にしたい場合）はそれを尊重する。
+    const defaultWorker = auth.display_name || null
     const row = {
       report_date: date,
-      worker_am: trimOrNull(payload?.worker_am, 50),
-      worker_pm: trimOrNull(payload?.worker_pm, 50),
+      worker_am: 'worker_am' in (payload || {}) ? trimOrNull(payload.worker_am, 50) : defaultWorker,
+      worker_pm: 'worker_pm' in (payload || {}) ? trimOrNull(payload.worker_pm, 50) : defaultWorker,
       work_start: normalizeTime(payload?.work_start) ?? '09:00:00',
       work_end: normalizeTime(payload?.work_end) ?? '18:00:00',
       created_by: auth.sub,
@@ -664,7 +669,7 @@ export async function handleStorageUsage(req) {
 // ============================================================
 
 const INSPECTION_COLUMNS =
-  'id, building, inspected_on, inspector, all_clear, items, note, periodic_result, confirmed_by, created_at, updated_at'
+  'id, building, inspected_on, inspector, all_clear, items, note, periodic_result, confirmed_by, closed, created_at, updated_at'
 
 // 紙の様式に並ぶ検査項目（順序も紙に合わせる）。判定値は ok=良 / ng=不良 / fixed=即時改修。
 // 「避難通路」「喫煙場所」は紙でも2行あるため区別してキーを分ける。
@@ -755,20 +760,25 @@ export async function handleInspectionSave(req) {
     if (!VALID_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
     if (!isValidDate(date)) return json({ error: 'inspected_on が不正です' }, 400)
 
-    const items = sanitizeItems(payload?.items)
+    // 休館日マーカー（2026-08-05）。点検データを持たない特別なレコードで、
+    // 「その日は点検の必要が無かった」ことだけを記録する。誤操作を想定し、
+    // 取り消しは専用ボタンから DELETE で行う（未入力の状態に戻す）。
+    const closed = Boolean(payload?.closed)
+    const items = closed ? {} : sanitizeItems(payload?.items)
     // 不備が1件でもあるなら「一斉に○」は成立しない。画面側の指定によらずサーバーで確定させる
-    const allClear = Object.keys(items).length === 0 && payload?.all_clear !== false
+    const allClear = !closed && Object.keys(items).length === 0 && payload?.all_clear !== false
 
     const periodic = payload?.periodic_result
     const row = {
       building,
       inspected_on: date,
-      inspector: trimOrNull(payload?.inspector, 50),
+      inspector: closed ? null : trimOrNull(payload?.inspector, 50),
       all_clear: allClear,
       items,
-      note: typeof payload?.note === 'string' ? payload.note.trim().slice(0, 1000) || null : null,
-      periodic_result: periodic === 'ok' || periodic === 'ng' ? periodic : null,
-      confirmed_by: trimOrNull(payload?.confirmed_by, 50),
+      note: closed || typeof payload?.note !== 'string' ? null : payload.note.trim().slice(0, 1000) || null,
+      periodic_result: !closed && (periodic === 'ok' || periodic === 'ng') ? periodic : null,
+      confirmed_by: closed ? null : trimOrNull(payload?.confirmed_by, 50),
+      closed,
       created_by: auth.sub,
     }
 
@@ -786,6 +796,20 @@ export async function handleInspectionSave(req) {
   } catch (err) {
     console.error('inspection-save 失敗:', err)
     return json({ error: '自主検査表の保存に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report/holidays — 日本の祝日一覧（{日付: 祝日名}）。自主検査表の日付列の色分けに使う。
+// 取得に失敗しても画面自体は表示できるよう、空オブジェクトを返す（土日の色分けだけは効く）。
+export async function handleHolidays(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const holidays = await fetchHolidays()
+    return json({ holidays })
+  } catch (err) {
+    console.error('holidays 取得失敗:', err)
+    return json({ holidays: {} })
   }
 }
 
