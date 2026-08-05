@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportPhotos from '../components/ReportPhotos'
+import { IconHome, IconChevronLeft, IconChevronRight, IconTrash } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -165,7 +166,7 @@ export default function ReportDetail() {
             aria-label="日報一覧に戻る"
             title="日報一覧に戻る"
           >
-            🏠 一覧へ
+            <IconHome size={22} />
           </button>
           <div className="report-nav">
             <button
@@ -175,7 +176,7 @@ export default function ReportDetail() {
               aria-label="前日"
               title="前日"
             >
-              ‹
+              <IconChevronLeft size={28} />
             </button>
             <h2 className="page-title">
               {formatReportDate(date)}
@@ -188,7 +189,7 @@ export default function ReportDetail() {
               aria-label="翌日"
               title="翌日"
             >
-              ›
+              <IconChevronRight size={28} />
             </button>
           </div>
           <div className="report-head-right">{savedAt && <span className="report-saved">保存しました</span>}</div>
@@ -257,17 +258,6 @@ export default function ReportDetail() {
               <h3 className="report-card-title">
                 作業記録
                 <span className="report-count">{entries.length} 件</span>
-                {!readOnly && (
-                  <button
-                    type="button"
-                    className="icon-btn-add"
-                    onClick={() => handleAddEntry()}
-                    aria-label="記録を追加"
-                    title="記録を追加"
-                  >
-                    ＋
-                  </button>
-                )}
               </h3>
 
               {entries.length === 0 && <p className="settings-hint">まだ記録がありません。</p>}
@@ -305,30 +295,44 @@ export default function ReportDetail() {
                         aria-label="この記録を削除"
                         title="削除"
                       >
-                        🗑
+                        <IconTrash size={18} />
                       </button>
                     )}
                   </li>
                 ))}
               </ul>
 
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-btn-add is-compact entry-add-trigger"
+                  onClick={() => handleAddEntry()}
+                  aria-label="記録を追加"
+                  title="記録を追加"
+                >
+                  ＋
+                </button>
+              )}
+
               {!readOnly && templates.length > 0 && (
-                <div className="entry-add">
-                  <div className="entry-templates">
-                    <span className="entry-templates-label">定型文から追加</span>
-                    <div className="entry-template-chips">
-                      {templates.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          className="entry-template-chip"
-                          onClick={() => handleAddEntry(t.label)}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="entry-templates">
+                  <select
+                    className="entry-template-select"
+                    value=""
+                    aria-label="定型文から追加"
+                    onChange={(e) => {
+                      const label = e.target.value
+                      e.target.value = ''
+                      if (label) handleAddEntry(label)
+                    }}
+                  >
+                    <option value="">定型文から追加…</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.label}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </section>

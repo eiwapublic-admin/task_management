@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import { IconHome } from '../components/Icons'
 import { fetchTemplates, saveTemplates } from '../lib/reports'
 import './Dashboard.css'
 
@@ -51,7 +52,7 @@ export default function ReportTemplates() {
             aria-label="日報一覧に戻る"
             title="日報一覧に戻る"
           >
-            🏠 一覧へ
+            <IconHome size={22} />
           </button>
           <h2 className="page-title">定型文の設定</h2>
           <div className="report-head-right">

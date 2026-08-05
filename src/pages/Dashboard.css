@@ -925,6 +925,9 @@
 }
 
 .report-date { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+/* 土曜=青、日曜・祝日=赤（2026-08-05。自主検査表の日付列と同じ配色） */
+.report-date.is-saturday { color: #1d4ed8; }
+.report-date.is-holiday { color: #dc2626; }
 
 .report-workers { font-size: 13px; color: var(--text-muted); }
 
@@ -999,8 +1002,6 @@
   align-items: center;
   gap: var(--space-2);
 }
-
-.report-card-title .icon-btn-add { margin-left: auto; }
 
 .report-count { font-size: 13px; color: var(--reports-header-ink); opacity: 0.75; font-weight: 600; }
 
@@ -1086,24 +1087,21 @@
   padding: 2px 8px;
 }
 
-.entry-add { display: flex; flex-direction: column; gap: var(--space-3); }
+/* 記録の追加ボタン。作業一覧の左端（データがある場合はその下）に置く（2026-08-05） */
+.entry-add-trigger { margin-bottom: var(--space-3); }
 
 .entry-templates { display: flex; flex-direction: column; gap: 6px; }
-.entry-templates-label { font-size: 12px; color: var(--text-muted); }
-.entry-template-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.entry-template-chip {
-  padding: 5px 12px;
-  font-size: 13px;
-  color: var(--text-base);
-  background: var(--bg-surface);
+/* 定型文はドロップダウンから選ぶとそのまま追加する（2026-08-05） */
+.entry-template-select {
+  max-width: 320px;
+  padding: 7px 10px;
+  font-size: 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-  text-align: left;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
 }
-
-.entry-template-chip:hover { border-color: #33604d; color: #33604d; }
 
 .template-textarea {
   width: 100%;
@@ -1127,7 +1125,8 @@
   .entry-time { width: 110px; }
   .entry-content { flex-basis: 100%; order: 3; }
   /* iOSでフォーカス時にズームされるのを防ぐため16px以上にする */
-  .entry-content, .entry-time, .report-field select, .report-field input, .template-textarea {
+  .entry-content, .entry-time, .report-field select, .report-field input, .template-textarea,
+  .entry-template-select {
     font-size: 16px;
   }
 }
@@ -1175,12 +1174,27 @@
   color: var(--text-base);
 }
 
-.photo-actions {
+/* 空枠の追加タイル。写真を追加するたびに末尾に残るので連続して追加できる（2026-08-05） */
+.photo-add-item { justify-content: flex-start; }
+
+.photo-dropzone {
+  width: 100%;
+  aspect-ratio: 4 / 3;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  justify-content: center;
+  padding: var(--space-2);
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  text-align: center;
 }
+
+.photo-dropzone.is-dragover { border-color: var(--color-primary); background: var(--color-primary-weak); }
+
+.photo-dropzone-hint { font-size: 12px; color: var(--text-muted); }
+
+.photo-add-btn { width: 100%; height: 36px; font-size: 13px; padding: 0 var(--space-2); }
 
 .photo-hint { margin: 0; }
 
@@ -1310,9 +1324,17 @@
 .inspection-table tbody tr:last-child td { border-bottom: none; }
 .inspection-table tbody tr.is-today { background: rgba(51, 96, 77, 0.06); }
 
-/* 休館日の行はグレーアウトして「対応不要」であることを一目で分かるようにする（2026-08-05） */
-.inspection-table tbody tr.is-closed { background: var(--bg-subtle); color: var(--text-muted); }
-.inspection-table tbody tr.is-closed .inspection-day { color: var(--text-muted); }
+/* 休館日の行はグレーアウトして「対応不要」であることを一目で分かるようにする（2026-08-05）。
+   日付の色（平日・土曜・日曜/祝日）は休館日でも変えない */
+.inspection-table tbody tr.is-closed { background: var(--border); color: var(--text-muted); }
+
+/* 行全体をタップして詳細モーダルを開ける（2026-08-05。追加/変更を意識しないUIにする） */
+.inspection-table tbody tr.is-clickable { cursor: pointer; }
+.inspection-table tbody tr.is-clickable:hover,
+.inspection-table tbody tr.is-clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
 
 .inspection-day {
   width: 84px;
@@ -1333,7 +1355,6 @@
 .inspection-closed-label { color: var(--text-muted); font-size: 13px; font-weight: 600; }
 .inspection-issues { font-size: 13px; color: var(--text-base); }
 .inspection-note { display: block; color: var(--text-muted); }
-.inspection-actions { white-space: nowrap; display: flex; gap: 8px; align-items: center; }
 .inspection-legend { margin-top: var(--space-3); }
 
 /* 入力モーダル */
@@ -1403,8 +1424,17 @@
   border-color: #33604d;
 }
 
+/* 休館日はステータス表示をグレーにする（2026-08-05） */
+.inspection-status.is-closed {
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+.inspection-status.is-closed strong { color: var(--text-muted); }
+
 .inspection-status strong { color: var(--text-strong); }
 .inspection-status span { font-size: 13px; color: var(--text-muted); }
+
+.inspection-hint { margin: 0; font-size: 13px; color: var(--text-muted); }
 
 .inspection-group h4 {
   margin: 0 0 6px;
@@ -1464,8 +1494,10 @@
 
 .inspection-modal-foot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
   position: sticky;
@@ -1473,6 +1505,55 @@
   background: var(--bg-surface);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
+
+.inspection-modal-foot-left, .inspection-modal-foot-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* オン/オフのスイッチ（休館日トグル等。2026-08-05） */
+.switch-field { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.switch-field input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition);
+}
+
+.switch-field input:checked + .switch-track { background: var(--color-primary); }
+.switch-field input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+.switch-field input:focus-visible + .switch-track { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.switch-label { font-size: 14px; font-weight: 600; color: var(--text-base); }
 
 @media (max-width: 640px) {
   .inspection-items { grid-template-columns: 1fr 1fr; }
@@ -1486,6 +1567,14 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* 「自主検査表」「定型文の設定」「本日の日報」のボタンは大きさ・フォントを統一する（2026-08-05） */
+.reports-toolbar-actions .btn-plain {
+  height: 44px;
+  padding: 0 var(--space-5);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 /* ============================================================
@@ -1564,45 +1653,41 @@
 /* 表の行内など、大きすぎると窮屈な場所向けの小さめ版 */
 .icon-btn-add.is-compact { width: 30px; height: 30px; font-size: 18px; }
 
-/* 年月・日付の移動（‹ ›）。日付のすぐ左右に置いて目立たせる。 */
+/* 年月・日付の移動（‹ ›）。背景なしのフラットボタンで、アイコン自体を大きく目立たせる（2026-08-05）。 */
 .icon-btn-nav {
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 700;
   color: var(--text-base);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   padding: 0;
 }
 
-.icon-btn-nav:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.icon-btn-nav:hover { color: var(--color-primary); }
 
-/* ホーム（一覧に戻る）。左上に置く。 */
+/* ホーム（一覧に戻る）。アイコンのみ・背景なしのフラットボタン。左上に置く（2026-08-05）。 */
 .icon-btn-home {
   flex-shrink: 0;
-  height: 38px;
-  padding: 0 var(--space-3);
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-base);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  white-space: nowrap;
+  padding: 0;
 }
 
-.icon-btn-home:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.icon-btn-home:hover { color: var(--color-primary); }
 
 /* 削除（ゴミ箱）。タスク詳細の閉じるボタンと同系（枠なし・ホバーで色が付く）。 */
 .icon-btn-delete {
