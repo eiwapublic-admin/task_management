@@ -26,6 +26,11 @@ function uniqueSorted(list) {
   return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
 }
 
+// ナンバーは数字4桁のみを保持する（「-」等の区切り文字は除去。2026-08-05）
+function sanitizePlateNumber(value) {
+  return (value || '').replace(/\D/g, '').slice(0, 4)
+}
+
 // 違反車両の登録。写真セクションと同じ「空枠にドラッグ＆ドロップ/撮影」の流れで、
 // 1件につき写真2枚まで登録し、その場でナンバー等の項目を入力できるようにする。
 // 一覧は日を跨って見られるよう別画面（/reports/parking）に分けている（このセクションは当日分のみ）。
@@ -243,7 +248,7 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
     const result = await recognizeParkingPhoto(photoId)
     const patch = {}
     if (!violation.plate_region && result.plate_region) patch.plate_region = result.plate_region
-    if (!violation.plate_number && result.plate_number) patch.plate_number = result.plate_number
+    if (!violation.plate_number && result.plate_number) patch.plate_number = sanitizePlateNumber(result.plate_number)
     if (!violation.maker && result.maker) patch.maker = result.maker
     if (!violation.model && result.model) patch.model = result.model
     if (Object.keys(patch).length > 0) patchViolation(violation.id, patch)
@@ -484,10 +489,11 @@ function ParkingCard({
           <input
             type="text"
             placeholder="ナンバー"
+            inputMode="numeric"
             list="parking-plate-options"
             value={v.plate_number || ''}
             disabled={readOnly}
-            onChange={(e) => onPatch({ plate_number: e.target.value })}
+            onChange={(e) => onPatch({ plate_number: sanitizePlateNumber(e.target.value) })}
             aria-label="ナンバー"
           />
         </div>
@@ -543,7 +549,7 @@ function ParkingCard({
           aria-label="補足"
         />
       </div>
-      {!readOnly && <ConfirmDeleteButton onConfirm={onDelete} label="この記録を削除" size={16} />}
+      {!readOnly && <ConfirmDeleteButton onConfirm={onDelete} label="この記録を削除" size={20} />}
     </li>
   )
 }
@@ -620,14 +626,21 @@ function ParkingPhotoPreview({ photo, violation, readOnly, onClose, onDelete, on
               .join('　')}
           </p>
         )}
-        {!readOnly && (
+        {(url || onDelete || onRecognize) && (
           <div className="photo-overlay-actions">
-            {onRecognize && violation && (
+            {!readOnly && onRecognize && violation && (
               <button type="button" className="btn-plain" onClick={handleRecognizeClick} disabled={recognizing}>
                 {recognizing ? '読み取り中…' : '写真から読み取る'}
               </button>
             )}
-            {onDelete && <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={20} dark />}
+            <div className="photo-overlay-actions-right">
+              {url && (
+                <a className="btn-plain" href={url} download={photo.filename || 'photo.jpg'}>
+                  ダウンロード
+                </a>
+              )}
+              {onDelete && <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={24} dark />}
+            </div>
           </div>
         )}
         {recognizeMessage && <p className="photo-overlay-caption">{recognizeMessage}</p>}

@@ -1284,12 +1284,21 @@
 .photo-overlay-caption { color: #fff; font-size: 14px; margin: 0; text-align: center; }
 
 /* 削除ボタン（・違反車両では読み取りボタンも）は一覧の狭いタイルではなく、
-   拡大表示のここに置く（2026-08-05） */
+   拡大表示のここに置く（2026-08-05）。読み取りボタンは左、ダウンロード・削除は
+   写真の右端に揃うようグループ化して間隔を空ける（2026-08-05 調整）。 */
 .photo-overlay-actions {
   margin-top: var(--space-1);
   display: flex;
   align-items: center;
+  gap: var(--space-4);
+  align-self: stretch;
+}
+
+.photo-overlay-actions-right {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
 }
 
 /* 暗い背景（拡大表示）向けの削除アイコン色。ホバー時は共通の赤系のまま */
@@ -1314,6 +1323,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
   padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1323,9 +1333,16 @@
 .parking-add-item { justify-content: flex-start; }
 
 /* 写真は1件につき最大2枚まで横並びで表示する（2026-08-05） */
-.parking-card-photos { display: flex; gap: 6px; }
+/* Grid にする（flexだと iOS Safari で子要素が縮みきらずカードからはみ出すことがあるため。
+   2026-08-05）。作業写真の一覧（.photo-grid のモバイル時）と同じ minmax(120px,1fr) にして
+   写真の幅を揃え、カードに収まらなければ自動で折り返す。 */
+.parking-card-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+}
 
-.parking-card-photo-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.parking-card-photo-wrap { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 
 .parking-card-photo {
   width: 100%;
@@ -1932,15 +1949,16 @@
 
 .icon-btn-gear:hover { color: var(--color-primary); }
 
-/* 削除（ゴミ箱）。タスク詳細の閉じるボタンと同系（枠なし・ホバーで色が付く）。 */
+/* 削除（ゴミ箱）。タスク詳細の閉じるボタンと同系（枠なし・ホバーで色が付く）。
+   2026-08-05: 押しやすさのため一回り拡大（34px→40px）。 */
 .icon-btn-delete {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text-muted);
   background: transparent;
   border: 1px solid transparent;
