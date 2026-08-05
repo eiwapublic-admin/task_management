@@ -332,9 +332,16 @@ function PhotoPreview({ photo, onClose, onDelete }) {
           <p className="dashboard-loading">読み込み中…</p>
         )}
         {photo.comment && <p className="photo-overlay-caption">{photo.comment}</p>}
-        {onDelete && (
+        {(url || onDelete) && (
           <div className="photo-overlay-actions">
-            <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={20} dark />
+            <div className="photo-overlay-actions-right">
+              {url && (
+                <a className="btn-plain" href={url} download={photo.filename || 'photo.jpg'}>
+                  ダウンロード
+                </a>
+              )}
+              {onDelete && <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={24} dark />}
+            </div>
           </div>
         )}
       </div>

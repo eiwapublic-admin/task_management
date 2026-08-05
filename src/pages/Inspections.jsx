@@ -430,7 +430,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
         <div className="inspection-modal-foot">
           <div className="inspection-modal-foot-left">
             {existing && (
-              <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={18} />
+              <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
             )}
             <label className="switch-field">
               <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />

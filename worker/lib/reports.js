@@ -880,6 +880,13 @@ function sanitizeViolations(raw) {
   return [...new Set(raw.filter((v) => VALID_VIOLATIONS.has(v)))]
 }
 
+// ナンバーは数字4桁のみを保持する（「-」等の区切り文字は除去。2026-08-05）
+function sanitizePlateNumber(value) {
+  if (typeof value !== 'string') return null
+  const digits = value.replace(/\D/g, '').slice(0, 4)
+  return digits || null
+}
+
 // GET /api/report/parking?report_id=… — report_id を指定すればその日だけ、
 // 省略すれば全期間（新しい順・上限1000）を返す（違反車両一覧画面はこちらを使う）。
 export async function handleParkingList(req) {
@@ -926,7 +933,7 @@ export async function handleParkingCreate(req) {
       report_id: reportId,
       checked_at: payload?.checked_at && !Number.isNaN(Date.parse(payload.checked_at)) ? payload.checked_at : new Date().toISOString(),
       plate_region: trimOrNull(payload?.plate_region, 20),
-      plate_number: trimOrNull(payload?.plate_number, 20),
+      plate_number: sanitizePlateNumber(payload?.plate_number),
       maker: trimOrNull(payload?.maker, 50),
       model: trimOrNull(payload?.model, 50),
       owner_company: trimOrNull(payload?.owner_company, 100),
@@ -961,7 +968,7 @@ export async function handleParkingUpdate(req) {
 
     const patch = {}
     if ('plate_region' in payload) patch.plate_region = trimOrNull(payload.plate_region, 20)
-    if ('plate_number' in payload) patch.plate_number = trimOrNull(payload.plate_number, 20)
+    if ('plate_number' in payload) patch.plate_number = sanitizePlateNumber(payload.plate_number)
     if ('maker' in payload) patch.maker = trimOrNull(payload.maker, 50)
     if ('model' in payload) patch.model = trimOrNull(payload.model, 50)
     if ('owner_company' in payload) patch.owner_company = trimOrNull(payload.owner_company, 100)
@@ -1058,7 +1065,7 @@ export async function handleParkingRecognize(req) {
 
     return json({
       plate_region: typeof result.plate_region === 'string' ? result.plate_region : null,
-      plate_number: typeof result.plate_number === 'string' ? result.plate_number : null,
+      plate_number: sanitizePlateNumber(result.plate_number),
       maker: typeof result.maker === 'string' ? result.maker : null,
       model: typeof result.model === 'string' ? result.model : null,
     })

@@ -290,7 +290,7 @@ export default function ReportDetail() {
                       </span>
                     )}
                     {!readOnly && (
-                      <ConfirmDeleteButton onConfirm={() => handleDeleteEntry(e.id)} label="この記録を削除" size={18} />
+                      <ConfirmDeleteButton onConfirm={() => handleDeleteEntry(e.id)} label="この記録を削除" size={22} />
                     )}
                   </li>
                 ))}
