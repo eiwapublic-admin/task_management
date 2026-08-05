@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import TaskDetail from '../components/TaskDetail'
 import { fetchArchive, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
 import { updateTask } from '../lib/api'
+import { createReport, addEntry, todayJST, nowHHMM } from '../lib/reports'
 import { formatDate, formatDateTime } from '../lib/format'
 import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
 import { formatTaskId } from '../lib/taskId'
@@ -22,6 +24,7 @@ function parseAssignees(raw) {
 }
 
 export default function Archive() {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState(null)
   const [error, setError] = useState('')
   const [assignees, setAssignees] = useState(DEFAULT_ASSIGNEES)
@@ -117,6 +120,19 @@ export default function Archive() {
     }
     reload()
     return res.task
+  }
+
+  // タスク詳細の「日報に追加」。当日の日報（未作成なら作成）に、タスクのタイトルを
+  // 内容とした作業記録を追加し、日報の該当日入力画面へ遷移する。
+  async function handleAddToReport(task) {
+    const today = todayJST()
+    const report = await createReport(today)
+    await addEntry(report.id, {
+      entry_time: nowHHMM(),
+      content: task.title,
+      source_task_id: task.id,
+    })
+    navigate(`/reports/${today}`)
   }
 
   const assigneeOptions = Array.from(new Set([...assignees, UNASSIGNED]))
@@ -271,6 +287,7 @@ export default function Archive() {
         assignees={assignees}
         onUpdateTask={handleUpdateTask}
         onUnspam={handleUnspam}
+        onAddToReport={handleAddToReport}
       />
     </div>
   )
