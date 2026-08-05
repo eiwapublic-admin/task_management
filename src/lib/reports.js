@@ -310,3 +310,12 @@ export async function updateParkingViolation(id, patch) {
 export async function deleteParkingViolation(id) {
   await authFetch(`/api/report/parking?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
+
+// 写真からナンバープレート・車種を読み取る（手動トリガー。2026-08-05〜）。
+// 読み取れなかった項目は null で返る（呼び出し側は空欄のままにする）。
+export async function recognizeParkingPhoto(photoId) {
+  return authFetch('/api/report/parking/recognize', {
+    method: 'POST',
+    body: JSON.stringify({ photo_id: photoId }),
+  })
+}

@@ -29,6 +29,7 @@ import {
   handleParkingCreate,
   handleParkingUpdate,
   handleParkingDelete,
+  handleParkingRecognize,
 } from './lib/reports.js'
 
 // Cloudflare Worker 本体。
@@ -928,6 +929,9 @@ async function route(req, env) {
     if (req.method === 'PATCH') return handleParkingUpdate(req)
     if (req.method === 'DELETE') return handleParkingDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/parking/recognize') {
+    return req.method === 'POST' ? handleParkingRecognize(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {
