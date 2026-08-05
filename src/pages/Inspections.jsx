@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import { IconHome, IconChevronLeft, IconChevronRight, IconTrash } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
@@ -84,7 +85,8 @@ export default function Inspections() {
     setEditing(null)
   }
 
-  // 削除。「休館取り消し」も同じ経路（休館日マーカーを消せば未入力に戻る）。
+  // 削除。休館日の取り消しも同じ経路（モーダルのスイッチをオフにして保存するか、
+  // モーダルの削除ボタンで記録ごと消す）。
   async function handleDelete(id) {
     setRows((prev) => prev.filter((r) => r.id !== id))
     try {
@@ -93,18 +95,7 @@ export default function Inspections() {
       setError(err.message)
       load()
     }
-  }
-
-  // 未入力の日を「休館日」としてマークする（点検データを持たないレコード）。
-  // 誤操作を想定し、行の右端の「休館取り消し」でいつでも元に戻せる。
-  async function handleMarkClosed(date) {
-    setError('')
-    try {
-      const saved = await saveInspection({ building, inspected_on: date, closed: true })
-      setRows((prev) => [...prev.filter((r) => r.id !== saved.id), saved])
-    } catch (err) {
-      setError(err.message)
-    }
+    setEditing(null)
   }
 
   return (
@@ -119,7 +110,7 @@ export default function Inspections() {
             aria-label="日報一覧に戻る"
             title="日報一覧に戻る"
           >
-            🏠 一覧へ
+            <IconHome size={22} />
           </button>
           <h2 className="page-title">自主検査表（日常）</h2>
         </div>
@@ -133,7 +124,7 @@ export default function Inspections() {
               aria-label="前月"
               title="前月"
             >
-              ‹
+              <IconChevronLeft size={28} />
             </button>
             <span className="inspection-month-label">{month.replace('-', '年')}月</span>
             <button
@@ -143,7 +134,7 @@ export default function Inspections() {
               aria-label="翌月"
               title="翌月"
             >
-              ›
+              <IconChevronRight size={28} />
             </button>
           </div>
           <div className="inspection-buildings" role="group" aria-label="ビル">
@@ -178,7 +169,6 @@ export default function Inspections() {
                   <th>点検者</th>
                   <th>結果</th>
                   <th>不備の内容</th>
-                  <th aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -189,9 +179,34 @@ export default function Inspections() {
                   const isFuture = date > today
                   const closed = Boolean(rec?.closed)
                   const wd = weekdayInfo(date, holidays)
-                  const rowClass = [date === today && 'is-today', closed && 'is-closed'].filter(Boolean).join(' ')
+                  // 未入力/既存どちらも行全体のタップで詳細モーダルを開く（追加と変更を区別しない）。
+                  // 未来日はまだ記録できないので、既に何かある場合を除きタップ不可にする
+                  const clickable = !readOnly && (Boolean(rec) || !isFuture)
+                  const rowClass = [
+                    date === today && 'is-today',
+                    closed && 'is-closed',
+                    clickable && 'is-clickable',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
                   return (
-                    <tr key={date} className={rowClass || undefined}>
+                    <tr
+                      key={date}
+                      className={rowClass || undefined}
+                      onClick={clickable ? () => setEditing(date) : undefined}
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      onKeyDown={
+                        clickable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                setEditing(date)
+                              }
+                            }
+                          : undefined
+                      }
+                    >
                       <th
                         scope="row"
                         className={`inspection-day ${wd.className}`}
@@ -206,7 +221,9 @@ export default function Inspections() {
                         {closed ? (
                           <span className="inspection-closed-label">休館日</span>
                         ) : !rec ? (
-                          <span className="inspection-empty">{isFuture ? '' : '未実施'}</span>
+                          <span className="inspection-empty">
+                            {isFuture ? '' : clickable ? '未入力（タップで記録）' : '未実施'}
+                          </span>
                         ) : rec.all_clear ? (
                           <span className="inspection-ok">○ 異常なし</span>
                         ) : (
@@ -225,49 +242,6 @@ export default function Inspections() {
                           </span>
                         )}
                         {!closed && rec?.note && <span className="inspection-note">{rec.note}</span>}
-                      </td>
-                      <td className="inspection-actions">
-                        {readOnly ? null : closed ? (
-                          <button type="button" className="btn-plain" onClick={() => handleDelete(rec.id)}>
-                            休館取り消し
-                          </button>
-                        ) : !rec ? (
-                          !isFuture && (
-                            <>
-                              <button
-                                type="button"
-                                className="icon-btn-add is-compact"
-                                onClick={() => setEditing(date)}
-                                aria-label="点検を記録"
-                                title="点検を記録"
-                              >
-                                ＋
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-plain"
-                                onClick={() => handleMarkClosed(date)}
-                              >
-                                休館日
-                              </button>
-                            </>
-                          )
-                        ) : (
-                          <>
-                            <button type="button" className="btn-plain" onClick={() => setEditing(date)}>
-                              編集
-                            </button>
-                            <button
-                              type="button"
-                              className="icon-btn-delete"
-                              onClick={() => handleDelete(rec.id)}
-                              aria-label="この記録を削除"
-                              title="削除"
-                            >
-                              🗑
-                            </button>
-                          </>
-                        )}
                       </td>
                     </tr>
                   )
@@ -290,6 +264,7 @@ export default function Inspections() {
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+          onDelete={handleDelete}
         />
       )}
     </div>
@@ -297,11 +272,13 @@ export default function Inspections() {
 }
 
 // 点検の入力。既定は「すべて良好」で、不備のある項目だけタップして×/◎に落とす。
-function InspectionForm({ date, building, existing, defaultInspector, onClose, onSaved }) {
+// 休館日はモーダル下部のスイッチで切り替える（オンにすると点検データを持たないマーカーになる）。
+function InspectionForm({ date, building, existing, defaultInspector, onClose, onSaved, onDelete }) {
   const [inspector, setInspector] = useState(existing?.inspector || defaultInspector)
   const [items, setItems] = useState(existing?.items || {})
   const [note, setNote] = useState(existing?.note || '')
   const [periodic, setPeriodic] = useState(existing?.periodic_result || '')
+  const [closed, setClosed] = useState(Boolean(existing?.closed))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -335,6 +312,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
         items,
         note,
         periodic_result: showPeriodic ? periodic || null : null,
+        closed,
       })
       onSaved(saved)
     } catch (err) {
@@ -372,22 +350,50 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
             </p>
           )}
 
-          <label className="report-field inspection-inspector">
-            <span>点検者名</span>
-            <input
-              type="text"
-              value={inspector}
-              onChange={(e) => setInspector(e.target.value)}
-              placeholder="点検者名"
-            />
-          </label>
+          {!closed && (
+            <>
+              <label className="report-field inspection-inspector">
+                <span>点検者名</span>
+                <input
+                  type="text"
+                  value={inspector}
+                  onChange={(e) => setInspector(e.target.value)}
+                  placeholder="点検者名"
+                />
+              </label>
 
-          <div className={`inspection-status${allClear ? ' is-clear' : ''}`}>
-            {allClear ? (
-              <>
-                <strong>すべて良好（点検箇所一斉に○）</strong>
-                <span>不備があった項目だけ、下の一覧でタップしてください。</span>
-              </>
+              <p className="inspection-hint">不備があった項目だけ、下の一覧でタップしてください。</p>
+
+              {groups.map((group) => (
+                <div className="inspection-group" key={group}>
+                  <h4>{group}</h4>
+                  <div className="inspection-items">
+                    {INSPECTION_ITEMS.filter((i) => i.group === group).map((item) => {
+                      const value = items[item.key] || 'ok'
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`inspection-item is-${value}`}
+                          onClick={() => cycle(item.key)}
+                          aria-label={`${item.label}: ${JUDGEMENT_LABELS[value]}`}
+                        >
+                          <span className="inspection-item-mark">{JUDGEMENT_MARKS[value]}</span>
+                          <span className="inspection-item-label">{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          <div className={`inspection-status${closed ? ' is-closed' : allClear ? ' is-clear' : ''}`}>
+            {closed ? (
+              <strong>休館日</strong>
+            ) : allClear ? (
+              <strong>すべて良好</strong>
             ) : (
               <>
                 <strong>{ngCount} 件の不備があります</strong>
@@ -398,30 +404,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
             )}
           </div>
 
-          {groups.map((group) => (
-            <div className="inspection-group" key={group}>
-              <h4>{group}</h4>
-              <div className="inspection-items">
-                {INSPECTION_ITEMS.filter((i) => i.group === group).map((item) => {
-                  const value = items[item.key] || 'ok'
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={`inspection-item is-${value}`}
-                      onClick={() => cycle(item.key)}
-                      aria-label={`${item.label}: ${JUDGEMENT_LABELS[value]}`}
-                    >
-                      <span className="inspection-item-mark">{JUDGEMENT_MARKS[value]}</span>
-                      <span className="inspection-item-label">{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-
-          {ngCount > 0 && (
+          {!closed && ngCount > 0 && (
             <label className="report-field inspection-note-field">
               <span>不備の内容・報告事項</span>
               <textarea
@@ -433,7 +416,7 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
             </label>
           )}
 
-          {showPeriodic && (
+          {!closed && showPeriodic && (
             <fieldset className="inspection-periodic">
               <legend>{monthNum}月の定期点検結果</legend>
               <label>
@@ -459,12 +442,34 @@ function InspectionForm({ date, building, existing, defaultInspector, onClose, o
         </div>
 
         <div className="inspection-modal-foot">
-          <button type="button" className="btn-plain" onClick={onClose}>
-            キャンセル
-          </button>
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中…' : allClear ? '異常なしで記録' : '記録する'}
-          </button>
+          <div className="inspection-modal-foot-left">
+            {existing && (
+              <button
+                type="button"
+                className="icon-btn-delete"
+                onClick={() => onDelete(existing.id)}
+                aria-label="この記録を削除"
+                title="削除"
+              >
+                <IconTrash size={18} />
+              </button>
+            )}
+            <label className="switch-field">
+              <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
+              <span className="switch-track">
+                <span className="switch-thumb" />
+              </span>
+              <span className="switch-label">休館日</span>
+            </label>
+          </div>
+          <div className="inspection-modal-foot-right">
+            <button type="button" className="btn-plain" onClick={onClose}>
+              キャンセル
+            </button>
+            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? '保存中…' : closed ? '休館日として記録' : allClear ? '異常なしで記録' : '記録する'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

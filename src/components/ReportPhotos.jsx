@@ -7,8 +7,12 @@ import {
   fetchPhotoObjectUrl,
 } from '../lib/reports'
 import { prepareImage, formatBytes } from '../lib/imageResize'
+import { IconTrash } from './Icons'
 
-// 日報の写真。撮影 → 自動縮小 → アップロード → コメント入力までをこの中で完結させる。
+// モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
+const MOBILE_QUERY = '(max-width: 640px)'
+
+// 日報の写真。撮影/選択 → 自動縮小 → アップロード → コメント入力までをこの中で完結させる。
 // 保管容量を抑えるため、送信前にブラウザ側で縮小する（docs/daily-report-plan.md 4-3）。
 export default function ReportPhotos({ reportId, readOnly }) {
   const [photos, setPhotos] = useState([])
@@ -17,10 +21,21 @@ export default function ReportPhotos({ reportId, readOnly }) {
   const [uploading, setUploading] = useState(0)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(null) // 拡大表示中の写真
+  const [dragOver, setDragOver] = useState(false)
+  // モバイルでは同じボタンが「撮影して追加」になる（2026-08-05）。
+  // ドラッグ＆ドロップの空枠はPC向けなので、モバイルではボタンだけが頼り。
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
   const cameraRef = useRef(null)
   const fileRef = useRef(null)
   // 解放漏れを防ぐため、作成した Blob URL を全て覚えておく
   const createdUrls = useRef(new Set())
+
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_QUERY)
+    const onChange = () => setIsMobile(mql.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -179,7 +194,7 @@ export default function ReportPhotos({ reportId, readOnly }) {
                     aria-label="この写真を削除"
                     title="削除"
                   >
-                    🗑
+                    <IconTrash size={16} />
                   </button>
                 )}
               </li>
@@ -191,43 +206,63 @@ export default function ReportPhotos({ reportId, readOnly }) {
                 </div>
               </li>
             )}
+            {!readOnly && (
+              <li className="photo-item photo-add-item">
+                {/* 空枠にドラッグ＆ドロップで登録できる（PC向け）。写真を追加するたびに
+                    この枠が末尾に残るので、連続して追加できる（2026-08-05） */}
+                <div
+                  className={`photo-dropzone${dragOver ? ' is-dragover' : ''}`}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragOver(true)
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOver(false)
+                    handleFiles(e.dataTransfer.files)
+                  }}
+                >
+                  <span className="photo-dropzone-hint">ここにドラッグ＆ドロップ</span>
+                </div>
+                {/* capture 指定でスマホのカメラを直接起動する */}
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  hidden
+                  onChange={(e) => {
+                    handleFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    handleFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-plain photo-add-btn"
+                  onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
+                >
+                  {isMobile ? '撮影して追加' : 'ファイルから選ぶ'}
+                </button>
+              </li>
+            )}
           </ul>
 
           {!readOnly && (
-            <div className="photo-actions">
-              {/* capture 指定でスマホのカメラを直接起動する。PCではファイル選択になる */}
-              <input
-                ref={cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                hidden
-                onChange={(e) => {
-                  handleFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                hidden
-                onChange={(e) => {
-                  handleFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <button type="button" className="btn-primary" onClick={() => cameraRef.current?.click()}>
-                📷 撮影して追加
-              </button>
-              <button type="button" className="btn-plain" onClick={() => fileRef.current?.click()}>
-                ファイルから選ぶ
-              </button>
-              <span className="settings-hint photo-hint">
-                アップロード時に自動で縮小されます（保管容量の節約のため）
-              </span>
-            </div>
+            <p className="settings-hint photo-hint">
+              アップロード時に自動で縮小されます（保管容量の節約のため）
+            </p>
           )}
         </>
       )}
