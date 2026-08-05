@@ -1283,8 +1283,14 @@
 
 .photo-overlay-caption { color: #fff; font-size: 14px; margin: 0; text-align: center; }
 
-/* 削除ボタンは一覧の狭いタイルではなく、拡大表示のここに置く（2026-08-05） */
-.photo-overlay-actions { margin-top: var(--space-1); }
+/* 削除ボタン（・違反車両では読み取りボタンも）は一覧の狭いタイルではなく、
+   拡大表示のここに置く（2026-08-05） */
+.photo-overlay-actions {
+  margin-top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 
 /* 暗い背景（拡大表示）向けの削除アイコン色。ホバー時は共通の赤系のまま */
 .icon-btn-delete.icon-btn-delete-dark { color: rgba(255, 255, 255, 0.85); }
@@ -1316,18 +1322,50 @@
 
 .parking-add-item { justify-content: flex-start; }
 
+/* 写真は1件につき最大2枚まで横並びで表示する（2026-08-05） */
+.parking-card-photos { display: flex; gap: 6px; }
+
+.parking-card-photo-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+
 .parking-card-photo {
   width: 100%;
   aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
   background: var(--bg-subtle);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.parking-card-photo:hover { border-color: #33604d; }
 .parking-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 2枚目までの追加枠。空枠タイルの簡易版（ドラッグ＆ドロップ無しでボタンのみ） */
+.parking-card-photo-add {
+  border: 2px dashed var(--border);
+  background: transparent;
+  cursor: default;
+}
+
+.parking-card-photo-add-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+.parking-card-photo-add-btn:hover { background: var(--color-primary-hover); }
 
 .parking-card-fields { display: flex; flex-direction: column; gap: 6px; }
 

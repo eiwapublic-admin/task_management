@@ -18,7 +18,7 @@ const RETRY_DELAY_MS = [800, 2000]
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // 応答テキストから最初の JSON オブジェクトを頑健に取り出す。
-function extractJson(text) {
+export function extractJson(text) {
   if (!text) return null
   // ```json ... ``` で囲まれている場合を先に剥がす
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -171,4 +171,76 @@ export async function classifyEmail(email, context, documents = []) {
     output_tokens: data.usage?.output_tokens || 0,
   }
   return { classification: parsed, usage }
+}
+
+// 違反車両の写真からナンバープレート・車種を読み取る（2026-08-05〜。手動トリガー式）。
+// FAX読み取りと同じ考え方で、判読できない項目は推測せず null を返させる。
+export async function recognizeVehicle(imageBase64, mediaType) {
+  const { ANTHROPIC_API_KEY } = process.env
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY が設定されていません')
+  }
+  const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
+
+  const system = [
+    'あなたは駐車違反車両の記録を補助するアシスタントです。',
+    '与えられた車両の写真を見て、ナンバープレートと車種を読み取り、指定のJSON形式のみで回答してください。説明文やコードフェンスは不要です。',
+    '',
+    '【重要: 読み取れないときに創作しないこと】',
+    '文字が不鮮明・低解像度・撮影角度・被写体が写っていない等で自信を持って読み取れない項目は、推測や創作をせず必ず null にしてください。',
+    '誤った情報を記録すると実害があるため、確実に判読できた項目だけを埋めてください。',
+    '',
+    '【出力JSONの形式】',
+    '{',
+    '  "plate_region": "ナンバープレート上部の地名（例: 広島、なにわ、品川）。読み取れなければ null",',
+    '  "plate_number": "ナンバープレート下段の一連指定番号のみ（例: 12-34）。分類番号やひらがな部分は含めない。読み取れなければ null",',
+    '  "maker": "車両メーカー名（例: トヨタ、ホンダ、日産）。判別できなければ null",',
+    '  "model": "車種名（例: プリウス、フィット）。判別できなければ null"',
+    '}',
+    '',
+    '必ず有効なJSONのみを返してください。',
+  ].join('\n')
+
+  const res = await fetch(API_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 300,
+      system,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: '添付の写真からナンバープレートと車種を読み取ってください。' },
+          ],
+        },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
+    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
+      err.isBillingError = true
+    }
+    throw err
+  }
+
+  const data = await res.json()
+  const text = (data.content || []).map((b) => b.text || '').join('')
+  const parsed = extractJson(text)
+  if (!parsed) {
+    throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
+  }
+  const usage = {
+    input_tokens: data.usage?.input_tokens || 0,
+    output_tokens: data.usage?.output_tokens || 0,
+  }
+  return { result: parsed, usage }
 }

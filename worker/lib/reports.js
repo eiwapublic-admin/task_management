@@ -7,6 +7,7 @@ import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { fetchHolidays } from './holidays.js'
+import { recognizeVehicle } from './anthropic.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
 const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
@@ -1012,5 +1013,58 @@ export async function handleParkingDelete(req) {
   } catch (err) {
     console.error('parking-delete 失敗:', err)
     return json({ error: '違反車両の削除に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/parking/recognize — 既にアップロード済みの違反車両写真から
+// ナンバープレート・車種を読み取る（手動トリガー。自動実行ではない）。
+// 費用の見える化のため、既存の Anthropic 利用量集計（api_usage）に加算する。
+// 専用の内訳列は設けず、通常の分類呼び出しと同じ列に含める（call件数は少ない想定のため）。
+export async function handleParkingRecognize(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const photoId = payload?.photo_id
+    if (typeof photoId !== 'string' || !photoId) return json({ error: 'photo_id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: photo } = await supabase
+      .from('report_photos')
+      .select('storage_key, mime, category')
+      .eq('id', photoId)
+      .maybeSingle()
+    if (!photo) return json({ error: '写真が見つかりません' }, 404)
+    if (photo.category !== 'parking') return json({ error: '違反車両の写真ではありません' }, 400)
+
+    const res = await getObject(photo.storage_key)
+    if (!res.ok) return json({ error: '写真の取得に失敗しました' }, 500)
+    const buf = await res.arrayBuffer()
+    const base64 = Buffer.from(buf).toString('base64')
+
+    const { result, usage } = await recognizeVehicle(base64, photo.mime || 'image/jpeg')
+
+    const month = new Date().toISOString().slice(0, 7)
+    const { error: usageErr } = await supabase.rpc('add_api_usage', {
+      p_month: month,
+      p_input: usage.input_tokens,
+      p_output: usage.output_tokens,
+      p_calls: 1,
+      p_fax_calls: 0,
+      p_fax_input: 0,
+      p_fax_output: 0,
+    })
+    if (usageErr) console.error('parking-recognize(usage):', usageErr.message)
+
+    return json({
+      plate_region: typeof result.plate_region === 'string' ? result.plate_region : null,
+      plate_number: typeof result.plate_number === 'string' ? result.plate_number : null,
+      maker: typeof result.maker === 'string' ? result.maker : null,
+      model: typeof result.model === 'string' ? result.model : null,
+    })
+  } catch (err) {
+    console.error('parking-recognize 失敗:', err)
+    const message = err.isBillingError ? 'APIクレジット残高が不足しています' : '写真の解析に失敗しました'
+    return json({ error: message }, err.isBillingError ? 402 : 500)
   }
 }
