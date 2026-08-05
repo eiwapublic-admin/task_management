@@ -48,15 +48,16 @@ export default function ReportList() {
         <div className="reports-toolbar">
           <h2 className="page-title">日報</h2>
           <div className="reports-toolbar-actions">
-            {/* 自主検査表はハンバーガーメニューだけだと見つけにくいため、
-                一覧の見える位置にも導線を置く（2026-08-04のご指摘を受けて追加） */}
-            <button
-              type="button"
-              className="btn-plain"
-              onClick={() => navigate('/reports/inspections')}
-            >
-              自主検査表
+            {/* 自主検査表・定型文の設定はハンバーガーメニューに入れず、
+                この画面の見える位置に並べて置く（2026-08-05のご指摘） */}
+            <button type="button" className="btn-plain" onClick={() => navigate('/reports/inspections')}>
+              📋 自主検査表
             </button>
+            {!isOwner && (
+              <button type="button" className="btn-plain" onClick={() => navigate('/reports/templates')}>
+                ⚙ 定型文の設定
+              </button>
+            )}
             {!isOwner && (
               <button type="button" className="btn-primary" onClick={openToday} disabled={creating}>
                 {creating ? '準備中…' : hasToday ? '本日の日報を開く' : '＋ 本日の日報をつくる'}

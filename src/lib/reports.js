@@ -219,6 +219,28 @@ export async function deleteInspection(id) {
   await authFetch(`/api/report/inspections?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
+// 日本の祝日一覧（{日付: 祝日名}）。日付列の色分けに使う。
+export async function fetchHolidays() {
+  const data = await authFetch('/api/report/holidays')
+  return data.holidays || {}
+}
+
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
+// 'YYYY-MM-DD' の曜日情報を返す。土曜=青、日曜・祝日=赤（2026-08-05）。
+export function weekdayInfo(date, holidays = {}) {
+  const d = new Date(`${date}T00:00:00Z`)
+  const dow = d.getUTCDay()
+  const holidayName = holidays[date] || null
+  const isRed = dow === 0 || Boolean(holidayName)
+  const isBlue = dow === 6 && !holidayName
+  return {
+    label: WEEKDAY_LABELS[dow],
+    holidayName,
+    className: isRed ? 'is-holiday' : isBlue ? 'is-saturday' : '',
+  }
+}
+
 // 'YYYY-MM'（JST基準の当月）
 export function currentMonthJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)

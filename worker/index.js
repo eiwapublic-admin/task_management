@@ -24,6 +24,7 @@ import {
   handleInspectionList,
   handleInspectionSave,
   handleInspectionDelete,
+  handleHolidays,
 } from './lib/reports.js'
 
 // Cloudflare Worker 本体。
@@ -913,6 +914,9 @@ async function route(req, env) {
     if (req.method === 'POST') return handleInspectionSave(req)
     if (req.method === 'DELETE') return handleInspectionDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/holidays') {
+    return req.method === 'GET' ? handleHolidays(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

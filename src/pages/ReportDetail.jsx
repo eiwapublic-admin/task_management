@@ -158,24 +158,40 @@ export default function ReportDetail() {
       <AppHeader />
       <div className="reports-container">
         <div className="report-detail-head">
+          <button
+            type="button"
+            className="icon-btn-home"
+            onClick={() => navigate('/reports')}
+            aria-label="日報一覧に戻る"
+            title="日報一覧に戻る"
+          >
+            🏠 一覧へ
+          </button>
           <div className="report-nav">
-            <button type="button" onClick={() => navigate(`/reports/${shiftDate(date, -1)}`)}>
-              ‹ 前日
+            <button
+              type="button"
+              className="icon-btn-nav"
+              onClick={() => navigate(`/reports/${shiftDate(date, -1)}`)}
+              aria-label="前日"
+              title="前日"
+            >
+              ‹
             </button>
             <h2 className="page-title">
               {formatReportDate(date)}
               {isToday && <span className="report-today-badge">本日</span>}
             </h2>
-            <button type="button" onClick={() => navigate(`/reports/${shiftDate(date, 1)}`)}>
-              翌日 ›
+            <button
+              type="button"
+              className="icon-btn-nav"
+              onClick={() => navigate(`/reports/${shiftDate(date, 1)}`)}
+              aria-label="翌日"
+              title="翌日"
+            >
+              ›
             </button>
           </div>
-          <div className="report-head-right">
-            {savedAt && <span className="report-saved">保存しました</span>}
-            <button type="button" className="btn-plain" onClick={() => navigate('/reports')}>
-              一覧へ
-            </button>
-          </div>
+          <div className="report-head-right">{savedAt && <span className="report-saved">保存しました</span>}</div>
         </div>
 
         {error && (
@@ -241,6 +257,17 @@ export default function ReportDetail() {
               <h3 className="report-card-title">
                 作業記録
                 <span className="report-count">{entries.length} 件</span>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="icon-btn-add"
+                    onClick={() => handleAddEntry()}
+                    aria-label="記録を追加"
+                    title="記録を追加"
+                  >
+                    ＋
+                  </button>
+                )}
               </h3>
 
               {entries.length === 0 && <p className="settings-hint">まだ記録がありません。</p>}
@@ -273,39 +300,35 @@ export default function ReportDetail() {
                     {!readOnly && (
                       <button
                         type="button"
-                        className="entry-delete"
+                        className="icon-btn-delete"
                         onClick={() => handleDeleteEntry(e.id)}
                         aria-label="この記録を削除"
+                        title="削除"
                       >
-                        ×
+                        🗑
                       </button>
                     )}
                   </li>
                 ))}
               </ul>
 
-              {!readOnly && (
+              {!readOnly && templates.length > 0 && (
                 <div className="entry-add">
-                  <button type="button" className="btn-primary" onClick={() => handleAddEntry()}>
-                    ＋ 記録を追加
-                  </button>
-                  {templates.length > 0 && (
-                    <div className="entry-templates">
-                      <span className="entry-templates-label">定型文から追加</span>
-                      <div className="entry-template-chips">
-                        {templates.map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            className="entry-template-chip"
-                            onClick={() => handleAddEntry(t.label)}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="entry-templates">
+                    <span className="entry-templates-label">定型文から追加</span>
+                    <div className="entry-template-chips">
+                      {templates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="entry-template-chip"
+                          onClick={() => handleAddEntry(t.label)}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </section>

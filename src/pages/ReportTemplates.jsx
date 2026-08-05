@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import { fetchTemplates, saveTemplates } from '../lib/reports'
 import './Dashboard.css'
@@ -6,6 +7,7 @@ import './Dashboard.css'
 // 定型文（ルーチン業務の文言）の設定。現行 FileMaker の「特記事項設定」に相当する。
 // 設定の担当者名と同じく、改行区切りの1つのテキストエリアで編集する方式に揃えた。
 export default function ReportTemplates() {
+  const navigate = useNavigate()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,6 +44,15 @@ export default function ReportTemplates() {
       <AppHeader />
       <div className="reports-container">
         <div className="reports-toolbar">
+          <button
+            type="button"
+            className="icon-btn-home"
+            onClick={() => navigate('/reports')}
+            aria-label="日報一覧に戻る"
+            title="日報一覧に戻る"
+          >
+            🏠 一覧へ
+          </button>
           <h2 className="page-title">定型文の設定</h2>
           <div className="report-head-right">
             {message && <span className="report-saved">{message}</span>}

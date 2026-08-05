@@ -353,3 +353,7 @@ create trigger fire_inspections_set_updated_at before update on fire_inspections
 
 alter table fire_inspections enable row level security;
 revoke all on fire_inspections from anon, authenticated;
+
+-- 自主検査表に「休館日」フラグを追加（2026-08-05）。休館日は点検データを持たない
+-- マーカーレコードとして扱い、行をグレー表示し「休館取り消し」で削除できるようにする。
+alter table fire_inspections add column if not exists closed boolean not null default false;
