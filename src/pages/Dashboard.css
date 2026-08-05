@@ -178,11 +178,12 @@
 
 /* 見出し行のグレー塗りつぶしバー。report-card-title と同じ、カード上端いっぱいに
    広げる負のマージンの手法。塗りつぶし色はグレー（2026-08-05: var(--bg-subtle) は
-   ほぼ白に近くメリハリが弱かったため、はっきり濃いグレーに変更） */
+   ほぼ白に近くメリハリが弱かったため濃いグレーに変更。#d1d5db でもまだ薄いとの
+   指摘を受け、さらに一段濃い #9ca3af に変更） */
 .usage-panel-title {
   margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-4);
   padding: var(--space-3) var(--space-5);
-  background: #d1d5db;
+  background: #9ca3af;
   border-bottom: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
