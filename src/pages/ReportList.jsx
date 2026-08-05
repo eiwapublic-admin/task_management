@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import { IconClipboard, IconGear } from '../components/Icons'
+import { IconClipboard, IconGear, IconCar, IconClip } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReports,
@@ -73,6 +73,10 @@ export default function ReportList() {
               <IconClipboard size={18} />
               自主検査表
             </button>
+            <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
+              <IconCar size={18} />
+              違反車両一覧
+            </button>
             {!isOwner && (
               <button type="button" className="btn-primary" onClick={openToday} disabled={creating}>
                 {creating ? '準備中…' : hasToday ? '本日の日報を開く' : '＋ 本日の日報をつくる'}
@@ -114,30 +118,39 @@ export default function ReportList() {
                     className={`report-row${r.report_date === today ? ' is-today' : ''}`}
                     onClick={() => navigate(`/reports/${r.report_date}`)}
                   >
-                    <div className="report-row-date">
-                      <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
-                      {r.report_date === today && <span className="report-today-badge">本日</span>}
-                      <span className="report-workers">
-                        午前：{r.worker_am || '—'}　午後：{r.worker_pm || '—'}
-                      </span>
+                    <div className="report-row-main">
+                      <div className="report-row-date">
+                        <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
+                        {r.report_date === today && <span className="report-today-badge">本日</span>}
+                        <span className="report-workers">
+                          午前：{r.worker_am || '—'}　午後：{r.worker_pm || '—'}
+                        </span>
+                      </div>
+                      <div className="report-row-body">
+                        {entries.length === 0 ? (
+                          <span className="report-empty">記録なし</span>
+                        ) : (
+                          <>
+                            {entries.slice(0, PREVIEW_LINES).map((e) => (
+                              <div className="report-line" key={e.id}>
+                                <span className="report-line-time">{toHHMM(e.entry_time)}</span>
+                                <span className="report-line-text">{e.content}</span>
+                              </div>
+                            ))}
+                            {entries.length > PREVIEW_LINES && (
+                              <div className="report-more">ほか {entries.length - PREVIEW_LINES} 件</div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="report-row-body">
-                      {entries.length === 0 ? (
-                        <span className="report-empty">記録なし</span>
-                      ) : (
-                        <>
-                          {entries.slice(0, PREVIEW_LINES).map((e) => (
-                            <div className="report-line" key={e.id}>
-                              <span className="report-line-time">{toHHMM(e.entry_time)}</span>
-                              <span className="report-line-text">{e.content}</span>
-                            </div>
-                          ))}
-                          {entries.length > PREVIEW_LINES && (
-                            <div className="report-more">ほか {entries.length - PREVIEW_LINES} 件</div>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    {/* 右端のアイコン。違反車両があった日は車、写真がある日はクリップ（2026-08-05） */}
+                    {(r.has_parking || r.has_photos) && (
+                      <div className="report-row-icons">
+                        {r.has_parking && <IconCar size={20} title="違反車両あり" />}
+                        {r.has_photos && <IconClip size={20} title="写真あり" />}
+                      </div>
+                    )}
                   </button>
                 </li>
               )

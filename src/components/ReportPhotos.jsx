@@ -40,7 +40,7 @@ export default function ReportPhotos({ reportId, readOnly }) {
 
   const load = useCallback(async () => {
     try {
-      const list = await fetchPhotos(reportId)
+      const list = await fetchPhotos(reportId, 'work')
       setPhotos(list)
     } catch (err) {
       setError(err.message)
@@ -185,18 +185,15 @@ export default function ReportPhotos({ reportId, readOnly }) {
                     {p.taken_at && <span>{formatDateTime(p.taken_at)}</span>}
                   </div>
                 )}
-                <input
+                <textarea
                   className="photo-comment"
-                  type="text"
+                  rows={2}
                   value={p.comment || ''}
                   placeholder="コメント"
                   disabled={readOnly}
                   onChange={(e) => handleComment(p.id, e.target.value)}
                   aria-label="写真のコメント"
                 />
-                {!readOnly && (
-                  <ConfirmDeleteButton onConfirm={() => handleDelete(p.id)} label="この写真を削除" size={16} />
-                )}
               </li>
             ))}
             {uploading > 0 && (
@@ -268,14 +265,26 @@ export default function ReportPhotos({ reportId, readOnly }) {
       )}
 
       {preview && (
-        <PhotoPreview photo={preview} onClose={() => setPreview(null)} />
+        <PhotoPreview
+          photo={preview}
+          onClose={() => setPreview(null)}
+          onDelete={
+            readOnly
+              ? undefined
+              : async () => {
+                  await handleDelete(preview.id)
+                  setPreview(null)
+                }
+          }
+        />
       )}
     </section>
   )
 }
 
-// 拡大表示。原本（縮小済みの本体）を改めて取得して表示する
-function PhotoPreview({ photo, onClose }) {
+// 拡大表示。原本（縮小済みの本体）を改めて取得して表示する。
+// 削除ボタンはここに置く（一覧の狭いタイルではなく、拡大して確認してから消せるように）。
+function PhotoPreview({ photo, onClose, onDelete }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState('')
 
@@ -323,6 +332,11 @@ function PhotoPreview({ photo, onClose }) {
           <p className="dashboard-loading">読み込み中…</p>
         )}
         {photo.comment && <p className="photo-overlay-caption">{photo.comment}</p>}
+        {onDelete && (
+          <div className="photo-overlay-actions">
+            <ConfirmDeleteButton onConfirm={onDelete} label="この写真を削除" size={20} dark />
+          </div>
+        )}
       </div>
     </div>
   )

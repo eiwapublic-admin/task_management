@@ -901,7 +901,9 @@
 }
 
 .report-row {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
   background: var(--bg-surface);
@@ -915,6 +917,17 @@
 
 .report-row:hover { border-color: #33604d; }
 .report-row.is-today { border-left: 3px solid #33604d; }
+
+.report-row-main { flex: 1; min-width: 0; }
+
+/* 右端のアイコン（違反車両あり=車／写真あり=クリップ。2026-08-05） */
+.report-row-icons {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
 
 .report-row-date {
   display: flex;
@@ -1183,12 +1196,16 @@
 
 .photo-comment {
   width: 100%;
+  height: 44px;
   padding: 5px 8px;
   font-size: 13px;
+  line-height: 1.5;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-surface);
   color: var(--text-base);
+  font-family: inherit;
+  resize: vertical;
 }
 
 /* 空枠の追加タイル。写真を追加するたびに末尾に残るので連続して追加できる（2026-08-05） */
@@ -1266,10 +1283,182 @@
 
 .photo-overlay-caption { color: #fff; font-size: 14px; margin: 0; text-align: center; }
 
+/* 削除ボタンは一覧の狭いタイルではなく、拡大表示のここに置く（2026-08-05） */
+.photo-overlay-actions { margin-top: var(--space-1); }
+
+/* 暗い背景（拡大表示）向けの削除アイコン色。ホバー時は共通の赤系のまま */
+.icon-btn-delete.icon-btn-delete-dark { color: rgba(255, 255, 255, 0.85); }
+
 @media (max-width: 640px) {
   .photo-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .photo-comment { font-size: 16px; } /* iOSのフォーカス時ズームを抑止 */
 }
+
+/* --- 違反車両（Phase 4。2026-08-05〜）。日報詳細では写真と同じ流れで登録する --- */
+.parking-grid {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.parking-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+}
+
+.parking-add-item { justify-content: flex-start; }
+
+.parking-card-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parking-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.parking-card-fields { display: flex; flex-direction: column; gap: 6px; }
+
+.parking-card-row { display: flex; gap: 6px; }
+
+.parking-card-row input, .parking-card-fields > input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
+}
+
+.parking-card-violations { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+
+.parking-violation-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-base);
+}
+
+.parking-card-note {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
+  font-family: inherit;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .parking-grid { grid-template-columns: 1fr; }
+  .parking-card-row input, .parking-card-fields > input, .parking-card-note {
+    font-size: 16px; /* iOSのフォーカス時ズームを抑止 */
+  }
+}
+
+/* --- 違反車両一覧（/reports/parking。日を跨って横断的に見る独立画面。2026-08-05〜） --- */
+.parking-list-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.parking-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
+}
+
+/* 2択の切替タブ（自主検査表の旧ビル切替と同じ考え方の汎用版） */
+.sort-toggle { display: flex; gap: 6px; flex-shrink: 0; }
+
+.sort-toggle-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sort-toggle-btn.is-active { color: #fff; background: #33604d; border-color: #33604d; }
+
+.parking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.parking-list-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+}
+
+.parking-list-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+
+.parking-list-date { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.parking-list-plate { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+
+.parking-list-count {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--due-overdue);
+  border-radius: 999px;
+}
+
+.parking-list-link {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.parking-list-sub { display: flex; gap: var(--space-3); font-size: 13px; color: var(--text-base); margin-top: 4px; }
+
+.parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+.parking-list-tag {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #c81021;
+  background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
+  border-radius: 999px;
+}
+
+.parking-list-note { margin: 6px 0 0; font-size: 13px; color: var(--text-muted); }
 
 /* ストレージ使用量のバー（従量課金事項画面。2026-08-04） */
 .storage-bar {
@@ -1292,32 +1481,11 @@
 /* --- 自主検査表（Phase 3。2026-08-04〜） --- */
 .inspections-container { max-width: 1000px; }
 
-.inspection-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-3);
-}
+/* ホーム・年月・タイトルを1行にまとめる（2026-08-05。BKBのみ運用のためビル切替は廃止） */
+.inspection-toolbar { justify-content: flex-start; }
 
 .inspection-month { display: flex; align-items: center; gap: var(--space-3); }
 .inspection-month-label { font-size: 16px; font-weight: 700; color: var(--text-strong); }
-
-.inspection-buildings { display: flex; gap: 6px; }
-
-.inspection-building-btn {
-  padding: 5px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.inspection-building-btn.is-active { color: #fff; background: #33604d; border-color: #33604d; }
 
 .inspection-table-wrap { overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 

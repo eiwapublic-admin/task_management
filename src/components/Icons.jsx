@@ -76,3 +76,22 @@ export function IconGear(props) {
     </Icon>
   )
 }
+
+export function IconCar(props) {
+  return (
+    <Icon {...props}>
+      <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" />
+      <rect x="3" y="11" width="18" height="6" rx="2" />
+      <circle cx="7.5" cy="18.5" r="1.5" />
+      <circle cx="16.5" cy="18.5" r="1.5" />
+    </Icon>
+  )
+}
+
+export function IconClip(props) {
+  return (
+    <Icon {...props}>
+      <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l8.49-8.48a4 4 0 0 1 5.66 5.66l-8.49 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" />
+    </Icon>
+  )
+}

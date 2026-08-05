@@ -357,3 +357,39 @@ revoke all on fire_inspections from anon, authenticated;
 -- 自主検査表に「休館日」フラグを追加（2026-08-05）。休館日は点検データを持たない
 -- マーカーレコードとして扱い、行をグレー表示し「休館取り消し」で削除できるようにする。
 alter table fire_inspections add column if not exists closed boolean not null default false;
+
+-- ============================================================
+-- 不正駐車（Phase 4。2026-08-05〜）。日報詳細から写真と同様の流れで登録するが、
+-- 一覧は日を跨って横断的に見られるよう daily_reports とは独立したテーブルにする。
+-- ============================================================
+create table if not exists parking_violations (
+  id            uuid primary key default gen_random_uuid(),
+  report_id     uuid not null references daily_reports(id) on delete cascade,
+  checked_at    timestamptz not null default now(),
+  -- ナンバープレートの地名・番号。この2列で過去履歴・累計回数を名寄せする
+  plate_region  text,
+  plate_number  text,
+  maker         text,
+  model         text,
+  owner_company text,
+  -- unrecorded=無断駐車 / false_entry=虚偽記入 / long_stay=長時間駐車 / after_hours=時間外 / other=その他
+  violations    text[] not null default '{}'::text[],
+  note          text,
+  created_by    uuid references users(id),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists parking_violations_plate_idx on parking_violations (plate_region, plate_number);
+create index if not exists parking_violations_report_idx on parking_violations (report_id);
+create index if not exists parking_violations_checked_idx on parking_violations (checked_at desc);
+
+drop trigger if exists parking_violations_set_updated_at on parking_violations;
+create trigger parking_violations_set_updated_at before update on parking_violations
+  for each row execute function set_updated_at();
+
+alter table parking_violations enable row level security;
+revoke all on parking_violations from anon, authenticated;
+
+-- 写真をどの違反車両レコードの分か紐付ける（category='parking' のときのみ使う）
+alter table report_photos add column if not exists parking_id uuid references parking_violations(id) on delete cascade;
+create index if not exists report_photos_parking_idx on report_photos (parking_id);

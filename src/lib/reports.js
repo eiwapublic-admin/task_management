@@ -113,18 +113,33 @@ export function nowHHMM() {
 // ---- 写真（Phase 2。2026-08-04〜）----
 
 
-export async function fetchPhotos(reportId) {
-  const data = await authFetch(`/api/report/photos?report_id=${encodeURIComponent(reportId)}`)
+// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真。混在させないため）
+export async function fetchPhotos(reportId, category) {
+  const qs = new URLSearchParams({ report_id: reportId })
+  if (category) qs.set('category', category)
+  const data = await authFetch(`/api/report/photos?${qs}`)
   return data.photos || []
 }
 
 // 写真のアップロード。縮小は呼び出し側（imageResize.prepareImage）で済ませてから渡す。
 // FormData を送るため authFetch は使わず、ここで Bearer を付ける
 // （authFetch は Content-Type: application/json を付けてしまうため）。
-export async function uploadPhoto({ reportId, category, file, thumb, filename, width, height, takenAt, comment }) {
+export async function uploadPhoto({
+  reportId,
+  category,
+  parkingId,
+  file,
+  thumb,
+  filename,
+  width,
+  height,
+  takenAt,
+  comment,
+}) {
   const form = new FormData()
   form.append('report_id', reportId)
   form.append('category', category || 'work')
+  if (parkingId) form.append('parking_id', parkingId)
   form.append('file', file, filename || 'photo.jpg')
   if (thumb) form.append('thumb', thumb, 'thumb.jpg')
   if (filename) form.append('filename', filename)
@@ -257,4 +272,41 @@ export function shiftMonth(month, delta) {
 export function daysInMonth(month) {
   const [y, m] = month.split('-').map(Number)
   return new Date(Date.UTC(y, m, 0)).getUTCDate()
+}
+
+// ---- 不正駐車（Phase 4。2026-08-05〜）----
+
+export const VIOLATION_LABELS = {
+  unrecorded: '無断駐車',
+  false_entry: '虚偽記入',
+  long_stay: '長時間駐車',
+  after_hours: '時間外駐車',
+  other: 'その他',
+}
+
+// reportId を指定すればその日だけ、省略すれば全期間（違反車両一覧画面用）
+export async function fetchParkingViolations({ reportId } = {}) {
+  const qs = reportId ? `?report_id=${encodeURIComponent(reportId)}` : ''
+  const data = await authFetch(`/api/report/parking${qs}`)
+  return data.violations || []
+}
+
+export async function createParkingViolation(payload) {
+  const data = await authFetch('/api/report/parking', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return data.violation
+}
+
+export async function updateParkingViolation(id, patch) {
+  const data = await authFetch('/api/report/parking', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...patch }),
+  })
+  return data.violation
+}
+
+export async function deleteParkingViolation(id) {
+  await authFetch(`/api/report/parking?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }

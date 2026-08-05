@@ -31,7 +31,8 @@ export default function Inspections() {
   const readOnly = user?.role === 'owner'
 
   const [month, setMonth] = useState(currentMonthJST())
-  const [building, setBuilding] = useState(INSPECTION_BUILDINGS[0])
+  // BKBのみ運用のため切替UIは廃止し固定にする（2026-08-05）
+  const building = INSPECTION_BUILDINGS[0]
   const [rows, setRows] = useState([])
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
@@ -103,7 +104,7 @@ export default function Inspections() {
     <div className="reports-page">
       <AppHeader />
       <div className="reports-container inspections-container">
-        <div className="reports-toolbar">
+        <div className="reports-toolbar inspection-toolbar">
           <button
             type="button"
             className="icon-btn-home"
@@ -113,10 +114,6 @@ export default function Inspections() {
           >
             <IconHome size={32} />
           </button>
-          <h2 className="page-title">自主検査表（日常）</h2>
-        </div>
-
-        <div className="inspection-controls">
           <div className="inspection-month">
             <button
               type="button"
@@ -138,19 +135,7 @@ export default function Inspections() {
               <IconChevronRight size={28} />
             </button>
           </div>
-          <div className="inspection-buildings" role="group" aria-label="ビル">
-            {INSPECTION_BUILDINGS.map((b) => (
-              <button
-                key={b}
-                type="button"
-                className={`inspection-building-btn${building === b ? ' is-active' : ''}`}
-                aria-pressed={building === b}
-                onClick={() => setBuilding(b)}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
+          <h2 className="page-title">自主検査表（日常）</h2>
         </div>
 
         {error && (

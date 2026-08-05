@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportPhotos from '../components/ReportPhotos'
+import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import { IconHome, IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
@@ -330,6 +331,8 @@ export default function ReportDetail() {
             </section>
 
             <ReportPhotos reportId={report.id} readOnly={readOnly} />
+
+            <ReportParkingViolations reportId={report.id} readOnly={readOnly} />
           </>
         )}
       </div>

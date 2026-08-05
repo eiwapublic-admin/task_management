@@ -86,8 +86,23 @@ export async function handleReportList(req) {
       if (!byReport.has(e.report_id)) byReport.set(e.report_id, [])
       byReport.get(e.report_id).push(e)
     }
+
+    // 一覧の右端アイコン（📎写真あり／🚗違反車両あり）用。存在有無だけ分かればよいので件数はまとめて取らない
+    const reportIds = list.map((r) => r.id)
+    const [{ data: photoRows }, { data: parkingRows }] = await Promise.all([
+      supabase.from('report_photos').select('report_id').eq('category', 'work').in('report_id', reportIds),
+      supabase.from('parking_violations').select('report_id').in('report_id', reportIds),
+    ])
+    const photoSet = new Set((photoRows || []).map((p) => p.report_id))
+    const parkingSet = new Set((parkingRows || []).map((p) => p.report_id))
+
     return json({
-      reports: list.map((r) => ({ ...r, entries: byReport.get(r.id) || [] })),
+      reports: list.map((r) => ({
+        ...r,
+        entries: byReport.get(r.id) || [],
+        has_photos: photoSet.has(r.id),
+        has_parking: parkingSet.has(r.id),
+      })),
     })
   } catch (err) {
     console.error('report-list 失敗:', err)
@@ -397,7 +412,7 @@ export async function handleTemplateSave(req) {
 // ============================================================
 
 const PHOTO_COLUMNS =
-  'id, report_id, category, storage_key, thumb_key, filename, mime, size, width, height, comment, taken_at, sort_order, created_at'
+  'id, report_id, category, parking_id, storage_key, thumb_key, filename, mime, size, width, height, comment, taken_at, sort_order, created_at'
 
 // 用途ごとの想定解像度（縮小はクライアント側で行う。ここは上限の検証用）。
 // work=作業エビデンス720px / parking=不正駐車1280px（ナンバーの判読性を確保）
@@ -418,20 +433,22 @@ function extFromMime(mime) {
   return 'jpg'
 }
 
-// GET /api/report/photos?report_id=… — 指定日報の写真メタ一覧
+// GET /api/report/photos?report_id=…&category=… — 指定日報の写真メタ一覧。
+// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真。混在させないため）。
 export async function handlePhotoList(req) {
   const { error } = await requireAuth(req)
   if (error) return error
   try {
-    const reportId = new URL(req.url).searchParams.get('report_id') || ''
+    const params = new URL(req.url).searchParams
+    const reportId = params.get('report_id') || ''
+    const category = params.get('category') || ''
     if (!reportId) return json({ error: 'report_id は必須です' }, 400)
+    if (category && !VALID_CATEGORIES.has(category)) return json({ error: 'category が不正です' }, 400)
 
     const supabase = getAdminClient()
-    const { data, error: err } = await supabase
-      .from('report_photos')
-      .select(PHOTO_COLUMNS)
-      .eq('report_id', reportId)
-      .order('sort_order', { ascending: true })
+    let query = supabase.from('report_photos').select(PHOTO_COLUMNS).eq('report_id', reportId)
+    if (category) query = query.eq('category', category)
+    const { data, error: err } = await query.order('sort_order', { ascending: true })
     if (err) {
       console.error('photo-list:', err.message)
       return json({ error: '写真の取得に失敗しました' }, 500)
@@ -454,6 +471,7 @@ export async function handlePhotoUpload(req) {
 
     const reportId = String(form.get('report_id') || '')
     const category = String(form.get('category') || 'work')
+    const parkingId = String(form.get('parking_id') || '') || null
     const file = form.get('file')
     const thumb = form.get('thumb') // 一覧に写真が並ぶ用途のみ付く（任意）
     if (!reportId) return json({ error: 'report_id は必須です' }, 400)
@@ -470,6 +488,17 @@ export async function handlePhotoUpload(req) {
       .eq('id', reportId)
       .maybeSingle()
     if (!report) return json({ error: '日報が見つかりません' }, 404)
+
+    // 違反車両の写真は、対象レコードが同じ日報に属することを確認してから紐付ける
+    if (parkingId) {
+      const { data: violation } = await supabase
+        .from('parking_violations')
+        .select('id')
+        .eq('id', parkingId)
+        .eq('report_id', reportId)
+        .maybeSingle()
+      if (!violation) return json({ error: '違反車両のレコードが見つかりません' }, 404)
+    }
 
     const key = buildStorageKey(report.report_date, category, extFromMime(file.type))
     await putObject(key, file.stream(), file.type)
@@ -496,6 +525,7 @@ export async function handlePhotoUpload(req) {
     const row = {
       report_id: reportId,
       category,
+      parking_id: parkingId,
       storage_key: key,
       thumb_key: thumbKey,
       filename: String(form.get('filename') || file.name || '').slice(0, 255) || null,
@@ -830,5 +860,157 @@ export async function handleInspectionDelete(req) {
   } catch (err) {
     console.error('inspection-delete 失敗:', err)
     return json({ error: '自主検査表の削除に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 不正駐車（Phase 4。2026-08-05〜）。日報詳細から写真と同様の流れで登録するが、
+// 一覧は日を跨って独立した画面（/reports/parking）で見られるようにする。
+// ============================================================
+
+const PARKING_COLUMNS =
+  'id, report_id, checked_at, plate_region, plate_number, maker, model, owner_company, violations, note, created_at, updated_at'
+
+const VALID_VIOLATIONS = new Set(['unrecorded', 'false_entry', 'long_stay', 'after_hours', 'other'])
+
+// violations は許可リストにある値だけを残す（画面の改造で不正な値が混ざっても保存側で弾く）
+function sanitizeViolations(raw) {
+  if (!Array.isArray(raw)) return []
+  return [...new Set(raw.filter((v) => VALID_VIOLATIONS.has(v)))]
+}
+
+// GET /api/report/parking?report_id=… — report_id を指定すればその日だけ、
+// 省略すれば全期間（新しい順・上限1000）を返す（違反車両一覧画面はこちらを使う）。
+export async function handleParkingList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const reportId = new URL(req.url).searchParams.get('report_id') || ''
+    const supabase = getAdminClient()
+    // 一覧画面（日を跨って表示）ではその日の日報へ戻れるよう report_date も一緒に返す
+    let query = supabase.from('parking_violations').select(`${PARKING_COLUMNS}, daily_reports(report_date)`)
+    if (reportId) query = query.eq('report_id', reportId)
+    else query = query.limit(1000)
+    const { data, error: err } = await query.order('checked_at', { ascending: false })
+    if (err) {
+      console.error('parking-list:', err.message)
+      return json({ error: '違反車両の取得に失敗しました' }, 500)
+    }
+    const violations = (data || []).map(({ daily_reports, ...rest }) => ({
+      ...rest,
+      report_date: daily_reports?.report_date || null,
+    }))
+    return json({ violations })
+  } catch (err) {
+    console.error('parking-list 失敗:', err)
+    return json({ error: '違反車両の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/parking — 違反車両レコードの新規作成。
+// 写真と同様、まず空のレコードを作ってから写真をアップロードし、そのあと項目を埋めていく想定。
+export async function handleParkingCreate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const reportId = payload?.report_id
+    if (typeof reportId !== 'string' || !reportId) return json({ error: 'report_id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: report } = await supabase.from('daily_reports').select('id').eq('id', reportId).maybeSingle()
+    if (!report) return json({ error: '日報が見つかりません' }, 404)
+
+    const row = {
+      report_id: reportId,
+      checked_at: payload?.checked_at && !Number.isNaN(Date.parse(payload.checked_at)) ? payload.checked_at : new Date().toISOString(),
+      plate_region: trimOrNull(payload?.plate_region, 20),
+      plate_number: trimOrNull(payload?.plate_number, 20),
+      maker: trimOrNull(payload?.maker, 50),
+      model: trimOrNull(payload?.model, 50),
+      owner_company: trimOrNull(payload?.owner_company, 100),
+      violations: sanitizeViolations(payload?.violations),
+      note: trimOrNull(payload?.note, 1000),
+      created_by: auth.sub,
+    }
+    const { data, error: err } = await supabase
+      .from('parking_violations')
+      .insert(row)
+      .select(PARKING_COLUMNS)
+      .single()
+    if (err) {
+      console.error('parking-create:', err.message)
+      return json({ error: '違反車両の登録に失敗しました' }, 500)
+    }
+    return json({ violation: data })
+  } catch (err) {
+    console.error('parking-create 失敗:', err)
+    return json({ error: '違反車両の登録に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/report/parking — 項目の更新（ナンバー・車種・所有会社・違反事項・補足）。
+export async function handleParkingUpdate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = payload?.id
+    if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
+
+    const patch = {}
+    if ('plate_region' in payload) patch.plate_region = trimOrNull(payload.plate_region, 20)
+    if ('plate_number' in payload) patch.plate_number = trimOrNull(payload.plate_number, 20)
+    if ('maker' in payload) patch.maker = trimOrNull(payload.maker, 50)
+    if ('model' in payload) patch.model = trimOrNull(payload.model, 50)
+    if ('owner_company' in payload) patch.owner_company = trimOrNull(payload.owner_company, 100)
+    if ('violations' in payload) patch.violations = sanitizeViolations(payload.violations)
+    if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('parking_violations')
+      .update(patch)
+      .eq('id', id)
+      .select(PARKING_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('parking-update:', err.message)
+      return json({ error: '違反車両の更新に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '違反車両のレコードが見つかりません' }, 404)
+    return json({ violation: data })
+  } catch (err) {
+    console.error('parking-update 失敗:', err)
+    return json({ error: '違反車両の更新に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/parking?id=… — レコードの削除（紐づく写真も cascade で消える）
+export async function handleParkingDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const supabase = getAdminClient()
+    // Storage の実体は DB の cascade 削除に追従しないため、消す前に対象を控えておく
+    const { data: photos } = await supabase.from('report_photos').select('storage_key, thumb_key').eq('parking_id', id)
+    const { error: err } = await supabase.from('parking_violations').delete().eq('id', id)
+    if (err) {
+      console.error('parking-delete:', err.message)
+      return json({ error: '違反車両の削除に失敗しました' }, 500)
+    }
+    // DB側は report_photos.parking_id の on delete cascade で自動的に消えるが、
+    // Storage の実体は明示的に消さないと孤児が残る
+    for (const p of photos || []) {
+      await deleteObject(p.storage_key)
+      if (p.thumb_key) await deleteObject(p.thumb_key)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('parking-delete 失敗:', err)
+    return json({ error: '違反車両の削除に失敗しました' }, 500)
   }
 }
