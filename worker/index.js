@@ -25,6 +25,10 @@ import {
   handleInspectionSave,
   handleInspectionDelete,
   handleHolidays,
+  handleParkingList,
+  handleParkingCreate,
+  handleParkingUpdate,
+  handleParkingDelete,
 } from './lib/reports.js'
 
 // Cloudflare Worker 本体。
@@ -917,6 +921,13 @@ async function route(req, env) {
   }
   if (pathname === '/api/report/holidays') {
     return req.method === 'GET' ? handleHolidays(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/parking') {
+    if (req.method === 'GET') return handleParkingList(req)
+    if (req.method === 'POST') return handleParkingCreate(req)
+    if (req.method === 'PATCH') return handleParkingUpdate(req)
+    if (req.method === 'DELETE') return handleParkingDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

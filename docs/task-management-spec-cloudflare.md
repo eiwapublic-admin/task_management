@@ -236,18 +236,19 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/push/public-key` | JWT | Web Push購読作成用のVAPID公開鍵を返す（4-9参照）。未設定時は404 |
 | POST `/api/push/subscribe` | JWT | ブラウザの`PushSubscription`（`endpoint`/`keys.p256dh`/`keys.auth`）を`push_subscriptions`に保存（`endpoint`で upsert） |
 | POST `/api/push/unsubscribe` | JWT | 指定`endpoint`の購読を削除（自分（トークンのuser_id）に紐づくもののみ） |
-| GET `/api/reports` | JWT | 日報一覧（日付の新しい順・上限400）。一覧表示用に各日の作業記録も含めて返す（明細は1回のクエリでまとめて取得しN+1を避ける） |
+| GET `/api/reports` | JWT | 日報一覧（日付の新しい順・上限400）。一覧表示用に各日の作業記録も含めて返す（明細は1回のクエリでまとめて取得しN+1を避ける）。各日に `has_photos`（作業写真の有無）・`has_parking`（違反車両の有無）を付与し、一覧の右端アイコン表示に使う（2026-08-05追加） |
 | GET `/api/report` | JWT | `date=YYYY-MM-DD` の日報1件（明細つき）。未作成の日は404ではなく `report:null` を返す（画面側で新規作成の導線を出すため） |
 | POST `/api/report` | JWT（owner不可） | 指定日の日報を作成。既にあればそれを返す（冪等）。同時作成のunique違反時も既存を読み直して返す |
 | PATCH `/api/report` | JWT（owner不可） | 日報ヘッダ（作業者AM/PM・作業開始/終了）の更新 |
 | POST/PATCH/DELETE `/api/report/entries` | JWT（owner不可） | 作業記録の明細の追加・更新・削除。追加時は既存の最大 `sort_order`+1 を採番して末尾に置く。タスクからの転記は `source_task_id` を伴う |
 | GET `/api/report/templates` | JWT | 定型文（有効なもののみ・並び順） |
 | PUT `/api/report/templates` | JWT（owner不可） | 定型文を丸ごと差し替え（配列の順序＝`sort_order`） |
-| GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。POST は multipart/form-data（縮小はクライアント側で済ませてから送る）。DELETE は保管したオブジェクトも消す |
+| GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。GET は `category=work`/`parking` で絞り込み可能（2026-08-05追加。work=作業記録の写真／parking=違反車両の写真を混在させないため）。POST は multipart/form-data（縮小はクライアント側で済ませてから送る。`parking_id` を渡すと違反車両レコードに紐付く）。DELETE は保管したオブジェクトも消す |
 | GET `/api/report/photo` | JWT | 写真の本体を返す（`thumb=1` でサムネイル。無ければ本体で代替）。バケットは非公開なのでこの経路以外からは取得できない |
 | GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
 | GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。`closed:true` を送ると点検データを持たない「休館日」マーカーとして保存する（4-12参照） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
+| GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -330,7 +331,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 ### 4-10. 日報機能（2026-08-04〜。Phase 1〜3 完了）
 
 FileMaker で運用していた日報アプリ `koizumi-report` を統合したもの。計画の全体像は `docs/daily-report-plan.md` を参照。
-**Phase 1〜3（権限ロール・日報の作業記録・写真・自主検査表）が完了済み**。不正駐車／残留塩素／FileMaker連携（Phase 4〜6）は未着手。
+**Phase 1〜3（権限ロール・日報の作業記録・写真・自主検査表）が完了済み、Phase 4（不正駐車）に着手済み**（4-13参照）。残留塩素／FileMaker連携（Phase 5〜6）は未着手。
 
 - **セクション切替**: 共通ヘッダに `[ タスク ｜ 日報 ]` のセグメントを置く（`AppHeader.jsx` の `.app-switch`）。
   現在位置は `useLocation()` で判定し（`/reports` 配下が日報）、ハンバーガーメニューの項目もセクションに応じて出し分ける。
@@ -340,7 +341,7 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   既存ユーザーは全員 `staff` になるため挙動は変わらない。**ロールは JWT に埋めた値ではなく `verifyRequestAuth` が毎回DBから引く**ため、
   権限を下げた際に有効期限（30日）を待たず即反映される。owner にはフロントでも書き込みUIを出さないが、
   **サーバー側でも日報系APIの書き込みを403で拒否**し、UIの無効化だけに依存しない（`worker/lib/http.js` の `canWrite`）
-- **画面**: 日報一覧（`/reports`）／日報詳細（`/reports/:date`）／写真（日報詳細内）／自主検査表（`/reports/inspections`）／定型文の設定（`/reports/templates`）。
+- **画面**: 日報一覧（`/reports`）／日報詳細（`/reports/:date`。写真・違反車両の登録を含む）／自主検査表（`/reports/inspections`）／違反車両一覧（`/reports/parking`）／定型文の設定（`/reports/templates`）。
   タスク管理側の各ルートは `RequireStaff` で包み、owner が来たら `/reports` へ送る
 - **入力の設計**: 作業記録は一覧の下（既存の記録がある場合はその下）の「＋」ボタンで行が増え、**時刻は空欄が既定値**（後からまとめて入力する運用のため。撮影時刻等と違い現在時刻を入れると実際の作業時刻と食い違う）。
   定型文は**ドロップダウンから選ぶとその場で内容入りの行を追加**する（2026-08-05。従来のチップ一覧から変更）。
@@ -358,7 +359,8 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
 | レコード・明細の追加 | `.icon-btn-add`（表内は `.is-compact`） | 「＋」の正方形アイコンボタン |
 | 年月・日付の移動 | `.icon-btn-nav` | 背景なし・アイコンのみの `‹`/`›`（大きめ） |
 | 一覧画面へ戻る（左上） | `.icon-btn-home` | 背景なし・アイコンのみ（文字ラベルは付けない）。56px・アクセントカラーで大きめに目立たせる（2026-08-05） |
-| 削除 | `.icon-btn-delete` | ゴミ箱アイコン、ホバーで赤くなる |
+| 滅多に使わない操作（定型文の設定 等） | `.icon-btn-gear` | 背景なし・歯車アイコンのみ。ホームより控えめな40px（2026-08-05） |
+| 削除 | `.icon-btn-delete` | ゴミ箱アイコン、ホバーで赤くなる。**押しただけでは削除せず確認を挟む**（共通コンポーネント `ConfirmDeleteButton`。タスク詳細の「スパム」確認と同じ見た目。2026-08-05） |
 | 枠・モーダルを閉じる | `.icon-btn-close` | 「×」、タスク詳細の閉じるボタンと同じ見た目 |
 
 日報系の入力欄（作業記録・写真 等）の小見出しはイエロー基調のヘッダーバー（`.report-card-title`、`--reports-header-bg`/`--reports-header-ink`）とし、タスク一覧のグリーン系と区別する。一覧の日付表示は土曜=青字・日曜/祝日=赤字（`weekdayInfo()`。下記4-12の祝日取得と共通）。
@@ -375,6 +377,8 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   デコードできない形式（変換されなかったHEIC等）は**縮小を諦めて原本のまま送る**（写真がまったく残せなくなる事態を避けるため）
 - **サムネイル**: 一覧に写真が並ぶ用途（不正駐車）だけ作る。日報の写真はグリッド表示で本体（720px・約80KB）をそのまま使う
 - **追加UI（2026-08-05確定）**: 写真グリッドの末尾に常に「空枠」タイル（`.photo-add-item`）を1つ置く。空枠はドラッグ＆ドロップの受け皿（PC向け）で、その下に選択ボタンを置く。ボタンはPCでは「ファイルから選ぶ」（複数選択可）、**モバイル幅（`max-width:640px`。`window.matchMedia`で判定）では「撮影して追加」に変わりカメラを直接起動**する（アイコンは付けない）。空枠は写真を追加するたびグリッドの末尾に残るので、そのまま連続して追加でき、横幅いっぱいになると自然に折り返す
+- **コメント欄・削除ボタンの配置（2026-08-05）**: コメント欄は1行の`<input>`から**2行分の`<textarea>`**に変更。削除ボタンは一覧の狭いタイルには置かず、**拡大表示（プレビュー）モーダルの中**に移動した（暗い背景の上に載るため `ConfirmDeleteButton` に `dark` 指定を渡し、アイコンの色を明るくしている）
+- **写真の絞り込み（2026-08-05）**: `report_photos` は `category`（`work`/`parking`/`chlorine`）で写真セクション・違反車両セクションを分けているため、`GET /api/report/photos` は `category` クエリで絞り込む（4-13の違反車両写真と混在しないようにするため）
 - **表示**: Worker 経由で取得した Blob URL を使う（既存の添付プレビューと同じ方式。Safari を含め検証済み）。
   アンマウント時に `URL.revokeObjectURL` でまとめて解放する
 - **使用量の可視化**: 「従量課金事項」画面に写真の保存枚数・使用量・無料枠1GBに対する使用率をバーで表示し、逼迫する前に気付けるようにした
@@ -402,7 +406,30 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   行の背景をグレー表示にする（日付自体の色＝平日/土曜/日曜祝日の配色は変えない）。休館日を解除したい場合はモーダル内のスイッチをオフにして保存し直す
 - **行タップで統一モーダルを開く（2026-08-05）**: 従来あった「＋」「編集」「休館日」の行内ボタンは廃止し、**行全体のタップで詳細モーダルを開く**方式に統一した（追加と変更を画面上で区別しない）。読み取り専用の owner、および未来日（記録の無い日）はタップ不可。モーダル下部フッタの左に「休館日」のオン/オフ切替スイッチ（既定オフ）と、既存レコードのみ表示される削除（ゴミ箱アイコン）ボタンを置く。休館日をオンにすると点検者・点検項目・不備内容・定期点検結果の入力欄は非表示になる
 - **モーダル内の並び（2026-08-05）**: 点検者名 →「不備があった項目だけ、下の一覧でタップしてください。」の説明 → 点検項目群 → ステータス表示（すべて良好／◯件の不備があります／休館日はグレーで「休館日」）→ 不備の内容・報告事項の入力欄（不備がある場合のみ）→ 6月・12月のみ定期点検結果、の順。ステータス表示から「（点検箇所一斉に○）」の文言は削除した
+- **ツールバーの統合（2026-08-05）**: ホームボタン・年月移動・ページタイトルを1行にまとめた（`.inspection-toolbar`）。**BKBのみ運用のため小泉本社との切替ボタンは廃止**（`INSPECTION_BUILDINGS`定数自体は`['BKB', '小泉本社']`のまま残し、`building`はコード内で`INSPECTION_BUILDINGS[0]`に固定。将来複数ビル運用が必要になれば切替UIを復活できるようにしてある）
 - 月次の一覧は紙の様式に近い日付順の表で、未実施の日・不備の内容が一目で分かる
+
+### 4-13. 違反車両（2026-08-05〜。Phase 4 着手）
+
+FileMaker の「不正駐車記録」タブ・一覧画面に相当する機能。計画は `docs/daily-report-plan.md` Phase 4 を参照。
+
+- **登録UI（日報詳細内）**: 「写真」セクションと同じ流れ（空枠にドラッグ＆ドロップ/撮影）で登録する。
+  写真1枚を追加すると同時に `parking_violations` レコードを1件作成し（`POST /api/report/parking`）、
+  その写真を`parking_id`で紐付けてアップロードする。以降、ナンバー地域/番号・メーカー/車種・所有会社・
+  違反事項（`unrecorded`=無断駐車／`false_entry`=虚偽記入／`long_stay`=長時間駐車／`after_hours`=時間外駐車／`other`=その他。
+  複数選択可）・補足はカード内でその場編集し、作業記録と同じ**0.8秒デバウンスの自動保存**（`PATCH /api/report/parking`）にする。
+  **このセッションでは1件につき写真1枚のみ**（複数枚対応は未実装）。写真アップロードに失敗した場合は、
+  空のレコードだけが残らないよう作成した違反車両レコードを取り消す
+- **一覧画面（`/reports/parking`）**: 日報入力とは独立させ、`report_id`を指定しない`GET /api/report/parking`で
+  全期間（新しい順・上限1000件）を取得し、クライアント側でフリーワード検索・並び替えを行う
+  （件数が少ない想定のためサーバー側の検索・ページングは実装していない。4-4章参照）。
+  「日付順」（`checked_at`降順）と「累計回数順」（同一ナンバー＝`plate_region`+`plate_number`の出現回数降順）を切り替えられる。
+  各行に記録元の日報の日付（`report_date`。`parking_violations`と`daily_reports`をJOINして取得）を表示し、
+  クリックするとその日の日報詳細（写真つき）へ遷移できる。**このセッションでは一覧に写真サムネイルは出していない**
+  （記録元の日報を開けば確認できる）
+- **一覧アイコン**: 日報一覧（`/reports`）の各行の右端に、その日に違反車両の記録がある場合は車アイコン、
+  作業写真がある場合はクリップアイコンを表示する（`GET /api/reports`が返す`has_parking`/`has_photos`を使用）
+- **未実装**: 入力時に同一ナンバーの過去履歴・累計回数を自動表示する機能、一覧画面での統計、過去データ（FileMaker）の移行
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
@@ -470,8 +497,9 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 | daily_reports | id / report_date(**unique**) / worker_am / worker_pm / work_start / work_end / created_by | 日報ヘッダ。**1日1件**（BKB＝備後町コイズミビルと小泉本社を1件にまとめる） |
 | report_entries | id / report_id(FK cascade) / entry_time / content / source_task_id(FK set null) / sort_order | 作業記録の明細。`source_task_id` はタスク管理からの転記元（タスクが消えても明細は残す） |
 | routine_templates | id / label / sort_order / is_active | 定型文マスタ（現行の「特記事項設定」に相当） |
-| report_photos | id / report_id(FK cascade) / category(`work`/`parking`/`chlorine`) / storage_key(unique) / thumb_key(unique) / filename / mime / size / width / height / comment / taken_at / sort_order | 写真のメタ情報。実体は Supabase Storage の非公開バケット `report-photos`（4-11参照） |
+| report_photos | id / report_id(FK cascade) / category(`work`/`parking`/`chlorine`) / **parking_id**(FK cascade。2026-08-05追加) / storage_key(unique) / thumb_key(unique) / filename / mime / size / width / height / comment / taken_at / sort_order | 写真のメタ情報。実体は Supabase Storage の非公開バケット `report-photos`（4-11参照）。`parking_id` は違反車両の写真だけ持つ（4-13参照） |
 | fire_inspections | id / building / inspected_on / inspector / all_clear / items(jsonb) / note / periodic_result / confirmed_by / **closed**(既定false。2026-08-05追加) | 自主検査表。`(building, inspected_on)` で unique。`closed=true` は点検データを持たない「休館日」マーカー（4-12参照） |
+| parking_violations | id / report_id(FK cascade) / checked_at / plate_region / plate_number / maker / model / owner_company / violations(text[]) / note | 違反車両。`daily_reports`とは独立したテーブルで、日を跨って一覧できるようにしている（`/reports/parking`。4-13参照）。`plate_region`+`plate_number`で過去履歴・累計回数を名寄せする |
 
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）は通常メールより入出力トークンが多く、将来的にFAXのみ上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「分類したメール」「分類したFAX」の件数を分けて表示）

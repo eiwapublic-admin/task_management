@@ -9,6 +9,7 @@ import ReportList from './pages/ReportList'
 import ReportDetail from './pages/ReportDetail'
 import ReportTemplates from './pages/ReportTemplates'
 import Inspections from './pages/Inspections'
+import ParkingViolations from './pages/ParkingViolations'
 import { isAuthenticated, getCurrentUser } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -95,6 +96,14 @@ function App() {
           element={
             <RequireAuth>
               <Inspections />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reports/parking"
+          element={
+            <RequireAuth>
+              <ParkingViolations />
             </RequireAuth>
           }
         />
