@@ -876,7 +876,45 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- 一覧 --- */
+/* --- 一覧（月ごとにトグル開閉できる。2026-08-06） --- */
+.report-month-group { margin-bottom: var(--space-3); }
+.report-month-group:last-child { margin-bottom: 0; }
+
+.report-month-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-strong);
+  cursor: pointer;
+  text-align: left;
+}
+
+.report-month-toggle:hover { border-color: #33604d; }
+
+.report-month-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+
+.report-month-chevron.is-open { transform: rotate(90deg); }
+
+.report-month-count {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .report-list {
   list-style: none;
   margin: 0;
