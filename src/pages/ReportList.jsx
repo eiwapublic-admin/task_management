@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import { IconClipboard, IconGear, IconCar, IconClip } from '../components/Icons'
+import { IconClipboard, IconGear, IconCar, IconClip, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReports,
@@ -11,11 +11,19 @@ import {
   toHHMM,
   fetchHolidays,
   weekdayInfo,
+  currentMonthJST,
+  shiftMonth,
 } from '../lib/reports'
 import './Dashboard.css'
 
 // 一覧に出す作業記録の抜粋の行数（現行 FileMaker の一覧に合わせて3行程度）
 const PREVIEW_LINES = 3
+
+// 'YYYY-MM' → '2026年8月'
+function formatMonthLabel(month) {
+  const [y, m] = month.split('-')
+  return `${y}年${Number(m)}月`
+}
 
 export default function ReportList() {
   const navigate = useNavigate()
@@ -27,9 +35,35 @@ export default function ReportList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  // 月ごとにトグル開閉できるようにする（2026-08-06）。直近2ヶ月分（今月・先月）は
+  // 見た目の初期状態として開き、それより古い月は畳んでおく。
+  const [openMonths, setOpenMonths] = useState(() => {
+    const thisMonth = currentMonthJST()
+    return new Set([thisMonth, shiftMonth(thisMonth, -1)])
+  })
 
   const today = todayJST()
   const hasToday = reports.some((r) => r.report_date === today)
+
+  // report_date は新しい順に取得済みのため、月ごとにまとめても月の並びは崩れない
+  const monthGroups = useMemo(() => {
+    const map = new Map()
+    for (const r of reports) {
+      const month = r.report_date.slice(0, 7)
+      if (!map.has(month)) map.set(month, [])
+      map.get(month).push(r)
+    }
+    return [...map.entries()]
+  }, [reports])
+
+  function toggleMonth(month) {
+    setOpenMonths((prev) => {
+      const next = new Set(prev)
+      if (next.has(month)) next.delete(month)
+      else next.add(month)
+      return next
+    })
+  }
 
   useEffect(() => {
     fetchReports()
@@ -115,55 +149,76 @@ export default function ReportList() {
         ) : reports.length === 0 ? (
           <p className="settings-hint">まだ日報がありません。</p>
         ) : (
-          <ul className="report-list">
-            {reports.map((r) => {
-              const entries = (r.entries || []).filter((e) => e.content)
-              const wd = weekdayInfo(r.report_date, holidays)
-              return (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    className={`report-row${r.report_date === today ? ' is-today' : ''}`}
-                    onClick={() => navigate(`/reports/${r.report_date}`)}
-                  >
-                    <div className="report-row-main">
-                      <div className="report-row-date">
-                        <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
-                        {r.report_date === today && <span className="report-today-badge">本日</span>}
-                        <span className="report-workers">
-                          {r.worker_am || '—'} | {r.worker_pm || '—'}
-                        </span>
-                      </div>
-                      <div className="report-row-body">
-                        {entries.length === 0 ? (
-                          <span className="report-empty">記録なし</span>
-                        ) : (
-                          <>
-                            {entries.slice(0, PREVIEW_LINES).map((e) => (
-                              <div className="report-line" key={e.id}>
-                                <span className="report-line-time">{toHHMM(e.entry_time)}</span>
-                                <span className="report-line-text">{e.content}</span>
+          monthGroups.map(([month, monthReports]) => {
+            const isOpen = openMonths.has(month)
+            return (
+              <div className="report-month-group" key={month}>
+                <button
+                  type="button"
+                  className="report-month-toggle"
+                  aria-expanded={isOpen}
+                  onClick={() => toggleMonth(month)}
+                >
+                  <IconChevronRight size={16} className={`report-month-chevron${isOpen ? ' is-open' : ''}`} />
+                  <span className="report-month-label">{formatMonthLabel(month)}</span>
+                  <span className="report-month-count">{monthReports.length} 件</span>
+                </button>
+                {isOpen && (
+                  <ul className="report-list">
+                    {monthReports.map((r) => {
+                      const entries = (r.entries || []).filter((e) => e.content)
+                      const wd = weekdayInfo(r.report_date, holidays)
+                      return (
+                        <li key={r.id}>
+                          <button
+                            type="button"
+                            className={`report-row${r.report_date === today ? ' is-today' : ''}`}
+                            onClick={() => navigate(`/reports/${r.report_date}`)}
+                          >
+                            <div className="report-row-main">
+                              <div className="report-row-date">
+                                <span className={`report-date ${wd.className}`}>
+                                  {formatReportDate(r.report_date)}
+                                </span>
+                                {r.report_date === today && <span className="report-today-badge">本日</span>}
+                                <span className="report-workers">
+                                  {r.worker_am || '—'} | {r.worker_pm || '—'}
+                                </span>
                               </div>
-                            ))}
-                            {entries.length > PREVIEW_LINES && (
-                              <div className="report-more">ほか {entries.length - PREVIEW_LINES} 件</div>
+                              <div className="report-row-body">
+                                {entries.length === 0 ? (
+                                  <span className="report-empty">記録なし</span>
+                                ) : (
+                                  <>
+                                    {entries.slice(0, PREVIEW_LINES).map((e) => (
+                                      <div className="report-line" key={e.id}>
+                                        <span className="report-line-time">{toHHMM(e.entry_time)}</span>
+                                        <span className="report-line-text">{e.content}</span>
+                                      </div>
+                                    ))}
+                                    {entries.length > PREVIEW_LINES && (
+                                      <div className="report-more">ほか {entries.length - PREVIEW_LINES} 件</div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {/* 右端のアイコン。違反車両があった日は車、写真がある日はクリップ（2026-08-05） */}
+                            {(r.has_parking || r.has_photos) && (
+                              <div className="report-row-icons">
+                                {r.has_parking && <IconCar size={20} title="違反車両あり" />}
+                                {r.has_photos && <IconClip size={20} title="写真あり" />}
+                              </div>
                             )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {/* 右端のアイコン。違反車両があった日は車、写真がある日はクリップ（2026-08-05） */}
-                    {(r.has_parking || r.has_photos) && (
-                      <div className="report-row-icons">
-                        {r.has_parking && <IconCar size={20} title="違反車両あり" />}
-                        {r.has_photos && <IconClip size={20} title="写真あり" />}
-                      </div>
-                    )}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
     </div>
