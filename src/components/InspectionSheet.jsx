@@ -44,7 +44,9 @@ export default function InspectionSheet({
         <span className="ins-sheet-building">
           ビル名 <strong>{building}</strong>
         </span>
-        <span className="ins-sheet-heading">（ {monthNum} 月）自主検査表(日常)</span>
+        <span className="ins-sheet-heading">
+          （ {month.slice(0, 4)} 年 {monthNum} 月）自主検査表(日常)
+        </span>
         <span className="ins-sheet-range">
           {range.from}〜{range.to}日
         </span>
