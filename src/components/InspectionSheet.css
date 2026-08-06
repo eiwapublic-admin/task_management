@@ -1,0 +1,201 @@
+/* 自主検査表（日常）のPDF用シート。A4縦1枚＝半月分（16列）で、紙の様式に寄せた固定レイアウト。
+   画面には出さず、PDF化のあいだだけ画面外（left:-10000px）に描画して html2canvas で撮る。
+   このシートは全てハードコードした色（hex）と mm 指定で組んでいる。html2canvas は
+   oklch などの新しい色関数を解釈できないため、ここに Tailwind 的なユーティリティや
+   最近の色関数を持ち込まないこと（プロジェクトスキル print-and-pdf-download を参照）。 */
+
+.ins-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .ins-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  /* A4縦。撮った画像を pdf.addImage で 210×297mm に固定配置するため、
+     はみ出しても2ページ目に流れることはない（高さを固定して切り落とす） */
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 10mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.ins-sheet * {
+  box-sizing: border-box;
+}
+
+/* ---- 見出し（ビル名・○月・対象の半月）---- */
+.ins-sheet-title {
+  display: flex;
+  align-items: baseline;
+  height: 12mm;
+  padding-bottom: 2mm;
+}
+
+.ins-sheet-building {
+  font-size: 11pt;
+  width: 45mm;
+}
+
+.ins-sheet-building strong {
+  font-size: 13pt;
+  margin-left: 2mm;
+}
+
+.ins-sheet-heading {
+  flex: 1;
+  text-align: center;
+  font-size: 13pt;
+  font-weight: 700;
+}
+
+.ins-sheet-range {
+  width: 25mm;
+  text-align: right;
+  font-size: 9pt;
+  color: #333;
+}
+
+/* ---- 本体の表 ---- */
+.ins-sheet-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.ins-col-group { width: 8mm; }
+.ins-col-item { width: 44mm; }
+.ins-col-day { width: 8.625mm; }
+
+.ins-sheet-table th,
+.ins-sheet-table td {
+  border: 0.3mm solid #000;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 400;
+  font-size: 8.5pt;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.ins-row-head td,
+.ins-row-head th { height: 8mm; }
+
+.ins-row-days td,
+.ins-row-days th,
+.ins-row-inspector td,
+.ins-row-inspector th,
+.ins-row-allclear td,
+.ins-row-allclear th { height: 9mm; }
+
+.ins-row-item td,
+.ins-row-item th { height: 11.5mm; }
+
+.ins-row-periodic td,
+.ins-row-periodic th,
+.ins-row-confirm td,
+.ins-row-confirm th { height: 12mm; }
+
+/* 日付の行。数字を大きく、曜日を小さく添える（紙は数字のみだが、休館日や
+   土日の並びが一目で追えるほうが確認しやすいため） */
+.ins-day-num {
+  display: block;
+  font-size: 9pt;
+}
+
+.ins-day-wd {
+  display: block;
+  font-size: 6pt;
+  color: #444;
+}
+
+.ins-row-days .is-holiday .ins-day-num,
+.ins-row-days .is-holiday .ins-day-wd { color: #c00; }
+
+.ins-row-days .is-saturday .ins-day-num,
+.ins-row-days .is-saturday .ins-day-wd { color: #06c; }
+
+/* 点検者名は列幅（約8.6mm）に対して長くなりがちなので、小さめにして折り返す */
+.ins-row-inspector td {
+  font-size: 7pt;
+  line-height: 1.05;
+  word-break: break-all;
+}
+
+/* ○ × ◎ と「休」を入れるセル */
+.ins-mark {
+  font-size: 11pt;
+}
+
+/* 左端の項目名。紙と同じく左寄せで少しだけ字下げする */
+.ins-item {
+  text-align: left;
+  padding-left: 2mm;
+  font-size: 9pt;
+}
+
+/* 分類（防火管理・避難管理／防火・火気使用・電気器具・喫煙）の縦書き見出し。
+   writing-mode は html2canvas での再現が不安定なため、1文字ずつ積んで縦組みにする */
+.ins-group {
+  font-size: 8pt;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.ins-group span {
+  display: block;
+}
+
+/* 定期点検の行 */
+.ins-row-periodic td {
+  font-size: 9pt;
+}
+
+.ins-choice {
+  margin-left: 6mm;
+}
+
+.ins-choice.is-on {
+  font-weight: 700;
+}
+
+.ins-checkbox {
+  display: inline-block;
+  width: 3.2mm;
+  height: 3.2mm;
+  margin-right: 1mm;
+  border: 0.3mm solid #000;
+  font-size: 7pt;
+  line-height: 3mm;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 防火管理者確認の行。紙と同じく左側は枠線を引かず空けておく
+   （上辺だけは「定期点検」行の下罫線として残す） */
+.ins-blank {
+  border: none;
+  border-top: 0.3mm solid #000;
+}
+
+.ins-confirm-box {
+  font-size: 9pt;
+}
+
+/* ---- 表の下の注意書き ---- */
+.ins-sheet-notes {
+  padding-top: 3mm;
+  font-size: 8pt;
+  line-height: 1.5;
+}
+
+.ins-sheet-notes p {
+  margin: 0;
+}

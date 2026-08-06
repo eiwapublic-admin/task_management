@@ -274,6 +274,21 @@ export function daysInMonth(month) {
   return new Date(Date.UTC(y, m, 0)).getUTCDate()
 }
 
+// 自主検査表（紙の様式）の「実施日時」の列数。PDFはこの列数＝半月で1ページに分ける
+export const INSPECTION_SHEET_COLUMNS = 16
+
+// 半月ごとの日付リスト（前半＝1〜16日、後半＝17日〜末日）。
+// 後半が16日に満たない月（2月など）は、PDF側で残りの列を空欄のまま並べる
+export function halfMonthRanges(month, dayCount) {
+  const build = (from, to) => {
+    const days = []
+    for (let d = from; d <= to; d += 1) days.push(`${month}-${String(d).padStart(2, '0')}`)
+    return { from, to, days }
+  }
+  const half = INSPECTION_SHEET_COLUMNS
+  return [build(1, Math.min(half, dayCount)), build(half + 1, dayCount)]
+}
+
 // ---- 不正駐車（Phase 4。2026-08-05〜）----
 
 export const VIOLATION_LABELS = {

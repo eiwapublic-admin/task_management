@@ -1623,6 +1623,9 @@
 .inspection-note { display: block; color: var(--text-muted); }
 .inspection-legend { margin-top: var(--space-3); }
 
+/* PDF出力ボタンはツールバーの右端に寄せる（2026-08-06） */
+.inspection-pdf-btn { margin-left: auto; }
+
 /* 入力モーダル */
 .inspection-overlay {
   position: fixed;
