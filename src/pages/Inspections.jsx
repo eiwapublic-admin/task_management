@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
-import { IconHome, IconChevronLeft, IconChevronRight } from '../components/Icons'
+import InspectionSheet from '../components/InspectionSheet'
+import { IconHome, IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
@@ -17,6 +19,7 @@ import {
   currentMonthJST,
   shiftMonth,
   daysInMonth,
+  halfMonthRanges,
   todayJST,
   formatReportDate,
 } from '../lib/reports'
@@ -38,6 +41,10 @@ export default function Inspections() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null) // 入力中の日付（'YYYY-MM-DD'）
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState('')
+  // PDF化のときだけ画面外に描画する紙様式のシート（前半・後半の2枚）を差し込む場所
+  const sheetsRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,6 +85,63 @@ export default function Inspections() {
   }, [month])
 
   const today = todayJST()
+
+  // 紙の様式は「実施日時」が16列しかないため、PDFは半月ごとに1ページとする
+  const ranges = useMemo(() => halfMonthRanges(month, daysInMonth(month)), [month])
+
+  // 定期点検（6月・12月）と防火管理者確認は月に1つの欄しかないため、その月の記録から拾う
+  const monthRecords = useMemo(() => rows.filter((r) => r.building === building), [rows, building])
+  const periodicResult = useMemo(
+    () => monthRecords.find((r) => r.periodic_result)?.periodic_result || '',
+    [monthRecords],
+  )
+  const confirmedBy = useMemo(
+    () => monthRecords.find((r) => r.confirmed_by)?.confirmed_by || '',
+    [monthRecords],
+  )
+
+  // 画面外に置いた紙様式のシートを html2canvas で撮り、1枚＝1ページのPDFにする。
+  // シートは 210×297mm ちょうどで組んであるので addImage の固定配置で必ず1ページに収まる
+  // （プロジェクトスキル print-and-pdf-download を参照。iOSのホーム画面アプリでは
+  // window.print() が無反応のため、印刷ではなくPDFダウンロードで出力する）。
+  async function handleDownloadPdf() {
+    if (!sheetsRef.current) return
+    setPdfBusy(true)
+    setPdfError('')
+    try {
+      // 手書きCSS（hex色・mm指定）のみのシートなので html2canvas-pro ではなく本家を使う
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+
+      document.body.classList.add('pdf-capture-mode')
+      try {
+        // クラス適用後のレイアウトが確定してから撮る
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+        const sheets = sheetsRef.current.querySelectorAll('.ins-sheet')
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+        for (const [i, sheet] of [...sheets].entries()) {
+          const canvas = await html2canvas(sheet, { scale: 3, backgroundColor: '#ffffff' })
+          if (i > 0) pdf.addPage()
+          // 第8引数の圧縮指定（'FAST'）は必須。既定の無圧縮だとA4・scale3の画像が
+          // 生データのまま埋め込まれ、2ページで約48MBになる（'FAST'で約0.9MB。
+          // 可逆圧縮なので線や文字の劣化はない）。
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST')
+        }
+        pdf.save(`自主検査表_${building}_${month}.pdf`)
+      } finally {
+        // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す
+        document.body.classList.remove('pdf-capture-mode')
+      }
+    } catch (err) {
+      // 失敗の原因（描画できない色・レイアウト等）はこのメッセージにしか出ないため握り潰さない
+      setPdfError(`PDFの作成に失敗しました（${err instanceof Error ? err.message : String(err)}）`)
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   async function handleSaved(inspection) {
     setRows((prev) => {
@@ -136,11 +200,27 @@ export default function Inspections() {
             </button>
           </div>
           <h2 className="page-title">自主検査表（日常）</h2>
+          <button
+            type="button"
+            className="btn-plain inspection-pdf-btn"
+            onClick={handleDownloadPdf}
+            disabled={pdfBusy || loading}
+            title="紙の様式でPDFに出力する（半月ごとに1ページ）"
+          >
+            <IconDownload size={18} />
+            {pdfBusy ? '作成中…' : 'PDF'}
+          </button>
         </div>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
+          </p>
+        )}
+
+        {pdfError && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {pdfError}
           </p>
         )}
 
@@ -241,6 +321,26 @@ export default function Inspections() {
           凡例: ○ 良／× 不良／◎ 即時改修　　不備・欠陥がある場合は直ちに防火管理者に報告してください。
         </p>
       </div>
+
+      {/* PDF用の紙様式シート。通常は display:none で、PDF作成中だけ画面外に描画される。
+          親のレイアウト（flex/overflow）の影響を受けないよう body 直下に出す。 */}
+      {createPortal(
+        <div ref={sheetsRef}>
+          {ranges.map((range) => (
+            <InspectionSheet
+              key={range.from}
+              building={building}
+              month={month}
+              range={range}
+              byDate={byDate}
+              holidays={holidays}
+              periodicResult={periodicResult}
+              confirmedBy={confirmedBy}
+            />
+          ))}
+        </div>,
+        document.body,
+      )}
 
       {editing && (
         <InspectionForm

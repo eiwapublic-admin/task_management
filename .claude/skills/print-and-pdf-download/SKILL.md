@@ -11,8 +11,16 @@ description: Add "print this" and/or "download as PDF" to a React/Next.js page �
 > ため、Gotcha 4/5 の `oklch`／Tailwind v4 まわりの罠はそのままでは発生しない（該当する場合は
 > 通常の `html2canvas`（`-pro` ではない）を使えばよい）。`assets/*.tsx` もこのプロジェクトの
 > 実コードは `.jsx`（型注釈なし）なので、そのまま貼り付けるのではなく実装の参考として読み、
-> 型注釈を外して移植すること。現時点でこのアプリに印刷/PDFダウンロード機能は存在しない
-> （導入時点では知見の登録のみで、具体的な画面への実装依頼はまだない）。
+> 型注釈を外して移植すること。
+>
+> **このプロジェクトでの実装例（2026-08-06）**: 自主検査表（日常）のPDF出力
+> （`src/components/InspectionSheet.jsx` / `.css`、`src/pages/Inspections.jsx` の
+> `handleDownloadPdf`）。紙の様式に寄せたA4縦ちょうど（210×297mm）のシートを半月ごとに
+> 1枚組み、`display:none` → 撮影中だけ画面外という同じ手口で html2canvas に撮らせ、
+> 1枚＝1ページとして並べている。**キャンバスを分割していない**点がこのスキルの
+> 「Wide data tables」節と違う: ページ割りを紙の様式（16列＝半月）に合わせて先に決めて
+> しまえば、シート自体が必ず1ページに収まるのでスライス処理はいらない。
+> 下の Gotcha 7（`addImage` の圧縮指定）はこの実装で踏んだもの。
 
 Two shapes of the same job:
 
@@ -166,6 +174,39 @@ message is the entire diagnosis. Always surface it:
   setError(`PDFの作成に失敗しました(${detail})`);
 }
 ```
+
+### Gotcha 7 — `addImage()` without the compression argument makes a ~50MB PDF
+
+**Symptom:** the PDF is correct but absurdly large — an A4 page captured at `scale: 3` came out
+at **24MB per page** (48MB for two pages). On a phone that is a failed download, not a slow one.
+
+**Cause:** `pdf.addImage(data, 'PNG', …)` ignores the PNG's own compression and embeds the
+decoded raster (width × height × 3 bytes) unless you ask for compression. `2382 × 3369 × 3B`
+is exactly the 24MB observed.
+
+**Fix:** pass the 8th argument, `compression`:
+
+```ts
+pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST')
+//                                            ^alias   ^compression
+```
+
+Measured on the same two-page A4 capture (自主検査表, 2026-08-06):
+
+| Variant | Size | Time |
+| --- | --- | --- |
+| PNG, no compression arg | **48.2 MB** | — |
+| PNG + `'FAST'`, scale 3 | **0.93 MB** | 3.4s |
+| PNG + `'FAST'`, scale 2 | 0.53 MB | 1.7s |
+| JPEG q0.92, scale 3 | 1.26 MB | 0.8s |
+
+`'FAST'` (Flate) is **lossless and smaller than JPEG** for line-art documents (forms, tables,
+text) because they are mostly flat white — so prefer PNG + `'FAST'` over dropping to JPEG. JPEG
+is only the faster option, and it softens exactly what matters here (thin rules, small kanji).
+
+Verify by decoding the stream back out of the PDF rather than trusting the byte count: the image
+XObject should read `/Filter /FlateDecode` with `/DecodeParms << /Predictor 11 … >>`, and its
+inflated length must equal `height × (width × 3 + 1)`.
 
 ## PDF download: html2canvas + jsPDF (no font embedding needed)
 
