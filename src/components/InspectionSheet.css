@@ -63,10 +63,14 @@ body.pdf-capture-mode .ins-sheet {
 }
 
 /* ---- 本体の表 ---- */
+/* 表の外枠は0.3mmのまま、内側の罫線はその半分（0.15mm）にする。
+   border-collapse は太い方の罫線を採用するため、table要素に太い枠を、
+   セルに細い枠を指定するだけで「外枠だけ太く・内側は細く」を両立できる */
 .ins-sheet-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
+  border: 0.3mm solid #000;
 }
 
 .ins-col-group { width: 8mm; }
@@ -75,7 +79,7 @@ body.pdf-capture-mode .ins-sheet {
 
 .ins-sheet-table th,
 .ins-sheet-table td {
-  border: 0.3mm solid #000;
+  border: 0.15mm solid #000;
   padding: 0;
   text-align: center;
   vertical-align: middle;
@@ -182,7 +186,7 @@ body.pdf-capture-mode .ins-sheet {
    （上辺だけは「定期点検」行の下罫線として残す） */
 .ins-blank {
   border: none;
-  border-top: 0.3mm solid #000;
+  border-top: 0.15mm solid #000;
 }
 
 .ins-confirm-box {
