@@ -1,0 +1,25 @@
+/* Companion CSS for PrintablePanel.tsx.
+   The capture sheet is invisible on screen by default; it's only shown
+   (off-screen, so the user never sees it) while html2canvas captures it for the PDF. */
+.pdf-capture-sheet {
+  display: none;
+}
+body.pdf-capture-mode .pdf-capture-sheet {
+  display: block;
+  box-sizing: border-box;
+  width: 210mm;
+  /* height:297mm + overflow:hidden is fine HERE (unlike the print window) because this
+     box is captured as a canvas and placed into the PDF with fixed dimensions via
+     pdf.addImage(...,0,0,210,297) — there's no OS print-margin process involved that could
+     push content into a second page. Capping the height just guarantees the canvas itself
+     never grows taller than one page's worth of pixels. */
+  height: 297mm;
+  overflow: hidden;
+  padding: 14mm 12mm;
+  text-align: center;
+  background: #fff;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+}

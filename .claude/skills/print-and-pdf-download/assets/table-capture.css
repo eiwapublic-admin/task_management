@@ -1,0 +1,31 @@
+/* Companion CSS for TablePdfButton.tsx.
+   Only active while html2canvas is capturing (body gets .pdf-capture-mode, the target
+   element gets .pdf-capture-target). Nothing here affects normal rendering. */
+
+body.pdf-capture-mode .pdf-capture-target {
+  /* Park it off-screen so the user never sees the reflow, and give it a width wide enough
+     for every column. Without this the capture is clipped to whatever slice of the table
+     happened to be scrolled into view inside the overflow-x:auto wrapper. */
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  width: 1400px;
+  max-width: none;
+  background: #fff;
+}
+
+/* Release the horizontal scroll container so all columns lay out at once.
+   Change `.print-report` to whatever class wraps your table. */
+body.pdf-capture-mode .pdf-capture-target .print-report {
+  overflow: visible !important;
+}
+
+/* Sticky first columns (common in wide tables) misbehave once the scroll container is
+   released — they'd overlap the neighbouring cells in the capture. Neutralise them,
+   along with the shadow used to hint the scroll edge on screen. */
+body.pdf-capture-mode .pdf-capture-target .print-report th,
+body.pdf-capture-mode .pdf-capture-target .print-report td {
+  position: static !important;
+  box-shadow: none !important;
+}
