@@ -6,7 +6,6 @@ import Logs from './pages/Logs'
 import Archive from './pages/Archive'
 import Usage from './pages/Usage'
 import ReportList from './pages/ReportList'
-import ReportDetail from './pages/ReportDetail'
 import ReportTemplates from './pages/ReportTemplates'
 import Inspections from './pages/Inspections'
 import ParkingViolations from './pages/ParkingViolations'
@@ -107,11 +106,15 @@ function App() {
             </RequireAuth>
           }
         />
+        {/* 日報詳細は一覧の上のモーダルとして出す（2026-08-07）。URL（/reports/:date）は
+            そのまま残すことで、他画面（違反車両一覧・タスク側の「本日の日報」など）からの
+            リンクとブラウザの戻るボタンが従来どおり使える。描画するのは一覧側で、
+            :date が付いていればその日のモーダルを重ねる（ReportList.jsx） */}
         <Route
           path="/reports/:date"
           element={
             <RequireAuth>
-              <ReportDetail />
+              <ReportList />
             </RequireAuth>
           }
         />

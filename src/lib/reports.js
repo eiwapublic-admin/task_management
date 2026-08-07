@@ -96,6 +96,18 @@ export function formatReportDate(date) {
   ).padStart(2, '0')} (${WEEKDAYS[d.getUTCDay()]})`
 }
 
+// 作業記録を時刻順に並べる（保存順＝sort_order とは独立）。時刻が同じ／未入力のものは
+// 追加順を保つため sort_order をタイブレークに使う。日報詳細と一覧（リスト型・カレンダー型）
+// で並び順が食い違わないよう、両方からこの関数を使う（2026-08-07）。
+export function sortEntriesByTime(entries) {
+  return [...entries].sort((a, b) => {
+    const at = a.entry_time || '99:99:99'
+    const bt = b.entry_time || '99:99:99'
+    if (at !== bt) return at < bt ? -1 : 1
+    return a.sort_order - b.sort_order
+  })
+}
+
 // 'HH:MM:SS' → 'HH:MM'（input[type=time] と表示で使う）
 export function toHHMM(value) {
   if (typeof value !== 'string') return ''

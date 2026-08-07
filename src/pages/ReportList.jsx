@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import ReportDetail from './ReportDetail'
 import {
   IconClipboard,
   IconGear,
@@ -29,14 +30,13 @@ import {
   currentMonthJST,
   shiftMonth,
   daysInMonth,
+  sortEntriesByTime,
 } from '../lib/reports'
 import './Dashboard.css'
 
-// 一覧に出す作業記録の抜粋の行数（現行 FileMaker の一覧に合わせて3行程度）
-const PREVIEW_LINES = 3
-// カレンダー型の1日のマス目に出す作業記録の行数。リスト型より横幅が狭いため別に持つ。
-// **表示分量は実際の画面を見ながら調整する予定（2026-08-07。この定数を変えるだけで済む）**
-const CALENDAR_PREVIEW_LINES = 3
+// 作業記録は件数で打ち切らず全件出す（2026-08-07。従来は3件までで「ほか N 件」と
+// 省略していたが、枠の高さを伸縮させて全部見えるようにしてほしいとの要望による）。
+// リスト型・カレンダー型とも、行／マス目の高さは中身に合わせて伸びる。
 
 // カレンダー型を出せる下限幅（iPad縦=768pxを含める）。これ未満（＝スマートフォン）は
 // マス目が狭すぎて実用にならないため、リスト型のみとする
@@ -49,6 +49,10 @@ const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土']
 // 表示は「リスト型」と「カレンダー型」を切り替えられる（カレンダー型はPC/iPad専用。2026-08-07）。
 export default function ReportList() {
   const navigate = useNavigate()
+  // URLが /reports/:date のときは、その日の詳細を一覧の上にモーダルで重ねる（2026-08-07）。
+  // 別画面にしないことで一覧の月・表示形式（リスト/カレンダー）がそのまま残り、
+  // 閉じたときに元の見え方へ戻る。
+  const { date: openDate } = useParams()
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
 
@@ -183,7 +187,8 @@ export default function ReportList() {
       isFuture,
       isToday: date === today,
       weekday: weekdayInfo(date, holidays),
-      entries: r ? (r.entries || []).filter((e) => e.content) : [],
+      // 詳細画面と同じ時刻順で出す（APIはsort_order順で返すため、ここで並べ替える）
+      entries: r ? sortEntriesByTime((r.entries || []).filter((e) => e.content)) : [],
       // 未入力かつ未来日でなければタップで新規作成できる
       clickable: !r && !isOwner && !closed && !isFuture,
     }
@@ -273,17 +278,12 @@ export default function ReportList() {
                       {entries.length === 0 ? (
                         <span className="report-empty">記録なし</span>
                       ) : (
-                        <>
-                          {entries.slice(0, PREVIEW_LINES).map((e) => (
-                            <div className="report-line" key={e.id}>
-                              <span className="report-line-time">{toHHMM(e.entry_time)}</span>
-                              <span className="report-line-text">{e.content}</span>
-                            </div>
-                          ))}
-                          {entries.length > PREVIEW_LINES && (
-                            <div className="report-more">ほか {entries.length - PREVIEW_LINES} 件</div>
-                          )}
-                        </>
+                        entries.map((e) => (
+                          <div className="report-line" key={e.id}>
+                            <span className="report-line-time">{toHHMM(e.entry_time)}</span>
+                            <span className="report-line-text">{e.content}</span>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>
@@ -400,17 +400,12 @@ export default function ReportList() {
                         {entries.length === 0 ? (
                           <span className="report-empty">記録なし</span>
                         ) : (
-                          <>
-                            {entries.slice(0, CALENDAR_PREVIEW_LINES).map((e) => (
-                              <div className="report-calendar-line" key={e.id}>
-                                <span className="report-line-time">{toHHMM(e.entry_time)}</span>
-                                <span className="report-line-text">{e.content}</span>
-                              </div>
-                            ))}
-                            {entries.length > CALENDAR_PREVIEW_LINES && (
-                              <div className="report-more">ほか {entries.length - CALENDAR_PREVIEW_LINES} 件</div>
-                            )}
-                          </>
+                          entries.map((e) => (
+                            <div className="report-calendar-line" key={e.id}>
+                              <span className="report-line-time">{toHHMM(e.entry_time)}</span>
+                              <span className="report-line-text">{e.content}</span>
+                            </div>
+                          ))
                         )}
                       </div>
                     </>
@@ -520,6 +515,19 @@ export default function ReportList() {
           renderList()
         )}
       </div>
+
+      {/* 日報詳細（一覧の上に重ねるモーダル）。閉じたら一覧のURLへ戻し、
+          モーダル内での編集・削除・休館日指定を一覧へ反映するため読み直す */}
+      {openDate && (
+        <ReportDetail
+          key={openDate}
+          date={openDate}
+          onClose={() => {
+            navigate('/reports')
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }

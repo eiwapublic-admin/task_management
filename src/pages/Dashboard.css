@@ -1016,7 +1016,8 @@
   white-space: nowrap;
 }
 
-.report-more, .report-empty { font-size: 13px; color: var(--text-muted); }
+/* 「ほか N 件」の省略表示は廃止（2026-08-07。作業記録は全件出す）*/
+.report-empty { font-size: 13px; color: var(--text-muted); }
 
 /* 記録の無い日（未入力／休館日）の行。未入力かつ未来日でなければ<button>としてタップ可能
    （タップで新規作成。2026-08-07）、休館日・未来日は素の<div>にしている。 */
@@ -1247,23 +1248,55 @@
   .report-calendar-workers { font-size: 11px; }
 }
 
-/* --- 詳細 ---
-   左: ホーム・前日/翌日・日付。右: 保存状態・自主検査入力・削除（2026-08-07。
-   従来 justify-content:space-between で3要素を並べていたため、画面幅によって
-   日付がホームから離れて見えることがあった。日付をホームの右隣に固定するため
-   左右を別グループにまとめ、右側だけ margin-left:auto で寄せる形に変更した） */
+/* --- 詳細（2026-08-07に別画面から「一覧の上に重ねるモーダル」へ変更） ---
+   左: 日付。右: 保存状態・自主点検・削除・×（閉じる）。
+   ホームボタンと前日/翌日の移動ボタンは廃止し、×だけで閉じる。
+   自主点検モーダル（.inspection-overlay。z-index:55）はこの上に重なる必要があるため、
+   こちらは 50 にしている */
+.report-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-3)
+           calc(var(--space-4) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.report-detail-modal {
+  background: var(--bg-app);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 900px;
+  max-height: calc(100dvh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
 .report-detail-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
-  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  flex-shrink: 0;
 }
 
-.report-detail-head-left { display: flex; align-items: center; gap: var(--space-3); }
+.report-detail-head .page-title { margin: 0; }
 
-.report-nav { display: flex; align-items: center; gap: var(--space-3); }
-.report-nav .page-title { margin: 0; }
+/* モーダル本体（ヘッダを残して中身だけスクロールさせる） */
+.report-detail-body {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
 
 .report-head-right { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
 
