@@ -225,32 +225,79 @@ webview is left blank. Gotcha 1 covers `window.print()` being a no-op in this sa
 context; this is the sibling problem for downloads — the platform silently substitutes
 "navigate and show" for "save," and standalone mode has no fallback for that substitution.
 
-**Fix:** hand the file to the OS via the **Web Share API** instead of an anchor click, whenever
-it's available — this opens the native share sheet (Save to Files, AirDrop, Mail, …) without any
-navigation at all, so there is nothing to "close" back out of:
+**First fix tried (works, but has its own UX cost): Web Share API on its own.** Hand the file to
+the OS via `navigator.share` instead of an anchor click — this opens the native share sheet (Save
+to Files, AirDrop, Mail, …) without any navigation at all, so there's nothing to "close" back out
+of. This does fix the blank screen. But routing *every* PDF view through the OS share sheet means
+the sheet pops up even when the user just wants to look at the document — which reads as its own
+bug ("why does a share menu appear when I tap a PDF button?") and is easy to mistake for a
+half-fixed version of the very problem it replaced. Don't ship this as the whole fix if the app has
+any kind of "view it" use case, not just "send it somewhere" — see the real fix below.
+
+**Real fix: never navigate away at all — preview the PDF inside the app, share only on request.**
+Render the PDF in your own in-app modal via an `<iframe>`, with a plain "×" that just clears React
+state (no navigation ever happened, so there's nothing to recover from). Add an explicit "Share /
+Save" button *inside* that modal for when the user actually wants to send or download it — and
+only call Web Share (or `pdf.save()`) from that button's `onClick`, never automatically on open.
+
+The catch: WebKit cannot render a `blob:` URL PDF inside an `<iframe>` (a separate, unrelated
+Safari bug from the one above — full details in the `multi-env-attachment-preview` skill). So the
+iframe needs a same-origin **real URL**, not a blob URL. For a PDF that was generated client-side
+(jsPDF output, not something already sitting in server storage), that means a short round trip:
+
+1. `POST` the generated PDF bytes to a same-origin endpoint that stores them — even transiently is
+   fine (reuse whatever object storage the app already has; key it per-user/session and overwrite
+   on every generation so nothing accumulates — no cleanup job needed).
+2. That endpoint returns a short-lived **signed token** scoped to the stored object (a JWT
+   expiring in 1–3 minutes is plenty — it only needs to survive the immediate page view).
+3. Point the iframe's `src` at a `GET` endpoint + `?token=...`. `<iframe src>` can't carry an
+   `Authorization` header, so the token substitutes for it. That handler validates the token,
+   streams the bytes back with `Content-Disposition: inline`, and — **only for this response** —
+   relaxes `X-Frame-Options`/CSP `frame-ancestors` to same-origin (the rest of the app keeps the
+   stricter default; this is the same technique as a same-origin attachment preview, just fed by
+   an upload instead of an existing stored file).
+4. The "Share / Save" button builds a `File` from the PDF blob already held in memory (no need to
+   re-fetch it) and calls `navigator.share`, falling back to `pdf.save()` where Web Share isn't
+   available.
 
 ```ts
-const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
-if (navigator.canShare && navigator.canShare({ files: [file] })) {
-  try {
-    await navigator.share({ files: [file], title: filename });
-  } catch (e) {
-    // AbortError = the user dismissed the share sheet themselves; that's a normal outcome,
-    // not a failure. Anything else: fall back to the old path rather than doing nothing.
-    if ((e as Error)?.name !== "AbortError") pdf.save(filename);
+// client: generate → upload for preview → open modal. No navigation, no share sheet yet.
+const blob = pdf.output("blob");
+const { token } = await api.post("/pdf-preview", blob, { headers: { "Content-Type": "application/pdf" } });
+setPreview({ url: `/pdf-preview?token=${token}&filename=${encodeURIComponent(filename)}`, blob });
+// <iframe src={preview.url} /> inside your own modal; "×" just clears `preview` state.
+
+// modal's explicit "Share / Save" button — runs ONLY on tap, never automatically on open
+async function shareOrSave({ blob, filename }) {
+  const file = new File([blob], filename, { type: "application/pdf" });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (e) {
+      if (e?.name === "AbortError") return; // user dismissed the sheet themselves; not a failure
+      // anything else: fall through to the plain-download path below
+    }
   }
-} else {
-  pdf.save(filename); // desktop / browsers without file-sharing support: unchanged, known-good
+  pdf.save(filename); // desktop / no Web Share support: unchanged, known-good
 }
 ```
 
 Gate on `canShare` (feature detection), not a `navigator.userAgent` iOS sniff — desktop Safari and
-some Android/Chrome builds support it too and behave fine either way, while browsers that don't
-support it (most desktop Chrome/Firefox today) fall straight through to the original, already
-verified `pdf.save()` path, so this is additive and doesn't touch the working desktop behavior.
+some Android/Chrome builds support it too and behave fine either way, while browsers without it
+(most desktop Chrome/Firefox today) fall straight through to the original, already-verified
+`pdf.save()` path.
 
-**Confirmed on:** iPhone, app added to home screen (standalone), 2026-08-07 — reproduced the blank
-screen with plain `pdf.save()`, fixed with the `canShare`/`share()` path above.
+**Confirmed on:** iPhone, app added to home screen (standalone), 2026-08-07 — blank screen
+reproduced with plain `pdf.save()`; the Web-Share-only fix worked but was rejected for popping the
+share sheet on every open; the in-app iframe preview + on-demand "Share / Save" button was
+confirmed working end to end (opens inline, "×" returns cleanly with no white screen, the share
+sheet only appears when the button is tapped).
+
+**See also:** the `multi-env-attachment-preview` skill for the full blob-vs-real-URL /
+CSP / `X-Frame-Options` mechanics this fix depends on (it was built for previewing files already in
+server storage; the only difference here is uploading generated bytes first to get something to
+point the token at).
 
 ## PDF download: html2canvas + jsPDF (no font embedding needed)
 

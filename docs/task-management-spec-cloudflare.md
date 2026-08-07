@@ -159,7 +159,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **スクロールバーの見た目（2026-07-21）**: Windows/macOSのデスクトップブラウザ既定のオーバーレイ型スクロールバーは、ページのスタッキング（sticky固定のヘッダー等）とは無関係にOS/ブラウザのUI層で最前面に描画されるため、sticky固定ヘッダーに食い込んで見えることがある。`src/index.css` に常時表示の細いスクロールバーを自前描画するCSS（`scrollbar-gutter: stable` + `::-webkit-scrollbar` 系 + Firefox の `scrollbar-width`/`scrollbar-color`）を追加し、通常のスタッキング順に従わせることで解消した。全画面共通の対応（ページ個別のCSSではない）。**ただしSafariでは未解消**（Safariはメインページのスクロールを`::-webkit-scrollbar`等ではなくOS統合の表示（NSScroller）で描画する傾向が強く、ページ側CSSでの制御が効きにくい。業務に支障が無いためユーザー了承のもと対応保留）
 - **iPhoneでヘッダーのタイトルが見えなくなる不具合への対策（2026-07-21）**: `.dashboard-header` に `env(safe-area-inset-top)` 分の上余白が無く、`viewport-fit=cover`＋ホーム画面追加（PWAスタンドアロン表示）時にノッチ/ステータスバー領域とヘッダー内容が重なっていた可能性を想定し、ヘッダーの上パディングに `env(safe-area-inset-top)` を追加（`TaskDetail`のオーバーレイや`ReloadPrompt.jsx`で既に採用済みの対策と同種）。**手元では実機の症状を再現できておらず、実機での解消は未確認**
 - **768px以下で折り返る2行目の両端揃え（2026-08-07）**: 狭幅では`.dashboard-header`が2行に折り返るが、2行目（ユーザー名＋ハンバーガー）が要素1つだけだと`justify-content: space-between`が効かず左寄りになっていた。タスク/日報の切替（`.app-switch`）をモバイル専用にもう1つ複製し（`.app-switch-mobile`。768px以下でのみ表示、通常の`.app-switch`は768px以下で非表示）、2行目に「切替＝左端」「ユーザー名＋ハンバーガー＝右端」の2要素を並べて両端揃えにした。**実装上の注意**: モバイル専用ボタンは共有クラス`.app-switch`も持つため、単純な`.app-switch-mobile`セレクタで表示制御すると無条件の`.app-switch{display:flex;...}`ルール（同じ詳細度）とファイル内の定義順によって競合し、狭幅でも表示されない／広幅でも表示されたままになる、の両方の不具合を実際に踏んだ。表示制御は`.app-switch.app-switch-mobile`という複合セレクタに統一し、詳細度で確実に勝つようにして解消した
-- **768px以下のレイアウトをgrid-template-areasで固定（2026-08-07）**: 上記のflex-wrap方式は実機で「デプロイしたのに反映されない」との報告が続いた。折り返し位置がタイトル文字幅・端末のフォント設定次第で変わりうる構造自体が原因だった可能性があり、`.dashboard-header`を768px以下で`display:grid; grid-template-columns:1fr auto; grid-template-areas:'title title' 'switch menu'`に書き換え、`.dashboard-header-left`＝title、`.app-switch-mobile`＝switch（`justify-self:start`）、`.dashboard-header-right`＝menu（`justify-self:end`）に明示的に割り当てた。1行目＝ロゴ・タイトルのみ、2行目＝切替（左端）とユーザー名＋ハンバーガー（右端）が幅・文字数によらず必ず同じ形になる。owner（切替が無いロール）でも`switch`領域が空のまま崩れない
+- **768px以下のレイアウトをgrid-template-areasで固定（2026-08-07）**: 上記のflex-wrap方式は実機で「デプロイしたのに反映されない」との報告が続いた。折り返し位置がタイトル文字幅・端末のフォント設定次第で変わりうる構造自体が原因だった可能性があり、`.dashboard-header`を768px以下で`display:grid; grid-template-columns:1fr auto; grid-template-areas:'title title' 'switch menu'`に書き換え、`.dashboard-header-left`＝title、`.app-switch-mobile`＝switch（`justify-self:start`）、`.dashboard-header-right`＝menu（`justify-self:end`）に明示的に割り当てた。1行目＝ロゴ・タイトルのみ、2行目＝切替（左端）とユーザー名＋ハンバーガー（右端）が幅・文字数によらず必ず同じ形になる。owner（切替が無いロール）でも`switch`領域が空のまま崩れない。**実機（iPhone）で表示OKを確認済み（2026-08-07）**
 
 **ログイン画面**: ロゴ + 「栄和　タスク管理システム」。ユーザー名/パスワード認証。
 
@@ -470,7 +470,9 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
     CSP `frame-ancestors 'self'` を緩めて自オリジンのプレビューiframeに埋め込めるようにする。
     共有シートは自動起動せず、モーダルの「共有 / 保存」ボタンを明示的に押したときだけ
     `navigator.canShare`で機能検出し、対応環境は`navigator.share`、非対応（主にデスクトップ）は
-    通常のBlobダウンロードを行う（`Inspections.jsx` の `handleDownloadPdf` / `handleSharePdf`）
+    通常のBlobダウンロードを行う（`Inspections.jsx` の `handleDownloadPdf` / `handleSharePdf`）。
+    **実機（iPhone・ホーム画面追加アプリ）で表示・×での復帰・共有ボタンとも問題なしを確認済み
+    （2026-08-07）**
 
 ### 4-13. 違反車両（2026-08-05〜。Phase 4 着手）
 
