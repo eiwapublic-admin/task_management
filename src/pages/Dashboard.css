@@ -758,10 +758,21 @@
 }
 
 @media (max-width: 768px) {
-  /* 狭幅ではヘッダーを折り返し、操作ボタン群を2行目に回して溢れを防ぐ */
+  /* 狭幅では2行固定のグリッドにする：1行目はロゴ・タイトルのみ、2行目は
+     タスク/日報切替（左端）とユーザー名＋ハンバーガー（右端）。
+     以前はflex-wrapの自然な折り返しに任せていたが、折り返し位置は要素の実際の
+     幅（実データのタイトル文字数・端末フォント設定等）次第で変わってしまい、
+     「ツールバー側は直ったのに共通ヘッダー側だけ実機で反映されない」という
+     再現できない不具合報告につながった（2026-08-07）。grid-template-areas で
+     行・列の割り当てを明示することで、幅に関わらず必ず同じ形になるようにする。 */
   .dashboard-header {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'title title'
+      'switch menu';
     row-gap: var(--space-2);
+    column-gap: var(--space-3);
     padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3) var(--space-3);
   }
 
@@ -770,18 +781,25 @@
   }
 
   .dashboard-header-left {
-    flex: 1 1 auto;
+    grid-area: title;
     min-width: 0;
   }
 
-  /* 1行目はロゴ・タイトルのみにする（タスク/日報切替は2行目のモバイル専用ボタンへ）。
-     2行目に切替とハンバーガー側の2要素が並ぶことで、ヘッダーの space-between が
-     両端に振り分けてくれる（2026-08-07） */
+  /* 1行目はロゴ・タイトルのみにする（タスク/日報切替は2行目のモバイル専用ボタンへ） */
   .dashboard-header-left .app-switch { display: none; }
 
   .app-switch.app-switch-mobile {
     display: flex;
+    grid-area: switch;
+    justify-self: start;
+    align-self: center;
     margin-left: 0;
+  }
+
+  .dashboard-header-right {
+    grid-area: menu;
+    justify-self: end;
+    align-self: center;
   }
 
   .dashboard-header-right button {
