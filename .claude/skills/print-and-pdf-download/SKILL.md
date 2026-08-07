@@ -208,6 +208,50 @@ Verify by decoding the stream back out of the PDF rather than trusting the byte 
 XObject should read `/Filter /FlateDecode` with `/DecodeParms << /Predictor 11 … >>`, and its
 inflated length must equal `height × (width × 3 + 1)`.
 
+### Gotcha 8 — `jsPDF.save()` leaves an installed iOS PWA blank after the user closes the PDF
+
+**Symptom:** on a normal desktop browser, `pdf.save(filename)` downloads the file cleanly — no
+complaints for weeks. On an iPhone with the app **added to the home screen** (`display-mode:
+standalone`), the PDF *does* open, but tapping the PDF viewer's own "×"/back control to return to
+the app leaves a **blank white screen with nothing tappable** — not an error, just dead.
+
+**Cause:** `pdf.save()` works by creating a blob URL and clicking a hidden `<a download>`. iOS
+Safari does not honor the `download` attribute — instead of triggering a file save, it just
+**navigates the current document to the blob URL** and shows the PDF in the platform viewer. In a
+normal browser tab that's recoverable (back button returns to the SPA tab). In an installed
+standalone PWA **there is no separate tab to go back to** — the webview *is* the one and only
+page, so once it has navigated away, "closing" the viewer has nothing correct to return to and the
+webview is left blank. Gotcha 1 covers `window.print()` being a no-op in this same standalone
+context; this is the sibling problem for downloads — the platform silently substitutes
+"navigate and show" for "save," and standalone mode has no fallback for that substitution.
+
+**Fix:** hand the file to the OS via the **Web Share API** instead of an anchor click, whenever
+it's available — this opens the native share sheet (Save to Files, AirDrop, Mail, …) without any
+navigation at all, so there is nothing to "close" back out of:
+
+```ts
+const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  try {
+    await navigator.share({ files: [file], title: filename });
+  } catch (e) {
+    // AbortError = the user dismissed the share sheet themselves; that's a normal outcome,
+    // not a failure. Anything else: fall back to the old path rather than doing nothing.
+    if ((e as Error)?.name !== "AbortError") pdf.save(filename);
+  }
+} else {
+  pdf.save(filename); // desktop / browsers without file-sharing support: unchanged, known-good
+}
+```
+
+Gate on `canShare` (feature detection), not a `navigator.userAgent` iOS sniff — desktop Safari and
+some Android/Chrome builds support it too and behave fine either way, while browsers that don't
+support it (most desktop Chrome/Firefox today) fall straight through to the original, already
+verified `pdf.save()` path, so this is additive and doesn't touch the working desktop behavior.
+
+**Confirmed on:** iPhone, app added to home screen (standalone), 2026-08-07 — reproduced the blank
+screen with plain `pdf.save()`, fixed with the `canShare`/`share()` path above.
+
 ## PDF download: html2canvas + jsPDF (no font embedding needed)
 
 `jsPDF`'s built-in fonts (Helvetica/Times/Courier) don't support Japanese or most non-Latin

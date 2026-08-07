@@ -135,7 +135,25 @@ export default function Inspections() {
           // 可逆圧縮なので線や文字の劣化はない）。
           pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST')
         }
-        pdf.save(`自主検査表_${building}_${month}.pdf`)
+
+        const filename = `自主検査表_${building}_${month}.pdf`
+        // pdf.save() は内部で <a download> をクリックして保存させるが、iOS Safari
+        // （特にホーム画面アプリのstandalone表示）はdownload属性を無視してblob URLへ
+        // そのままナビゲートする。standaloneにはタブの概念が無いため、開いたPDF
+        // ビューアの「×」で戻ろうとしてもアプリの画面に復帰できず真っ白になる
+        // （2026-08-07に実機で確認）。Web Share API（ファイル共有）が使える環境では
+        // 共有シートを使い、ページ遷移を一切発生させないようにする。
+        const file = new File([pdf.output('blob')], filename, { type: 'application/pdf' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: filename })
+          } catch (shareErr) {
+            // ユーザーが共有シートを閉じただけなら何もしない。それ以外は従来の保存にフォールバック
+            if (shareErr?.name !== 'AbortError') pdf.save(filename)
+          }
+        } else {
+          pdf.save(filename)
+        }
       } finally {
         // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す
         document.body.classList.remove('pdf-capture-mode')
