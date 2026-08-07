@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
+import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import {
-  IconClipboard,
+  IconDownload,
   IconGear,
   IconCar,
   IconClip,
@@ -33,6 +34,10 @@ import {
   sortEntriesByTime,
 } from '../lib/reports'
 import './Dashboard.css'
+// AttachmentPreview（PDFのアプリ内プレビュー）の見た目は本来タスク管理側の
+// KanbanBoard.css で定義されており、日報一覧を直接開いた場合はまだ読み込まれて
+// いないことがあるため、ここでも明示的に import しておく（Inspections.jsxと同じ対応）。
+import '../components/KanbanBoard.css'
 
 // 作業記録は件数で打ち切らず全件出す（2026-08-07。従来は3件までで「ほか N 件」と
 // 省略していたが、枠の高さを伸縮させて全部見えるようにしてほしいとの要望による）。
@@ -43,6 +48,12 @@ import './Dashboard.css'
 const WIDE_SCREEN_QUERY = '(min-width: 768px)'
 
 const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土']
+
+// リスト/カレンダーの選択を覚えておくキー（2026-08-07）。違反車両一覧・自主検査表など
+// 他画面のホームボタンで /reports に戻ると ReportList は作り直されて view state が
+// 初期値に戻ってしまうため、sessionStorage に退避してタブを閉じるまで保持する
+// （ログイン情報等ではないため localStorage ほど長く残す必要はない）。
+const VIEW_STORAGE_KEY = 'reports_view'
 
 // 自主検査表（Inspections.jsx）と同じ「月単位・＜＞で移動・1日から全日表示」の構成にする
 // （2026-08-07）。休館日はプロジェクト共通情報（closed_days）のため自主検査表とも共有する。
@@ -66,14 +77,23 @@ export default function ReportList() {
   // 未入力の行タップで新規作成中（多重タップ防止）
   const [creating, setCreating] = useState(false)
   // 'list' | 'calendar'
-  const [view, setView] = useState('list')
+  const [view, setView] = useState(() =>
+    typeof window !== 'undefined' && sessionStorage.getItem(VIEW_STORAGE_KEY) === 'calendar'
+      ? 'calendar'
+      : 'list',
+  )
   // カレンダー型を出せる画面幅か。回転（iPadの縦横）にも追従させる
   const [isWideScreen, setIsWideScreen] = useState(
     () => typeof window === 'undefined' || window.matchMedia(WIDE_SCREEN_QUERY).matches,
   )
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') sessionStorage.setItem(VIEW_STORAGE_KEY, view)
+  }, [view])
+
   const today = todayJST()
   const building = INSPECTION_BUILDINGS[0]
+  const pdf = useInspectionPdfExport(month, building)
 
   // 狭い画面では常にリスト型にフォールバックする（state自体は保持し、広い画面に戻れば
   // 選んでいた表示に復帰する）
@@ -475,13 +495,20 @@ export default function ReportList() {
                 </button>
               </div>
             )}
-            {/* 自主検査表はハンバーガーメニューに入れず、この画面の見える位置に置く
-                （2026-08-05のご指摘）。定型文の設定は滅多に使わないため、歯車アイコンのみ
-                にしている（2026-08-05 追加調整）。「自主検査入力」は日報詳細画面へ移動した
-                （2026-08-07。該当の日を開いてから記録する運用にするため）。 */}
-            <button type="button" className="btn-plain" onClick={() => navigate('/reports/inspections')}>
-              <IconClipboard size={18} />
-              自主検査表
+            {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
+                その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
+                （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
+                アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
+                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持 */}
+            <button
+              type="button"
+              className="btn-plain"
+              onClick={pdf.download}
+              disabled={pdf.busy}
+              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
+            >
+              <IconDownload size={18} />
+              {pdf.busy ? '作成中…' : '自主検査PDF'}
             </button>
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
               <IconCar size={18} />
@@ -507,6 +534,12 @@ export default function ReportList() {
           </p>
         )}
 
+        {pdf.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {pdf.error}
+          </p>
+        )}
+
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
         ) : activeView === 'calendar' ? (
@@ -528,6 +561,9 @@ export default function ReportList() {
           }}
         />
       )}
+
+      {pdf.sheetsPortal}
+      {pdf.previewModal}
     </div>
   )
 }
