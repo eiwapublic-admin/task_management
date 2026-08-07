@@ -88,6 +88,13 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+/* デスクトップ幅では出さない。狭幅時のみ表示する（@media (max-width: 768px) 参照）。
+   このモバイル専用ボタンは共有クラス .app-switch も持つため、下の方に定義されている
+   無条件の `.app-switch { display:flex; margin-left:... }`（同じ詳細度）と常にぶつかる。
+   単純な `.app-switch-mobile` セレクタだと、そちらが後勝ちして幅に関係なく表示されて
+   しまう不具合を実際に踏んだため、詳細度で確実に勝つよう複合セレクタにしている。 */
+.app-switch.app-switch-mobile { display: none; }
+
 /* ハンバーガーメニュー左のログインユーザー名（緑ヘッダー上で白く表示） */
 .dashboard-user {
   font-size: 15px;
@@ -767,6 +774,16 @@
     min-width: 0;
   }
 
+  /* 1行目はロゴ・タイトルのみにする（タスク/日報切替は2行目のモバイル専用ボタンへ）。
+     2行目に切替とハンバーガー側の2要素が並ぶことで、ヘッダーの space-between が
+     両端に振り分けてくれる（2026-08-07） */
+  .dashboard-header-left .app-switch { display: none; }
+
+  .app-switch.app-switch-mobile {
+    display: flex;
+    margin-left: 0;
+  }
+
   .dashboard-header-right button {
     white-space: nowrap;
   }
@@ -1197,7 +1214,11 @@
 @media (max-width: 640px) {
   .reports-container { padding: var(--space-3); }
   .app-switch { margin-left: var(--space-2); }
+  .app-switch.app-switch-mobile { margin-left: 0; }
   .app-switch-btn { padding: 5px 12px; font-size: 12px; }
+  /* 自主検査表・違反車両・歯車のボタン群が2行目に折り返ったとき、space-betweenは
+     単独の要素だと左端に置いてしまうため、margin-left:auto で右端に寄せる（2026-08-07） */
+  .reports-toolbar-actions { margin-left: auto; }
   .entry-row { flex-wrap: wrap; }
   .entry-time { width: 110px; }
   .entry-content { flex-basis: 100%; order: 3; }
