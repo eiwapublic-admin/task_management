@@ -25,6 +25,8 @@ import {
   handleInspectionList,
   handleInspectionSave,
   handleInspectionDelete,
+  handleInspectionPdfPreviewCreate,
+  handleInspectionPdfPreviewGet,
   handleHolidays,
   handleClosedDaysList,
   handleClosedDayCreate,
@@ -927,6 +929,11 @@ async function route(req, env) {
   }
   if (pathname === '/api/report/holidays') {
     return req.method === 'GET' ? handleHolidays(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/inspection-pdf-preview') {
+    if (req.method === 'GET') return handleInspectionPdfPreviewGet(req)
+    if (req.method === 'POST') return handleInspectionPdfPreviewCreate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/report/closed-days') {
     if (req.method === 'GET') return handleClosedDaysList(req)

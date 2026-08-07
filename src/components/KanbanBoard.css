@@ -977,6 +977,21 @@ select.task-detail-input.is-unassigned {
   color: var(--text-muted);
 }
 
+/* 自主検査表PDFプレビューの「共有 / 保存」。自動で共有シートを出す代わりに
+   ユーザーが明示的にタップしたときだけ実行するための操作（2026-08-07） */
+.attachment-preview-share {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .attachment-preview-close {
   border: none;
   background: transparent;

@@ -20,15 +20,17 @@ function serviceKey() {
   return key
 }
 
-// オブジェクトを保存する。既存キーは上書きしない（キーは毎回 uuid で作るため衝突しない想定）
-export async function putObject(key, body, contentType) {
+// オブジェクトを保存する。既定では既存キーを上書きしない（キーは毎回 uuid で作るため
+// 衝突しない想定）。upsert: true を渡すと固定キーを毎回上書きできる（自主検査表PDFの
+// プレビュー保存など、ユーザーごとに1個だけ保持して溜め込みたくない用途向け）。
+export async function putObject(key, body, contentType, { upsert = false } = {}) {
   const res = await fetch(`${storageBase()}/object/${PHOTO_BUCKET}/${encodeURI(key)}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${serviceKey()}`,
       apikey: serviceKey(),
       'Content-Type': contentType || 'application/octet-stream',
-      'x-upsert': 'false',
+      'x-upsert': upsert ? 'true' : 'false',
     },
     body,
   })

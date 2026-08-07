@@ -17,7 +17,7 @@ function touchDistance(touches) {
 // タスク詳細モーダルの上に重ねて表示する（オーバーレイのz-indexをより高くする）。
 // 画像はホイール/ピンチでの拡大縮小・ドラッグでの移動に対応する
 // （PDFはブラウザ内蔵のPDFビューア自体がズーム機能を持つため、ここでは制御しない）。
-export default function AttachmentPreview({ attachment, url, onClose }) {
+export default function AttachmentPreview({ attachment, url, onClose, headerAction }) {
   const overlayRef = useRef(null)
   const dragRef = useRef(null)
   const pinchRef = useRef(null)
@@ -139,6 +139,7 @@ export default function AttachmentPreview({ attachment, url, onClose }) {
               )}
             </div>
           )}
+          {headerAction}
           <button
             className="attachment-preview-close"
             onClick={(e) => {

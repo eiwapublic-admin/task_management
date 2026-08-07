@@ -239,6 +239,22 @@ export async function deleteInspection(id) {
   await authFetch(`/api/report/inspections?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
+// 自主検査表PDFをアプリ内プレビュー表示するための短時間有効URLを発行する
+// （プロジェクトスキル print-and-pdf-download Gotcha 8）。iOS Safariのホーム画面追加
+// アプリ（standalone表示）は pdf.save() の download 属性を無視してそのままナビゲート
+// してしまい、「×」で閉じても戻り先が無く画面が真っ白になる。既存の添付ファイル
+// プレビュー（getAttachmentPreviewUrl）と同じ「実URLへの<iframe>ナビゲーション」方式
+// にすることで、共有シートも画面遷移も発生させずアプリ内で開いて×で戻れるようにする。
+export async function getInspectionPdfPreviewUrl(pdfBlob, filename) {
+  const { token } = await authFetch('/api/report/inspection-pdf-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: pdfBlob,
+  })
+  const params = new URLSearchParams({ token, filename: filename || 'inspection.pdf' })
+  return `/api/report/inspection-pdf-preview?${params.toString()}`
+}
+
 // 日本の祝日一覧（{日付: 祝日名}）。日付列の色分けに使う。
 export async function fetchHolidays() {
   const data = await authFetch('/api/report/holidays')

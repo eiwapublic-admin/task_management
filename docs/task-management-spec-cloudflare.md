@@ -159,6 +159,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **スクロールバーの見た目（2026-07-21）**: Windows/macOSのデスクトップブラウザ既定のオーバーレイ型スクロールバーは、ページのスタッキング（sticky固定のヘッダー等）とは無関係にOS/ブラウザのUI層で最前面に描画されるため、sticky固定ヘッダーに食い込んで見えることがある。`src/index.css` に常時表示の細いスクロールバーを自前描画するCSS（`scrollbar-gutter: stable` + `::-webkit-scrollbar` 系 + Firefox の `scrollbar-width`/`scrollbar-color`）を追加し、通常のスタッキング順に従わせることで解消した。全画面共通の対応（ページ個別のCSSではない）。**ただしSafariでは未解消**（Safariはメインページのスクロールを`::-webkit-scrollbar`等ではなくOS統合の表示（NSScroller）で描画する傾向が強く、ページ側CSSでの制御が効きにくい。業務に支障が無いためユーザー了承のもと対応保留）
 - **iPhoneでヘッダーのタイトルが見えなくなる不具合への対策（2026-07-21）**: `.dashboard-header` に `env(safe-area-inset-top)` 分の上余白が無く、`viewport-fit=cover`＋ホーム画面追加（PWAスタンドアロン表示）時にノッチ/ステータスバー領域とヘッダー内容が重なっていた可能性を想定し、ヘッダーの上パディングに `env(safe-area-inset-top)` を追加（`TaskDetail`のオーバーレイや`ReloadPrompt.jsx`で既に採用済みの対策と同種）。**手元では実機の症状を再現できておらず、実機での解消は未確認**
 - **768px以下で折り返る2行目の両端揃え（2026-08-07）**: 狭幅では`.dashboard-header`が2行に折り返るが、2行目（ユーザー名＋ハンバーガー）が要素1つだけだと`justify-content: space-between`が効かず左寄りになっていた。タスク/日報の切替（`.app-switch`）をモバイル専用にもう1つ複製し（`.app-switch-mobile`。768px以下でのみ表示、通常の`.app-switch`は768px以下で非表示）、2行目に「切替＝左端」「ユーザー名＋ハンバーガー＝右端」の2要素を並べて両端揃えにした。**実装上の注意**: モバイル専用ボタンは共有クラス`.app-switch`も持つため、単純な`.app-switch-mobile`セレクタで表示制御すると無条件の`.app-switch{display:flex;...}`ルール（同じ詳細度）とファイル内の定義順によって競合し、狭幅でも表示されない／広幅でも表示されたままになる、の両方の不具合を実際に踏んだ。表示制御は`.app-switch.app-switch-mobile`という複合セレクタに統一し、詳細度で確実に勝つようにして解消した
+- **768px以下のレイアウトをgrid-template-areasで固定（2026-08-07）**: 上記のflex-wrap方式は実機で「デプロイしたのに反映されない」との報告が続いた。折り返し位置がタイトル文字幅・端末のフォント設定次第で変わりうる構造自体が原因だった可能性があり、`.dashboard-header`を768px以下で`display:grid; grid-template-columns:1fr auto; grid-template-areas:'title title' 'switch menu'`に書き換え、`.dashboard-header-left`＝title、`.app-switch-mobile`＝switch（`justify-self:start`）、`.dashboard-header-right`＝menu（`justify-self:end`）に明示的に割り当てた。1行目＝ロゴ・タイトルのみ、2行目＝切替（左端）とユーザー名＋ハンバーガー（右端）が幅・文字数によらず必ず同じ形になる。owner（切替が無いロール）でも`switch`領域が空のまま崩れない
 
 **ログイン画面**: ロゴ + 「栄和　タスク管理システム」。ユーザー名/パスワード認証。
 
@@ -252,6 +253,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
 | GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表の実施記録。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。休館日は含まない（下記 `/api/report/closed-days` 参照。2026-08-07に分離） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
+| POST `/api/report/inspection-pdf-preview` | JWT | 自主検査表PDF（本体そのもの。`application/pdf`）を受け取り、Supabase Storage（ユーザーごとに固定キーでupsert）に一時保存して、プレビュー用の180秒だけ有効な署名トークンを返す（4-12参照。2026-08-07追加） |
+| GET `/api/report/inspection-pdf-preview` | 上記トークン（クエリ`token=`） | PDF本体を`Content-Disposition: inline`で返す。`<iframe src>`はAuthorizationヘッダを送れないため、通常のBearer認証の代わりに短時間トークンで認証する（`/api/attachment`のpreview_tokenと同じ方式）。このレスポンスだけ`X-Frame-Options: SAMEORIGIN`/CSP `frame-ancestors 'self'`で自オリジンのiframe埋め込みを許可する（2026-08-07追加） |
 | GET/POST/DELETE `/api/report/closed-days` | JWT（書込はowner不可） | 休館日（4-12・4-14参照）。自主検査表専用ではなく日報一覧とも共有するプロジェクト共通情報。GET は `month=YYYY-MM` で絞り込み（省略で全期間）、`{closed_days:["YYYY-MM-DD",...]}` を返す。POST は `{date}` を休館日にする（既にその日の日報があれば400で拒否。自主検査表の記録があれば削除してから登録）。DELETE は `date=` で解除（2026-08-07追加） |
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
 | POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（`plate_number`は数字4桁に正規化。判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は`api_usage`の`parking_calls`列に加算し、メール/FAXとは別内訳として従量課金事項画面に表示する（2026-08-05追加。4-13参照） |
@@ -450,6 +453,24 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
     `addImage` は圧縮指定を省くと画像が無圧縮で埋め込まれ2ページで約48MBになるので `'FAST'` を必ず渡す（約0.9MB・可逆）。
     シート側のCSSは hex 色と mm 指定のみで書く（`html2canvas` は `oklch` 等の新しい色関数を解釈できない）。
     詳細はプロジェクトスキル `.claude/skills/print-and-pdf-download/` を参照
+  - **アプリ内プレビュー表示（2026-08-07）**: 生成したPDFは `pdf.save()` で直接ダウンロードさせるのではなく、
+    アプリ内モーダル（`AttachmentPreview.jsx`）で**プレビュー表示**する。理由は2つ：
+    (1) iOS Safariのホーム画面追加アプリ（standalone表示）は `pdf.save()` が使う `<a download>` の `download` 属性を
+    無視してblob URLへナビゲートしてしまい、standaloneには戻り先のタブが無いため「×」で閉じると画面が真っ白になる
+    （プロジェクトスキル `print-and-pdf-download` Gotcha 8）、
+    (2) 対策として一時Web Share API（`navigator.share`）を自動起動する方式を試したが、
+    「共有メニューを毎回自動で出さずプレビュー表示にしてほしい」との要望を受けて置き換えた。
+    既存の添付ファイルプレビュー（4-6参照）と同じ「短時間有効な署名トークン＋実URLへの`<iframe>`ナビゲーション」
+    方式（`multi-env-attachment-preview`スキル参照。SafariはblobのPDFを`<iframe>`に描画できないため必須）を採用：
+    生成したPDF本体を `POST /api/report/inspection-pdf-preview` でSupabase Storage
+    （`report-photos`バケット、キーはユーザーごとに固定 `inspection-pdf-preview/{userId}.pdf` でupsert＝
+    生成のたびに上書きし溜め込まない）に一時保存し、180秒だけ有効な署名トークンを受け取る。
+    `GET /api/report/inspection-pdf-preview?token=…` へその実URLを`<iframe>`で直接ナビゲーションさせ、
+    `Content-Disposition: inline` ＋そのレスポンスだけ `X-Frame-Options: SAMEORIGIN`/
+    CSP `frame-ancestors 'self'` を緩めて自オリジンのプレビューiframeに埋め込めるようにする。
+    共有シートは自動起動せず、モーダルの「共有 / 保存」ボタンを明示的に押したときだけ
+    `navigator.canShare`で機能検出し、対応環境は`navigator.share`、非対応（主にデスクトップ）は
+    通常のBlobダウンロードを行う（`Inspections.jsx` の `handleDownloadPdf` / `handleSharePdf`）
 
 ### 4-13. 違反車両（2026-08-05〜。Phase 4 着手）
 

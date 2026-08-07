@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import InspectionForm from '../components/InspectionForm'
 import InspectionSheet from '../components/InspectionSheet'
+import AttachmentPreview from '../components/AttachmentPreview'
 import { IconHome, IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
@@ -14,6 +15,7 @@ import {
   deleteInspection,
   fetchHolidays,
   fetchClosedDays,
+  getInspectionPdfPreviewUrl,
   weekdayInfo,
   currentMonthJST,
   shiftMonth,
@@ -22,6 +24,10 @@ import {
   todayJST,
 } from '../lib/reports'
 import './Dashboard.css'
+// AttachmentPreview（PDFのアプリ内プレビュー）の見た目は本来タスク管理側の
+// KanbanBoard.css で定義されており、日報セクションのみを直接開いた場合はまだ
+// 読み込まれていないことがあるため、ここでも明示的に import しておく。
+import '../components/KanbanBoard.css'
 
 // 自主検査表（日常）。紙の様式の置き換え。
 // 紙の記入ルール「不備が有る場合は項目に×とし、良好の場合は確認箇所一斉に○とすること」に
@@ -43,6 +49,8 @@ export default function Inspections() {
   const [editing, setEditing] = useState(null) // 入力中の日付（'YYYY-MM-DD'）
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState('')
+  // アプリ内プレビュー表示中のPDF（{ filename, url, blob }）。null なら非表示
+  const [pdfPreview, setPdfPreview] = useState(null)
   // PDF化のときだけ画面外に描画する紙様式のシート（前半・後半の2枚）を差し込む場所
   const sheetsRef = useRef(null)
 
@@ -141,19 +149,13 @@ export default function Inspections() {
         // （特にホーム画面アプリのstandalone表示）はdownload属性を無視してblob URLへ
         // そのままナビゲートする。standaloneにはタブの概念が無いため、開いたPDF
         // ビューアの「×」で戻ろうとしてもアプリの画面に復帰できず真っ白になる
-        // （2026-08-07に実機で確認）。Web Share API（ファイル共有）が使える環境では
-        // 共有シートを使い、ページ遷移を一切発生させないようにする。
-        const file = new File([pdf.output('blob')], filename, { type: 'application/pdf' })
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ files: [file], title: filename })
-          } catch (shareErr) {
-            // ユーザーが共有シートを閉じただけなら何もしない。それ以外は従来の保存にフォールバック
-            if (shareErr?.name !== 'AbortError') pdf.save(filename)
-          }
-        } else {
-          pdf.save(filename)
-        }
+        // （2026-08-07に実機で確認）。共有シートを自動で出すのではなく、既存の
+        // 添付ファイルプレビューと同じ「実URLへの<iframe>ナビゲーション」方式で
+        // アプリ内にプレビュー表示し、×で閉じても画面遷移が無いので復帰できるようにする
+        // （プロジェクトスキル print-and-pdf-download Gotcha 8）。
+        const pdfBlob = pdf.output('blob')
+        const previewUrl = await getInspectionPdfPreviewUrl(pdfBlob, filename)
+        setPdfPreview({ filename, url: previewUrl, blob: pdfBlob })
       } finally {
         // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す
         document.body.classList.remove('pdf-capture-mode')
@@ -164,6 +166,31 @@ export default function Inspections() {
     } finally {
       setPdfBusy(false)
     }
+  }
+
+  // プレビュー内の「共有 / 保存」。ユーザーが明示的にタップしたときだけ実行する
+  // （自動で共有シートを出すと2026-08-07に報告されたPDF閉じた後の白画面と紛らわしいため）。
+  // Web Share APIが使える環境（主にiOS）ではファイル共有シートを、それ以外
+  // （デスクトップ等）では通常のダウンロードとして保存する。
+  async function handleSharePdf({ blob, filename }) {
+    const file = new File([blob], filename, { type: 'application/pdf' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename })
+        return
+      } catch (shareErr) {
+        if (shareErr?.name === 'AbortError') return
+        // それ以外の失敗時は下の通常ダウンロードにフォールバックする
+      }
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   function handleSaved(result) {
@@ -386,6 +413,23 @@ export default function Inspections() {
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
           onDelete={handleDelete}
+        />
+      )}
+
+      {pdfPreview && (
+        <AttachmentPreview
+          attachment={{ filename: pdfPreview.filename, mimeType: 'application/pdf' }}
+          url={pdfPreview.url}
+          onClose={() => setPdfPreview(null)}
+          headerAction={
+            <button
+              type="button"
+              className="attachment-preview-share"
+              onClick={() => handleSharePdf(pdfPreview)}
+            >
+              共有 / 保存
+            </button>
+          }
         />
       )}
     </div>

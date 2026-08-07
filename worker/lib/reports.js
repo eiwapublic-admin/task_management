@@ -8,6 +8,7 @@ import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { fetchHolidays } from './holidays.js'
 import { recognizeVehicle } from './anthropic.js'
+import { signJwt, verifyJwt } from './jwt.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
 const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
@@ -888,6 +889,91 @@ export async function handleInspectionDelete(req) {
   } catch (err) {
     console.error('inspection-delete 失敗:', err)
     return json({ error: '自主検査表の削除に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 自主検査表PDFのアプリ内プレビュー（2026-08-07）。
+// jsPDFのpdf.save()はiOS Safari（特にホーム画面追加のstandalone表示）でdownload属性が
+// 無視されblob URLへナビゲートしてしまい、閉じる操作の戻り先が無く画面が真っ白になる
+// （プロジェクトスキル print-and-pdf-download Gotcha 8）。既存の添付ファイルプレビュー
+// （handleAttachmentPreviewToken/handleDownloadAttachment、worker/index.js）と同じ
+// 「短時間有効な署名トークン + 実URLへの<iframe>ナビゲーション」方式を使い、共有シートを
+// 自動で出さずアプリ内でプレビュー→×で戻れるようにする（画面遷移が一切発生しないため、
+// standaloneでも「戻り先が無い」問題自体が起きない）。
+// 保存先キーはユーザーごとに固定（upsert）にして生成のたびに上書きし、溜め込まない。
+// ============================================================
+
+const PDF_PREVIEW_TTL_SECONDS = 180
+const MAX_PDF_PREVIEW_BYTES = 20 * 1024 * 1024 // 自主検査表PDFは通常1MB未満。念のため上限を設ける
+
+function pdfPreviewKey(userId) {
+  return `inspection-pdf-preview/${userId}.pdf`
+}
+
+// POST /api/report/inspection-pdf-preview — 生成済みPDF（本体そのもの）を一時保存し、
+// プレビュー用の短時間有効トークンを発行する。ログイン必須（書き込み権限は不要）
+export async function handleInspectionPdfPreviewCreate(req) {
+  const { auth, error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const bytes = await req.arrayBuffer()
+    if (!bytes.byteLength) return json({ error: 'PDFが空です' }, 400)
+    if (bytes.byteLength > MAX_PDF_PREVIEW_BYTES) return json({ error: 'PDFが大きすぎます' }, 413)
+
+    const { SESSION_SECRET } = process.env
+    if (!SESSION_SECRET) {
+      console.error('inspection-pdf-preview: SESSION_SECRET が設定されていません')
+      return json({ error: 'サーバー設定エラーが発生しました' }, 500)
+    }
+
+    const key = pdfPreviewKey(auth.sub)
+    await putObject(key, bytes, 'application/pdf', { upsert: true })
+    const token = await signJwt(
+      { purpose: 'inspection-pdf-preview', key },
+      SESSION_SECRET,
+      PDF_PREVIEW_TTL_SECONDS
+    )
+    return json({ token })
+  } catch (err) {
+    console.error('inspection-pdf-preview-create 失敗:', err)
+    return json({ error: 'PDFプレビューの準備に失敗しました' }, 500)
+  }
+}
+
+// GET /api/report/inspection-pdf-preview?token=…&filename=… — PDF本体を返す。
+// <iframe src>はAuthorizationヘッダを送れないため、上記で発行した短時間トークンを
+// クエリ文字列で受け取り、通常のBearer認証の代わりとする。
+export async function handleInspectionPdfPreviewGet(req) {
+  const params = new URL(req.url).searchParams
+  const token = params.get('token') || ''
+  const { SESSION_SECRET } = process.env
+  const claims = SESSION_SECRET && token ? await verifyJwt(token, SESSION_SECRET) : null
+  if (!claims || claims.purpose !== 'inspection-pdf-preview' || !claims.key) {
+    return json({ error: '認証が必要です' }, 401)
+  }
+  try {
+    const res = await getObject(claims.key)
+    if (!res.ok) {
+      console.error('inspection-pdf-preview-get: storage が', res.status, 'を返した')
+      return json({ error: 'PDFの取得に失敗しました' }, 404)
+    }
+    const filename = (params.get('filename') || 'inspection.pdf').slice(0, 255)
+    const asciiName = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_')
+    const encodedName = encodeURIComponent(filename)
+    return new Response(res.body, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+        'Cache-Control': 'private, no-store',
+        // 自オリジンの<iframe>に埋め込めるようにする（handleDownloadAttachmentと同じ理由）
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Content-Security-Policy': "frame-ancestors 'self'",
+      },
+    })
+  } catch (err) {
+    console.error('inspection-pdf-preview-get 失敗:', err)
+    return json({ error: 'PDFの取得に失敗しました' }, 500)
   }
 }
 
