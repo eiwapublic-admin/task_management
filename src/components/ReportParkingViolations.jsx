@@ -594,15 +594,12 @@ function ParkingPhotoPreview({ photo, violation, readOnly, onClose, onDelete, on
     setRecognizing(true)
     setRecognizeMessage('')
     try {
-      const patch = await onRecognize()
-      setRecognizeMessage(
-        Object.keys(patch).length > 0
-          ? '空欄だった項目に読み取り結果を反映しました。'
-          : '読み取れませんでした。手動で入力してください。'
-      )
+      await onRecognize()
+      // 読み取り完了後は拡大表示を閉じ、背後のカードに反映された結果をそのまま見せる。
+      // 失敗時はここに来ないので、エラーメッセージを表示したまま開いておく
+      onClose()
     } catch (err) {
       setRecognizeMessage(err.message)
-    } finally {
       setRecognizing(false)
     }
   }
