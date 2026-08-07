@@ -96,6 +96,15 @@ export function IconClip(props) {
   )
 }
 
+export function IconCheckCircle(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l2.5 2.5L16 8.5" />
+    </Icon>
+  )
+}
+
 export function IconDownload(props) {
   return (
     <Icon {...props}>

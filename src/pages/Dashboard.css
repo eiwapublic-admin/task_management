@@ -902,17 +902,39 @@
 }
 
 .report-row:hover { border-color: #33604d; }
-.report-row.is-today { border-left: 3px solid #33604d; }
+/* 当日の帯はひと目で分かるよう大胆に太くする（2026-08-07。3px→8px） */
+.report-row.is-today { border-left: 8px solid #33604d; }
 
 .report-row-main { flex: 1; min-width: 0; }
 
 /* 右端のアイコン（違反車両あり=車／写真あり=クリップ。2026-08-05） */
+/* 右端のアイコン3種（違反車両／添付画像／自主点検）を固定位置で並べる（2026-08-07）。
+   該当しないものは visibility:hidden で場所だけ残し、他のアイコンの位置がずれないようにする */
 .report-row-icons {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
+}
+
+.report-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+}
+
+.report-row-icon.is-hidden { visibility: hidden; }
+
+/* 自主点検の実施有無。実施済みは落ち着いた緑、当日以前で未実施のときだけ
+   黄色い丸背景で目立たせる（日報系ヘッダーバーと同じ配色を流用） */
+.report-inspection-icon.is-done { color: #33604d; }
+.report-inspection-icon.is-pending {
+  color: var(--reports-header-ink);
+  background: var(--reports-header-bg);
 }
 
 .report-row-date {
@@ -981,8 +1003,8 @@
 .report-day-row.is-clickable { cursor: pointer; }
 .report-day-row.is-clickable:hover { border-color: #33604d; }
 
-/* 当日をひと目で分かるよう枠の左端に色を付ける（.report-rowの当日表示と同じ配色。2026-08-07） */
-.report-day-row.is-today { border-left: 3px solid #33604d; }
+/* 当日をひと目で分かるよう枠の左端に色を付ける（.report-rowの当日表示と同じ配色・太さ。2026-08-07） */
+.report-day-row.is-today { border-left: 8px solid #33604d; }
 
 /* 休館日は自主検査表の一覧と同じ配色でグレーアウトする */
 .report-day-row.is-closed { background: var(--border); }
