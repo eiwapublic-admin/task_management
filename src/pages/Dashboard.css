@@ -961,18 +961,28 @@
 
 .report-more, .report-empty { font-size: 13px; color: var(--text-muted); }
 
-/* 記録の無い日（未入力／休館日）の行。既存の.report-rowはボタン（クリックで詳細へ）だが、
-   こちらはクリック対象が無い日もあるため素の div にしている（2026-08-07）。 */
+/* 記録の無い日（未入力／休館日）の行。未入力かつ未来日でなければ<button>としてタップ可能
+   （タップで新規作成。2026-08-07）、休館日・未来日は素の<div>にしている。 */
 .report-day-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
 }
+
+/* 未入力の日をタップすると新規作成できる（2026-08-07。上部の「＋」ボタンを廃止した代わり） */
+.report-day-row.is-clickable { cursor: pointer; }
+.report-day-row.is-clickable:hover { border-color: #33604d; }
+
+/* 当日をひと目で分かるよう枠の左端に色を付ける（.report-rowの当日表示と同じ配色。2026-08-07） */
+.report-day-row.is-today { border-left: 3px solid #33604d; }
 
 /* 休館日は自主検査表の一覧と同じ配色でグレーアウトする */
 .report-day-row.is-closed { background: var(--border); }
@@ -989,22 +999,30 @@
 
 .report-day-row-action { flex-shrink: 0; margin-left: auto; }
 
-/* --- 詳細 --- */
+/* --- 詳細 ---
+   左: ホーム・前日/翌日・日付。右: 保存状態・自主検査入力・削除（2026-08-07。
+   従来 justify-content:space-between で3要素を並べていたため、画面幅によって
+   日付がホームから離れて見えることがあった。日付をホームの右隣に固定するため
+   左右を別グループにまとめ、右側だけ margin-left:auto で寄せる形に変更した） */
 .report-detail-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
 
+.report-detail-head-left { display: flex; align-items: center; gap: var(--space-3); }
+
 .report-nav { display: flex; align-items: center; gap: var(--space-3); }
 .report-nav .page-title { margin: 0; }
 
-.report-head-right { display: flex; align-items: center; gap: var(--space-3); }
+.report-head-right { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
 
 .report-saved { font-size: 12px; color: #33604d; font-weight: 700; }
+
+/* 削除は誤操作を防ぐため自主検査入力ボタンと少し間隔を空ける */
+.report-head-delete { margin-left: var(--space-3); }
 
 .report-card {
   background: var(--bg-surface);
@@ -1029,6 +1047,9 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* 「作業者・時間」欄右端の「休館日」ボタン（2026-08-07）。見出しバーの一番右に寄せる */
+.report-card-title-action { margin-left: auto; flex-shrink: 0; font-weight: 400; }
 
 .report-count { font-size: 13px; color: var(--reports-header-ink); opacity: 0.75; font-weight: 600; }
 
@@ -1554,7 +1575,8 @@
 .inspection-toolbar { justify-content: flex-start; }
 
 .inspection-month { display: flex; align-items: center; gap: var(--space-3); }
-.inspection-month-label { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+/* ページタイトルと同じ大きさに揃える（2026-08-07。日報一覧の月見出しとも共通） */
+.inspection-month-label { font-size: 20px; font-weight: 700; color: var(--text-strong); }
 
 .inspection-table-wrap { overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 

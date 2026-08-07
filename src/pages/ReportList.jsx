@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import InspectionForm from '../components/InspectionForm'
-import {
-  IconClipboard,
-  IconGear,
-  IconCar,
-  IconClip,
-  IconChevronLeft,
-  IconChevronRight,
-} from '../components/Icons'
+import { IconClipboard, IconGear, IconCar, IconClip, IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReports,
@@ -25,9 +17,6 @@ import {
   currentMonthJST,
   shiftMonth,
   daysInMonth,
-  fetchInspections,
-  deleteInspection,
-  INSPECTION_BUILDINGS,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -40,7 +29,6 @@ export default function ReportList() {
   const navigate = useNavigate()
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
-  const building = INSPECTION_BUILDINGS[0]
 
   const [month, setMonth] = useState(currentMonthJST())
   const [reports, setReports] = useState([])
@@ -48,16 +36,10 @@ export default function ReportList() {
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // 未入力の行タップで新規作成中（多重タップ防止）
   const [creating, setCreating] = useState(false)
 
-  // 自主検査表の当日分入力モーダル（右上の「自主検査入力」ボタンから開く）
-  const [inspectionOpen, setInspectionOpen] = useState(false)
-  const [inspectionLoading, setInspectionLoading] = useState(false)
-  const [todayInspection, setTodayInspection] = useState(null)
-  const [todayInspectionClosed, setTodayInspectionClosed] = useState(false)
-
   const today = todayJST()
-  const hasToday = reports.some((r) => r.report_date === today)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -95,13 +77,15 @@ export default function ReportList() {
     return map
   }, [reports])
 
-  // 本日分をまだ作っていなければ作ってから開く。既にあればそのまま開く（APIが冪等）
-  async function openToday() {
+  // 未入力の行をタップすると新規作成してそのまま詳細を開く（2026-08-07。上部の「＋」ボタンを廃止）。
+  // 何も入力しないまま詳細画面のホームボタンで戻った場合は、詳細画面側でこの日報をロールバック（削除）する
+  async function handleCreateAndOpen(date) {
+    if (isOwner || creating) return
     setCreating(true)
     setError('')
     try {
-      await createReport(today)
-      navigate(`/reports/${today}`)
+      await createReport(date)
+      navigate(`/reports/${date}`)
     } catch (err) {
       setError(err.message)
       setCreating(false)
@@ -132,47 +116,6 @@ export default function ReportList() {
     }
   }
 
-  // 「自主検査入力」ボタン。当日分の既存記録・休館日状態を取得してからモーダルを開く
-  async function openTodayInspection() {
-    setInspectionLoading(true)
-    setError('')
-    try {
-      const [list, closed] = await Promise.all([
-        fetchInspections({ date: today }),
-        fetchClosedDays({ month: today.slice(0, 7) }),
-      ])
-      setTodayInspection(list[0] || null)
-      setTodayInspectionClosed(closed.includes(today))
-      setInspectionOpen(true)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setInspectionLoading(false)
-    }
-  }
-
-  function handleInspectionSaved(result) {
-    setInspectionOpen(false)
-    // 表示中の月の休館日一覧にも反映する（当日が表示中の月に含まれる場合のみ意味を持つ）
-    if (result.inspected_on.slice(0, 7) === month) {
-      setClosedDays((prev) => {
-        const next = new Set(prev)
-        if (result.closed) next.add(result.inspected_on)
-        else next.delete(result.inspected_on)
-        return next
-      })
-    }
-  }
-
-  async function handleInspectionDelete(id) {
-    try {
-      await deleteInspection(id)
-    } catch (err) {
-      setError(err.message)
-    }
-    setInspectionOpen(false)
-  }
-
   return (
     <div className="reports-page">
       <AppHeader />
@@ -201,35 +144,10 @@ export default function ReportList() {
           </div>
           <h2 className="page-title">日報</h2>
           <div className="reports-toolbar-actions">
-            {/* 「本日の日報をつくる」は＋アイコンのみにして一番左端に置き、本日分が
-                未作成のときだけ表示する（2026-08-05）。iPhoneでもツールバーが1行に
-                収まるようにするため。自主検査表はハンバーガーメニューに入れず、この
-                画面の見える位置に置く（2026-08-05のご指摘）。定型文の設定は滅多に
-                使わないため、歯車アイコンのみにしている（2026-08-05 追加調整）。
-                自主検査入力は当日分をこの画面から直接記録できるショートカット（2026-08-07）。 */}
-            {!isOwner && !hasToday && (
-              <button
-                type="button"
-                className="icon-btn-add"
-                onClick={openToday}
-                disabled={creating}
-                aria-label="本日の日報をつくる"
-                title="本日の日報をつくる"
-              >
-                {creating ? '…' : '＋'}
-              </button>
-            )}
-            {!isOwner && (
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={openTodayInspection}
-                disabled={inspectionLoading}
-              >
-                <IconClipboard size={18} />
-                {inspectionLoading ? '読み込み中…' : '自主検査入力'}
-              </button>
-            )}
+            {/* 自主検査表はハンバーガーメニューに入れず、この画面の見える位置に置く
+                （2026-08-05のご指摘）。定型文の設定は滅多に使わないため、歯車アイコンのみ
+                にしている（2026-08-05 追加調整）。「自主検査入力」は日報詳細画面へ移動した
+                （2026-08-07。該当の日を開いてから記録する運用にするため）。 */}
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/inspections')}>
               <IconClipboard size={18} />
               自主検査表
@@ -267,6 +185,7 @@ export default function ReportList() {
               const closed = closedDays.has(date)
               const wd = weekdayInfo(date, holidays)
               const isFuture = date > today
+              const isTodayRow = date === today
 
               if (r) {
                 const entries = (r.entries || []).filter((e) => e.content)
@@ -274,13 +193,13 @@ export default function ReportList() {
                   <li key={date}>
                     <button
                       type="button"
-                      className={`report-row${date === today ? ' is-today' : ''}`}
+                      className={`report-row${isTodayRow ? ' is-today' : ''}`}
                       onClick={() => navigate(`/reports/${date}`)}
                     >
                       <div className="report-row-main">
                         <div className="report-row-date">
                           <span className={`report-date ${wd.className}`}>{formatReportDate(date)}</span>
-                          {date === today && <span className="report-today-badge">本日</span>}
+                          {isTodayRow && <span className="report-today-badge">本日</span>}
                           <span className="report-workers">
                             {r.worker_am || '—'} | {r.worker_pm || '—'}
                           </span>
@@ -315,19 +234,50 @@ export default function ReportList() {
                 )
               }
 
+              // 未入力・未来日でもない日は行タップで新規作成できる。他の要素（休館日ボタン）を
+              // 内包するため <button> ではなく role="button" の <div> にしている
+              const clickable = !isOwner && !closed && !isFuture
+              const rowClass = [
+                'report-day-row',
+                closed && 'is-closed',
+                isTodayRow && 'is-today',
+                clickable && 'is-clickable',
+              ]
+                .filter(Boolean)
+                .join(' ')
+
               return (
                 <li key={date}>
-                  <div className={`report-day-row${closed ? ' is-closed' : ''}`}>
+                  <div
+                    className={rowClass}
+                    onClick={clickable ? () => handleCreateAndOpen(date) : undefined}
+                    role={clickable ? 'button' : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    aria-disabled={clickable ? creating : undefined}
+                    onKeyDown={
+                      clickable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              handleCreateAndOpen(date)
+                            }
+                          }
+                        : undefined
+                    }
+                  >
                     <div className="report-day-row-date">
                       <span className={`report-date ${wd.className}`}>{formatReportDate(date)}</span>
-                      {date === today && <span className="report-today-badge">本日</span>}
+                      {isTodayRow && <span className="report-today-badge">本日</span>}
                       <span className="report-day-empty-label">{closed ? '休館日' : '未入力'}</span>
                     </div>
                     {!isOwner && closed && (
                       <button
                         type="button"
                         className="btn-plain report-day-row-action"
-                        onClick={() => handleUnmarkClosed(date)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleUnmarkClosed(date)
+                        }}
                       >
                         休館日を解除
                       </button>
@@ -336,7 +286,10 @@ export default function ReportList() {
                       <button
                         type="button"
                         className="btn-plain report-day-row-action"
-                        onClick={() => handleMarkClosed(date)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMarkClosed(date)
+                        }}
                       >
                         休館日
                       </button>
@@ -348,19 +301,6 @@ export default function ReportList() {
           </ul>
         )}
       </div>
-
-      {inspectionOpen && (
-        <InspectionForm
-          date={today}
-          building={building}
-          existing={todayInspection}
-          initialClosed={todayInspectionClosed}
-          defaultInspector={user?.display_name || ''}
-          onClose={() => setInspectionOpen(false)}
-          onSaved={handleInspectionSaved}
-          onDelete={handleInspectionDelete}
-        />
-      )}
     </div>
   )
 }

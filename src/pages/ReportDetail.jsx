@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportPhotos from '../components/ReportPhotos'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
-import { IconHome, IconChevronLeft, IconChevronRight } from '../components/Icons'
+import InspectionForm from '../components/InspectionForm'
+import { IconHome, IconChevronLeft, IconChevronRight, IconClipboard } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
   createReport,
   updateReport,
+  deleteReport,
   addEntry,
   updateEntry,
   deleteEntry,
   fetchTemplates,
+  fetchPhotos,
+  fetchParkingViolations,
+  fetchInspections,
+  fetchClosedDays,
+  markClosedDay,
+  deleteInspection,
+  INSPECTION_BUILDINGS,
   shiftDate,
   todayJST,
   formatReportDate,
@@ -33,6 +42,7 @@ export default function ReportDetail() {
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
   const readOnly = isOwner
+  const building = INSPECTION_BUILDINGS[0]
 
   const [report, setReport] = useState(null)
   const [entries, setEntries] = useState([])
@@ -40,6 +50,12 @@ export default function ReportDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savedAt, setSavedAt] = useState(null)
+
+  // 自主検査入力モーダル（この日の分を直接記録するショートカット。2026-08-07）
+  const [inspectionOpen, setInspectionOpen] = useState(false)
+  const [inspectionLoading, setInspectionLoading] = useState(false)
+  const [dateInspection, setDateInspection] = useState(null)
+  const [dateInspectionClosed, setDateInspectionClosed] = useState(false)
 
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
@@ -81,6 +97,17 @@ export default function ReportDetail() {
     setSavedAt(new Date())
   }
 
+  // 表示は常に時刻順にする（保存順＝sort_orderとは独立。時刻が同じ／未入力なものは
+  // 追加順を維持するため sort_order をタイブレークに使う。2026-08-07）
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      const at = a.entry_time || '99:99:99'
+      const bt = b.entry_time || '99:99:99'
+      if (at !== bt) return at < bt ? -1 : 1
+      return a.sort_order - b.sort_order
+    })
+  }, [entries])
+
   async function handleCreate() {
     setError('')
     try {
@@ -90,6 +117,82 @@ export default function ReportDetail() {
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  // ホームに戻る。未入力（明細・写真・違反車両のいずれも無い）まま離れる場合は、
+  // 一覧の行タップで自動作成された空の日報を残さないよう削除する（2026-08-07）
+  async function handleGoHome() {
+    if (report && !readOnly && entries.length === 0) {
+      try {
+        const [photos, violations] = await Promise.all([
+          fetchPhotos(report.id),
+          fetchParkingViolations({ reportId: report.id }),
+        ])
+        if (photos.length === 0 && violations.length === 0) {
+          await deleteReport(report.id)
+        }
+      } catch {
+        // ロールバック判定に失敗しても画面遷移自体は妨げない
+      }
+    }
+    navigate('/reports')
+  }
+
+  async function handleDeleteReport() {
+    if (!report || readOnly) return
+    setError('')
+    try {
+      await deleteReport(report.id)
+      navigate('/reports')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // 「休館日」指定。この日の日報を削除し、休館日として登録してから一覧へ戻る
+  // （休館日は日報を持たない日という扱いのため。/api/report/closed-days 参照）
+  async function handleMarkDayClosed() {
+    if (!report || readOnly) return
+    setError('')
+    try {
+      await deleteReport(report.id)
+      await markClosedDay(date)
+      navigate('/reports')
+    } catch (err) {
+      setError(err.message)
+      load()
+    }
+  }
+
+  async function openInspection() {
+    setInspectionLoading(true)
+    setError('')
+    try {
+      const [list, closed] = await Promise.all([
+        fetchInspections({ date }),
+        fetchClosedDays({ month: date.slice(0, 7) }),
+      ])
+      setDateInspection(list[0] || null)
+      setDateInspectionClosed(closed.includes(date))
+      setInspectionOpen(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setInspectionLoading(false)
+    }
+  }
+
+  function handleInspectionSaved() {
+    setInspectionOpen(false)
+  }
+
+  async function handleInspectionDelete(id) {
+    try {
+      await deleteInspection(id)
+    } catch (err) {
+      setError(err.message)
+    }
+    setInspectionOpen(false)
   }
 
   async function patchHeader(patch) {
@@ -161,40 +264,55 @@ export default function ReportDetail() {
       <AppHeader />
       <div className="reports-container">
         <div className="report-detail-head">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/reports')}
-            aria-label="日報一覧に戻る"
-            title="日報一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <div className="report-nav">
+          <div className="report-detail-head-left">
             <button
               type="button"
-              className="icon-btn-nav"
-              onClick={() => navigate(`/reports/${shiftDate(date, -1)}`)}
-              aria-label="前日"
-              title="前日"
+              className="icon-btn-home"
+              onClick={handleGoHome}
+              aria-label="日報一覧に戻る"
+              title="日報一覧に戻る"
             >
-              <IconChevronLeft size={28} />
+              <IconHome size={32} />
             </button>
-            <h2 className="page-title">
-              {formatReportDate(date)}
-              {isToday && <span className="report-today-badge">本日</span>}
-            </h2>
-            <button
-              type="button"
-              className="icon-btn-nav"
-              onClick={() => navigate(`/reports/${shiftDate(date, 1)}`)}
-              aria-label="翌日"
-              title="翌日"
-            >
-              <IconChevronRight size={28} />
-            </button>
+            <div className="report-nav">
+              <button
+                type="button"
+                className="icon-btn-nav"
+                onClick={() => navigate(`/reports/${shiftDate(date, -1)}`)}
+                aria-label="前日"
+                title="前日"
+              >
+                <IconChevronLeft size={28} />
+              </button>
+              <h2 className="page-title">
+                {formatReportDate(date)}
+                {isToday && <span className="report-today-badge">本日</span>}
+              </h2>
+              <button
+                type="button"
+                className="icon-btn-nav"
+                onClick={() => navigate(`/reports/${shiftDate(date, 1)}`)}
+                aria-label="翌日"
+                title="翌日"
+              >
+                <IconChevronRight size={28} />
+              </button>
+            </div>
           </div>
-          <div className="report-head-right">{savedAt && <span className="report-saved">保存しました</span>}</div>
+          <div className="report-head-right">
+            {savedAt && <span className="report-saved">保存しました</span>}
+            {!readOnly && (
+              <button type="button" className="btn-plain" onClick={openInspection} disabled={inspectionLoading}>
+                <IconClipboard size={18} />
+                {inspectionLoading ? '読み込み中…' : '自主検査入力'}
+              </button>
+            )}
+            {!readOnly && report && (
+              <span className="report-head-delete">
+                <ConfirmDeleteButton onConfirm={handleDeleteReport} label="この日の日報を削除" size={22} />
+              </span>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -217,7 +335,10 @@ export default function ReportDetail() {
         ) : (
           <>
             <section className="report-card">
-              <h3 className="report-card-title">作業者・時間</h3>
+              <h3 className="report-card-title">
+                作業者・時間
+                {!readOnly && <CloseDayButton onConfirm={handleMarkDayClosed} />}
+              </h3>
               <div className="report-fields">
                 <label className="report-field">
                   <span>作業者（午前）</span>
@@ -265,7 +386,7 @@ export default function ReportDetail() {
               {entries.length === 0 && <p className="settings-hint">まだ記録がありません。</p>}
 
               <ul className="entry-list">
-                {entries.map((e) => (
+                {sortedEntries.map((e) => (
                   <li className="entry-row" key={e.id}>
                     <input
                       className="entry-time"
@@ -336,6 +457,19 @@ export default function ReportDetail() {
           </>
         )}
       </div>
+
+      {inspectionOpen && (
+        <InspectionForm
+          date={date}
+          building={building}
+          existing={dateInspection}
+          initialClosed={dateInspectionClosed}
+          defaultInspector={user?.display_name || ''}
+          onClose={() => setInspectionOpen(false)}
+          onSaved={handleInspectionSaved}
+          onDelete={handleInspectionDelete}
+        />
+      )}
     </div>
   )
 }
@@ -381,5 +515,39 @@ function WorkerSelect({ value, disabled, onChange }) {
       ))}
       <option value="__other__">その他…</option>
     </select>
+  )
+}
+
+// 「休館日」指定ボタン。押しただけでは実行せず、削除して休館日にする旨の確認を挟む
+// （ConfirmDeleteButtonと同じ2段階確認のパターンだが、削除ではなく「休館日への変換」
+// という別の意味の操作のためテキストボタンにしている。2026-08-07）
+function CloseDayButton({ onConfirm }) {
+  const [confirming, setConfirming] = useState(false)
+
+  if (confirming) {
+    return (
+      <span className="confirm-delete-group report-card-title-action" role="group" aria-label="休館日にする確認">
+        <span className="confirm-delete-message">記録を削除して休館日にしますか？</span>
+        <button
+          type="button"
+          className="confirm-delete-go"
+          onClick={() => {
+            setConfirming(false)
+            onConfirm()
+          }}
+        >
+          休館日にする
+        </button>
+        <button type="button" className="confirm-delete-cancel" onClick={() => setConfirming(false)}>
+          キャンセル
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <button type="button" className="btn-plain report-card-title-action" onClick={() => setConfirming(true)}>
+      休館日
+    </button>
   )
 }

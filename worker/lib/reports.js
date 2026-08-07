@@ -237,6 +237,35 @@ export async function handleReportUpdate(req) {
   }
 }
 
+// DELETE /api/report?id=… — 日報1件の削除（明細・写真・違反車両は DB 側の cascade で
+// まとめて消える）。写真の Storage 実体は cascade に追従しないため、消す前に控えておいて
+// DB 削除後に個別に消す（photo-delete/parking-delete と同じ順序）。
+export async function handleReportDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: photos } = await supabase.from('report_photos').select('storage_key, thumb_key').eq('report_id', id)
+
+    const { error: err } = await supabase.from('daily_reports').delete().eq('id', id)
+    if (err) {
+      console.error('report-delete:', err.message)
+      return json({ error: '日報の削除に失敗しました' }, 500)
+    }
+    for (const p of photos || []) {
+      await deleteObject(p.storage_key)
+      if (p.thumb_key) await deleteObject(p.thumb_key)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('report-delete 失敗:', err)
+    return json({ error: '日報の削除に失敗しました' }, 500)
+  }
+}
+
 // POST /api/report/entries — 作業記録の明細を追加する。
 // タスク管理からの転記（source_task_id つき）もこの経路を使う。
 export async function handleEntryCreate(req) {
