@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import { IconClipboard, IconGear, IconCar, IconClip, IconChevronLeft, IconChevronRight } from '../components/Icons'
+import {
+  IconClipboard,
+  IconGear,
+  IconCar,
+  IconClip,
+  IconCheckCircle,
+  IconChevronLeft,
+  IconChevronRight,
+} from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReports,
@@ -13,6 +21,8 @@ import {
   fetchClosedDays,
   markClosedDay,
   unmarkClosedDay,
+  fetchInspections,
+  INSPECTION_BUILDINGS,
   weekdayInfo,
   currentMonthJST,
   shiftMonth,
@@ -33,6 +43,7 @@ export default function ReportList() {
   const [month, setMonth] = useState(currentMonthJST())
   const [reports, setReports] = useState([])
   const [closedDays, setClosedDays] = useState(new Set())
+  const [inspectedDates, setInspectedDates] = useState(new Set())
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,20 +51,26 @@ export default function ReportList() {
   const [creating, setCreating] = useState(false)
 
   const today = todayJST()
+  const building = INSPECTION_BUILDINGS[0]
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [list, closed] = await Promise.all([fetchReports(), fetchClosedDays({ month })])
+      const [list, closed, inspections] = await Promise.all([
+        fetchReports(),
+        fetchClosedDays({ month }),
+        fetchInspections({ month }),
+      ])
       setReports(list)
       setClosedDays(new Set(closed))
+      setInspectedDates(new Set(inspections.filter((i) => i.building === building).map((i) => i.inspected_on)))
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [month])
+  }, [month, building])
 
   useEffect(() => {
     load()
@@ -222,13 +239,26 @@ export default function ReportList() {
                           )}
                         </div>
                       </div>
-                      {/* 右端のアイコン。違反車両があった日は車、写真がある日はクリップ（2026-08-05） */}
-                      {(r.has_parking || r.has_photos) && (
-                        <div className="report-row-icons">
-                          {r.has_parking && <IconCar size={20} title="違反車両あり" />}
-                          {r.has_photos && <IconClip size={20} title="写真あり" />}
-                        </div>
-                      )}
+                      {/* 右端のアイコン3種（違反車両／添付画像／自主点検）。左から順に固定位置で並べ、
+                          該当しないものは場所だけ残して非表示にする（2026-08-05。2026-08-07に
+                          自主点検の実施有無アイコンを追加し、位置固定に変更）。自主点検は当日以前で
+                          未実施のときだけ黄色い丸で目立たせる */}
+                      <div className="report-row-icons">
+                        <span className={`report-row-icon${r.has_parking ? '' : ' is-hidden'}`} title="違反車両あり">
+                          <IconCar size={20} />
+                        </span>
+                        <span className={`report-row-icon${r.has_photos ? '' : ' is-hidden'}`} title="添付画像あり">
+                          <IconClip size={20} />
+                        </span>
+                        <span
+                          className={`report-row-icon report-inspection-icon${
+                            inspectedDates.has(date) ? ' is-done' : !isFuture ? ' is-pending' : ''
+                          }`}
+                          title={inspectedDates.has(date) ? '自主点検実施済み' : '自主点検未実施'}
+                        >
+                          <IconCheckCircle size={18} />
+                        </span>
+                      </div>
                     </button>
                   </li>
                 )

@@ -51,9 +51,10 @@ export default function ReportDetail() {
   const [error, setError] = useState('')
   const [savedAt, setSavedAt] = useState(null)
 
-  // 自主検査入力モーダル（この日の分を直接記録するショートカット。2026-08-07）
+  // 自主点検入力モーダル（この日の分を直接記録するショートカット。2026-08-07）。
+  // ボタンの表示（未記載/記載済み）を最初から出し分けるため、開く前から状態を取得しておく
   const [inspectionOpen, setInspectionOpen] = useState(false)
-  const [inspectionLoading, setInspectionLoading] = useState(false)
+  const [inspectionStatusLoading, setInspectionStatusLoading] = useState(true)
   const [dateInspection, setDateInspection] = useState(null)
   const [dateInspectionClosed, setDateInspectionClosed] = useState(false)
 
@@ -164,9 +165,8 @@ export default function ReportDetail() {
     }
   }
 
-  async function openInspection() {
-    setInspectionLoading(true)
-    setError('')
+  const loadInspectionStatus = useCallback(async () => {
+    setInspectionStatusLoading(true)
     try {
       const [list, closed] = await Promise.all([
         fetchInspections({ date }),
@@ -174,16 +174,20 @@ export default function ReportDetail() {
       ])
       setDateInspection(list[0] || null)
       setDateInspectionClosed(closed.includes(date))
-      setInspectionOpen(true)
     } catch (err) {
       setError(err.message)
     } finally {
-      setInspectionLoading(false)
+      setInspectionStatusLoading(false)
     }
-  }
+  }, [date])
+
+  useEffect(() => {
+    loadInspectionStatus()
+  }, [loadInspectionStatus])
 
   function handleInspectionSaved() {
     setInspectionOpen(false)
+    loadInspectionStatus() // ボタンの「未記載/記載済み」表示を保存結果に合わせて更新する
   }
 
   async function handleInspectionDelete(id) {
@@ -193,6 +197,7 @@ export default function ReportDetail() {
       setError(err.message)
     }
     setInspectionOpen(false)
+    loadInspectionStatus()
   }
 
   async function patchHeader(patch) {
@@ -302,9 +307,16 @@ export default function ReportDetail() {
           <div className="report-head-right">
             {savedAt && <span className="report-saved">保存しました</span>}
             {!readOnly && (
-              <button type="button" className="btn-plain" onClick={openInspection} disabled={inspectionLoading}>
+              // 未記載（この日の記録がまだ無い）のときは青地・白字で目立たせて登録を促し、
+              // 記載済みのときは控えめな見た目のまま「修正」に変える（2026-08-07）
+              <button
+                type="button"
+                className={dateInspection ? 'btn-plain' : 'btn-primary'}
+                onClick={() => setInspectionOpen(true)}
+                disabled={inspectionStatusLoading}
+              >
                 <IconClipboard size={18} />
-                {inspectionLoading ? '読み込み中…' : '自主検査入力'}
+                {inspectionStatusLoading ? '読み込み中…' : dateInspection ? '自主点検修正' : '自主点検登録'}
               </button>
             )}
             {!readOnly && report && (
