@@ -146,3 +146,30 @@ Content-Security-Policy: frame-ancestors 'self'
 - フロントのプレビューURL生成: `src/lib/api.js`（`getAttachmentPreviewUrl`, `fetchAttachmentBlob`）
 - プレビューUI・ズーム: `src/components/AttachmentPreview.jsx`, `src/components/TaskDetail.jsx`
 - 経緯: `docs/HANDOFF.md`（経緯の要約 57〜59番）, 設計書 `docs/task-management-spec-cloudflare.md` 4-5章・8章
+
+## 応用: 既存の保存済みファイルではなく「その場でクライアント生成したファイル」をプレビューする
+
+上記の実装は Gmail 添付という**既にサーバー側（外部API）に存在するファイル**が前提だが、
+同じ「短命トークン＋実URLへの`<iframe>`ナビゲーション」の型は、**jsPDFなどでブラウザ側が
+その場で生成したファイル**（プレビューすべき実体がまだどこにも保存されていない）にもそのまま
+応用できる。違いはトークン発行の前に一段階「アップロードして保存」が増える点だけ：
+
+1. クライアントは生成したファイル（PDFのBlob等）を `POST` でアップロードするだけの
+   専用エンドポイントに送る。保存先は既存の一時保存先（写真バケット等）を流用してよく、
+   キーを**ユーザーごとに固定**して毎回上書き（upsert）すれば、削除処理を別途書かなくても
+   ゴミが溜まらない。
+2. サーバーはそのオブジェクトに紐づく短命トークン（1〜3分で十分。Gmail添付のケースと同じ
+   `signJwt`/`verifyJwt`）を返す。
+3. 以降は既存の型と同じ: `<iframe src="/preview?token=...">` へナビゲーションさせ、
+   GETハンドラはトークンを検証してオブジェクトを`Content-Disposition: inline`で返し、
+   そのレスポンスだけ`X-Frame-Options: SAMEORIGIN`/CSP `frame-ancestors 'self'`に緩める。
+
+参照実装（2026-08-07・自主検査表PDFのアプリ内プレビュー化）:
+- アップロード＋トークン発行・配信: `worker/lib/reports.js`
+  （`handleInspectionPdfPreviewCreate`, `handleInspectionPdfPreviewGet`）
+- 一時保存（ユーザーごとに固定キーでupsert、溜め込まない）: `worker/lib/storage.js`（`putObject`の`upsert`オプション）
+- フロントのプレビューURL生成: `src/lib/reports.js`（`getInspectionPdfPreviewUrl`）
+- プレビューUI: 既存の`AttachmentPreview.jsx`をそのまま再利用（`headerAction` propで
+  「共有 / 保存」ボタンを追加注入。既存の添付ファイル用途は無変更）
+- 経緯・関連するiOS standalone PWA特有の罠（`jsPDF.save()`が閉じた後に白画面になる問題）は
+  プロジェクトスキル `print-and-pdf-download` の Gotcha 8 を参照
