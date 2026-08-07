@@ -137,6 +137,31 @@ export default function AppHeader() {
             </nav>
           )}
         </div>
+        {/* 狭幅ではヘッダーが2行に折り返り、通常はヘッダー右側（ユーザー名・ハンバーガー）
+            だけが2行目に単独で残るため space-between が効かず左寄りに表示されていた
+            （2026-08-07）。同じタスク/日報切替をモバイル専用にもう1つ用意し、2行目の
+            もう一方の要素にすることで、切替＝左端／ハンバーガー側＝右端に振り分ける。
+            desktop幅では常に非表示（.app-switch-mobile参照） */}
+        {!isOwner && (
+          <nav className="app-switch app-switch-mobile" aria-label="表示するセクション">
+            <button
+              type="button"
+              className={`app-switch-btn${inReports ? '' : ' is-active'}`}
+              aria-current={inReports ? undefined : 'page'}
+              onClick={() => goTo('/')}
+            >
+              タスク
+            </button>
+            <button
+              type="button"
+              className={`app-switch-btn${inReports ? ' is-active' : ''}`}
+              aria-current={inReports ? 'page' : undefined}
+              onClick={() => goTo('/reports')}
+            >
+              日報
+            </button>
+          </nav>
+        )}
         <div className="dashboard-header-right">
           {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
           <div className="dashboard-menu" ref={menuRef}>
