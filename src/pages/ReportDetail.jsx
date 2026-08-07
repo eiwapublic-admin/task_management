@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import AppHeader from '../components/AppHeader'
 import ReportPhotos from '../components/ReportPhotos'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
-import { IconHome, IconChevronLeft, IconChevronRight, IconClipboard } from '../components/Icons'
+import { IconClipboard } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -23,10 +21,10 @@ import {
   markClosedDay,
   deleteInspection,
   INSPECTION_BUILDINGS,
-  shiftDate,
   todayJST,
   formatReportDate,
   toHHMM,
+  sortEntriesByTime,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -36,9 +34,11 @@ const WORKERS = ['岡田', '西川', '橋口']
 // 入力の取りこぼしを防ぐため、変更から少し待って自動保存する
 const AUTOSAVE_MS = 800
 
-export default function ReportDetail() {
-  const { date } = useParams()
-  const navigate = useNavigate()
+// 日報の詳細。別画面ではなく**日報一覧の上に重ねるモーダル**として表示する（2026-08-07）。
+// ホームボタンと前日/翌日の移動ボタンは廃止し、右上の「×」だけで閉じる。
+// 呼び出しは ReportList.jsx（URL /reports/:date に :date があるときに描画する）。
+// onClose: 閉じたあとの後始末（一覧へ戻る＋一覧の再読み込み）は呼び出し側が行う。
+export default function ReportDetail({ date, onClose }) {
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
   const readOnly = isOwner
@@ -57,9 +57,17 @@ export default function ReportDetail() {
   const [inspectionStatusLoading, setInspectionStatusLoading] = useState(true)
   const [dateInspection, setDateInspection] = useState(null)
   const [dateInspectionClosed, setDateInspectionClosed] = useState(false)
+  // 自主点検モーダルが開いている間は、こちらのEscape処理を無効にする
+  // （同じ window に付けた別リスナは stopPropagation では止まらないため、
+  //   TaskDetail の previewOpenRef と同じ方式で親側を早期returnさせる）
+  const inspectionOpenRef = useRef(false)
 
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
+
+  // Escapeで閉じる。handleClose は毎レンダー作り直されるため、常に最新を参照できるよう
+  // refに載せ替えてからリスナに渡す（リスナ自体は登録/解除を繰り返さない）
+  const closeRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,20 +102,22 @@ export default function ReportDetail() {
     }
   }, [])
 
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return
+      if (inspectionOpenRef.current) return // 自主点検モーダル側に任せる
+      closeRef.current?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   function markSaved() {
     setSavedAt(new Date())
   }
 
-  // 表示は常に時刻順にする（保存順＝sort_orderとは独立。時刻が同じ／未入力なものは
-  // 追加順を維持するため sort_order をタイブレークに使う。2026-08-07）
-  const sortedEntries = useMemo(() => {
-    return [...entries].sort((a, b) => {
-      const at = a.entry_time || '99:99:99'
-      const bt = b.entry_time || '99:99:99'
-      if (at !== bt) return at < bt ? -1 : 1
-      return a.sort_order - b.sort_order
-    })
-  }, [entries])
+  // 表示は常に時刻順にする（一覧側とも共通の並び順。src/lib/reports.js）
+  const sortedEntries = useMemo(() => sortEntriesByTime(entries), [entries])
 
   async function handleCreate() {
     setError('')
@@ -120,9 +130,9 @@ export default function ReportDetail() {
     }
   }
 
-  // ホームに戻る。未入力（明細・写真・違反車両のいずれも無い）まま離れる場合は、
+  // モーダルを閉じる。未入力（明細・写真・違反車両のいずれも無い）まま閉じる場合は、
   // 一覧の行タップで自動作成された空の日報を残さないよう削除する（2026-08-07）
-  async function handleGoHome() {
+  async function handleClose() {
     if (report && !readOnly && entries.length === 0) {
       try {
         const [photos, violations] = await Promise.all([
@@ -133,10 +143,10 @@ export default function ReportDetail() {
           await deleteReport(report.id)
         }
       } catch {
-        // ロールバック判定に失敗しても画面遷移自体は妨げない
+        // ロールバック判定に失敗しても閉じる操作自体は妨げない
       }
     }
-    navigate('/reports')
+    onClose()
   }
 
   async function handleDeleteReport() {
@@ -144,13 +154,13 @@ export default function ReportDetail() {
     setError('')
     try {
       await deleteReport(report.id)
-      navigate('/reports')
+      onClose() // 既に削除済みなので handleClose のロールバック判定は通さない
     } catch (err) {
       setError(err.message)
     }
   }
 
-  // 「休館日」指定。この日の日報を削除し、休館日として登録してから一覧へ戻る
+  // 「休館日」指定。この日の日報を削除し、休館日として登録してから閉じる
   // （休館日は日報を持たない日という扱いのため。/api/report/closed-days 参照）
   async function handleMarkDayClosed() {
     if (!report || readOnly) return
@@ -158,7 +168,7 @@ export default function ReportDetail() {
     try {
       await deleteReport(report.id)
       await markClosedDay(date)
-      navigate('/reports')
+      onClose()
     } catch (err) {
       setError(err.message)
       load()
@@ -185,8 +195,18 @@ export default function ReportDetail() {
     loadInspectionStatus()
   }, [loadInspectionStatus])
 
-  function handleInspectionSaved() {
+  function openInspection() {
+    inspectionOpenRef.current = true
+    setInspectionOpen(true)
+  }
+
+  function closeInspection() {
+    inspectionOpenRef.current = false
     setInspectionOpen(false)
+  }
+
+  function handleInspectionSaved() {
+    closeInspection()
     loadInspectionStatus() // ボタンの「未記載/記載済み」表示を保存結果に合わせて更新する
   }
 
@@ -196,7 +216,7 @@ export default function ReportDetail() {
     } catch (err) {
       setError(err.message)
     }
-    setInspectionOpen(false)
+    closeInspection()
     loadInspectionStatus()
   }
 
@@ -263,70 +283,47 @@ export default function ReportDetail() {
   }
 
   const isToday = date === todayJST()
+  // 上のkeydownリスナが常に最新の handleClose（report/entriesの最新値を閉じ込んだもの）を
+  // 呼べるようにする。レンダー後に毎回書き換える
+  closeRef.current = handleClose
 
   return (
-    <div className="reports-page">
-      <AppHeader />
-      <div className="reports-container">
-        <div className="report-detail-head">
-          <div className="report-detail-head-left">
-            <button
-              type="button"
-              className="icon-btn-home"
-              onClick={handleGoHome}
-              aria-label="日報一覧に戻る"
-              title="日報一覧に戻る"
-            >
-              <IconHome size={32} />
-            </button>
-            <div className="report-nav">
-              <button
-                type="button"
-                className="icon-btn-nav"
-                onClick={() => navigate(`/reports/${shiftDate(date, -1)}`)}
-                aria-label="前日"
-                title="前日"
-              >
-                <IconChevronLeft size={28} />
-              </button>
-              <h2 className="page-title">
-                {formatReportDate(date)}
-                {isToday && <span className="report-today-badge">本日</span>}
-              </h2>
-              <button
-                type="button"
-                className="icon-btn-nav"
-                onClick={() => navigate(`/reports/${shiftDate(date, 1)}`)}
-                aria-label="翌日"
-                title="翌日"
-              >
-                <IconChevronRight size={28} />
+    <>
+      <div className="report-detail-overlay" role="dialog" aria-modal="true" onClick={handleClose}>
+        <div className="report-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="report-detail-head">
+            <h2 className="page-title">
+              {formatReportDate(date)}
+              {isToday && <span className="report-today-badge">本日</span>}
+            </h2>
+            <div className="report-head-right">
+              {savedAt && <span className="report-saved">保存しました</span>}
+              {!readOnly && (
+                // 未記載（この日の記録がまだ無い）のときは青地・白字で目立たせて登録を促し、
+                // 記載済みのときは控えめな見た目のまま「修正」に変える（2026-08-07）
+                <button
+                  type="button"
+                  className={dateInspection ? 'btn-plain' : 'btn-primary'}
+                  onClick={openInspection}
+                  disabled={inspectionStatusLoading}
+                >
+                  <IconClipboard size={18} />
+                  {inspectionStatusLoading ? '読み込み中…' : dateInspection ? '自主点検修正' : '自主点検登録'}
+                </button>
+              )}
+              {!readOnly && report && (
+                <span className="report-head-delete">
+                  <ConfirmDeleteButton onConfirm={handleDeleteReport} label="この日の日報を削除" size={22} />
+                </span>
+              )}
+              {/* ホーム・前日/翌日のボタンは廃止し、この「×」だけで閉じる（2026-08-07） */}
+              <button type="button" className="icon-btn-close" onClick={handleClose} aria-label="閉じる">
+                ×
               </button>
             </div>
           </div>
-          <div className="report-head-right">
-            {savedAt && <span className="report-saved">保存しました</span>}
-            {!readOnly && (
-              // 未記載（この日の記録がまだ無い）のときは青地・白字で目立たせて登録を促し、
-              // 記載済みのときは控えめな見た目のまま「修正」に変える（2026-08-07）
-              <button
-                type="button"
-                className={dateInspection ? 'btn-plain' : 'btn-primary'}
-                onClick={() => setInspectionOpen(true)}
-                disabled={inspectionStatusLoading}
-              >
-                <IconClipboard size={18} />
-                {inspectionStatusLoading ? '読み込み中…' : dateInspection ? '自主点検修正' : '自主点検登録'}
-              </button>
-            )}
-            {!readOnly && report && (
-              <span className="report-head-delete">
-                <ConfirmDeleteButton onConfirm={handleDeleteReport} label="この日の日報を削除" size={22} />
-              </span>
-            )}
-          </div>
-        </div>
 
+          <div className="report-detail-body">
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
@@ -468,8 +465,12 @@ export default function ReportDetail() {
             <ReportParkingViolations reportId={report.id} readOnly={readOnly} />
           </>
         )}
+          </div>
+        </div>
       </div>
 
+      {/* 自主点検モーダルは詳細モーダルのオーバーレイの外に出す。中に入れると、
+          自主点検側の背景クリックが詳細側のオーバーレイにも伝播して両方閉じてしまう */}
       {inspectionOpen && (
         <InspectionForm
           date={date}
@@ -477,12 +478,12 @@ export default function ReportDetail() {
           existing={dateInspection}
           initialClosed={dateInspectionClosed}
           defaultInspector={user?.display_name || ''}
-          onClose={() => setInspectionOpen(false)}
+          onClose={closeInspection}
           onSaved={handleInspectionSaved}
           onDelete={handleInspectionDelete}
         />
       )}
-    </div>
+    </>
   )
 }
 
