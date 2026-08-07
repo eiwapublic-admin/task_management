@@ -359,9 +359,16 @@ create trigger fire_inspections_set_updated_at before update on fire_inspections
 alter table fire_inspections enable row level security;
 revoke all on fire_inspections from anon, authenticated;
 
--- 自主検査表に「休館日」フラグを追加（2026-08-05）。休館日は点検データを持たない
--- マーカーレコードとして扱い、行をグレー表示し「休館取り消し」で削除できるようにする。
-alter table fire_inspections add column if not exists closed boolean not null default false;
+-- 休館日（2026-08-05に fire_inspections.closed として追加 → 2026-08-07に独立テーブルへ移行）。
+-- 自主検査表専用ではなく日報一覧とも共有する「プロジェクト共通」の情報にするため、
+-- 建物・点検の有無に関わらず日付単位で持つ独立したテーブルに切り出した。
+create table if not exists closed_days (
+  closed_on  date primary key,
+  created_by uuid references users(id),
+  created_at timestamptz not null default now()
+);
+alter table closed_days enable row level security;
+revoke all on closed_days from anon, authenticated;
 
 -- ============================================================
 -- 不正駐車（Phase 4。2026-08-05〜）。日報詳細から写真と同様の流れで登録するが、

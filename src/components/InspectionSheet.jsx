@@ -8,15 +8,16 @@ const SHEET_COLUMNS = INSPECTION_SHEET_COLUMNS
 
 // 各項目のセル。紙の記入例（添付資料）に合わせ、記録がある日は良好な項目にも○を入れる
 // （様式の注意書きは「良好なら確認箇所一斉に○」だが、実際の運用は全項目に○を書いている）。
-function itemMark(rec, key) {
-  if (!rec || rec.closed) return ''
+// 休館日はプロジェクト共通情報（closed_days）のため、rec とは別に closed を渡す。
+function itemMark(rec, closed, key) {
+  if (closed || !rec) return ''
   return JUDGEMENT_MARKS[rec.items?.[key] || 'ok']
 }
 
 // 「点検箇所一斉」の行。休館日は点検自体をしていないので「休」を置いて空欄と区別する
-function allClearMark(rec) {
+function allClearMark(rec, closed) {
+  if (closed) return '休'
   if (!rec) return ''
-  if (rec.closed) return '休'
   return rec.all_clear ? '○' : ''
 }
 
@@ -29,6 +30,7 @@ export default function InspectionSheet({
   month,
   range,
   byDate,
+  closedDays,
   holidays,
   periodicResult,
   confirmedBy,
@@ -96,7 +98,7 @@ export default function InspectionSheet({
             <th colSpan={2}>点検箇所一斉</th>
             {columns.map((date, i) => (
               <td key={i} className="ins-mark">
-                {date ? allClearMark(byDate.get(date)) : ''}
+                {date ? allClearMark(byDate.get(date), closedDays.has(date)) : ''}
               </td>
             ))}
           </tr>
@@ -119,7 +121,7 @@ export default function InspectionSheet({
                 </th>
                 {columns.map((date, i) => (
                   <td key={i} className="ins-mark">
-                    {date ? itemMark(byDate.get(date), item.key) : ''}
+                    {date ? itemMark(byDate.get(date), closedDays.has(date), item.key) : ''}
                   </td>
                 ))}
               </tr>

@@ -876,47 +876,7 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- 一覧（月ごとにトグル開閉できる。2026-08-06） --- */
-.report-month-group { margin-bottom: var(--space-3); }
-.report-month-group:last-child { margin-bottom: 0; }
-
-/* 月の区切りをはっきり視認できるよう、見出し行の背景を塗りつぶしのブルーにする
-   （2026-08-06。タスク管理側の主要アクションと同じ --color-primary を流用）。 */
-.report-month-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-2);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-weight: 700;
-  font-size: 15px;
-  color: #fff;
-  cursor: pointer;
-  text-align: left;
-}
-
-.report-month-toggle:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-
-.report-month-chevron {
-  flex-shrink: 0;
-  color: #fff;
-  transition: transform var(--transition);
-}
-
-.report-month-chevron.is-open { transform: rotate(90deg); }
-
-.report-month-count {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-
+/* --- 一覧（自主検査表と同様、月単位で1日から全日を表示する。2026-08-07） --- */
 .report-list {
   list-style: none;
   margin: 0;
@@ -1000,6 +960,34 @@
 }
 
 .report-more, .report-empty { font-size: 13px; color: var(--text-muted); }
+
+/* 記録の無い日（未入力／休館日）の行。既存の.report-rowはボタン（クリックで詳細へ）だが、
+   こちらはクリック対象が無い日もあるため素の div にしている（2026-08-07）。 */
+.report-day-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* 休館日は自主検査表の一覧と同じ配色でグレーアウトする */
+.report-day-row.is-closed { background: var(--border); }
+
+.report-day-row-date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.report-day-empty-label { font-size: 13px; color: var(--text-muted); }
+.report-day-row.is-closed .report-day-empty-label { font-weight: 600; }
+
+.report-day-row-action { flex-shrink: 0; margin-left: auto; }
 
 /* --- 詳細 --- */
 .report-detail-head {

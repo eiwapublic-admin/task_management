@@ -25,6 +25,9 @@ import {
   handleInspectionSave,
   handleInspectionDelete,
   handleHolidays,
+  handleClosedDaysList,
+  handleClosedDayCreate,
+  handleClosedDayDelete,
   handleParkingList,
   handleParkingCreate,
   handleParkingUpdate,
@@ -922,6 +925,12 @@ async function route(req, env) {
   }
   if (pathname === '/api/report/holidays') {
     return req.method === 'GET' ? handleHolidays(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/closed-days') {
+    if (req.method === 'GET') return handleClosedDaysList(req)
+    if (req.method === 'POST') return handleClosedDayCreate(req)
+    if (req.method === 'DELETE') return handleClosedDayDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/report/parking') {
     if (req.method === 'GET') return handleParkingList(req)

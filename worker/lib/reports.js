@@ -700,7 +700,7 @@ export async function handleStorageUsage(req) {
 // ============================================================
 
 const INSPECTION_COLUMNS =
-  'id, building, inspected_on, inspector, all_clear, items, note, periodic_result, confirmed_by, closed, created_at, updated_at'
+  'id, building, inspected_on, inspector, all_clear, items, note, periodic_result, confirmed_by, created_at, updated_at'
 
 // 紙の様式に並ぶ検査項目（順序も紙に合わせる）。判定値は ok=良 / ng=不良 / fixed=即時改修。
 // 「避難通路」「喫煙場所」は紙でも2行あるため区別してキーを分ける。
@@ -780,7 +780,10 @@ export async function handleInspectionList(req) {
   }
 }
 
-// POST /api/report/inspections — 実施記録の作成/更新（同じビル・同じ日は上書き）
+// POST /api/report/inspections — 実施記録の作成/更新（同じビル・同じ日は上書き）。
+// 休館日（closed_days。2026-08-07〜）はこのテーブルの管轄外。呼び出し側は休館日にする/
+// 解除するときは /api/report/closed-days を使う（POST /api/report/closed-days が
+// 休館日にする際にこのテーブルの当日分を削除するため、ここでは closed を一切扱わない）。
 export async function handleInspectionSave(req) {
   const { auth, error } = await requireAuth(req, { write: true })
   if (error) return error
@@ -791,25 +794,20 @@ export async function handleInspectionSave(req) {
     if (!VALID_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
     if (!isValidDate(date)) return json({ error: 'inspected_on が不正です' }, 400)
 
-    // 休館日マーカー（2026-08-05）。点検データを持たない特別なレコードで、
-    // 「その日は点検の必要が無かった」ことだけを記録する。誤操作を想定し、
-    // 取り消しは専用ボタンから DELETE で行う（未入力の状態に戻す）。
-    const closed = Boolean(payload?.closed)
-    const items = closed ? {} : sanitizeItems(payload?.items)
+    const items = sanitizeItems(payload?.items)
     // 不備が1件でもあるなら「一斉に○」は成立しない。画面側の指定によらずサーバーで確定させる
-    const allClear = !closed && Object.keys(items).length === 0 && payload?.all_clear !== false
+    const allClear = Object.keys(items).length === 0 && payload?.all_clear !== false
 
     const periodic = payload?.periodic_result
     const row = {
       building,
       inspected_on: date,
-      inspector: closed ? null : trimOrNull(payload?.inspector, 50),
+      inspector: trimOrNull(payload?.inspector, 50),
       all_clear: allClear,
       items,
-      note: closed || typeof payload?.note !== 'string' ? null : payload.note.trim().slice(0, 1000) || null,
-      periodic_result: !closed && (periodic === 'ok' || periodic === 'ng') ? periodic : null,
-      confirmed_by: closed ? null : trimOrNull(payload?.confirmed_by, 50),
-      closed,
+      note: typeof payload?.note !== 'string' ? null : payload.note.trim().slice(0, 1000) || null,
+      periodic_result: periodic === 'ok' || periodic === 'ng' ? periodic : null,
+      confirmed_by: trimOrNull(payload?.confirmed_by, 50),
       created_by: auth.sub,
     }
 
@@ -861,6 +859,101 @@ export async function handleInspectionDelete(req) {
   } catch (err) {
     console.error('inspection-delete 失敗:', err)
     return json({ error: '自主検査表の削除に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 休館日（2026-08-05に自主検査表専用のフラグとして追加 → 2026-08-07に closed_days
+// テーブルへ切り出し、日報一覧とも共有するプロジェクト共通情報にした。
+// ============================================================
+
+// GET /api/report/closed-days?month=YYYY-MM — 指定月の休館日一覧（日付の配列）。
+// month を省略した場合は全期間を返す（件数が少ない想定のため一覧のページングは行わない）。
+export async function handleClosedDaysList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const month = new URL(req.url).searchParams.get('month') || ''
+    const supabase = getAdminClient()
+    let query = supabase.from('closed_days').select('closed_on')
+    if (month) {
+      if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
+      const [y, m] = month.split('-').map(Number)
+      const from = `${month}-01`
+      const to = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+      query = query.gte('closed_on', from).lt('closed_on', to)
+    }
+    const { data, error: err } = await query.order('closed_on', { ascending: true })
+    if (err) {
+      console.error('closed-days-list:', err.message)
+      return json({ error: '休館日の取得に失敗しました' }, 500)
+    }
+    return json({ closed_days: (data || []).map((r) => r.closed_on) })
+  } catch (err) {
+    console.error('closed-days-list 失敗:', err)
+    return json({ error: '休館日の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/closed-days — 指定日を休館日にする。
+// 休館日は点検データ・日報のどちらも持たない日という扱いのため、(1) 既に日報が
+// 登録されている日は拒否し、(2) 自主検査表の記録があれば（点検データを持たない
+// 休館日と両立しないため）削除してから登録する。
+export async function handleClosedDayCreate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const date = payload?.date
+    if (!isValidDate(date)) return json({ error: 'date が不正です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: existingReport } = await supabase
+      .from('daily_reports')
+      .select('id')
+      .eq('report_date', date)
+      .maybeSingle()
+    if (existingReport) {
+      return json({ error: 'この日はすでに日報が登録されているため休館日にできません' }, 400)
+    }
+
+    const { error: delErr } = await supabase.from('fire_inspections').delete().eq('inspected_on', date)
+    if (delErr) {
+      console.error('closed-day-create(delete inspections):', delErr.message)
+      return json({ error: '休館日の登録に失敗しました' }, 500)
+    }
+
+    const { error: err } = await supabase
+      .from('closed_days')
+      .upsert({ closed_on: date, created_by: auth.sub }, { onConflict: 'closed_on' })
+    if (err) {
+      console.error('closed-day-create:', err.message)
+      return json({ error: '休館日の登録に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('closed-day-create 失敗:', err)
+    return json({ error: '休館日の登録に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/closed-days?date=YYYY-MM-DD — 休館日の解除（未入力の状態に戻す）
+export async function handleClosedDayDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const date = new URL(req.url).searchParams.get('date') || ''
+    if (!isValidDate(date)) return json({ error: 'date が不正です' }, 400)
+    const supabase = getAdminClient()
+    const { error: err } = await supabase.from('closed_days').delete().eq('closed_on', date)
+    if (err) {
+      console.error('closed-day-delete:', err.message)
+      return json({ error: '休館日の解除に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('closed-day-delete 失敗:', err)
+    return json({ error: '休館日の解除に失敗しました' }, 500)
   }
 }
 

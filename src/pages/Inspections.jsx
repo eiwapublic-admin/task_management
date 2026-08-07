@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
-import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
+import InspectionForm from '../components/InspectionForm'
 import InspectionSheet from '../components/InspectionSheet'
 import { IconHome, IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
@@ -10,18 +10,16 @@ import {
   INSPECTION_ITEMS,
   INSPECTION_BUILDINGS,
   JUDGEMENT_MARKS,
-  JUDGEMENT_LABELS,
   fetchInspections,
-  saveInspection,
   deleteInspection,
   fetchHolidays,
+  fetchClosedDays,
   weekdayInfo,
   currentMonthJST,
   shiftMonth,
   daysInMonth,
   halfMonthRanges,
   todayJST,
-  formatReportDate,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -37,6 +35,8 @@ export default function Inspections() {
   // BKBのみ運用のため切替UIは廃止し固定にする（2026-08-05）
   const building = INSPECTION_BUILDINGS[0]
   const [rows, setRows] = useState([])
+  // 休館日（closed_days）はプロジェクト共通情報のため、自主検査表の記録とは別に取得する
+  const [closedDays, setClosedDays] = useState(new Set())
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -50,7 +50,12 @@ export default function Inspections() {
     setLoading(true)
     setError('')
     try {
-      setRows(await fetchInspections({ month }))
+      const [inspections, closed] = await Promise.all([
+        fetchInspections({ month }),
+        fetchClosedDays({ month }),
+      ])
+      setRows(inspections)
+      setClosedDays(new Set(closed))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -143,16 +148,26 @@ export default function Inspections() {
     }
   }
 
-  async function handleSaved(inspection) {
-    setRows((prev) => {
-      const others = prev.filter((r) => r.id !== inspection.id)
-      return [...others, inspection]
-    })
+  function handleSaved(result) {
+    if (result.closed) {
+      setClosedDays((prev) => new Set(prev).add(result.inspected_on))
+      setRows((prev) => prev.filter((r) => r.inspected_on !== result.inspected_on))
+    } else {
+      setClosedDays((prev) => {
+        if (!prev.has(result.inspected_on)) return prev
+        const next = new Set(prev)
+        next.delete(result.inspected_on)
+        return next
+      })
+      setRows((prev) => {
+        const others = prev.filter((r) => r.id !== result.id)
+        return [...others, result]
+      })
+    }
     setEditing(null)
   }
 
-  // 削除。休館日の取り消しも同じ経路（モーダルのスイッチをオフにして保存するか、
-  // モーダルの削除ボタンで記録ごと消す）。
+  // 削除（実際の点検記録のみ。休館日はモーダルのスイッチをオフにして保存すると解除される）。
   async function handleDelete(id) {
     setRows((prev) => prev.filter((r) => r.id !== id))
     try {
@@ -243,11 +258,11 @@ export default function Inspections() {
                   const day = Number(date.slice(-2))
                   const ngKeys = rec ? Object.keys(rec.items || {}) : []
                   const isFuture = date > today
-                  const closed = Boolean(rec?.closed)
+                  const closed = closedDays.has(date)
                   const wd = weekdayInfo(date, holidays)
                   // 未入力/既存どちらも行全体のタップで詳細モーダルを開く（追加と変更を区別しない）。
                   // 未来日はまだ記録できないので、既に何かある場合を除きタップ不可にする
-                  const clickable = !readOnly && (Boolean(rec) || !isFuture)
+                  const clickable = !readOnly && (Boolean(rec) || closed || !isFuture)
                   const rowClass = [
                     date === today && 'is-today',
                     closed && 'is-closed',
@@ -333,6 +348,7 @@ export default function Inspections() {
               month={month}
               range={range}
               byDate={byDate}
+              closedDays={closedDays}
               holidays={holidays}
               periodicResult={periodicResult}
               confirmedBy={confirmedBy}
@@ -347,209 +363,13 @@ export default function Inspections() {
           date={editing}
           building={building}
           existing={byDate.get(editing) || null}
+          initialClosed={closedDays.has(editing)}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
           onDelete={handleDelete}
         />
       )}
-    </div>
-  )
-}
-
-// 点検の入力。既定は「すべて良好」で、不備のある項目だけタップして×/◎に落とす。
-// 休館日はモーダル下部のスイッチで切り替える（オンにすると点検データを持たないマーカーになる）。
-function InspectionForm({ date, building, existing, defaultInspector, onClose, onSaved, onDelete }) {
-  const [inspector, setInspector] = useState(existing?.inspector || defaultInspector)
-  const [items, setItems] = useState(existing?.items || {})
-  const [note, setNote] = useState(existing?.note || '')
-  const [periodic, setPeriodic] = useState(existing?.periodic_result || '')
-  const [closed, setClosed] = useState(Boolean(existing?.closed))
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  // 6月・12月は紙の様式にも定期点検結果の欄があるため、その月だけ表示する
-  const monthNum = Number(date.slice(5, 7))
-  const showPeriodic = monthNum === 6 || monthNum === 12
-
-  const ngCount = Object.keys(items).length
-  const allClear = ngCount === 0
-
-  // 項目をタップするたび ○ → × → ◎ → ○ と切り替える
-  function cycle(key) {
-    setItems((prev) => {
-      const next = { ...prev }
-      const current = next[key]
-      if (!current) next[key] = 'ng'
-      else if (current === 'ng') next[key] = 'fixed'
-      else delete next[key]
-      return next
-    })
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    setError('')
-    try {
-      const saved = await saveInspection({
-        building,
-        inspected_on: date,
-        inspector,
-        items,
-        note,
-        periodic_result: showPeriodic ? periodic || null : null,
-        closed,
-      })
-      onSaved(saved)
-    } catch (err) {
-      setError(err.message)
-      setSaving(false)
-    }
-  }
-
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  const groups = [...new Set(INSPECTION_ITEMS.map((i) => i.group))]
-
-  return (
-    <div className="inspection-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="inspection-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="inspection-modal-head">
-          <h3>
-            {formatReportDate(date)}　{building}
-          </h3>
-          <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
-            ×
-          </button>
-        </div>
-
-        <div className="inspection-modal-body">
-          {error && (
-            <p className="dashboard-error dashboard-banner" role="alert">
-              {error}
-            </p>
-          )}
-
-          {!closed && (
-            <>
-              <label className="report-field inspection-inspector">
-                <span>点検者名</span>
-                <input
-                  type="text"
-                  value={inspector}
-                  onChange={(e) => setInspector(e.target.value)}
-                  placeholder="点検者名"
-                />
-              </label>
-
-              <p className="inspection-hint">不備があった項目だけ、下の一覧でタップしてください。</p>
-
-              {groups.map((group) => (
-                <div className="inspection-group" key={group}>
-                  <h4>{group}</h4>
-                  <div className="inspection-items">
-                    {INSPECTION_ITEMS.filter((i) => i.group === group).map((item) => {
-                      const value = items[item.key] || 'ok'
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          className={`inspection-item is-${value}`}
-                          onClick={() => cycle(item.key)}
-                          aria-label={`${item.label}: ${JUDGEMENT_LABELS[value]}`}
-                        >
-                          <span className="inspection-item-mark">{JUDGEMENT_MARKS[value]}</span>
-                          <span className="inspection-item-label">{item.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-
-          <div className={`inspection-status${closed ? ' is-closed' : allClear ? ' is-clear' : ''}`}>
-            {closed ? (
-              <strong>休館日</strong>
-            ) : allClear ? (
-              <strong>すべて良好</strong>
-            ) : (
-              <>
-                <strong>{ngCount} 件の不備があります</strong>
-                <button type="button" className="btn-plain" onClick={() => setItems({})}>
-                  すべて良好に戻す
-                </button>
-              </>
-            )}
-          </div>
-
-          {!closed && ngCount > 0 && (
-            <label className="report-field inspection-note-field">
-              <span>不備の内容・報告事項</span>
-              <textarea
-                value={note}
-                rows={3}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="不備の具体的な内容を記入してください"
-              />
-            </label>
-          )}
-
-          {!closed && showPeriodic && (
-            <fieldset className="inspection-periodic">
-              <legend>{monthNum}月の定期点検結果</legend>
-              <label>
-                <input
-                  type="radio"
-                  name="periodic"
-                  checked={periodic === 'ok'}
-                  onChange={() => setPeriodic('ok')}
-                />
-                支障無し
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="periodic"
-                  checked={periodic === 'ng'}
-                  onChange={() => setPeriodic('ng')}
-                />
-                支障有り
-              </label>
-            </fieldset>
-          )}
-        </div>
-
-        <div className="inspection-modal-foot">
-          <div className="inspection-modal-foot-left">
-            {existing && (
-              <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
-            )}
-            <label className="switch-field">
-              <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
-              <span className="switch-track">
-                <span className="switch-thumb" />
-              </span>
-              <span className="switch-label">休館日</span>
-            </label>
-          </div>
-          <div className="inspection-modal-foot-right">
-            <button type="button" className="btn-plain" onClick={onClose}>
-              キャンセル
-            </button>
-            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中…' : closed ? '休館日として記録' : allClear ? '異常なしで記録' : '記録する'}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
