@@ -248,8 +248,9 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。GET は `category=work`/`parking` で絞り込み可能（2026-08-05追加。work=作業記録の写真／parking=違反車両の写真を混在させないため）。POST は multipart/form-data（縮小はクライアント側で済ませてから送る。`parking_id` を渡すと違反車両レコードに紐付く）。DELETE は保管したオブジェクトも消す |
 | GET `/api/report/photo` | JWT | 写真の本体を返す（`thumb=1` でサムネイル。無ければ本体で代替）。バケットは非公開なのでこの経路以外からは取得できない |
 | GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
-| GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。`closed:true` を送ると点検データを持たない「休館日」マーカーとして保存する（4-12参照） |
+| GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表の実施記録。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。休館日は含まない（下記 `/api/report/closed-days` 参照。2026-08-07に分離） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
+| GET/POST/DELETE `/api/report/closed-days` | JWT（書込はowner不可） | 休館日（4-12・4-14参照）。自主検査表専用ではなく日報一覧とも共有するプロジェクト共通情報。GET は `month=YYYY-MM` で絞り込み（省略で全期間）、`{closed_days:["YYYY-MM-DD",...]}` を返す。POST は `{date}` を休館日にする（既にその日の日報があれば400で拒否。自主検査表の記録があれば削除してから登録）。DELETE は `date=` で解除（2026-08-07追加） |
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
 | POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（`plate_number`は数字4桁に正規化。判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は`api_usage`の`parking_calls`列に加算し、メール/FAXとは別内訳として従量課金事項画面に表示する（2026-08-05追加。4-13参照） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
@@ -355,7 +356,9 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
 - **日報一覧のツールバーをiPhone幅で1行に収める（2026-08-05）**: 「本日の日報をつくる」は`.btn-primary`のテキストボタンから「＋」アイコンのみの`.icon-btn-add`に変更し、**ツールバーの一番左端**へ移動。**本日分がまだ無いときだけ表示**し、作成済みなら非表示にする（既存の日報行から開けるため）。「違反車両一覧」ボタンの文言も「違反車両」に短縮。加えて480px以下では`.reports-toolbar-actions .btn-plain`の横パディングを詰め、「＋・自主検査表・違反車両・歯車（定型文の設定）」の4つがiPhone幅でも折り返さず1行に収まるようにした
 - **一覧行の作業者表記（2026-08-05）**: 「午前：○○　午後：○○」から「○○ | ○○」に簡略化
 - **「本日」バッジの拡大（2026-08-05）**: `.report-today-badge`のフォントサイズを11px→13pxに拡大
-- **日報一覧を月単位のトグルにグループ化（2026-08-06）**: 日数が増えるにつれ一覧が縦に伸び続ける問題への対応。`report_date`の`YYYY-MM`部分で`reports`をグループ化し（`GET /api/reports`は既に日付降順で返すため、`Map`へ挿入するだけで月の並び順を維持できる）、各月の見出し行をクリックすると開閉できるようにした。**デフォルトは今月・先月（直近2ヶ月）だけ開き、それより古い月は畳んでおく**（`currentMonthJST()`/`shiftMonth()`を流用）。開閉状態はコンポーネントのstateのみ（`Set<string>`）で保持し、画面遷移で初期状態に戻る（永続化なし）。見出しのシェブロンは既存の`IconChevronRight`をCSSの`transform: rotate(90deg)`で開閉表現に流用しており、新規アイコンの追加はしていない
+- **日報一覧を自主検査表と同じ「月単位・＜＞移動・1日から全日表示」の構成に変更（2026-08-07）**: 日数が増えるにつれ一覧が縦に伸び続ける問題への対応として、2026-08-06にまず月単位のトグルグループ化を試したが、**自主検査表画面（4-12参照）と一貫した操作感にするため**、翌日にInspections.jsxと同じ「表示中の月は1つだけ・`‹`/`›`で月移動・その月の1日〜末日を必ず全て表示し、日報の無い日は『未入力』と表示する」構成に置き換えた（トグルグループ化のUIは撤去）。`GET /api/reports`は全期間分（日付降順・上限400件）を一度だけ取得し、表示中の月でクライアント側にフィルタする（1.5年分でも軽量なためサーバー側の月フィルタは設けていない）。日付範囲の生成は`daysInMonth()`を`Inspections.jsx`と共用する
+- **未入力の日に「休館日」ボタンを表示（2026-08-07）**: 日報の無い日（未来日を除く）の行の右端に「休館日」ボタンを置き、押すとその日を休館日にする（行がグレー背景になり「休館日を解除」ボタンに変わる）。休館日は自主検査表専用ではなく**プロジェクト共通の情報**（`closed_days`テーブル。下記4-12参照）で、日報一覧・自主検査表のどちらから登録・解除しても両画面に反映される
+- **「自主検査入力」ショートカット（2026-08-07）**: 日報一覧のツールバー右上に追加。押すと自主検査表の当日分の入力モーダル（`InspectionForm`。4-12参照）をこの画面から直接開ける（`/reports/inspections`へ移動しなくてよい）。開く前に当日の既存記録・休館日状態を取得してからモーダルを表示する
 - **データ**: `daily_reports`（1日1件。`report_date` unique）／ `report_entries`（時刻＋内容。`source_task_id` でタスクからの転記元を保持）／
   `routine_templates`（定型文）。いずれも service role 経由のみ（anon/authenticated へのGRANTなし）で既存方針を踏襲
 
@@ -411,9 +414,11 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   祝日データは CSP（`connect-src 'self'`）の制約でブラウザから直接は取得できないため、Worker側の `worker/lib/holidays.js` が
   `holidays-jp.github.io/api/v1/date.json`（無認証・無料の静的JSON）を取得し `cf: { cacheTtl: 86400, cacheEverything: true }` で
   エッジキャッシュしたうえで `GET /api/report/holidays` として中継する。取得に失敗しても空オブジェクトを返し、土日の色分けだけは機能させる
-- **休館日（`fire_inspections.closed`。2026-08-05）**: 点検の必要が無かった日を、点検データを持たないマーカーレコードとして記録する機能。
-  行の背景をグレー表示にする（日付自体の色＝平日/土曜/日曜祝日の配色は変えない）。休館日を解除したい場合はモーダル内のスイッチをオフにして保存し直す
-- **行タップで統一モーダルを開く（2026-08-05）**: 従来あった「＋」「編集」「休館日」の行内ボタンは廃止し、**行全体のタップで詳細モーダルを開く**方式に統一した（追加と変更を画面上で区別しない）。読み取り専用の owner、および未来日（記録の無い日）はタップ不可。モーダル下部フッタの左に「休館日」のオン/オフ切替スイッチ（既定オフ）と、既存レコードのみ表示される削除（ゴミ箱アイコン）ボタンを置く。休館日をオンにすると点検者・点検項目・不備内容・定期点検結果の入力欄は非表示になる
+- **休館日（当初 `fire_inspections.closed`。2026-08-05 → 2026-08-07に`closed_days`テーブルへ分離）**: 点検・日報のどちらも無かった日を記録する機能。
+  行の背景をグレー表示にする（日付自体の色＝平日/土曜/日曜祝日の配色は変えない）。休館日を解除したい場合はモーダル内のスイッチをオフにして保存し直す。
+  **2026-08-07に日報一覧（4-10参照）とも共有するプロジェクト共通情報にした**: 建物にも点検の有無にも紐付かない独立した`closed_days`テーブル（`closed_on` date主キー）に切り出し、`GET/POST/DELETE /api/report/closed-days`という専用APIで扱う。これに伴い`fire_inspections`から`closed`列を削除し（既存の1件のみ存在した休館日マーカー行は移行済み）、モーダルの「休館日」スイッチをオンにして保存すると`/api/report/inspections`ではなく`/api/report/closed-days`（POST）を呼ぶよう変更した（`InspectionForm.jsx`）。休館日にする際、その日に**既に日報が登録されていればサーバー側で400拒否**し（休館日と日報は両立しない運用のため）、その日の自主検査表の記録があれば（休館日は点検データを持たないため）削除してから登録する
+- **入力モーダルの共通化（2026-08-07）**: 上記の変更に合わせ、モーダル本体（旧`Inspections.jsx`内の`InspectionForm`）を`src/components/InspectionForm.jsx`へ切り出した。自主検査表画面と、日報一覧の「自主検査入力」ショートカット（4-10参照）の両方から使う
+- **行タップで統一モーダルを開く（2026-08-05）**: 従来あった「＋」「編集」「休館日」の行内ボタンは廃止し、**行全体のタップで詳細モーダルを開く**方式に統一した（追加と変更を画面上で区別しない）。読み取り専用の owner、および未来日（記録の無い日）はタップ不可。休館日の日（`closed_days`にある日。2026-08-07〜）は`fire_inspections`にレコードが無くてもタップ可能にしてある（スイッチをオフに戻せるように）。モーダル下部フッタの左に「休館日」のオン/オフ切替スイッチ（既定オフ）と、既存レコードのみ表示される削除（ゴミ箱アイコン）ボタンを置く。休館日をオンにすると点検者・点検項目・不備内容・定期点検結果の入力欄は非表示になる
 - **モーダル内の並び（2026-08-05）**: 点検者名 →「不備があった項目だけ、下の一覧でタップしてください。」の説明 → 点検項目群 → ステータス表示（すべて良好／◯件の不備があります／休館日はグレーで「休館日」）→ 不備の内容・報告事項の入力欄（不備がある場合のみ）→ 6月・12月のみ定期点検結果、の順。ステータス表示から「（点検箇所一斉に○）」の文言は削除した
 - **ツールバーの統合（2026-08-05）**: ホームボタン・年月移動・ページタイトルを1行にまとめた（`.inspection-toolbar`）。**BKBのみ運用のため小泉本社との切替ボタンは廃止**（`INSPECTION_BUILDINGS`定数自体は`['BKB', '小泉本社']`のまま残し、`building`はコード内で`INSPECTION_BUILDINGS[0]`に固定。将来複数ビル運用が必要になれば切替UIを復活できるようにしてある）
 - 月次の一覧は紙の様式に近い日付順の表で、未実施の日・不備の内容が一目で分かる
@@ -555,8 +560,9 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 | report_entries | id / report_id(FK cascade) / entry_time / content / source_task_id(FK set null) / sort_order | 作業記録の明細。`source_task_id` はタスク管理からの転記元（タスクが消えても明細は残す） |
 | routine_templates | id / label / sort_order / is_active | 定型文マスタ（現行の「特記事項設定」に相当） |
 | report_photos | id / report_id(FK cascade) / category(`work`/`parking`/`chlorine`) / **parking_id**(FK cascade。2026-08-05追加) / storage_key(unique) / thumb_key(unique) / filename / mime / size / width / height / comment / taken_at / sort_order | 写真のメタ情報。実体は Supabase Storage の非公開バケット `report-photos`（4-11参照）。`parking_id` は違反車両の写真だけ持つ（4-13参照） |
-| fire_inspections | id / building / inspected_on / inspector / all_clear / items(jsonb) / note / periodic_result / confirmed_by / **closed**(既定false。2026-08-05追加) | 自主検査表。`(building, inspected_on)` で unique。`closed=true` は点検データを持たない「休館日」マーカー（4-12参照） |
+| fire_inspections | id / building / inspected_on / inspector / all_clear / items(jsonb) / note / periodic_result / confirmed_by | 自主検査表の実施記録。`(building, inspected_on)` で unique。休館日フラグ（`closed`）は2026-08-07に`closed_days`テーブルへ分離した（後述） |
 | parking_violations | id / report_id(FK cascade) / checked_at / plate_region / plate_number / maker / model / owner_company / violations(text[]) / note | 違反車両。`daily_reports`とは独立したテーブルで、日を跨って一覧できるようにしている（`/reports/parking`。4-13参照）。`plate_region`+`plate_number`で過去履歴・累計回数を名寄せする |
+| closed_days | closed_on(**PK**) / created_by | 休館日。**建物にも点検有無にも紐付かない日付単位のテーブル**（2026-08-07追加。自主検査表専用の`fire_inspections.closed`から分離し、日報一覧とも共有するプロジェクト共通情報にした。4-12・4-14参照） |
 
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / **parking_calls**（違反車両写真AI読み取り分の内訳。マイグレーション `add_parking_usage_breakdown`。2026-08-05） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）・違反車両写真のAI読み取りは通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「メール」「FAX」「車両画像」の件数を分けて表示）

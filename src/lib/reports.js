@@ -240,6 +240,25 @@ export async function fetchHolidays() {
   return data.holidays || {}
 }
 
+// 休館日（2026-08-07〜。自主検査表・日報一覧の両方から参照・登録するプロジェクト共通情報）。
+// month を省略すると全期間を返す。
+export async function fetchClosedDays({ month } = {}) {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : ''
+  const data = await authFetch(`/api/report/closed-days${qs}`)
+  return data.closed_days || []
+}
+
+export async function markClosedDay(date) {
+  return authFetch('/api/report/closed-days', {
+    method: 'POST',
+    body: JSON.stringify({ date }),
+  })
+}
+
+export async function unmarkClosedDay(date) {
+  await authFetch(`/api/report/closed-days?date=${encodeURIComponent(date)}`, { method: 'DELETE' })
+}
+
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 // 'YYYY-MM-DD' の曜日情報を返す。土曜=青、日曜・祝日=赤（2026-08-05）。
