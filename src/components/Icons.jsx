@@ -114,3 +114,23 @@ export function IconDownload(props) {
     </Icon>
   )
 }
+
+// 日報一覧の表示切替（リスト型／カレンダー型。2026-08-07）
+export function IconList(props) {
+  return (
+    <Icon {...props}>
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </Icon>
+  )
+}
+
+export function IconCalendar(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4M16 3v4" />
+    </Icon>
+  )
+}
