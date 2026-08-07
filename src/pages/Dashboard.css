@@ -1056,6 +1056,197 @@
 
 .report-day-row-action { flex-shrink: 0; margin-left: auto; }
 
+/* --- カレンダー型の表示（2026-08-07。PC/iPad専用。リスト型とボタンで切り替える） --- */
+
+/* 表示切替のセグメントボタン。ヘッダの .app-switch と同じ形だが、
+   こちらは明るい背景の上に置くため配色だけ差し替えている */
+.report-view-switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.report-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.report-view-btn:hover { background: var(--bg-subtle); }
+
+.report-view-btn.is-active {
+  background: #33604d;
+  color: #fff;
+}
+
+/* カレンダー型のときはマス目を画面幅いっぱいに広げる（リスト型は900px中央寄せのまま） */
+.reports-container.is-calendar { max-width: none; }
+
+.report-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.report-calendar-head,
+.report-calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.report-calendar-head-cell {
+  padding: 4px 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* 曜日見出しも日付と同じ配色にする（土=青・日=赤） */
+.report-calendar-head-cell.is-sunday { color: #dc2626; }
+.report-calendar-head-cell.is-saturday { color: #1d4ed8; }
+
+.report-calendar-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 130px;
+  padding: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* 月初の前・月末の後の空マスは枠線も出さない */
+.report-calendar-cell.is-blank {
+  background: transparent;
+  border-color: transparent;
+}
+
+.report-calendar-cell.is-clickable { cursor: pointer; }
+.report-calendar-cell.is-clickable:hover { border-color: #33604d; }
+
+/* 当日の帯はリスト型と同じ配色・太さで左端に付ける */
+.report-calendar-cell.is-today { border-left: 8px solid #33604d; }
+
+.report-calendar-cell.is-closed { background: var(--border); }
+
+.report-calendar-cell-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.report-calendar-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.report-calendar-day.is-saturday { color: #1d4ed8; }
+.report-calendar-day.is-holiday { color: #dc2626; }
+
+/* マス目は狭いので「本日」バッジは余白を詰める */
+.report-calendar-cell-head .report-today-badge {
+  margin-left: 0;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+/* アイコン群は日付と同じ行の右端に寄せる。マス目は1列＝画面幅の1/7しかないため、
+   リスト型のままの大きさ（24px×3＋余白）だと iPad縦などでマス目から溢れて欠けてしまう。
+   カレンダー型のときだけ一回り小さくして、狭い列でも3つ並べられるようにする（2026-08-07） */
+.report-calendar-cell-head .report-row-icons {
+  margin-left: auto;
+  gap: 2px;
+}
+
+.report-calendar-cell-head .report-row-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.report-calendar-closed-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.report-calendar-workers {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-calendar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* リスト型（.report-line）より1段小さくし、狭いマス目でも行数を稼ぐ */
+.report-calendar-line {
+  display: flex;
+  gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.report-calendar-line .report-line-time { width: 38px; }
+
+.report-calendar-empty { font-size: 13px; color: var(--text-muted); }
+
+/* 休館日の指定／解除。マス目の下端に控えめに置く */
+.report-calendar-closed-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.report-calendar-closed-btn:hover {
+  border-color: #33604d;
+  color: var(--text-base);
+}
+
+/* iPad縦（768px）〜小さめのノートPCでは1列が100px前後しかないため、余白を詰めて
+   本文に使える幅を稼ぐ（2026-08-07）。表示できる分量そのものは
+   CALENDAR_PREVIEW_LINES（ReportList.jsx）で別途調整する */
+@media (max-width: 1024px) {
+  .reports-container.is-calendar { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .report-calendar-head,
+  .report-calendar-week { gap: 4px; }
+  .report-calendar-cell { padding: 6px; min-height: 110px; }
+  .report-calendar-line { font-size: 12px; gap: 4px; }
+  .report-calendar-line .report-line-time { width: 34px; }
+  .report-calendar-workers { font-size: 11px; }
+}
+
 /* --- 詳細 ---
    左: ホーム・前日/翌日・日付。右: 保存状態・自主検査入力・削除（2026-08-07。
    従来 justify-content:space-between で3要素を並べていたため、画面幅によって
