@@ -10,6 +10,7 @@ import {
   handleReportGet,
   handleReportCreate,
   handleReportUpdate,
+  handleReportDelete,
   handleEntryCreate,
   handleEntryUpdate,
   handleEntryDelete,
@@ -891,6 +892,7 @@ async function route(req, env) {
     if (req.method === 'GET') return handleReportGet(req)
     if (req.method === 'POST') return handleReportCreate(req)
     if (req.method === 'PATCH') return handleReportUpdate(req)
+    if (req.method === 'DELETE') return handleReportDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/report/entries') {

@@ -34,6 +34,11 @@ export async function updateReport(id, patch) {
   return data.report
 }
 
+// 日報1件の削除（明細・写真・違反車両もまとめて消える）
+export async function deleteReport(id) {
+  await authFetch(`/api/report?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 // 作業記録の追加。タスクからの転記は source_task_id を渡す
 export async function addEntry(reportId, fields = {}) {
   const data = await authFetch('/api/report/entries', {
