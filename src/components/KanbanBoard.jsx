@@ -5,6 +5,7 @@ import TaskDetail from './TaskDetail'
 import TaskForm from './TaskForm'
 import { STATUS_LIST } from '../lib/status'
 import { formatDateTime } from '../lib/format'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
 import './KanbanBoard.css'
 
 export default function KanbanBoard({
@@ -22,6 +23,9 @@ export default function KanbanBoard({
   const [selectedAssignee, setSelectedAssignee] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  // ツールバーをAppHeaderの下に固定表示し、各列のステータス見出しはさらにその下に
+  // 重ねて固定表示する（2026-08-11。KanbanColumn.jsx の .ui-sticky-head-2 参照）
+  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const filteredTasks = useMemo(() => {
     if (!selectedAssignee) return tasks
@@ -61,7 +65,7 @@ export default function KanbanBoard({
 
   return (
     <div className="kanban-board">
-      <div className="kanban-toolbar">
+      <div className="kanban-toolbar ui-sticky-head" ref={stickyHeadRef}>
         <FilterBar
           assignees={assignees}
           selectedAssignee={selectedAssignee}

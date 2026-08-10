@@ -5,6 +5,7 @@ import ChlorineForm from '../components/ChlorineForm'
 import useChlorinePdfExport from '../hooks/useChlorinePdfExport'
 import { IconHome, IconDownload, IconDroplet } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
 import {
   CHLORINE_BUILDINGS,
   CHLORINE_JUDGEMENT_ITEMS,
@@ -45,6 +46,8 @@ export default function Chlorine() {
   // 入力モーダル。'new' なら新規、レコードなら編集
   const [editing, setEditing] = useState(null)
   const pdf = useChlorinePdfExport(year, pdfBuilding)
+  // ツールバー＋年月・施設・PDF出力欄をAppHeaderの下に固定表示する（2026-08-11）
+  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,6 +126,8 @@ export default function Chlorine() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
+        {/* ツールバー＋年月・施設・PDF出力欄はAppHeaderの下に固定表示する（2026-08-11） */}
+        <div className="ui-sticky-head" ref={stickyHeadRef}>
         <div className="reports-toolbar">
           <button
             type="button"
@@ -182,6 +187,7 @@ export default function Chlorine() {
           >
             <IconDownload size={20} />
           </button>
+        </div>
         </div>
 
         {error && (

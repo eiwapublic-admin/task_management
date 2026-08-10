@@ -27,7 +27,9 @@ export default function KanbanColumn({ status, tasks, onDragStart, onDrop, onCar
       }}
       onDrop={handleDrop}
     >
-      <div className="kanban-column-header">
+      {/* 列の中でスクロールしても、ステータス見出しはツールバーの下に重ねて固定表示する
+          （2026-08-11。.ui-sticky-head-2 は src/styles/ui.css 参照） */}
+      <div className="kanban-column-header ui-sticky-head-2">
         <span className="kanban-column-title">
           <span className="kanban-column-dot" style={{ background: accent }} aria-hidden="true" />
           {status}

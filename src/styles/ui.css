@@ -71,6 +71,28 @@
 
 .ui-toolbar .ui-page-title { margin: 0; }
 
+/* 縦スクロールしてもヘッダー扱いの部分を固定表示するための2段目・3段目
+   （2026-08-11）。AppHeader（1段目。.dashboard-header）は既にそれ自身が
+   position: sticky; top: 0 だが、折り返し・safe-areaで高さが可変なため、
+   その下に重ねる段はJSで測った実測値（useStickyHeightVar.js）を
+   var(--app-header-h) / var(--sticky2-h) として使う。
+   使い方: 2段目にしたいツールバー等に .ui-sticky-head を付け、
+   useStickyHeightVar('--sticky2-h') の ref をそこに渡す。3段目
+   （一覧の列見出し・カレンダーの曜日行など）には .ui-sticky-head-2 を付ける
+   （3段目自体の高さを測る必要はない＝4段目が無いため ref は不要）。 */
+.ui-sticky-head {
+  position: sticky;
+  top: var(--app-header-h);
+  z-index: var(--z-header);
+  background: var(--bg-app);
+}
+
+.ui-sticky-head-2 {
+  position: sticky;
+  top: calc(var(--app-header-h) + var(--sticky2-h, 0px));
+  z-index: var(--z-header);
+}
+
 /* =========================================================================
    2. ボタン
 

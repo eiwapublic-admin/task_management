@@ -9,6 +9,7 @@ import { formatDate, formatDateTime } from '../lib/format'
 import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
 import { formatTaskId } from '../lib/taskId'
 import { STATUS_LIST, UNASSIGNED } from '../lib/status'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
 import './Dashboard.css'
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
@@ -37,6 +38,8 @@ export default function Archive() {
   const [appliedQ, setAppliedQ] = useState('')
 
   const [selectedTask, setSelectedTask] = useState(null)
+  // タイトル＋絞り込みをAppHeaderの下に固定表示し、表の列見出しはさらにその下に重ねる（2026-08-11）
+  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const load = useCallback(async (filters) => {
     setError('')
@@ -141,6 +144,8 @@ export default function Archive() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container logs-container">
+        {/* タイトル＋絞り込みはAppHeaderの下に固定表示する（2026-08-11） */}
+        <div className="ui-sticky-head" ref={stickyHeadRef}>
         <h2 className="ui-page-title">アーカイブ</h2>
         <form className="archive-filters" onSubmit={handleSearch}>
           <label className="archive-filter">
@@ -178,6 +183,7 @@ export default function Archive() {
             検索
           </button>
         </form>
+        </div>
 
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
@@ -190,16 +196,17 @@ export default function Archive() {
           <p className="dashboard-loading">該当するアーカイブはありません。</p>
         ) : (
           <table className="logs-table">
+            {/* 列見出しはタイトル＋絞り込みの下に重ねて固定表示する（2026-08-11） */}
             <thead>
               <tr>
-                <th>情報源</th>
-                <th>タスクID</th>
-                <th>タイトル</th>
-                <th>担当者</th>
-                <th>期限</th>
-                <th>受信日時</th>
-                <th>アーカイブ日</th>
-                <th>操作</th>
+                <th className="ui-sticky-head-2">情報源</th>
+                <th className="ui-sticky-head-2">タスクID</th>
+                <th className="ui-sticky-head-2">タイトル</th>
+                <th className="ui-sticky-head-2">担当者</th>
+                <th className="ui-sticky-head-2">期限</th>
+                <th className="ui-sticky-head-2">受信日時</th>
+                <th className="ui-sticky-head-2">アーカイブ日</th>
+                <th className="ui-sticky-head-2">操作</th>
               </tr>
             </thead>
             <tbody>

@@ -2,16 +2,30 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
+import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import { IconHome } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
-import { fetchParkingViolations, createReport, todayJST, VIOLATION_LABELS, formatReportDate } from '../lib/reports'
-import { formatDateTime } from '../lib/format'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
+import {
+  fetchParkingViolations,
+  deleteParkingViolation,
+  createReport,
+  todayJST,
+  VIOLATION_LABELS,
+  formatReportDate,
+} from '../lib/reports'
 import './Dashboard.css'
 
 // 同一ナンバー（地域+番号）の名寄せキー。どちらも未入力なら集計対象外にする
 function plateKey(v) {
   if (!v.plate_region && !v.plate_number) return null
   return `${v.plate_region || ''}|${v.plate_number || ''}`
+}
+
+// checked_at（タイムスタンプ）からJSTの日付だけを取り出す（残留塩素一覧の日付見出しと同じ考え方。
+// 2026-08-11。以前は時刻まで表示していたが、日付だけで十分＋時刻は目立たせたい項目の邪魔になるため外した）
+function jstDateOnly(iso) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
@@ -28,6 +42,10 @@ export default function ParkingViolations() {
   // 準備中（日報の取得/作成中）は null のまま、準備できたらモーダルを開く
   const [quickAddReportId, setQuickAddReportId] = useState(null)
   const [preparingQuickAdd, setPreparingQuickAdd] = useState(false)
+  // 明細クリックで開く詳細（写真・項目の閲覧/編集）モーダル。選んだレコードを保持する（2026-08-11）
+  const [selected, setSelected] = useState(null)
+  // ツールバー＋検索・並び順欄をAppHeaderの下に固定表示する（2026-08-11）
+  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -62,6 +80,25 @@ export default function ParkingViolations() {
   function handleCloseQuickAdd() {
     setQuickAddReportId(null)
     load()
+  }
+
+  // 明細クリックで開く詳細モーダルの保存・削除。フィールドの更新結果には report_date が
+  // 含まれない（更新APIは parking_violations テーブルの列だけを返すため）ので、
+  // 既存の行に上書きマージして日報一覧へのリンクなど他の情報を保つ
+  function handleDetailSaved(updated) {
+    setViolations((prev) => prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v)))
+    setSelected(null)
+  }
+
+  async function handleDetailDelete(id) {
+    setViolations((prev) => prev.filter((v) => v.id !== id))
+    setSelected(null)
+    try {
+      await deleteParkingViolation(id)
+    } catch (err) {
+      setError(err.message)
+      load()
+    }
   }
 
   // 同一ナンバーの累計回数
@@ -102,6 +139,8 @@ export default function ParkingViolations() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
+        {/* ツールバー＋検索・並び順欄はAppHeaderの下に固定表示する（2026-08-11） */}
+        <div className="ui-sticky-head" ref={stickyHeadRef}>
         <div className="reports-toolbar">
           <button
             type="button"
@@ -155,6 +194,7 @@ export default function ParkingViolations() {
             </button>
           </div>
         </div>
+        </div>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
@@ -173,42 +213,65 @@ export default function ParkingViolations() {
             {filtered.map((v) => {
               const key = plateKey(v)
               const count = key ? countByPlate.get(key) || 0 : 0
+              const vehicle = [v.maker, v.model].filter(Boolean).join(' ')
               return (
-                <li className="parking-list-row" key={v.id}>
-                  <div className="parking-list-main">
-                    <span className="parking-list-date">{formatDateTime(v.checked_at)}</span>
-                    <span className="parking-list-plate">
-                      {v.plate_region || v.plate_number
-                        ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim()
-                        : '（ナンバー未入力）'}
-                    </span>
-                    {count > 1 && <span className="parking-list-count">累計{count}回</span>}
+                <li key={v.id}>
+                  <div
+                    className={`parking-list-row${isOwner ? '' : ' is-clickable'}`}
+                    onClick={isOwner ? undefined : () => setSelected(v)}
+                    role={isOwner ? undefined : 'button'}
+                    tabIndex={isOwner ? undefined : 0}
+                    onKeyDown={
+                      isOwner
+                        ? undefined
+                        : (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setSelected(v)
+                            }
+                          }
+                    }
+                  >
+                    <div className="parking-list-main">
+                      {/* 残留塩素一覧の日付見出しと同じ「日付だけ・太字」の見せ方に揃える
+                          （2026-08-11。以前は時刻まで表示していた） */}
+                      <span className="parking-list-date">{formatReportDate(jstDateOnly(v.checked_at))}</span>
+                      <span className="parking-list-plate">
+                        {v.plate_region || v.plate_number
+                          ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim()
+                          : '（ナンバー未入力）'}
+                      </span>
+                      {count > 1 && <span className="parking-list-count">累計{count}回</span>}
+                    </div>
+                    {(vehicle || v.owner_company) && (
+                      <div className="parking-list-sub">
+                        {vehicle && <span className="parking-list-vehicle">{vehicle}</span>}
+                        {v.owner_company && <span className="parking-list-owner">{v.owner_company}</span>}
+                      </div>
+                    )}
+                    {v.violations.length > 0 && (
+                      <div className="parking-list-tags">
+                        {v.violations.map((t) => (
+                          <span key={t} className="parking-list-tag">
+                            {VIOLATION_LABELS[t] || t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {v.note && <p className="parking-list-note">{v.note}</p>}
                     {v.report_date && (
                       <button
                         type="button"
                         className="parking-list-link"
-                        onClick={() => navigate(`/reports/${v.report_date}`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/reports/${v.report_date}`)
+                        }}
                       >
                         {formatReportDate(v.report_date)}の日報を見る
                       </button>
                     )}
                   </div>
-                  {(v.maker || v.model || v.owner_company) && (
-                    <div className="parking-list-sub">
-                      {(v.maker || v.model) && <span>{[v.maker, v.model].filter(Boolean).join(' ')}</span>}
-                      {v.owner_company && <span>{v.owner_company}</span>}
-                    </div>
-                  )}
-                  {v.violations.length > 0 && (
-                    <div className="parking-list-tags">
-                      {v.violations.map((t) => (
-                        <span key={t} className="parking-list-tag">
-                          {VIOLATION_LABELS[t] || t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {v.note && <p className="parking-list-note">{v.note}</p>}
                 </li>
               )
             })}
@@ -232,6 +295,17 @@ export default function ParkingViolations() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 明細クリックで開く詳細（車両写真・項目の閲覧/編集。2026-08-11） */}
+      {selected && (
+        <ParkingViolationDetail
+          violation={selected}
+          readOnly={isOwner}
+          onClose={() => setSelected(null)}
+          onSaved={handleDetailSaved}
+          onDelete={handleDetailDelete}
+        />
       )}
     </div>
   )
