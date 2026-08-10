@@ -1,0 +1,170 @@
+/* 残留塩素等検査実施記録表（PDF用シート。2026-08-10）。A4縦1枚＝最大38行で、
+   現行アプリ（FileMaker）の帳票に寄せた固定レイアウト。
+   画面には出さず、PDF化のあいだだけ画面外（left:-10000px）に描画して html2canvas で撮る。
+   自主検査表のシート（InspectionSheet.css）と同じく、色は全てハードコードした hex、
+   寸法は mm 指定で組む。html2canvas は oklch などの新しい色関数を解釈できないため、
+   ここに Tailwind 的なユーティリティや最近の色関数を持ち込まないこと
+   （プロジェクトスキル print-and-pdf-download を参照）。 */
+
+.chl-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .chl-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  /* A4縦。撮った画像を pdf.addImage で 210×297mm に固定配置する */
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 10mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.chl-sheet * {
+  box-sizing: border-box;
+}
+
+/* ---- 見出し ---- */
+.chl-sheet-heading {
+  margin: 0 0 4mm;
+  text-align: center;
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: 0.5mm;
+}
+
+.chl-sheet-subhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 3mm;
+}
+
+.chl-sheet-terms {
+  font-size: 8.5pt;
+  line-height: 1.5;
+}
+
+.chl-sheet-terms p {
+  margin: 0;
+}
+
+.chl-sheet-meta {
+  text-align: right;
+  font-size: 10pt;
+  line-height: 1.6;
+}
+
+.chl-sheet-meta p {
+  margin: 0;
+}
+
+.chl-sheet-building strong {
+  font-size: 11pt;
+}
+
+/* ---- 本体の表 ----
+   紙の帳票は縦罫線を持たず、見出しの下線と1行おきの薄いグレーで読ませる作りのため、
+   その見た目をそのまま再現する */
+.chl-sheet-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+/* 合計190mm（A4幅210mm − 左右10mmずつの余白）。備考は紙の帳票と同じく
+   右端を広く取る（不備があった日の説明が読める幅を確保するため） */
+.chl-col-date { width: 40mm; }
+.chl-col-inspector { width: 20mm; }
+.chl-col-place { width: 26mm; }
+.chl-col-value { width: 22mm; }
+.chl-col-judge { width: 10mm; }
+.chl-col-note { width: 42mm; }
+
+.chl-sheet-table th {
+  height: 7mm;
+  padding: 0 1mm;
+  border-bottom: 0.4mm solid #000;
+  font-size: 9pt;
+  font-weight: 400;
+  text-align: center;
+  vertical-align: bottom;
+}
+
+.chl-sheet-table th.chl-th-date {
+  text-align: left;
+  padding-left: 3mm;
+}
+
+.chl-sheet-table th.chl-th-note {
+  text-align: left;
+}
+
+.chl-sheet-table td {
+  height: 6.2mm;
+  padding: 0 1mm;
+  font-size: 9pt;
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 1行おきの薄いグレー（紙の帳票と同じく、1行目は白・2行目から塗る） */
+.chl-sheet-table tbody tr:nth-child(even) td {
+  background: #f0f0f0;
+}
+
+.chl-td-date {
+  text-align: right;
+  padding-right: 2mm;
+  font-variant-numeric: tabular-nums;
+}
+
+.chl-td-inspector,
+.chl-td-place {
+  text-align: left;
+  padding-left: 2mm;
+}
+
+.chl-td-value {
+  text-align: right;
+  padding-right: 1mm;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「0.30 mg/L」の単位は紙と同じく小さく添える */
+.chl-unit {
+  font-size: 6.5pt;
+  margin-left: 0.5mm;
+}
+
+/* 基準（0.1mg/L）を下回った測定値は太字にして見落とさないようにする
+   （紙の帳票には無い表現だが、提出前の確認を助けるため付ける） */
+.chl-td-value.is-below {
+  font-weight: 700;
+}
+
+/* 備考は1行に収める（行の高さが固定のため折り返せない）。長い場合は末尾を
+   「…」にして、切れていることが分かるようにする */
+.chl-td-note {
+  text-align: left;
+  padding-left: 1mm;
+  font-size: 8pt;
+  text-overflow: ellipsis;
+}
+
+/* ---- ページ番号 ---- */
+.chl-sheet-foot {
+  padding-top: 3mm;
+  text-align: right;
+  font-size: 8pt;
+  color: #333;
+}

@@ -36,6 +36,10 @@ import {
   handleParkingUpdate,
   handleParkingDelete,
   handleParkingRecognize,
+  handleChlorineList,
+  handleChlorineCreate,
+  handleChlorineUpdate,
+  handleChlorineDelete,
 } from './lib/reports.js'
 
 // Cloudflare Worker 本体。
@@ -950,6 +954,13 @@ async function route(req, env) {
   }
   if (pathname === '/api/report/parking/recognize') {
     return req.method === 'POST' ? handleParkingRecognize(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/chlorine') {
+    if (req.method === 'GET') return handleChlorineList(req)
+    if (req.method === 'POST') return handleChlorineCreate(req)
+    if (req.method === 'PATCH') return handleChlorineUpdate(req)
+    if (req.method === 'DELETE') return handleChlorineDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

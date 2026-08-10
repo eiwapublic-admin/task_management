@@ -2453,3 +2453,193 @@
 }
 
 .icon-btn-close:hover { color: var(--text-strong); }
+
+/* ============================================================
+   残留塩素等検査（Phase 5。2026-08-10）。
+   現行アプリ（FileMaker）の「残留塩素濃度_TOP／検査一覧／帳票」に相当する画面。
+   一覧は測定日ごとにまとめ、行をタップすると入力モーダルが開く。
+   ============================================================ */
+
+/* 絞り込み（対象年・測定施設）と帳票の出力バー */
+.chlorine-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.chlorine-pdf-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.chlorine-pdf-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+  /* select・ボタンとベースラインを揃える（他の要素は下端揃えのため） */
+  padding-bottom: 9px;
+}
+
+.chlorine-pdf-bar .btn-plain { height: 40px; font-weight: 700; }
+
+/* 一覧（測定日ごとの見出し＋その日の測定行） */
+.chlorine-list { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.chlorine-day {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.chlorine-day-head {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-subtle);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 曜日・祝日の色分けは自主検査表・日報一覧と揃える（土曜=青、日曜・祝日=赤） */
+.chlorine-day-head.is-saturday { color: #1d4ed8; }
+.chlorine-day-head.is-holiday { color: #dc2626; }
+
+.chlorine-rows { list-style: none; margin: 0; padding: 0; }
+
+.chlorine-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.chlorine-row.is-clickable { cursor: pointer; }
+.chlorine-row.is-clickable:hover,
+.chlorine-row.is-clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.chlorine-row-building { font-size: 16px; font-weight: 700; color: var(--text-strong); min-width: 92px; }
+.chlorine-row-time { font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.chlorine-row-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: right;
+}
+
+/* 水道水質基準（0.1mg/L）を下回った測定値は赤で目立たせる */
+.chlorine-row-value.is-below { color: #c81021; }
+
+.chlorine-row-location, .chlorine-row-inspector { font-size: 14px; color: var(--text-base); }
+
+.chlorine-row-ng {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c81021;
+  border: 1px solid #c81021;
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.chlorine-legend { margin-top: var(--space-3); }
+
+/* --- 入力モーダル（自主検査表のモーダル .inspection-* を土台に使う） --- */
+.chlorine-building-field select { min-width: 200px; font-size: 16px; font-weight: 700; }
+
+/* datetime-local は iOS で幅が詰まりやすいので明示しておく */
+.chlorine-datetime { min-width: 210px; }
+
+.chlorine-warning {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #fdecec;
+  border: 1px solid #f0b4b4;
+  color: #c81021;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 色・濁り・臭気・味のOK/NG。もう一度押すと未選択に戻せる */
+.chlorine-judgements { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.chlorine-judgement-row { display: flex; align-items: center; gap: var(--space-3); }
+
+.chlorine-judgement-label {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-base);
+}
+
+.chlorine-judgement-buttons { display: flex; gap: var(--space-2); }
+
+.chlorine-judgement-btn {
+  min-width: 72px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chlorine-judgement-btn.is-ok.is-active { color: #fff; background: #33604d; border-color: #33604d; }
+.chlorine-judgement-btn.is-ng.is-active { color: #fff; background: #c81021; border-color: #c81021; }
+
+.chlorine-note-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-base);
+  resize: vertical;
+}
+
+/* --- 測定写真（検査薬の色変化） --- */
+.chlorine-photos { display: flex; flex-direction: column; gap: 6px; }
+.chlorine-photos-label { font-size: 13px; color: var(--text-muted); }
+
+/* 作業写真より小さめのタイルで十分（1回の測定で1〜2枚の想定） */
+.chlorine-photo-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+/* 拡大表示は持たないため（撮った色が分かれば足りる）、枠自体はボタンにしない */
+.chlorine-photo-thumb { cursor: default; }
+.chlorine-photo-thumb:hover { border-color: var(--border); }
+
+.chlorine-photo-pending { color: var(--color-primary); font-weight: 700; }
+
+.chlorine-photo-actions { display: flex; justify-content: flex-end; }
+
+.chlorine-photo-add { display: flex; flex-direction: column; gap: 6px; }
+.chlorine-photo-add .btn-plain { width: 100%; }
+
+@media (max-width: 640px) {
+  /* iOS のフォーカス時ズームを抑えるため、入力欄は16px以上を保つ */
+  .chlorine-note-field textarea,
+  .chlorine-datetime { font-size: 16px; }
+  .chlorine-row-building { min-width: 0; }
+  .chlorine-pdf-label { padding-bottom: 0; }
+}

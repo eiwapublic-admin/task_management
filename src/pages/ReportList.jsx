@@ -14,6 +14,7 @@ import {
   IconList,
   IconCalendar,
   IconSearch,
+  IconDroplet,
 } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
@@ -242,15 +243,18 @@ export default function ReportList() {
     }
   }
 
-  // 右端のアイコン3種（違反車両／添付画像／自主点検）。左から順に固定位置で並べ、
+  // 右端のアイコン4種（違反車両／残留塩素／添付画像／自主点検）。左から順に固定位置で並べ、
   // 該当しないものは場所だけ残して非表示にする（2026-08-05。2026-08-07に自主点検の
-  // 実施有無アイコンを追加し、位置固定に変更）。自主点検は当日以前で未実施のときだけ
-  // 黄色い丸で目立たせる。リスト型・カレンダー型で共通して使う。
+  // 実施有無アイコンを追加し、位置固定に変更。2026-08-10に残留塩素を追加）。自主点検は
+  // 当日以前で未実施のときだけ黄色い丸で目立たせる。リスト型・カレンダー型で共通して使う。
   function renderIcons(date, { report, isFuture }, size) {
     return (
       <div className="report-row-icons">
         <span className={`report-row-icon${report?.has_parking ? '' : ' is-hidden'}`} title="違反車両あり">
           <IconCar size={size} />
+        </span>
+        <span className={`report-row-icon${report?.has_chlorine ? '' : ' is-hidden'}`} title="残留塩素の測定あり">
+          <IconDroplet size={size} />
         </span>
         <span className={`report-row-icon${report?.has_photos ? '' : ' is-hidden'}`} title="添付画像あり">
           <IconClip size={size} />
@@ -619,6 +623,11 @@ export default function ReportList() {
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
               <IconCar size={18} />
               違反車両
+            </button>
+            {/* 残留塩素等検査（2026-08-10）。入力も帳票PDFの出力も専用画面で行う */}
+            <button type="button" className="btn-plain" onClick={() => navigate('/reports/chlorine')}>
+              <IconDroplet size={18} />
+              残留塩素
             </button>
             {!isOwner && (
               <button

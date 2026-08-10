@@ -135,6 +135,15 @@ export function IconCalendar(props) {
   )
 }
 
+// 残留塩素等検査（2026-08-10）
+export function IconDroplet(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3s6 6.4 6 10.5a6 6 0 0 1-12 0C6 9.4 12 3 12 3z" />
+    </Icon>
+  )
+}
+
 // 日報一覧の作業記録検索（2026-08-08）
 export function IconSearch(props) {
   return (
