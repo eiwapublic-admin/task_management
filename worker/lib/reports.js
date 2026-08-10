@@ -1383,8 +1383,9 @@ async function resolveReportIdForDate(supabase, date, auth) {
   throw new Error(err.message)
 }
 
-// GET /api/report/chlorine?year=YYYY&building=… — 測定記録の一覧（測定日時の新しい順）。
-// year / building は任意。省略時は全期間・全施設（上限1000件）を返す。
+// GET /api/report/chlorine?year=YYYY&building=…&report_id=… — 測定記録の一覧（測定日時の新しい順）。
+// year / building / report_id はいずれも任意。省略時は全期間・全施設（上限1000件）を返す。
+// report_id は日報詳細の「残留塩素」ボタン（2026-08-10〜）が、その日の記録有無を調べるのに使う
 export async function handleChlorineList(req) {
   const { error } = await requireAuth(req)
   if (error) return error
@@ -1392,6 +1393,7 @@ export async function handleChlorineList(req) {
     const params = new URL(req.url).searchParams
     const year = params.get('year') || ''
     const building = params.get('building') || ''
+    const reportId = params.get('report_id') || ''
 
     const supabase = getAdminClient()
     let query = supabase.from('chlorine_tests').select(`${CHLORINE_COLUMNS}, daily_reports(report_date)`)
@@ -1405,6 +1407,7 @@ export async function handleChlorineList(req) {
       if (!VALID_CHLORINE_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
       query = query.eq('building', building)
     }
+    if (reportId) query = query.eq('report_id', reportId)
 
     const { data, error: err } = await query.order('tested_at', { ascending: false }).limit(1000)
     if (err) {

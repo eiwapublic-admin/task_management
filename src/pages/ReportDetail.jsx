@@ -3,7 +3,8 @@ import ReportPhotos from '../components/ReportPhotos'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
-import { IconClipboard } from '../components/Icons'
+import ChlorineForm from '../components/ChlorineForm'
+import { IconClipboard, IconDroplet } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -20,6 +21,8 @@ import {
   fetchClosedDays,
   markClosedDay,
   deleteInspection,
+  fetchChlorineTests,
+  deleteChlorineTest,
   INSPECTION_BUILDINGS,
   todayJST,
   formatReportDate,
@@ -61,6 +64,15 @@ export default function ReportDetail({ date, onClose }) {
   // （同じ window に付けた別リスナは stopPropagation では止まらないため、
   //   TaskDetail の previewOpenRef と同じ方式で親側を早期returnさせる）
   const inspectionOpenRef = useRef(false)
+
+  // 残留塩素等検査入力モーダル（この日の分を直接記録するショートカット。2026-08-10）。
+  // 自主点検と同じ考え方だが、chlorine_tests は建物ごとに複数レコードを持てるため、
+  // ここでは「この日の最新の1件」の有無だけを見て登録/修正ボタンの表示を切り替える
+  // （複数施設を同日に記録する場合、2件目以降の編集は残留塩素等検査画面から行う）
+  const [chlorineOpen, setChlorineOpen] = useState(false)
+  const [chlorineStatusLoading, setChlorineStatusLoading] = useState(true)
+  const [dateChlorine, setDateChlorine] = useState(null)
+  const chlorineOpenRef = useRef(false)
 
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
@@ -106,6 +118,7 @@ export default function ReportDetail({ date, onClose }) {
     function onKey(e) {
       if (e.key !== 'Escape') return
       if (inspectionOpenRef.current) return // 自主点検モーダル側に任せる
+      if (chlorineOpenRef.current) return // 残留塩素モーダル側に任せる
       closeRef.current?.()
     }
     window.addEventListener('keydown', onKey)
@@ -220,6 +233,58 @@ export default function ReportDetail({ date, onClose }) {
     loadInspectionStatus()
   }
 
+  // 残留塩素の記録有無。report が無い（この日の日報がまだ無い）場合は、そもそも
+  // 記録も存在し得ない（記録があれば必ず日報が自動作成されているため）ので取得しない
+  const loadChlorineStatus = useCallback(async () => {
+    if (!report) {
+      setDateChlorine(null)
+      setChlorineStatusLoading(false)
+      return
+    }
+    setChlorineStatusLoading(true)
+    try {
+      const list = await fetchChlorineTests({ reportId: report.id })
+      setDateChlorine(list[0] || null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setChlorineStatusLoading(false)
+    }
+  }, [report])
+
+  useEffect(() => {
+    loadChlorineStatus()
+  }, [loadChlorineStatus])
+
+  function openChlorine() {
+    chlorineOpenRef.current = true
+    setChlorineOpen(true)
+  }
+
+  function closeChlorine() {
+    chlorineOpenRef.current = false
+    setChlorineOpen(false)
+  }
+
+  // 保存結果をそのままボタンの状態に反映する（一覧と違い、この画面では常に「この日の
+  // 最新1件」しか扱わないため）。まだ日報が無かった場合はサーバー側で自動作成されている
+  // ため、画面にもその日報を反映させる（作業者・時間欄が空のまま出てくるようにする）
+  function handleChlorineSaved(saved) {
+    closeChlorine()
+    setDateChlorine(saved)
+    if (!report) load()
+  }
+
+  async function handleChlorineDelete(id) {
+    try {
+      await deleteChlorineTest(id)
+    } catch (err) {
+      setError(err.message)
+    }
+    closeChlorine()
+    setDateChlorine(null)
+  }
+
   async function patchHeader(patch) {
     if (!report || readOnly) return
     setReport((prev) => ({ ...prev, ...patch }))
@@ -309,6 +374,18 @@ export default function ReportDetail({ date, onClose }) {
                 >
                   <IconClipboard size={18} />
                   {inspectionStatusLoading ? '読み込み中…' : dateInspection ? '自主点検修正' : '自主点検登録'}
+                </button>
+              )}
+              {!readOnly && (
+                // 自主点検ボタンと同じ考え方（未記載=青地で登録を促す／記載済み=控えめに修正）
+                <button
+                  type="button"
+                  className={dateChlorine ? 'btn-plain' : 'btn-primary'}
+                  onClick={openChlorine}
+                  disabled={chlorineStatusLoading}
+                >
+                  <IconDroplet size={18} />
+                  {chlorineStatusLoading ? '読み込み中…' : dateChlorine ? '残留塩素修正' : '残留塩素登録'}
                 </button>
               )}
               {!readOnly && report && (
@@ -481,6 +558,18 @@ export default function ReportDetail({ date, onClose }) {
           onClose={closeInspection}
           onSaved={handleInspectionSaved}
           onDelete={handleInspectionDelete}
+        />
+      )}
+
+      {/* 残留塩素モーダルも同じ理由で外に出す */}
+      {chlorineOpen && (
+        <ChlorineForm
+          existing={dateChlorine}
+          defaultDate={date}
+          defaultInspector={user?.display_name || ''}
+          onClose={closeChlorine}
+          onSaved={handleChlorineSaved}
+          onDelete={handleChlorineDelete}
         />
       )}
     </>

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import ReportParkingViolations from '../components/ReportParkingViolations'
 import { IconHome } from '../components/Icons'
-import { fetchParkingViolations, VIOLATION_LABELS, formatReportDate } from '../lib/reports'
+import { getCurrentUser } from '../lib/auth'
+import { fetchParkingViolations, createReport, todayJST, VIOLATION_LABELS, formatReportDate } from '../lib/reports'
 import { formatDateTime } from '../lib/format'
 import './Dashboard.css'
 
@@ -15,18 +17,52 @@ function plateKey(v) {
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
   const navigate = useNavigate()
+  const user = getCurrentUser()
+  const isOwner = user?.role === 'owner'
   const [violations, setViolations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('date') // 'date'（日付順） | 'rank'（累計回数順）
+  // ヘッダーの「＋」から直接登録するとき用。本日の日報の id を持つ（2026-08-10）。
+  // 準備中（日報の取得/作成中）は null のまま、準備できたらモーダルを開く
+  const [quickAddReportId, setQuickAddReportId] = useState(null)
+  const [preparingQuickAdd, setPreparingQuickAdd] = useState(false)
 
-  useEffect(() => {
-    fetchParkingViolations()
+  const load = useCallback(() => {
+    setLoading(true)
+    return fetchParkingViolations()
       .then(setViolations)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // 「＋」ボタン。この一覧は日を跨るため、新規登録は常に本日分として扱う
+  // （現行アプリの現場での「今すぐ記録する」用途に合わせる。他日の追加は日報詳細から）。
+  // 本日の日報が無ければここで作成する（既にあれば作成済みのものがそのまま返る）
+  async function handleOpenQuickAdd() {
+    if (preparingQuickAdd || isOwner) return
+    setPreparingQuickAdd(true)
+    setError('')
+    try {
+      const report = await createReport(todayJST())
+      setQuickAddReportId(report.id)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setPreparingQuickAdd(false)
+    }
+  }
+
+  // モーダルを閉じたら一覧を読み直す（今の登録分を反映するため）
+  function handleCloseQuickAdd() {
+    setQuickAddReportId(null)
+    load()
+  }
 
   // 同一ナンバーの累計回数
   const countByPlate = useMemo(() => {
@@ -77,6 +113,18 @@ export default function ParkingViolations() {
             <IconHome size={32} />
           </button>
           <h2 className="page-title">違反車両一覧</h2>
+          {!isOwner && (
+            <button
+              type="button"
+              className="icon-btn-add"
+              onClick={handleOpenQuickAdd}
+              disabled={preparingQuickAdd}
+              aria-label="違反車両を記録（本日分）"
+              title="違反車両を記録（本日分）"
+            >
+              ＋
+            </button>
+          )}
         </div>
 
         <div className="parking-list-controls">
@@ -167,6 +215,24 @@ export default function ParkingViolations() {
           </ul>
         )}
       </div>
+
+      {/* ヘッダーの「＋」からの新規登録（2026-08-10）。この一覧は日を跨るため常に本日分として扱い、
+          日報詳細と同じ入力欄（写真撮影・ナンバー等・AI読み取り）をそのままモーダルで開く */}
+      {quickAddReportId && (
+        <div className="inspection-overlay" role="dialog" aria-modal="true" onClick={handleCloseQuickAdd}>
+          <div className="inspection-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="inspection-modal-head">
+              <h3>違反車両を記録（本日 {formatReportDate(todayJST())}）</h3>
+              <button type="button" className="icon-btn-close" onClick={handleCloseQuickAdd} aria-label="閉じる">
+                ×
+              </button>
+            </div>
+            <div className="inspection-modal-body">
+              <ReportParkingViolations reportId={quickAddReportId} readOnly={false} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -178,11 +178,14 @@ export default function AppHeader() {
             <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
               {inReports || isOwner ? (
                 <>
-                  {/* 自主検査表・定型文の設定は日報一覧画面の見える位置に移動済み（2026-08-05）。
+                  {/* 自主検査表は日報一覧画面の見える位置に移動済み（2026-08-05）。
                       ここには日報セクションへ戻る導線だけを残す */}
                   <button onClick={() => goTo('/reports')}>日報一覧</button>
                   {/* 従量課金事項は日報表示中でも確認できるようにする（2026-08-05）。オーナーは対象外 */}
                   {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
+                  {/* 定型文の設定（旧・日報一覧ツールバーの歯車ボタン）をここへ移動
+                      （2026-08-10。iPhone幅でツールバーのボタンが1行に収まるようにするため） */}
+                  {!isOwner && <button onClick={() => goTo('/reports/templates')}>作業定型文の設定</button>}
                 </>
               ) : (
                 <>
