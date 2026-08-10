@@ -9,6 +9,7 @@ import {
   uploadPhoto,
   deletePhoto,
   fetchPhotoObjectUrl,
+  sanitizePlateNumber,
   VIOLATION_LABELS,
 } from '../lib/reports'
 import { prepareImage, formatMB } from '../lib/imageResize'
@@ -25,11 +26,6 @@ const MAX_PHOTOS = 2
 
 function uniqueSorted(list) {
   return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
-}
-
-// ナンバーは数字4桁のみを保持する（「-」等の区切り文字は除去。2026-08-05）
-function sanitizePlateNumber(value) {
-  return (value || '').replace(/\D/g, '').slice(0, 4)
 }
 
 // 違反車両の登録。写真セクションと同じ「空枠にドラッグ＆ドロップ/撮影」の流れで、
@@ -556,8 +552,9 @@ function ParkingCard({
 }
 
 // 写真の拡大表示。作業写真のプレビューと同じ構成（縮小後サイズ・撮影日時・削除・
-// あわせてナンバー・車種の読み取りボタンをここに置く）
-function ParkingPhotoPreview({ photo, violation, readOnly, onClose, onDelete, onRecognize }) {
+// あわせてナンバー・車種の読み取りボタンをここに置く）。
+// 違反車両一覧の詳細モーダル（ParkingViolationDetail.jsx）でも同じ拡大表示を使うため export する
+export function ParkingPhotoPreview({ photo, violation, readOnly, onClose, onDelete, onRecognize }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState('')
   const [recognizing, setRecognizing] = useState(false)

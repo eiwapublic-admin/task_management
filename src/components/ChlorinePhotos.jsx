@@ -188,19 +188,21 @@ export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending
       <ul className="photo-grid chlorine-photo-grid">
         {tiles.map((t) => (
           <li className="photo-item" key={t.key}>
-            <div className="photo-thumb chlorine-photo-thumb">
-              {t.url ? <img src={t.url} alt="測定写真" /> : <span className="photo-loading">読み込み中…</span>}
+            <div className="chlorine-photo-row">
+              <div className="photo-thumb chlorine-photo-thumb">
+                {t.url ? <img src={t.url} alt="測定写真" /> : <span className="photo-loading">読み込み中…</span>}
+              </div>
+              {!readOnly && (
+                <div className="chlorine-photo-actions">
+                  <ConfirmDeleteButton onConfirm={t.onDelete} label="この写真を削除" size={22} />
+                </div>
+              )}
             </div>
             <div className="photo-meta">
               {t.size > 0 && <span>{formatMB(t.size)}</span>}
               {t.takenAt && <span>{formatDateTime(t.takenAt)}</span>}
               {t.isPending && <span className="chlorine-photo-pending">保存時に登録</span>}
             </div>
-            {!readOnly && (
-              <div className="chlorine-photo-actions">
-                <ConfirmDeleteButton onConfirm={t.onDelete} label="この写真を削除" size={22} />
-              </div>
-            )}
           </li>
         ))}
         {!readOnly && (

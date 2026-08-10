@@ -538,8 +538,11 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  overflow: hidden;
   font-size: var(--fs-sm);
+  /* 以前は overflow: hidden で角丸に沿って切り抜いていたが、それだと table 自身が
+     position: sticky の包含ブロックになってしまい、列見出し（.ui-sticky-head-2）を
+     固定表示できなくなる（2026-08-11。アーカイブ画面のヘッダー固定化）。
+     角丸の見た目より固定表示を優先し外した */
 }
 
 .logs-table th {
@@ -1103,17 +1106,19 @@
   gap: var(--space-2);
 }
 
-/* 曜日の行に日報詳細と同じイエローの背景枠を付ける（2026-08-10） */
+/* 曜日の行に日報詳細と同じイエローの背景枠を付ける（2026-08-10）。
+   当初はアプリタイトルと同じ大きさ（fs-2xl）にしていたが、日付マス目に対して
+   目立ちすぎるとの指摘（2026-08-11）を受け、文字を小さく・枠の高さも縮めた */
 .report-calendar-head {
   background: var(--reports-header-bg);
   border-radius: var(--radius-lg);
-  padding: 6px 0;
+  padding: 3px 0;
 }
 
 .report-calendar-head-cell {
-  padding: 4px 0;
+  padding: 2px 0;
   text-align: center;
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--reports-header-ink);
 }
@@ -1780,6 +1785,8 @@
 
 .parking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
+/* 明細の表示フォーマットは残留塩素一覧（.chlorine-row）に合わせる（2026-08-11）。
+   日付・車種・テナント名を太字で目立たせ、クリックで詳細（写真・項目の編集）を開ける */
 .parking-list-row {
   /* .parking-card と同じく、1件ごとの区切りが分かるようはっきり濃いグレーにする（2026-08-10） */
   background: var(--bg-muted);
@@ -1788,9 +1795,18 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.parking-list-row.is-clickable { cursor: pointer; }
+.parking-list-row.is-clickable:hover,
+.parking-list-row.is-clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .parking-list-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 
-.parking-list-date { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* 日付・ナンバーは残留塩素一覧の測定日見出し・building 表示と同じ太字・大きめサイズにする。
+   時刻は表示しない（2026-08-11。以前は checked_at をそのまま formatDateTime していた） */
+.parking-list-date { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
 .parking-list-plate { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
 
 .parking-list-count {
@@ -1803,7 +1819,9 @@
 }
 
 .parking-list-link {
-  margin-left: auto;
+  display: block;
+  margin: 6px 0 0 auto;
+  width: fit-content;
   font-size: var(--fs-xs);
   color: var(--color-primary);
   background: transparent;
@@ -1813,7 +1831,10 @@
   padding: 0;
 }
 
-.parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-base); margin-top: 4px; }
+.parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-base); margin-top: 4px; }
+
+/* 車種・テナント名も太字で目立たせる（2026-08-11） */
+.parking-list-vehicle, .parking-list-owner { font-weight: 700; color: var(--text-strong); }
 
 .parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
@@ -2235,6 +2256,17 @@
   resize: vertical;
 }
 
+/* 色・濁り・臭気・味 と 備考。PC幅では備考を右側の余白に並べ、
+   モバイル幅は従来どおり縦に積む（2026-08-11） */
+.chlorine-judgements-row { display: flex; flex-direction: column; gap: var(--space-3); }
+
+@media (min-width: 641px) {
+  .chlorine-judgements-row { flex-direction: row; align-items: stretch; gap: var(--space-4); }
+  .chlorine-judgements-row .chlorine-judgements { flex: 0 0 auto; }
+  .chlorine-judgements-row .chlorine-note-field { flex: 1; min-width: 0; }
+  .chlorine-judgements-row .chlorine-note-field textarea { height: 100%; min-height: 100px; }
+}
+
 /* --- 測定写真（検査薬の色変化） --- */
 .chlorine-photos { display: flex; flex-direction: column; gap: 6px; }
 .chlorine-photos-label { font-size: var(--fs-sm); color: var(--text-muted); }
@@ -2248,7 +2280,12 @@
 
 .chlorine-photo-pending { color: var(--color-primary); font-weight: 700; }
 
-.chlorine-photo-actions { display: flex; justify-content: flex-end; }
+/* 写真とゴミ箱を横並びにする（2026-08-11。以前は写真の下に置いていたが、
+   写真の右側に移してほしいとの依頼） */
+.chlorine-photo-row { display: flex; align-items: center; gap: var(--space-2); }
+.chlorine-photo-row .chlorine-photo-thumb { flex: 1; min-width: 0; }
+
+.chlorine-photo-actions { display: flex; flex-shrink: 0; }
 
 .chlorine-photo-add { display: flex; flex-direction: column; gap: 6px; }
 .chlorine-photo-add .btn-plain { width: 100%; }

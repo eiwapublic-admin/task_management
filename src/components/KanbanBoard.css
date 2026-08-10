@@ -166,6 +166,9 @@
   font-size: var(--fs-lg);
   padding: var(--space-1) var(--space-1) var(--space-2);
   border-bottom: 2px solid var(--column-accent, var(--border-strong));
+  /* 固定表示（.ui-sticky-head-2）で列の中身が下を通り過ぎるため、列自身の背景色を
+     そのまま引き継いで隠す（透明のままだとカードが見出しの下敷きに透けて見える） */
+  background: inherit;
 }
 
 .kanban-column-title {

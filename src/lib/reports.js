@@ -368,6 +368,12 @@ export const VIOLATION_LABELS = {
   other: 'その他',
 }
 
+// ナンバーは数字4桁のみを保持する（「-」等の区切り文字は除去。2026-08-05）。
+// ReportParkingViolations.jsx・ParkingViolationDetail.jsx の両方で使う入力規則
+export function sanitizePlateNumber(value) {
+  return (value || '').replace(/\D/g, '').slice(0, 4)
+}
+
 // reportId を指定すればその日だけ、省略すれば全期間（違反車両一覧画面用）
 export async function fetchParkingViolations({ reportId } = {}) {
   const qs = reportId ? `?report_id=${encodeURIComponent(reportId)}` : ''

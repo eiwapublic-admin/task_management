@@ -254,36 +254,40 @@ export default function ChlorineForm({
             </p>
           )}
 
-          <div className="chlorine-judgements">
-            {CHLORINE_JUDGEMENT_ITEMS.map((item) => (
-              <div className="chlorine-judgement-row" key={item.key}>
-                <span className="chlorine-judgement-label">{item.label}</span>
-                <div className="chlorine-judgement-buttons" role="group" aria-label={item.label}>
-                  <button
-                    type="button"
-                    className={`chlorine-judgement-btn is-ok${judgements[item.key] === true ? ' is-active' : ''}`}
-                    aria-pressed={judgements[item.key] === true}
-                    onClick={() => setJudgement(item.key, true)}
-                  >
-                    OK
-                  </button>
-                  <button
-                    type="button"
-                    className={`chlorine-judgement-btn is-ng${judgements[item.key] === false ? ' is-active' : ''}`}
-                    aria-pressed={judgements[item.key] === false}
-                    onClick={() => setJudgement(item.key, false)}
-                  >
-                    NG
-                  </button>
+          {/* PC幅では備考欄を色・濁り・臭気・味の右側の余白に並べる（2026-08-11）。
+              モバイル幅は従来どおり縦に積む（.chlorine-judgements-row のメディアクエリ参照） */}
+          <div className="chlorine-judgements-row">
+            <div className="chlorine-judgements">
+              {CHLORINE_JUDGEMENT_ITEMS.map((item) => (
+                <div className="chlorine-judgement-row" key={item.key}>
+                  <span className="chlorine-judgement-label">{item.label}</span>
+                  <div className="chlorine-judgement-buttons" role="group" aria-label={item.label}>
+                    <button
+                      type="button"
+                      className={`chlorine-judgement-btn is-ok${judgements[item.key] === true ? ' is-active' : ''}`}
+                      aria-pressed={judgements[item.key] === true}
+                      onClick={() => setJudgement(item.key, true)}
+                    >
+                      OK
+                    </button>
+                    <button
+                      type="button"
+                      className={`chlorine-judgement-btn is-ng${judgements[item.key] === false ? ' is-active' : ''}`}
+                      aria-pressed={judgements[item.key] === false}
+                      onClick={() => setJudgement(item.key, false)}
+                    >
+                      NG
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <label className="report-field chlorine-note-field">
-            <span>備考</span>
-            <textarea value={note} rows={3} onChange={(e) => setNote(e.target.value)} placeholder="備考" />
-          </label>
+            <label className="report-field chlorine-note-field">
+              <span>備考</span>
+              <textarea value={note} rows={3} onChange={(e) => setNote(e.target.value)} placeholder="備考" />
+            </label>
+          </div>
         </div>
 
         <div className="ui-modal-foot">

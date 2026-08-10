@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
 import {
   IconDownload,
   IconCar,
@@ -114,6 +115,10 @@ export default function ReportList() {
   const [isWideScreen, setIsWideScreen] = useState(
     () => typeof window === 'undefined' || window.matchMedia(WIDE_SCREEN_QUERY).matches,
   )
+  // ツールバー（＋開いていれば検索欄）をAppHeaderの下に固定表示するための2段目
+  // （2026-08-11）。カレンダー型の曜日行はさらにその下の3段目として重ねる
+  // （.report-calendar-head の .ui-sticky-head-2。renderCalendar 内）
+  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   useEffect(() => {
     if (typeof window !== 'undefined') sessionStorage.setItem(VIEW_STORAGE_KEY, view)
@@ -399,7 +404,8 @@ export default function ReportList() {
   function renderCalendar() {
     return (
       <div className="report-calendar">
-        <div className="report-calendar-head">
+        {/* 縦スクロールしてもツールバーの下に重ねて固定表示する（2026-08-11） */}
+        <div className="report-calendar-head ui-sticky-head-2">
           {WEEKDAY_HEADERS.map((label, i) => (
             <div
               key={label}
@@ -559,6 +565,8 @@ export default function ReportList() {
       {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
       <div className={`ui-container reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ' is-narrow'}`}>
+        {/* ツールバー（＋検索欄）はAppHeaderの下に固定表示する（2026-08-11） */}
+        <div className="ui-sticky-head" ref={stickyHeadRef}>
         <div className="ui-toolbar reports-toolbar">
           <h2 className="ui-page-title">日報</h2>
           <div className="inspection-month">
@@ -684,6 +692,7 @@ export default function ReportList() {
             )}
           </div>
         )}
+        </div>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

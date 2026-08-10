@@ -6,6 +6,7 @@ import { reloadApp } from '../pwa/reloadApp'
 import { formatBuildTime } from '../lib/version'
 import { runFetch } from '../lib/api'
 import { isPushSupported, getPushStatus, enablePush, disablePush } from '../lib/push'
+import useStickyHeightVar from '../lib/useStickyHeightVar'
 
 // 全画面共通のヘッダー。ロゴ・タイトル・ログインユーザー名・ハンバーガーメニューを持つ。
 // 各画面はハンバーガーメニューから自由に行き来できるため、画面ごとの「×で閉じる」ボタンは不要。
@@ -19,6 +20,9 @@ export default function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
   const user = getCurrentUser()
+  // 各画面で2段目・3段目のヘッダーを重ねてスタック固定できるよう、実際の高さを
+  // CSS変数 --app-header-h として反映する（詳しくは useStickyHeightVar.js）
+  const headerRef = useStickyHeightVar('--app-header-h')
 
   useEffect(() => {
     if (!isPushSupported()) {
@@ -100,7 +104,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <header className="dashboard-header">
+      <header className="dashboard-header" ref={headerRef}>
         <div className="dashboard-header-left">
           <button
             type="button"
