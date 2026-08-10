@@ -36,8 +36,7 @@ export default function Chlorine() {
   const readOnly = user?.role === 'owner'
 
   const [year, setYear] = useState(currentYearJST())
-  // 一覧の絞り込み（''＝全施設）。帳票の出力対象はこれとは別に選ぶ
-  const [filterBuilding, setFilterBuilding] = useState('')
+  // 帳票の出力対象施設（一覧自体は施設で絞り込まない。2026-08-10。全施設まとめて見たいとの要望）
   const [pdfBuilding, setPdfBuilding] = useState(CHLORINE_BUILDINGS[0])
   const [tests, setTests] = useState([])
   const [holidays, setHolidays] = useState({})
@@ -75,11 +74,11 @@ export default function Chlorine() {
     return Array.from({ length: YEAR_CHOICES }, (_, i) => current - i)
   }, [])
 
-  // 測定日ごとにまとめる（現行アプリの一覧と同じ「日付見出し＋その日の測定行」の並び）
+  // 測定日ごとにまとめる（現行アプリの一覧と同じ「日付見出し＋その日の測定行」の並び）。
+  // 施設での絞り込みは行わない（2026-08-10。両施設まとめて見たいとの要望）
   const groups = useMemo(() => {
-    const filtered = filterBuilding ? tests.filter((t) => t.building === filterBuilding) : tests
     const map = new Map()
-    for (const t of filtered) {
+    for (const t of tests) {
       // 測定日はJSTの日付で見る（tested_at はタイムゾーン付きで持っている）
       const date = new Date(t.tested_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
       if (!map.has(date)) map.set(date, [])
@@ -91,7 +90,7 @@ export default function Chlorine() {
         date,
         rows: rows.sort((a, b) => new Date(a.tested_at) - new Date(b.tested_at)),
       }))
-  }, [tests, filterBuilding])
+  }, [tests])
 
   function handleSaved(saved) {
     setTests((prev) => [saved, ...prev.filter((t) => t.id !== saved.id)])
@@ -145,9 +144,11 @@ export default function Chlorine() {
           </div>
         </div>
 
-        {/* 一覧の絞り込み（年・施設）。年は帳票の出力対象年も兼ねる */}
+        {/* 年（一覧の絞り込み・帳票の対象年を兼ねる）・帳票の出力対象施設・PDF出力を1行にまとめる。
+            iPhone幅でも折り返さず収まるよう、施設フィルタは置かず出力ボタンもアイコンのみにした
+            （2026-08-10。「帳票の出力」の見出しラベルも省略） */}
         <div className="chlorine-controls">
-          <label className="report-field">
+          <label className="report-field chlorine-year-field">
             <span>対象年</span>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
               {years.map((y) => (
@@ -157,24 +158,7 @@ export default function Chlorine() {
               ))}
             </select>
           </label>
-          <label className="report-field">
-            <span>測定施設（一覧）</span>
-            <select value={filterBuilding} onChange={(e) => setFilterBuilding(e.target.value)}>
-              <option value="">すべて</option>
-              {CHLORINE_BUILDINGS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {/* 帳票の出力（現行アプリの「帳票の出力（年・測定施設）」に相当）。
-            年は上の「対象年」をそのまま使い、施設だけここで選ぶ */}
-        <div className="chlorine-pdf-bar">
-          <span className="chlorine-pdf-label">帳票の出力</span>
-          <label className="report-field">
+          <label className="report-field chlorine-building-filter-field">
             <span>測定施設</span>
             <select value={pdfBuilding} onChange={(e) => setPdfBuilding(e.target.value)}>
               {CHLORINE_BUILDINGS.map((b) => (
@@ -186,13 +170,17 @@ export default function Chlorine() {
           </label>
           <button
             type="button"
-            className="btn-plain"
+            className="icon-btn-download chlorine-pdf-btn"
             onClick={pdf.download}
             disabled={pdf.busy || loading}
-            title={`${year}年の${pdfBuilding}分を「残留塩素等検査実施記録表」としてPDFに出力する`}
+            aria-label="残留塩素等検査一覧表をPDF出力"
+            title={
+              pdf.busy
+                ? '作成中…'
+                : `${year}年の${pdfBuilding}分を「残留塩素等検査実施記録表」としてPDFに出力する`
+            }
           >
-            <IconDownload size={18} />
-            {pdf.busy ? '作成中…' : '残留塩素等検査一覧表出力'}
+            <IconDownload size={20} />
           </button>
         </div>
 
@@ -278,7 +266,7 @@ export default function Chlorine() {
         <ChlorineForm
           key={editing === 'new' ? 'new' : editing.id}
           existing={editing === 'new' ? null : editing}
-          defaultBuilding={filterBuilding || CHLORINE_BUILDINGS[0]}
+          defaultBuilding={tests[0]?.building || CHLORINE_BUILDINGS[0]}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}

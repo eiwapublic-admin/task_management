@@ -5,8 +5,10 @@ import {
   CHLORINE_BUILDINGS,
   CHLORINE_JUDGEMENT_ITEMS,
   CHLORINE_STANDARD_MIN,
+  CHLORINE_CONCENTRATION_OPTIONS,
   createChlorineTest,
   updateChlorineTest,
+  fetchChlorineTests,
   uploadPhoto,
   toDateTimeLocal,
 } from '../lib/reports'
@@ -17,11 +19,36 @@ import {
 //
 // 新規登録では、保存を押して初めて検査レコードを作る（写真も同時にアップロードする）。
 // 途中でキャンセルしてもレコード・写真・日報のどれも作られない。
-export default function ChlorineForm({ existing, defaultBuilding, defaultInspector, onClose, onSaved, onDelete }) {
+//
+// defaultDate: 日報詳細の「残留塩素」ボタン（2026-08-10〜）から開く場合、測定日時の既定値を
+// 「今」ではなく表示中の日付にするために渡す（'YYYY-MM-DD'）。過去日の日報を開いて記録した
+// つもりが、今日の日付で保存されてしまう（＝別の日の日報に付いてしまう）のを防ぐため
+export default function ChlorineForm({
+  existing,
+  defaultBuilding,
+  defaultInspector,
+  defaultDate,
+  onClose,
+  onSaved,
+  onDelete,
+}) {
   const [building, setBuilding] = useState(existing?.building || defaultBuilding || CHLORINE_BUILDINGS[0])
   const [location, setLocation] = useState(existing?.location || '')
+  // 新規登録時、測定場所は施設ごとの最後の入力値をデフォルト表示する（2026-08-10）。
+  // ユーザーが一度でも手で書き換えたら、以後は施設を切り替えても上書きしない
+  const [locationTouched, setLocationTouched] = useState(Boolean(existing))
   const [inspector, setInspector] = useState(existing?.inspector || defaultInspector || '')
-  const [testedAt, setTestedAt] = useState(toDateTimeLocal(existing?.tested_at))
+  const [testedAt, setTestedAt] = useState(() => {
+    if (existing) return toDateTimeLocal(existing.tested_at)
+    if (defaultDate) {
+      // 日付だけ確実に指定日にし、時刻は現在時刻を組み合わせる
+      const now = new Date()
+      const hh = String(now.getHours()).padStart(2, '0')
+      const mm = String(now.getMinutes()).padStart(2, '0')
+      return `${defaultDate}T${hh}:${mm}`
+    }
+    return toDateTimeLocal()
+  })
   const [concentration, setConcentration] = useState(
     existing?.concentration === null || existing?.concentration === undefined ? '' : String(existing.concentration),
   )
@@ -44,6 +71,23 @@ export default function ChlorineForm({ existing, defaultBuilding, defaultInspect
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // 新規登録時のみ、施設を切り替えるたびその施設で最後に記録した測定場所を取得して
+  // 既定値に反映する（2026-08-10）。既存レコードの編集時・ユーザーが手で書き換えた後は行わない
+  useEffect(() => {
+    if (existing || locationTouched) return
+    let cancelled = false
+    fetchChlorineTests({ building })
+      .then((tests) => {
+        if (cancelled) return
+        const last = tests[0]?.location
+        if (last) setLocation(last)
+      })
+      .catch(() => {}) // 取得できなくても入力自体は続けられるようにする
+    return () => {
+      cancelled = true
+    }
+  }, [building, existing, locationTouched])
 
   // 水道水質基準（遊離残留塩素 0.1mg/L 以上）を下回っていたら入力中に気付けるようにする
   const numericConcentration = concentration === '' ? null : Number(concentration)
@@ -107,16 +151,22 @@ export default function ChlorineForm({ existing, defaultBuilding, defaultInspect
             </p>
           )}
 
-          <label className="report-field chlorine-building-field">
+          <div className="chlorine-building-field">
             <span>測定施設</span>
-            <select value={building} onChange={(e) => setBuilding(e.target.value)}>
+            <div className="chlorine-building-toggle" role="group" aria-label="測定施設">
               {CHLORINE_BUILDINGS.map((b) => (
-                <option key={b} value={b}>
+                <button
+                  key={b}
+                  type="button"
+                  className={`chlorine-building-btn${building === b ? ' is-active' : ''}`}
+                  aria-pressed={building === b}
+                  onClick={() => setBuilding(b)}
+                >
                   {b}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
 
           <div className="report-fields">
             <label className="report-field">
@@ -124,7 +174,10 @@ export default function ChlorineForm({ existing, defaultBuilding, defaultInspect
               <input
                 type="text"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  setLocationTouched(true)
+                  setLocation(e.target.value)
+                }}
                 placeholder="1F給湯室"
               />
             </label>
@@ -158,16 +211,36 @@ export default function ChlorineForm({ existing, defaultBuilding, defaultInspect
             </label>
             <label className="report-field">
               <span>残留塩素濃度（mg/L）</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                max="99.99"
-                value={concentration}
-                onChange={(e) => setConcentration(e.target.value)}
-                placeholder="0.10"
-              />
+              <div className="chlorine-concentration-row">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  max="99.99"
+                  value={concentration}
+                  onChange={(e) => setConcentration(e.target.value)}
+                  placeholder="0.10"
+                />
+                {/* よく使う値をドロップダウンから選べるようにする（自由入力と併用可。2026-08-10） */}
+                <select
+                  className="chlorine-concentration-select"
+                  value=""
+                  aria-label="よく使う濃度から選ぶ"
+                  onChange={(e) => {
+                    const v = e.target.value
+                    e.target.value = ''
+                    if (v) setConcentration(v)
+                  }}
+                >
+                  <option value="">選択…</option>
+                  {CHLORINE_CONCENTRATION_OPTIONS.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
           </div>
 

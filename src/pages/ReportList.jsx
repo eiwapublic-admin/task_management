@@ -5,7 +5,6 @@ import ReportDetail from './ReportDetail'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import {
   IconDownload,
-  IconGear,
   IconCar,
   IconClip,
   IconCheckCircle,
@@ -243,19 +242,13 @@ export default function ReportList() {
     }
   }
 
-  // 右端のアイコン4種（違反車両／残留塩素／添付画像／自主点検）。左から順に固定位置で並べ、
-  // 該当しないものは場所だけ残して非表示にする（2026-08-05。2026-08-07に自主点検の
-  // 実施有無アイコンを追加し、位置固定に変更。2026-08-10に残留塩素を追加）。自主点検は
-  // 当日以前で未実施のときだけ黄色い丸で目立たせる。リスト型・カレンダー型で共通して使う。
-  function renderIcons(date, { report, isFuture }, size) {
+  // 右端のアイコン4種を2段に分けて表示する（2026-08-10。1段では窮屈になったため）。
+  // 上段＝添付画像・自主点検、下段＝違反車両・残留塩素。該当しないものは場所だけ残して
+  // 非表示にする（2026-08-05〜）。自主点検は当日以前で未実施のときだけ黄色い丸で目立たせる。
+  // リスト型・カレンダー型・検索結果で共通して使う。
+  function renderIconsRow1(date, { report, isFuture }, size) {
     return (
       <div className="report-row-icons">
-        <span className={`report-row-icon${report?.has_parking ? '' : ' is-hidden'}`} title="違反車両あり">
-          <IconCar size={size} />
-        </span>
-        <span className={`report-row-icon${report?.has_chlorine ? '' : ' is-hidden'}`} title="残留塩素の測定あり">
-          <IconDroplet size={size} />
-        </span>
         <span className={`report-row-icon${report?.has_photos ? '' : ' is-hidden'}`} title="添付画像あり">
           <IconClip size={size} />
         </span>
@@ -266,6 +259,19 @@ export default function ReportList() {
           title={inspectedDates.has(date) ? '自主点検実施済み' : '自主点検未実施'}
         >
           <IconCheckCircle size={size - 2} />
+        </span>
+      </div>
+    )
+  }
+
+  function renderIconsRow2(_date, { report }, size) {
+    return (
+      <div className="report-row-icons">
+        <span className={`report-row-icon${report?.has_parking ? '' : ' is-hidden'}`} title="違反車両あり">
+          <IconCar size={size} />
+        </span>
+        <span className={`report-row-icon${report?.has_chlorine ? '' : ' is-hidden'}`} title="残留塩素の測定あり">
+          <IconDroplet size={size} />
         </span>
       </div>
     )
@@ -339,7 +345,10 @@ export default function ReportList() {
                       )}
                     </div>
                   </div>
-                  {renderIcons(date, st, 20)}
+                  <div className="report-row-icons-stack">
+                    {renderIconsRow1(date, st, 20)}
+                    {renderIconsRow2(date, st, 20)}
+                  </div>
                 </button>
               </li>
             )
@@ -440,13 +449,16 @@ export default function ReportList() {
                     <span className={`report-calendar-day ${wd.className}`}>{Number(date.slice(-2))}</span>
                     {isToday && <span className="report-today-badge">本日</span>}
                     {closed && <span className="report-calendar-closed-label">休館日</span>}
-                    {r && renderIcons(date, st, 18)}
+                    {r && renderIconsRow1(date, st, 18)}
                   </div>
 
                   {r ? (
                     <>
-                      <div className="report-calendar-workers">
-                        {r.worker_am || '—'} | {r.worker_pm || '—'}
+                      <div className="report-calendar-workers-row">
+                        <span className="report-calendar-workers">
+                          {r.worker_am || '—'} | {r.worker_pm || '—'}
+                        </span>
+                        {renderIconsRow2(date, st, 18)}
                       </div>
                       <div className="report-calendar-body">
                         {entries.length === 0 ? (
@@ -529,7 +541,10 @@ export default function ReportList() {
                     ))}
                   </div>
                 </div>
-                {renderIcons(r.report_date, dayState(r.report_date), 20)}
+                <div className="report-row-icons-stack">
+                  {renderIconsRow1(r.report_date, dayState(r.report_date), 20)}
+                  {renderIconsRow2(r.report_date, dayState(r.report_date), 20)}
+                </div>
               </button>
             </li>
           )
@@ -609,7 +624,8 @@ export default function ReportList() {
                 （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
                 アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
                 ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持。
-                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08） */}
+                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08）。
+                iPhone幅では文字を隠しアイコンのみにする（下の.btn-plain-label参照。2026-08-10） */}
             <button
               type="button"
               className="btn-plain"
@@ -618,28 +634,27 @@ export default function ReportList() {
               title="紙の様式でPDFに出力する（半月ごとに1ページ）"
             >
               <IconDownload size={18} />
-              {pdf.busy ? '作成中…' : '自主検査'}
+              <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
             </button>
-            <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
+            <button
+              type="button"
+              className="btn-plain"
+              onClick={() => navigate('/reports/parking')}
+              title="違反車両一覧"
+            >
               <IconCar size={18} />
-              違反車両
+              <span className="btn-plain-label">違反車両</span>
             </button>
             {/* 残留塩素等検査（2026-08-10）。入力も帳票PDFの出力も専用画面で行う */}
-            <button type="button" className="btn-plain" onClick={() => navigate('/reports/chlorine')}>
+            <button
+              type="button"
+              className="btn-plain"
+              onClick={() => navigate('/reports/chlorine')}
+              title="残留塩素等検査"
+            >
               <IconDroplet size={18} />
-              残留塩素
+              <span className="btn-plain-label">残留塩素</span>
             </button>
-            {!isOwner && (
-              <button
-                type="button"
-                className="icon-btn-gear"
-                onClick={() => navigate('/reports/templates')}
-                aria-label="定型文の設定"
-                title="定型文の設定"
-              >
-                <IconGear size={20} />
-              </button>
-            )}
           </div>
         </div>
 

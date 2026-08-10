@@ -417,11 +417,16 @@ export const CHLORINE_JUDGEMENT_ITEMS = [
 // 水道水質基準（帳票の見出しに印字する）。遊離残留塩素として 0.1mg/L 以上
 export const CHLORINE_STANDARD_MIN = 0.1
 
-// year（'YYYY'）・building を省略すると全期間・全施設を返す
-export async function fetchChlorineTests({ year, building } = {}) {
+// 濃度入力欄の候補値（ドロップダウン選択用。2026-08-10）。自由入力も引き続きできる
+export const CHLORINE_CONCENTRATION_OPTIONS = ['0.05', '0.10', '0.20', '0.30', '0.40', '0.50']
+
+// year（'YYYY'）・building・reportId を省略すると全期間・全施設を返す。
+// reportId は日報詳細からの「残留塩素」ボタン（2026-08-10）で、その日の記録有無を見るために使う
+export async function fetchChlorineTests({ year, building, reportId } = {}) {
   const qs = new URLSearchParams()
   if (year) qs.set('year', String(year))
   if (building) qs.set('building', building)
+  if (reportId) qs.set('report_id', reportId)
   const suffix = qs.toString() ? `?${qs}` : ''
   const data = await authFetch(`/api/report/chlorine${suffix}`)
   return data.tests || []

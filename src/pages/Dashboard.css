@@ -946,9 +946,17 @@
 
 .report-row-main { flex: 1; min-width: 0; }
 
-/* 右端のアイコン（違反車両あり=車／写真あり=クリップ。2026-08-05） */
-/* 右端のアイコン3種（違反車両／添付画像／自主点検）を固定位置で並べる（2026-08-07）。
+/* 右端のアイコン群。上段＝添付画像・自主点検／下段＝違反車両・残留塩素の2段に分ける
+   （2026-08-10。4種を1段に並べると窮屈だったため）。各段2種を固定位置で並べ、
    該当しないものは visibility:hidden で場所だけ残し、他のアイコンの位置がずれないようにする */
+.report-row-icons-stack {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
 .report-row-icons {
   flex-shrink: 0;
   display: flex;
@@ -1254,9 +1262,9 @@
   font-size: 12px;
 }
 
-/* アイコン群は日付と同じ行の右端に寄せる。マス目は1列＝画面幅の1/7しかないため、
-   リスト型のままの大きさ（24px×3＋余白）だと iPad縦などでマス目から溢れて欠けてしまう。
-   カレンダー型のときだけ一回り小さくして、狭い列でも3つ並べられるようにする（2026-08-07） */
+/* 上段アイコン（添付画像・自主点検）は日付と同じ行の右端に寄せる。マス目は1列＝画面幅の
+   1/7しかないため、リスト型のままの大きさだと iPad縦などでマス目から溢れて欠けてしまう。
+   カレンダー型のときだけ一回り小さくする（2026-08-07） */
 .report-calendar-cell-head .report-row-icons {
   margin-left: auto;
   gap: 2px;
@@ -1273,7 +1281,20 @@
   color: var(--text-muted);
 }
 
+/* 下段アイコン（違反車両・残留塩素）は担当者名と同じ行に並べる（2026-08-10） */
+.report-calendar-workers-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.report-calendar-workers-row .report-row-icons { gap: 2px; }
+.report-calendar-workers-row .report-row-icon { width: 18px; height: 18px; }
+
 .report-calendar-workers {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-muted);
   overflow: hidden;
@@ -2226,13 +2247,18 @@
   font-weight: 700;
 }
 
-/* iPhone幅でもツールバー（＋・自主検査表・違反車両・歯車）が1行に収まるよう、
-   狭い画面では横パディングを詰める（2026-08-05） */
+/* iPhone幅でもツールバー（虫眼鏡・自主検査・違反車両・残留塩素）が1行に収まるよう、
+   狭い画面では文字ラベルを隠しアイコンのみの正方形ボタンにする（2026-08-05に横パディングを
+   詰める対応をしたが、2026-08-10に残留塩素ボタンが増えて文字入りのままでは収まらなくなった
+   ため、アイコンのみ化に変更）。ラベルは title 属性で引き続き参照できる */
 @media (max-width: 480px) {
   .reports-toolbar-actions .btn-plain {
-    padding: 0 var(--space-3);
-    font-size: 14px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    gap: 0;
   }
+  .reports-toolbar-actions .btn-plain-label { display: none; }
 }
 
 /* ============================================================
@@ -2460,36 +2486,29 @@
    一覧は測定日ごとにまとめ、行をタップすると入力モーダルが開く。
    ============================================================ */
 
-/* 絞り込み（対象年・測定施設）と帳票の出力バー */
+/* 対象年（一覧の絞り込み・帳票の対象年を兼ねる）・帳票の出力対象施設・PDF出力ボタンを
+   1行にまとめる（2026-08-10）。iPhone幅でも折り返さないよう、施設フィルタは置かず
+   出力ボタンもアイコンのみ（IconDownload）にした。select は現行アプリの選択肢が
+   少ない（年4桁／施設2択）ため、汎用の .report-field select の min-width: 130px を
+   このコンテキストだけ狭めて詰める */
 .chlorine-controls {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-4);
-  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
   margin-bottom: var(--space-3);
 }
 
-.chlorine-pdf-bar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+.chlorine-year-field { flex: 1 1 0; min-width: 0; }
+.chlorine-building-filter-field { flex: 1 1 0; min-width: 0; }
+.chlorine-year-field select,
+.chlorine-building-filter-field select {
+  width: 100%;
+  min-width: 0;
 }
 
-.chlorine-pdf-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-  /* select・ボタンとベースラインを揃える（他の要素は下端揃えのため） */
-  padding-bottom: 9px;
-}
-
-.chlorine-pdf-bar .btn-plain { height: 40px; font-weight: 700; }
+/* select と同じ高さ（ラベル分の余白込み）に揃える */
+.chlorine-pdf-btn { margin-bottom: 1px; }
 
 /* 一覧（測定日ごとの見出し＋その日の測定行） */
 .chlorine-list { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -2561,10 +2580,35 @@
 .chlorine-legend { margin-top: var(--space-3); }
 
 /* --- 入力モーダル（自主検査表のモーダル .inspection-* を土台に使う） --- */
-.chlorine-building-field select { min-width: 200px; font-size: 16px; font-weight: 700; }
+
+/* 測定施設。ドロップダウンではなく択一ボタンにする（2026-08-10。選択肢が2つだけなので
+   タップで直接選べる方が早い） */
+.chlorine-building-field { display: flex; flex-direction: column; gap: 4px; }
+.chlorine-building-field > span { font-size: 13px; color: var(--text-muted); }
+
+.chlorine-building-toggle { display: flex; gap: var(--space-2); }
+
+.chlorine-building-btn {
+  flex: 1;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-base);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chlorine-building-btn.is-active { color: #fff; background: #33604d; border-color: #33604d; }
 
 /* datetime-local は iOS で幅が詰まりやすいので明示しておく */
 .chlorine-datetime { min-width: 210px; }
+
+/* 残留塩素濃度。自由入力の数値欄＋よく使う値のドロップダウンを横に並べる（2026-08-10） */
+.chlorine-concentration-row { display: flex; gap: 6px; }
+.chlorine-concentration-row input { flex: 1; min-width: 0; }
+.chlorine-concentration-select { flex-shrink: 0; width: 76px; }
 
 .chlorine-warning {
   margin: 0;
@@ -2639,7 +2683,9 @@
 @media (max-width: 640px) {
   /* iOS のフォーカス時ズームを抑えるため、入力欄は16px以上を保つ */
   .chlorine-note-field textarea,
-  .chlorine-datetime { font-size: 16px; }
+  .chlorine-datetime,
+  .chlorine-concentration-row input,
+  .chlorine-concentration-select { font-size: 16px; }
   .chlorine-row-building { min-width: 0; }
-  .chlorine-pdf-label { padding-bottom: 0; }
+  .chlorine-controls .report-field span { font-size: 12px; }
 }
