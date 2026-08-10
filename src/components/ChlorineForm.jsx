@@ -135,16 +135,16 @@ export default function ChlorineForm({
   }
 
   return (
-    <div className="inspection-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="inspection-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="inspection-modal-head">
-          <h3>残留塩素等検査{existing ? '' : '（新規）'}</h3>
+    <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="ui-modal-head">
+          <h3 className="ui-modal-title">残留塩素等検査{existing ? '' : '（新規）'}</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
         </div>
 
-        <div className="inspection-modal-body">
+        <div className="ui-modal-body is-stacked">
           {error && (
             <p className="dashboard-error dashboard-banner" role="alert">
               {error}
@@ -282,13 +282,13 @@ export default function ChlorineForm({
           </label>
         </div>
 
-        <div className="inspection-modal-foot">
-          <div className="inspection-modal-foot-left">
+        <div className="ui-modal-foot">
+          <div className="ui-modal-foot-start">
             {existing && (
               <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
             )}
           </div>
-          <div className="inspection-modal-foot-right">
+          <div className="ui-modal-foot-end">
             <button type="button" className="btn-plain" onClick={onClose}>
               キャンセル
             </button>

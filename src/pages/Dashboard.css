@@ -1,7 +1,5 @@
-.dashboard-page {
-  min-height: 100vh;
-  background: var(--bg-subtle);
-}
+/* ページのルートは共通部品 .ui-page（ui.css）に統一済み（2026-08-10）。
+   以前あった .dashboard-page / .reports-page は同じ役割の重複だったため削除した。 */
 
 /* ヘッダー: 落ち着いたグリーン */
 .dashboard-header {
@@ -860,7 +858,6 @@
 }
 
 /* 日報ページ全体 */
-.reports-page { min-height: 100vh; background: var(--bg-app); }
 
 /* 日報系の本文コンテナ。幅・中央寄せ・余白は .ui-container(.is-narrow) が持つ。
    カレンダー型のときだけ .is-calendar で全幅に広げる */
@@ -1040,29 +1037,9 @@
 
 /* --- 作業記録の検索（2026-08-08） --- */
 
-/* 虫眼鏡アイコン。歯車ボタン（.icon-btn-gear）と同じ見た目だが、開いている間は
-   色を付けて状態が分かるようにする */
-.icon-btn-search {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.icon-btn-search:hover { color: var(--color-primary); }
-
-.icon-btn-search.is-active {
-  color: var(--color-brand);
-  background: var(--color-brand-soft);
-}
+/* 虫眼鏡アイコン（.icon-btn-search）の見た目は ui.css の共通部品に統合済み
+   （2026-08-10）。ここにあった複製は生値（40px）を持ち、選択中の配色も
+   共通部品と食い違っていたため削除した。 */
 
 .reports-search-bar {
   display: flex;
@@ -1527,11 +1504,6 @@
   .entry-row { flex-wrap: wrap; }
   .entry-time { width: 110px; }
   .entry-content { flex-basis: 100%; order: 3; }
-  /* iOSでフォーカス時にズームされるのを防ぐため16px以上にする */
-  .entry-content, .entry-time, .report-field select, .report-field input, .template-textarea,
-  .entry-template-select {
-    font-size: var(--fs-lg);
-  }
 }
 
 /* --- 日報の写真（Phase 2。2026-08-04〜） --- */
@@ -1685,11 +1657,12 @@
 }
 
 /* 暗い背景（拡大表示）向けの削除アイコン色。ホバー時は共通の赤系のまま */
-.icon-btn-delete.icon-btn-delete-dark { color: rgba(255, 255, 255, 0.85); }
+/* 暗い背景向けの削除アイコン色（.icon-btn-delete-dark）も ui.css に統合済み */
 
 @media (max-width: 640px) {
   .photo-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-  .photo-comment { font-size: var(--fs-lg); } /* iOSのフォーカス時ズームを抑止 */
+  /* iOSのフォーカス時ズーム抑止は ui.css が textarea 全体に一括で効かせているため、
+     ここで個別に font-size を指定する必要はない（UI標準の「二重管理をしない」） */
 }
 
 /* --- 違反車両（Phase 4。2026-08-05〜）。日報詳細では写真と同じ流れで登録する --- */
@@ -1811,9 +1784,6 @@
 
 @media (max-width: 640px) {
   .parking-grid { grid-template-columns: 1fr; }
-  .parking-card-row input, .parking-card-fields > input, .parking-card-note {
-    font-size: var(--fs-lg); /* iOSのフォーカス時ズームを抑止 */
-  }
 }
 
 /* --- 違反車両一覧（/reports/parking。日を跨って横断的に見る独立画面。2026-08-05〜） --- */
@@ -1974,51 +1944,9 @@
 .inspection-pdf-btn { margin-left: auto; }
 
 /* 入力モーダル */
-.inspection-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal-nested);
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3)
-           calc(var(--space-3) + env(safe-area-inset-bottom));
-  overflow-y: auto;
-}
-
-.inspection-modal {
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 620px;
-  max-height: calc(100dvh - 2 * var(--space-3) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-}
-
-.inspection-modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-}
-
-.inspection-modal-head h3 { margin: 0; font-size: var(--fs-lg); color: var(--text-strong); }
-
-.inspection-modal-body {
-  padding: var(--space-4);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
+/* 入力モーダルの骨格（オーバーレイ・枠・ヘッダ・本文・フッタ）は共通部品
+   .ui-overlay / .ui-modal（ui.css）へ統合済み（2026-08-11）。
+   ここに残すのは自主検査表そのものの見た目に関わるクラスだけ。 */
 
 .inspection-inspector input { width: 200px; }
 
@@ -2108,25 +2036,6 @@
 .inspection-periodic legend { font-size: var(--fs-sm); color: var(--text-muted); padding: 0 6px; }
 .inspection-periodic label { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); }
 
-.inspection-modal-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border);
-  position: sticky;
-  bottom: 0;
-  background: var(--bg-surface);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-}
-
-.inspection-modal-foot-left, .inspection-modal-foot-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 
 /* オン/オフのスイッチ（.switch-field）は src/styles/ui.css へ移動した（2026-08-11） */
 .switch-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-base); }
@@ -2375,11 +2284,6 @@
 .chlorine-photo-add .btn-plain { width: 100%; }
 
 @media (max-width: 640px) {
-  /* iOS のフォーカス時ズームを抑えるため、入力欄は16px以上を保つ */
-  .chlorine-note-field textarea,
-  .chlorine-datetime,
-  .chlorine-concentration-row input,
-  .chlorine-concentration-select { font-size: var(--fs-lg); }
   .chlorine-row-building { min-width: 0; }
   .chlorine-controls .report-field span { font-size: var(--fs-xs); }
 }

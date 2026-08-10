@@ -115,9 +115,3 @@
   padding: var(--space-2);
 }
 
-/* iOS Safari はフォーカスした入力の文字が 16px 未満だと自動ズームするため防ぐ */
-@media (max-width: 768px) {
-  .login-card input {
-    font-size: var(--fs-lg);
-  }
-}

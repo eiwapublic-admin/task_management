@@ -64,6 +64,11 @@
   --status-replied: #2563eb;   /* 返信済み */
   --status-progress: #d97706;  /* 対応中 */
   --status-done: #16a34a;      /* 完了 */
+  /* 「対応中」列だけは識別色との既定の混色が暗くなるため、専用の薄い黄色を持つ */
+  --status-progress-surface: #fdf6cf;
+
+  /* --- 濃色の面（返信・ダウンロードなど、白抜き文字を載せる黒に近いボタン）--- */
+  --surface-inverse: #1f2937;
 
   /* --- 期限の緊急度 --- */
   --due-overdue: #dc2626;

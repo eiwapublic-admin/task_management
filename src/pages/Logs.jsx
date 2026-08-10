@@ -25,7 +25,7 @@ export default function Logs() {
   }, [])
 
   return (
-    <div className="dashboard-page">
+    <div className="ui-page">
       <AppHeader />
       <div className="ui-container logs-container">
         <h2 className="ui-page-title">処理ログ</h2>
@@ -62,7 +62,7 @@ export default function Logs() {
                     </span>
                   </td>
                   <td className="logs-actor">{log.actor}</td>
-                  <td className="logs-message">{log.message}</td>
+                  <td>{log.message}</td>
                 </tr>
                 )
               })}

@@ -41,7 +41,7 @@ export default function ReportTemplates() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">

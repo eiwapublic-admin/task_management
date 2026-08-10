@@ -122,9 +122,9 @@ export default function Inspections() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide reports-container inspections-container">
+      <div className="ui-container is-wide">
         <div className="ui-toolbar reports-toolbar inspection-toolbar">
           <button
             type="button"

@@ -554,7 +554,7 @@ export default function ReportList() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
       {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
@@ -586,7 +586,7 @@ export default function ReportList() {
             {/* 表示切替（リスト型／カレンダー型）。カレンダー型はマス目が狭くなりすぎるため
                 PC/iPad幅でのみ選べるようにし、スマートフォン幅では切替自体を出さない（2026-08-07） */}
             {isWideScreen && (
-              <div className="ui-segmented report-view-switch" role="group" aria-label="表示の切り替え">
+              <div className="ui-segmented" role="group" aria-label="表示の切り替え">
                 <button
                   type="button"
                   className={`ui-segmented-btn${view === 'list' ? ' is-active' : ''}`}

@@ -473,18 +473,13 @@
 }
 
 /* iOS Safari はフォーカスした入力の文字が 16px 未満だと自動でズームする。
-   個々の画面で対処せず、ここで一括して止める */
+   個々の画面で対処せず、ここで一括して止める（UI標準「二重管理をしない」）。
+
+   type を列挙せず素の input を対象にしているのは、type 属性を書き忘れた
+   （＝既定の text になる）入力が将来追加されたときに、静かに漏れるのを防ぐため。
+   checkbox / radio / hidden は文字を持たないので当たっても無害。 */
 @media (max-width: 768px) {
-  .ui-input,
-  .ui-select,
-  .ui-textarea,
-  input[type='text'],
-  input[type='search'],
-  input[type='number'],
-  input[type='password'],
-  input[type='date'],
-  input[type='time'],
-  input[type='datetime-local'],
+  input,
   select,
   textarea {
     font-size: 16px;
@@ -646,7 +641,7 @@
 .ui-badge.is-current { background: var(--color-brand-soft); color: var(--color-brand); }
 .ui-badge.is-action { background: var(--color-primary); color: var(--color-primary-ink); }
 .ui-badge.is-danger { background: color-mix(in srgb, var(--color-danger) 12%, var(--bg-surface)); color: var(--color-danger); }
-.ui-badge.is-warn { background: color-mix(in srgb, var(--due-soon) 16%, var(--bg-surface)); color: #92400e; }
+.ui-badge.is-warn { background: color-mix(in srgb, var(--due-soon) 16%, var(--bg-surface)); color: var(--color-warn-ink); }
 
 /* =========================================================================
    8. モーダル
@@ -722,6 +717,14 @@
   min-height: 0;
 }
 
+/* 入力欄を縦に積むモーダル（自主点検・残留塩素の記録など）。
+   各要素の間隔を揃えるので、中でいちいち margin を書かなくてよい */
+.ui-modal-body.is-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .ui-modal-foot {
   display: flex;
   align-items: center;
@@ -732,8 +735,10 @@
   flex-shrink: 0;
 }
 
-/* 主要アクションは右端に置く（左＝取り消し系、右＝進める系） */
-.ui-modal-foot-end { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; }
+/* 主要アクションは右端に置く（左＝削除・取り消し系、右＝進める系）。
+   左側に何も置かない画面では -start ごと省略してよい */
+.ui-modal-foot-start { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ui-modal-foot-end { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 
 /* =========================================================================
    9. 空状態・注記

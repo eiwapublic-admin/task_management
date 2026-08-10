@@ -120,7 +120,7 @@ export default function Chlorine() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">

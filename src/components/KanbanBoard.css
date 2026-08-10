@@ -117,7 +117,7 @@
 
 /* 「対応中」列は既定の混色だと暗くなるため、視認性の高い薄い黄色にする */
 .kanban-column[data-status='対応中'] {
-  background: #fdf6cf;
+  background: var(--status-progress-surface);
 }
 
 /* ドラッグ中のカードが列に重なったときのフィードバック */
@@ -673,8 +673,8 @@
 
 /* 「返信」「ダウンロード」は黒背景 */
 .task-action-btn.task-action-dark {
-  background: #1f2937;
-  border-color: #1f2937;
+  background: var(--surface-inverse);
+  border-color: var(--surface-inverse);
   color: var(--ink-on-fill);
 }
 
@@ -872,8 +872,8 @@ select.task-detail-input.is-unassigned {
 }
 
 .task-detail-attachment-download {
-  border: 1px solid #1f2937;
-  background: #1f2937;
+  border: 1px solid var(--surface-inverse);
+  background: var(--surface-inverse);
   color: var(--ink-on-fill);
 }
 
@@ -1159,14 +1159,6 @@ select.task-detail-input.is-unassigned {
 
   .task-detail-fields dt:first-of-type {
     margin-top: 0;
-  }
-
-  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
-  .task-detail-input,
-  .task-form-field input,
-  .task-form-field select,
-  .task-form-field textarea {
-    font-size: var(--fs-lg);
   }
 
   /* タッチ操作しやすいようステータス/操作ボタンを大きめに */

@@ -55,11 +55,6 @@
     resize: vertical;
   }
 
-  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
-  .settings-panel input,
-  .settings-panel textarea {
-    font-size: var(--fs-lg);
-  }
 }
 
 .settings-panel section h2 {
