@@ -130,10 +130,18 @@ export function nowHHMM() {
 // ---- 写真（Phase 2。2026-08-04〜）----
 
 
-// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真。混在させないため）
+// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真 /
+// chlorine=残留塩素等検査の写真。混在させないため）
 export async function fetchPhotos(reportId, category) {
   const qs = new URLSearchParams({ report_id: reportId })
   if (category) qs.set('category', category)
+  const data = await authFetch(`/api/report/photos?${qs}`)
+  return data.photos || []
+}
+
+// 残留塩素等検査の写真は日報単位ではなく検査レコード単位で扱う（2026-08-10）
+export async function fetchChlorinePhotos(chlorineId) {
+  const qs = new URLSearchParams({ chlorine_id: chlorineId, category: 'chlorine' })
   const data = await authFetch(`/api/report/photos?${qs}`)
   return data.photos || []
 }
@@ -145,6 +153,7 @@ export async function uploadPhoto({
   reportId,
   category,
   parkingId,
+  chlorineId,
   file,
   thumb,
   filename,
@@ -157,6 +166,7 @@ export async function uploadPhoto({
   form.append('report_id', reportId)
   form.append('category', category || 'work')
   if (parkingId) form.append('parking_id', parkingId)
+  if (chlorineId) form.append('chlorine_id', chlorineId)
   form.append('file', file, filename || 'photo.jpg')
   if (thumb) form.append('thumb', thumb, 'thumb.jpg')
   if (filename) form.append('filename', filename)
@@ -251,13 +261,15 @@ export async function deleteInspection(id) {
   await authFetch(`/api/report/inspections?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-// 自主検査表PDFをアプリ内プレビュー表示するための短時間有効URLを発行する
+// 日報系で生成したPDFをアプリ内プレビュー表示するための短時間有効URLを発行する
 // （プロジェクトスキル print-and-pdf-download Gotcha 8）。iOS Safariのホーム画面追加
 // アプリ（standalone表示）は pdf.save() の download 属性を無視してそのままナビゲート
 // してしまい、「×」で閉じても戻り先が無く画面が真っ白になる。既存の添付ファイル
 // プレビュー（getAttachmentPreviewUrl）と同じ「実URLへの<iframe>ナビゲーション」方式
 // にすることで、共有シートも画面遷移も発生させずアプリ内で開いて×で戻れるようにする。
-export async function getInspectionPdfPreviewUrl(pdfBlob, filename) {
+// APIパスは自主検査表PDF用に作ったものをそのまま使う（保存内容はPDF本体だけで
+// 種類を問わないため。残留塩素等検査の帳票PDFも同じ経路を通す。2026-08-10）。
+export async function getReportPdfPreviewUrl(pdfBlob, filename) {
   const { token } = await authFetch('/api/report/inspection-pdf-preview', {
     method: 'POST',
     headers: { 'Content-Type': 'application/pdf' },
@@ -385,4 +397,72 @@ export async function recognizeParkingPhoto(photoId) {
     method: 'POST',
     body: JSON.stringify({ photo_id: photoId }),
   })
+}
+
+// ---- 残留塩素等検査（Phase 5。2026-08-10）----
+
+// 測定施設。BKB＝備後町コイズミビルの略称。実際の測定は BKB と小泉本社が中心だが、
+// 現行アプリ（FileMaker）の選択肢に合わせてスイングビルも残している。
+export const CHLORINE_BUILDINGS = ['BKB', 'スイングビル', '小泉本社']
+
+// 帳票・入力欄に並ぶ官能検査の4項目（順序も紙の帳票に合わせる）
+export const CHLORINE_JUDGEMENT_ITEMS = [
+  { key: 'color_ok', label: '色' },
+  { key: 'turbidity_ok', label: '濁り' },
+  { key: 'odor_ok', label: '臭気' },
+  { key: 'taste_ok', label: '味' },
+]
+
+// 水道水質基準（帳票の見出しに印字する）。遊離残留塩素として 0.1mg/L 以上
+export const CHLORINE_STANDARD_MIN = 0.1
+
+// year（'YYYY'）・building を省略すると全期間・全施設を返す
+export async function fetchChlorineTests({ year, building } = {}) {
+  const qs = new URLSearchParams()
+  if (year) qs.set('year', String(year))
+  if (building) qs.set('building', building)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const data = await authFetch(`/api/report/chlorine${suffix}`)
+  return data.tests || []
+}
+
+// 測定日（tested_at のJST日付）の日報はサーバー側で引き当て/作成される
+export async function createChlorineTest(payload) {
+  const data = await authFetch('/api/report/chlorine', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return data.test
+}
+
+export async function updateChlorineTest(id, patch) {
+  const data = await authFetch('/api/report/chlorine', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...patch }),
+  })
+  return data.test
+}
+
+export async function deleteChlorineTest(id) {
+  await authFetch(`/api/report/chlorine?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 'YYYY'（JST基準の今年）
+export function currentYearJST() {
+  return Number(todayJST().slice(0, 4))
+}
+
+// ISO文字列 → <input type="datetime-local"> 用の 'YYYY-MM-DDTHH:MM'（端末のローカル時刻）
+export function toDateTimeLocal(value) {
+  const d = value ? new Date(value) : new Date()
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 濃度の表示（0.10 のように小数第2位で揃える）。未測定は空文字
+export function formatConcentration(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const num = Number(value)
+  return Number.isFinite(num) ? num.toFixed(2) : ''
 }

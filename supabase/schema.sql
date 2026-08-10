@@ -405,3 +405,47 @@ revoke all on parking_violations from anon, authenticated;
 -- 写真をどの違反車両レコードの分か紐付ける（category='parking' のときのみ使う）
 alter table report_photos add column if not exists parking_id uuid references parking_violations(id) on delete cascade;
 create index if not exists report_photos_parking_idx on report_photos (parking_id);
+
+-- ============================================================
+-- 残留塩素等検査（Phase 5。2026-08-10）。週1回・建物別に残留塩素濃度と
+-- 色/濁り/臭気/味を記録し、年単位・建物別に「残留塩素等検査実施記録表」として
+-- PDF出力する（小泉産業様への提出物）。日を跨って一覧するため独立した行として
+-- 持つが、写真（report_photos）が日報に属する設計のため report_id で当日の
+-- 日報に紐付ける（日報が無い日は API 側で作成してから紐付ける）。
+-- ============================================================
+create table if not exists chlorine_tests (
+  id            uuid primary key default gen_random_uuid(),
+  report_id     uuid not null references daily_reports(id) on delete cascade,
+  -- BKB（＝備後町コイズミビル）/ スイングビル / 小泉本社
+  building      text not null,
+  -- 採水場所（1F給湯室 等）
+  location      text,
+  tested_at     timestamptz not null default now(),
+  -- 残留塩素濃度（mg/L）。水道水質基準は遊離残留塩素 0.1mg/L 以上
+  concentration numeric(4,2),
+  -- 色・濁り・臭気・味の判定。true=OK / false=NG / null=未選択
+  color_ok      boolean,
+  turbidity_ok  boolean,
+  odor_ok       boolean,
+  taste_ok      boolean,
+  inspector     text,
+  note          text,
+  created_by    uuid references users(id),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists chlorine_tests_tested_idx on chlorine_tests (tested_at desc);
+create index if not exists chlorine_tests_building_idx on chlorine_tests (building, tested_at desc);
+create index if not exists chlorine_tests_report_idx on chlorine_tests (report_id);
+
+drop trigger if exists chlorine_tests_set_updated_at on chlorine_tests;
+create trigger chlorine_tests_set_updated_at before update on chlorine_tests
+  for each row execute function set_updated_at();
+
+alter table chlorine_tests enable row level security;
+revoke all on chlorine_tests from anon, authenticated;
+
+-- 検査薬の色変化の写真をどの検査レコードの分か紐付ける（category='chlorine' のときのみ使う）
+alter table report_photos add column if not exists chlorine_id uuid references chlorine_tests(id) on delete cascade;
+create index if not exists report_photos_chlorine_idx on report_photos (chlorine_id);

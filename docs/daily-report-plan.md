@@ -146,19 +146,21 @@ SVGアイコン**（`src/components/Icons.jsx`）に統一する（初回実装�
 > 累計回数（現行の「トータル30回」）は `plate_region + plate_number` の COUNT で算出する。
 > 索引 `(plate_region, plate_number)` を張る。
 
-### chlorine_tests（残留塩素・週1回）
+### chlorine_tests（残留塩素・週1回。2026-08-10 実装）
 | 列 | 型 | 備考 |
 |---|---|---|
 | id | uuid PK | |
-| report_id | uuid | daily_reports 参照 |
-| building | text | `BKB` / `小泉本社` |
+| report_id | uuid | daily_reports 参照（**not null**。測定日の日報が無ければAPI側で作成して紐付ける） |
+| building | text | `BKB` / `スイングビル` / `小泉本社` |
 | location | text | 採水場所（1F給湯室 等） |
 | tested_at | timestamptz | |
-| concentration | numeric(3,2) | 濃度（0.10 等） |
-| color_ok / turbidity_ok / odor_ok / taste_ok | boolean | 色・濁り・臭気・味 |
+| concentration | numeric(4,2) | 濃度（0.10 等）。0〜99.99 |
+| color_ok / turbidity_ok / odor_ok / taste_ok | boolean | 色・濁り・臭気・味。true=OK / false=NG / **null=未選択** |
 | inspector | text | 検査者 |
+| note | text | 備考（帳票の備考欄に印字する） |
 
-> 写真の保管は必須ではない（ご要望どおり）。撮る場合は report_photos に `category='chlorine'` で紐付ける。
+> 検査薬の色変化の写真を残すため、report_photos に `category='chlorine'` + `chlorine_id` で紐付ける
+> （`chlorine_id` は2026-08-10に追加。違反車両の `parking_id` と同じ扱い）。
 
 ### fire_inspections（自主検査表・日次）
 | 列 | 型 | 備考 |
@@ -436,9 +438,18 @@ DB の内訳は `activity_logs` 520KB（60日で自動削除されるため頭�
 - **未実装（残タスク）**: 入力画面での「同一ナンバーの過去履歴を自動表示」（一覧画面の累計回数順ソートはあるが、
   登録中の即時表示は無い）、一覧画面での写真サムネイル表示、過去データ（FileMaker）の移行
 
-### Phase 5: 残留塩素 + メンテナンス実績
-- `chlorine_tests`（週1回・建物別）
-- `maintenance_results`（カレンダー由来タスクと紐付け、予定通り/本日実施/中止）
+### Phase 5: 残留塩素（2026-08-10 実装済み）+ メンテナンス実績（未着手）
+- `chlorine_tests`（週1回・建物別）。現行アプリ（FileMaker）の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相当する
+  機能を、日を跨って見られる独立画面 `/reports/chlorine` にまとめた（設計書4-14）
+  - 一覧: 対象年・測定施設で絞り込み、測定日ごとの見出しの下に 施設名・測定時刻・測定値・測定場所・検査者 を並べる。
+    行タップで入力モーダル（自主検査表と同じく追加/変更を区別しないUI）
+  - 入力: 測定施設 → 測定場所・検査者 → 測定写真（検査薬の色変化） → 測定日時 → 残留塩素濃度 →
+    色/濁り/臭気/味のOK・NG → 備考。現行アプリの入力画面の並びに合わせた
+  - 帳票: 年＋測定施設を指定して「残留塩素等検査実施記録表」をPDF出力（38行ごとに改ページ）。
+    自主検査表PDFと同じくアプリ内プレビュー方式（iOSのホーム画面アプリ対策）
+  - 日報一覧の各行右端に、その日に測定があれば水滴アイコンを表示する
+  - **未実装**: 過去データ（FileMaker）の移行、測定漏れ（週1回のペース）の警告
+- `maintenance_results`（カレンダー由来タスクと紐付け、予定通り/本日実施/中止）**は未着手**
 
 ### Phase 6: 公開・連携
 - オーナー（小泉産業様）アカウントの発行と閲覧範囲の設定

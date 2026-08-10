@@ -6,7 +6,7 @@ import {
   fetchInspections,
   fetchClosedDays,
   fetchHolidays,
-  getInspectionPdfPreviewUrl,
+  getReportPdfPreviewUrl,
   daysInMonth,
   halfMonthRanges,
 } from '../lib/reports'
@@ -93,7 +93,7 @@ export default function useInspectionPdfExport(month, building) {
         // アプリ内にプレビュー表示し、×で閉じても画面遷移が無いので復帰できるようにする
         // （プロジェクトスキル print-and-pdf-download Gotcha 8）。
         const pdfBlob = pdf.output('blob')
-        const previewUrl = await getInspectionPdfPreviewUrl(pdfBlob, filename)
+        const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename)
         setPreview({ filename, url: previewUrl, blob: pdfBlob })
       } finally {
         // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す

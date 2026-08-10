@@ -89,14 +89,17 @@ export async function handleReportList(req) {
       byReport.get(e.report_id).push(e)
     }
 
-    // 一覧の右端アイコン（📎写真あり／🚗違反車両あり）用。存在有無だけ分かればよいので件数はまとめて取らない
+    // 一覧の右端アイコン（写真あり／違反車両あり／残留塩素の測定あり）用。
+    // 存在有無だけ分かればよいので件数はまとめて取らない
     const reportIds = list.map((r) => r.id)
-    const [{ data: photoRows }, { data: parkingRows }] = await Promise.all([
+    const [{ data: photoRows }, { data: parkingRows }, { data: chlorineRows }] = await Promise.all([
       supabase.from('report_photos').select('report_id').eq('category', 'work').in('report_id', reportIds),
       supabase.from('parking_violations').select('report_id').in('report_id', reportIds),
+      supabase.from('chlorine_tests').select('report_id').in('report_id', reportIds),
     ])
     const photoSet = new Set((photoRows || []).map((p) => p.report_id))
     const parkingSet = new Set((parkingRows || []).map((p) => p.report_id))
+    const chlorineSet = new Set((chlorineRows || []).map((p) => p.report_id))
 
     return json({
       reports: list.map((r) => ({
@@ -104,6 +107,7 @@ export async function handleReportList(req) {
         entries: byReport.get(r.id) || [],
         has_photos: photoSet.has(r.id),
         has_parking: parkingSet.has(r.id),
+        has_chlorine: chlorineSet.has(r.id),
       })),
     })
   } catch (err) {
@@ -443,7 +447,7 @@ export async function handleTemplateSave(req) {
 // ============================================================
 
 const PHOTO_COLUMNS =
-  'id, report_id, category, parking_id, storage_key, thumb_key, filename, mime, size, width, height, comment, taken_at, sort_order, created_at'
+  'id, report_id, category, parking_id, chlorine_id, storage_key, thumb_key, filename, mime, size, width, height, comment, taken_at, sort_order, created_at'
 
 // 用途ごとの想定解像度（縮小はクライアント側で行う。ここは上限の検証用）。
 // work=作業エビデンス720px / parking=不正駐車1280px（ナンバーの判読性を確保）
@@ -464,8 +468,11 @@ function extFromMime(mime) {
   return 'jpg'
 }
 
-// GET /api/report/photos?report_id=…&category=… — 指定日報の写真メタ一覧。
-// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真。混在させないため）。
+// GET /api/report/photos?report_id=…&category=…&chlorine_id=… — 写真メタ一覧。
+// category を指定すると絞り込む（work=作業記録の写真 / parking=違反車両の写真 /
+// chlorine=残留塩素等検査の写真。混在させないため）。
+// chlorine_id を指定した場合は、その検査レコードの写真だけを返す（report_id は不要。
+// 残留塩素の入力モーダルは日報ではなく検査レコード単位で写真を扱うため。2026-08-10）。
 export async function handlePhotoList(req) {
   const { error } = await requireAuth(req)
   if (error) return error
@@ -473,11 +480,14 @@ export async function handlePhotoList(req) {
     const params = new URL(req.url).searchParams
     const reportId = params.get('report_id') || ''
     const category = params.get('category') || ''
-    if (!reportId) return json({ error: 'report_id は必須です' }, 400)
+    const chlorineId = params.get('chlorine_id') || ''
+    if (!reportId && !chlorineId) return json({ error: 'report_id は必須です' }, 400)
     if (category && !VALID_CATEGORIES.has(category)) return json({ error: 'category が不正です' }, 400)
 
     const supabase = getAdminClient()
-    let query = supabase.from('report_photos').select(PHOTO_COLUMNS).eq('report_id', reportId)
+    let query = supabase.from('report_photos').select(PHOTO_COLUMNS)
+    if (reportId) query = query.eq('report_id', reportId)
+    if (chlorineId) query = query.eq('chlorine_id', chlorineId)
     if (category) query = query.eq('category', category)
     const { data, error: err } = await query.order('sort_order', { ascending: true })
     if (err) {
@@ -503,6 +513,7 @@ export async function handlePhotoUpload(req) {
     const reportId = String(form.get('report_id') || '')
     const category = String(form.get('category') || 'work')
     const parkingId = String(form.get('parking_id') || '') || null
+    const chlorineId = String(form.get('chlorine_id') || '') || null
     const file = form.get('file')
     const thumb = form.get('thumb') // 一覧に写真が並ぶ用途のみ付く（任意）
     if (!reportId) return json({ error: 'report_id は必須です' }, 400)
@@ -531,6 +542,17 @@ export async function handlePhotoUpload(req) {
       if (!violation) return json({ error: '違反車両のレコードが見つかりません' }, 404)
     }
 
+    // 残留塩素等検査の写真も同様に、対象レコードが同じ日報に属することを確認する
+    if (chlorineId) {
+      const { data: test } = await supabase
+        .from('chlorine_tests')
+        .select('id')
+        .eq('id', chlorineId)
+        .eq('report_id', reportId)
+        .maybeSingle()
+      if (!test) return json({ error: '残留塩素等検査のレコードが見つかりません' }, 404)
+    }
+
     const key = buildStorageKey(report.report_date, category, extFromMime(file.type))
     await putObject(key, file.stream(), file.type)
 
@@ -557,6 +579,7 @@ export async function handlePhotoUpload(req) {
       report_id: reportId,
       category,
       parking_id: parkingId,
+      chlorine_id: chlorineId,
       storage_key: key,
       thumb_key: thumbKey,
       filename: String(form.get('filename') || file.name || '').slice(0, 255) || null,
@@ -1282,5 +1305,261 @@ export async function handleParkingRecognize(req) {
     console.error('parking-recognize 失敗:', err)
     const message = err.isBillingError ? 'APIクレジット残高が不足しています' : '写真の解析に失敗しました'
     return json({ error: message }, err.isBillingError ? 402 : 500)
+  }
+}
+
+// ============================================================
+// 残留塩素等検査（Phase 5。2026-08-10）。
+// BKB・小泉本社などで週1回、残留塩素濃度を測定し、検査薬の色変化の写真と
+// 色/濁り/臭気/味の判定を記録する。年単位・建物別に「残留塩素等検査実施記録表」
+// としてPDF出力し、小泉産業様へ提出する。
+//
+// 違反車両と同じく日を跨って一覧するため daily_reports とは独立した行として持つが、
+// 写真（report_photos）が日報に属する設計のため、測定日の日報に紐付ける
+// （その日の日報が無ければここで作成する。測定＝その日の作業実績のため）。
+// ============================================================
+
+const CHLORINE_COLUMNS =
+  'id, report_id, building, location, tested_at, concentration, color_ok, turbidity_ok, odor_ok, taste_ok, inspector, note, created_at, updated_at'
+
+// 測定施設。BKB＝備後町コイズミビルの略称。
+// 実際の測定は BKB と小泉本社が中心だが、現行アプリ（FileMaker）の選択肢に合わせて
+// スイングビルも残しておく。
+const VALID_CHLORINE_BUILDINGS = new Set(['BKB', 'スイングビル', '小泉本社'])
+
+// 濃度は 0〜99.99 mg/L の範囲で小数第2位まで（DBは numeric(4,2)）。
+// 未測定（記録だけ先に作る場合）は null を許す。
+function sanitizeConcentration(value) {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isFinite(num) || num < 0 || num > 99.99) return null
+  return Math.round(num * 100) / 100
+}
+
+// OK/NG の判定。true=OK / false=NG / それ以外（未選択）は null
+function sanitizeJudgement(value) {
+  if (value === true || value === false) return value
+  return null
+}
+
+// 'YYYY-MM-DD'（JST）に直す。日報（daily_reports.report_date）はJSTの日付で持つため、
+// タイムゾーン付きの測定日時から必ずこの関数で日付を求める
+function toJstDate(isoString) {
+  return new Date(isoString).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
+// 測定日の日報を取得し、無ければ作成して id を返す。
+// 写真が日報に属する設計のため、検査レコードは必ずいずれかの日報に紐付ける。
+async function resolveReportIdForDate(supabase, date, auth) {
+  const { data: existing } = await supabase
+    .from('daily_reports')
+    .select('id')
+    .eq('report_date', date)
+    .maybeSingle()
+  if (existing) return existing.id
+
+  const worker = auth.display_name || null
+  const { data: created, error: err } = await supabase
+    .from('daily_reports')
+    .insert({
+      report_date: date,
+      worker_am: worker,
+      worker_pm: worker,
+      work_start: '09:00:00',
+      work_end: '18:00:00',
+      created_by: auth.sub,
+    })
+    .select('id')
+    .single()
+  if (!err) return created.id
+
+  // unique 違反（同時作成）は既存を読み直す
+  const { data: raced } = await supabase
+    .from('daily_reports')
+    .select('id')
+    .eq('report_date', date)
+    .maybeSingle()
+  if (raced) return raced.id
+  throw new Error(err.message)
+}
+
+// GET /api/report/chlorine?year=YYYY&building=… — 測定記録の一覧（測定日時の新しい順）。
+// year / building は任意。省略時は全期間・全施設（上限1000件）を返す。
+export async function handleChlorineList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const params = new URL(req.url).searchParams
+    const year = params.get('year') || ''
+    const building = params.get('building') || ''
+
+    const supabase = getAdminClient()
+    let query = supabase.from('chlorine_tests').select(`${CHLORINE_COLUMNS}, daily_reports(report_date)`)
+
+    if (year) {
+      if (!/^\d{4}$/.test(year)) return json({ error: 'year が不正です' }, 400)
+      // JST基準の1年間（UTCで持つ tested_at を JST の年で切るため -09:00 を明示する）
+      query = query.gte('tested_at', `${year}-01-01T00:00:00+09:00`).lt('tested_at', `${Number(year) + 1}-01-01T00:00:00+09:00`)
+    }
+    if (building) {
+      if (!VALID_CHLORINE_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
+      query = query.eq('building', building)
+    }
+
+    const { data, error: err } = await query.order('tested_at', { ascending: false }).limit(1000)
+    if (err) {
+      console.error('chlorine-list:', err.message)
+      return json({ error: '残留塩素等検査の取得に失敗しました' }, 500)
+    }
+    // 記録元の日報へ戻れるよう report_date も一緒に返す（違反車両一覧と同じ扱い）
+    const tests = (data || []).map(({ daily_reports, ...rest }) => ({
+      ...rest,
+      report_date: daily_reports?.report_date || null,
+    }))
+    return json({ tests })
+  } catch (err) {
+    console.error('chlorine-list 失敗:', err)
+    return json({ error: '残留塩素等検査の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/report/chlorine — 測定記録の新規作成。
+// report_id は受け取らず、測定日時（tested_at）のJST日付から日報を引き当てる/作成する。
+export async function handleChlorineCreate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const building = String(payload?.building || '')
+    if (!VALID_CHLORINE_BUILDINGS.has(building)) return json({ error: 'building が不正です' }, 400)
+
+    const testedAt =
+      payload?.tested_at && !Number.isNaN(Date.parse(payload.tested_at))
+        ? new Date(payload.tested_at).toISOString()
+        : new Date().toISOString()
+
+    const supabase = getAdminClient()
+    const reportId = await resolveReportIdForDate(supabase, toJstDate(testedAt), auth)
+
+    const row = {
+      report_id: reportId,
+      building,
+      location: trimOrNull(payload?.location, 100),
+      tested_at: testedAt,
+      concentration: sanitizeConcentration(payload?.concentration),
+      color_ok: sanitizeJudgement(payload?.color_ok),
+      turbidity_ok: sanitizeJudgement(payload?.turbidity_ok),
+      odor_ok: sanitizeJudgement(payload?.odor_ok),
+      taste_ok: sanitizeJudgement(payload?.taste_ok),
+      inspector: trimOrNull(payload?.inspector, 50),
+      note: trimOrNull(payload?.note, 1000),
+      created_by: auth.sub,
+    }
+    const { data, error: err } = await supabase
+      .from('chlorine_tests')
+      .insert(row)
+      .select(CHLORINE_COLUMNS)
+      .single()
+    if (err) {
+      console.error('chlorine-create:', err.message)
+      return json({ error: '残留塩素等検査の登録に失敗しました' }, 500)
+    }
+    return json({ test: data })
+  } catch (err) {
+    console.error('chlorine-create 失敗:', err)
+    return json({ error: '残留塩素等検査の登録に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/report/chlorine — 測定記録の更新。
+// 測定日時を別の日に変更した場合は、紐付ける日報も新しい日付のものに付け替える
+// （その日報に属する写真も一緒に移す。写真の保管キーは作成時の日付のままで問題ない）。
+export async function handleChlorineUpdate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = payload?.id
+    if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
+
+    const patch = {}
+    if ('building' in payload) {
+      if (!VALID_CHLORINE_BUILDINGS.has(String(payload.building))) {
+        return json({ error: 'building が不正です' }, 400)
+      }
+      patch.building = String(payload.building)
+    }
+    if ('location' in payload) patch.location = trimOrNull(payload.location, 100)
+    if ('concentration' in payload) patch.concentration = sanitizeConcentration(payload.concentration)
+    if ('color_ok' in payload) patch.color_ok = sanitizeJudgement(payload.color_ok)
+    if ('turbidity_ok' in payload) patch.turbidity_ok = sanitizeJudgement(payload.turbidity_ok)
+    if ('odor_ok' in payload) patch.odor_ok = sanitizeJudgement(payload.odor_ok)
+    if ('taste_ok' in payload) patch.taste_ok = sanitizeJudgement(payload.taste_ok)
+    if ('inspector' in payload) patch.inspector = trimOrNull(payload.inspector, 50)
+    if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
+
+    const supabase = getAdminClient()
+    if ('tested_at' in payload) {
+      if (Number.isNaN(Date.parse(payload.tested_at))) return json({ error: 'tested_at が不正です' }, 400)
+      const testedAt = new Date(payload.tested_at).toISOString()
+      patch.tested_at = testedAt
+      patch.report_id = await resolveReportIdForDate(supabase, toJstDate(testedAt), auth)
+    }
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const { data, error: err } = await supabase
+      .from('chlorine_tests')
+      .update(patch)
+      .eq('id', id)
+      .select(CHLORINE_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('chlorine-update:', err.message)
+      return json({ error: '残留塩素等検査の更新に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '残留塩素等検査のレコードが見つかりません' }, 404)
+
+    // 日付の変更で日報を付け替えた場合は、紐づく写真も同じ日報へ移す
+    // （写真は report_id で日報に属するため、そのままだと元の日から辿れてしまう）
+    if (patch.report_id) {
+      const { error: photoErr } = await supabase
+        .from('report_photos')
+        .update({ report_id: patch.report_id })
+        .eq('chlorine_id', id)
+      if (photoErr) console.error('chlorine-update(photos):', photoErr.message)
+    }
+    return json({ test: data })
+  } catch (err) {
+    console.error('chlorine-update 失敗:', err)
+    return json({ error: '残留塩素等検査の更新に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/report/chlorine?id=… — 測定記録の削除（紐づく写真も cascade で消える）
+export async function handleChlorineDelete(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const supabase = getAdminClient()
+    // Storage の実体は DB の cascade 削除に追従しないため、消す前に対象を控えておく
+    const { data: photos } = await supabase
+      .from('report_photos')
+      .select('storage_key, thumb_key')
+      .eq('chlorine_id', id)
+    const { error: err } = await supabase.from('chlorine_tests').delete().eq('id', id)
+    if (err) {
+      console.error('chlorine-delete:', err.message)
+      return json({ error: '残留塩素等検査の削除に失敗しました' }, 500)
+    }
+    for (const p of photos || []) {
+      await deleteObject(p.storage_key)
+      if (p.thumb_key) await deleteObject(p.thumb_key)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('chlorine-delete 失敗:', err)
+    return json({ error: '残留塩素等検査の削除に失敗しました' }, 500)
   }
 }

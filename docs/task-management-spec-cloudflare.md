@@ -248,16 +248,17 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | POST/PATCH/DELETE `/api/report/entries` | JWT（owner不可） | 作業記録の明細の追加・更新・削除。追加時は既存の最大 `sort_order`+1 を採番して末尾に置く。タスクからの転記は `source_task_id` を伴う |
 | GET `/api/report/templates` | JWT | 定型文（有効なもののみ・並び順） |
 | PUT `/api/report/templates` | JWT（owner不可） | 定型文を丸ごと差し替え（配列の順序＝`sort_order`） |
-| GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。GET は `category=work`/`parking` で絞り込み可能（2026-08-05追加。work=作業記録の写真／parking=違反車両の写真を混在させないため）。POST は multipart/form-data（縮小はクライアント側で済ませてから送る。`parking_id` を渡すと違反車両レコードに紐付く）。DELETE は保管したオブジェクトも消す |
+| GET/POST/PATCH/DELETE `/api/report/photos` | JWT（書込はowner不可） | 日報の写真。GET は `category=work`/`parking`/`chlorine` で絞り込み可能（2026-08-05追加。用途の異なる写真を混在させないため）。残留塩素等検査の写真は日報単位ではなく検査レコード単位で扱うため `chlorine_id=` でも絞り込める（2026-08-10追加）。POST は multipart/form-data（縮小はクライアント側で済ませてから送る。`parking_id` / `chlorine_id` を渡すとそのレコードに紐付く）。DELETE は保管したオブジェクトも消す |
 | GET `/api/report/photo` | JWT | 写真の本体を返す（`thumb=1` でサムネイル。無ければ本体で代替）。バケットは非公開なのでこの経路以外からは取得できない |
 | GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
 | GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表の実施記録。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。休館日は含まない（下記 `/api/report/closed-days` 参照。2026-08-07に分離） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
-| POST `/api/report/inspection-pdf-preview` | JWT | 自主検査表PDF（本体そのもの。`application/pdf`）を受け取り、Supabase Storage（ユーザーごとに固定キーでupsert）に一時保存して、プレビュー用の180秒だけ有効な署名トークンを返す（4-12参照。2026-08-07追加） |
+| POST `/api/report/inspection-pdf-preview` | JWT | 日報系で生成したPDF（本体そのもの。`application/pdf`）を受け取り、Supabase Storage（ユーザーごとに固定キーでupsert）に一時保存して、プレビュー用の180秒だけ有効な署名トークンを返す（4-12参照。2026-08-07追加） |
 | GET `/api/report/inspection-pdf-preview` | 上記トークン（クエリ`token=`） | PDF本体を`Content-Disposition: inline`で返す。`<iframe src>`はAuthorizationヘッダを送れないため、通常のBearer認証の代わりに短時間トークンで認証する（`/api/attachment`のpreview_tokenと同じ方式）。このレスポンスだけ`X-Frame-Options: SAMEORIGIN`/CSP `frame-ancestors 'self'`で自オリジンのiframe埋め込みを許可する（2026-08-07追加） |
-| GET/POST/DELETE `/api/report/closed-days` | JWT（書込はowner不可） | 休館日（4-12・4-14参照）。自主検査表専用ではなく日報一覧とも共有するプロジェクト共通情報。GET は `month=YYYY-MM` で絞り込み（省略で全期間）、`{closed_days:["YYYY-MM-DD",...]}` を返す。POST は `{date}` を休館日にする（既にその日の日報があれば400で拒否。自主検査表の記録があれば削除してから登録）。DELETE は `date=` で解除（2026-08-07追加） |
+| GET/POST/DELETE `/api/report/closed-days` | JWT（書込はowner不可） | 休館日（4-10・4-12参照）。自主検査表専用ではなく日報一覧とも共有するプロジェクト共通情報。GET は `month=YYYY-MM` で絞り込み（省略で全期間）、`{closed_days:["YYYY-MM-DD",...]}` を返す。POST は `{date}` を休館日にする（既にその日の日報があれば400で拒否。自主検査表の記録があれば削除してから登録）。DELETE は `date=` で解除（2026-08-07追加） |
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
 | POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（`plate_number`は数字4桁に正規化。判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は`api_usage`の`parking_calls`列に加算し、メール/FAXとは別内訳として従量課金事項画面に表示する（2026-08-05追加。4-13参照） |
+| GET/POST/PATCH/DELETE `/api/report/chlorine` | JWT（書込はowner不可） | 残留塩素等検査（4-14参照）。GET は `year=YYYY`（JST基準の1年）・`building=` で絞り込み（省略で全期間・全施設。新しい順・上限1000）、各行に `report_date`（記録元の日報の日付）を付ける。POST は `tested_at` のJST日付から日報を引き当て（無ければ作成）て紐付ける。PATCH で測定日を別の日に変えた場合は紐づく写真の `report_id` も付け替える。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-10追加） |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -342,7 +343,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 ### 4-10. 日報機能（2026-08-04〜。Phase 1〜3 完了）
 
 FileMaker で運用していた日報アプリ `koizumi-report` を統合したもの。計画の全体像は `docs/daily-report-plan.md` を参照。
-**Phase 1〜3（権限ロール・日報の作業記録・写真・自主検査表）が完了済み、Phase 4（不正駐車）に着手済み**（4-13参照）。残留塩素／FileMaker連携（Phase 5〜6）は未着手。
+**Phase 1〜3（権限ロール・日報の作業記録・写真・自主検査表）が完了済み、Phase 4（不正駐車）に着手済み**（4-13参照）。
+**Phase 5 のうち残留塩素等検査を実装済み**（4-14参照）。メンテナンス実績／FileMaker連携は未着手。
 
 - **セクション切替**: 共通ヘッダに `[ タスク ｜ 日報 ]` のセグメントを置く（`AppHeader.jsx` の `.app-switch`）。
   現在位置は `useLocation()` で判定し（`/reports` 配下が日報）、ハンバーガーメニューの項目もセクションに応じて出し分ける。
@@ -352,7 +354,7 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   既存ユーザーは全員 `staff` になるため挙動は変わらない。**ロールは JWT に埋めた値ではなく `verifyRequestAuth` が毎回DBから引く**ため、
   権限を下げた際に有効期限（30日）を待たず即反映される。owner にはフロントでも書き込みUIを出さないが、
   **サーバー側でも日報系APIの書き込みを403で拒否**し、UIの無効化だけに依存しない（`worker/lib/http.js` の `canWrite`）
-- **画面**: 日報一覧（`/reports`）／日報詳細（`/reports/:date`。写真・違反車両の登録を含む）／自主検査表（`/reports/inspections`）／違反車両一覧（`/reports/parking`）／定型文の設定（`/reports/templates`）。
+- **画面**: 日報一覧（`/reports`）／日報詳細（`/reports/:date`。写真・違反車両の登録を含む）／自主検査表（`/reports/inspections`）／違反車両一覧（`/reports/parking`）／残留塩素等検査（`/reports/chlorine`）／定型文の設定（`/reports/templates`）。
   タスク管理側の各ルートは `RequireStaff` で包み、owner が来たら `/reports` へ送る
 - **入力の設計**: 作業記録は一覧の下（既存の記録がある場合はその下）の「＋」ボタンで行が増え、**時刻は空欄が既定値**（後からまとめて入力する運用のため。撮影時刻等と違い現在時刻を入れると実際の作業時刻と食い違う）。
   定型文は**ドロップダウンから選ぶとその場で内容入りの行を追加**する（2026-08-05。従来のチップ一覧から変更）。
@@ -541,6 +543,40 @@ FileMaker の「不正駐車記録」タブ・一覧画面に相当する機能�
 - **未実装**: 入力時に同一ナンバーの過去履歴・累計回数を自動表示する機能（一覧画面の「累計回数順」はあるが、
   登録画面での即時表示はまだ無い）、一覧画面での統計・写真サムネイル表示、過去データ（FileMaker）の移行
 
+### 4-14. 残留塩素等検査（2026-08-10〜。Phase 5）
+
+FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相当する機能。BKB・小泉本社などで週1回、
+残留塩素濃度を測定し、検査薬の色変化の写真と色/濁り/臭気/味の判定を記録して、年単位・建物別に
+「残留塩素等検査実施記録表」をPDF出力し小泉産業様へ提出する。計画は `docs/daily-report-plan.md` Phase 5 を参照。
+
+- **画面（`/reports/chlorine`）**: 現行アプリのTOP・一覧・帳票出力を1画面にまとめた。上から
+  「測定を記録」ボタン → 絞り込み（対象年・測定施設） → 帳票の出力（測定施設＋出力ボタン） → 測定日ごとの一覧。
+  一覧は日付見出しの下に施設名・測定時刻・測定値・測定場所・検査者を並べ、**行タップで入力モーダル**を開く
+  （自主検査表と同じく追加と変更を区別しないUI）。基準値（0.1mg/L）未満の測定値は赤、NG項目があればバッジを出す。
+  owner（小泉産業様）は閲覧とPDF出力のみで、行タップ・記録ボタンは出さない（サーバー側でも書き込みは403）
+- **入力モーダル（`ChlorineForm.jsx`）**: 現行アプリの入力画面の並びに合わせ、測定施設 → 測定場所・検査者 →
+  測定写真 → 測定日時 → 残留塩素濃度 → 色/濁り/臭気/味のOK・NG → 備考。OK/NGは同じボタンをもう一度押すと
+  未選択に戻せる（判定は `true`=OK / `false`=NG / `null`=未選択の3値。未選択は帳票でも空欄にして記入漏れが分かるようにする）。
+  濃度が基準値未満のときはその場で警告を出す
+- **測定写真**: `report_photos` に `category='chlorine'`・`chlorine_id` で紐付ける（作業写真720px・違反車両1280pxに対し、
+  色の判別が目的なので720pxで足りる。`RESIZE_PRESETS.chlorine`）。**新規登録では保存を押して初めて**検査レコードを作り、
+  選んでおいた写真をそのあとアップロードする（キャンセルしたときにレコード・写真・日報のどれも残さないため）
+- **日報との関係**: 一覧は日を跨るため `chlorine_tests` は `daily_reports` とは独立した行として持つが、
+  写真が日報に属する設計（`report_photos.report_id` は NOT NULL）のため、**測定日（JST）の日報に紐付ける。
+  その日の日報が無ければAPI側で作成する**（測定はその日の作業実績のため）。測定日を別の日に変更した場合は、
+  紐づく写真の `report_id` も新しい日報へ付け替える。日報一覧の各行右端には、その日に測定があれば水滴アイコンを出す
+  （`GET /api/reports` が返す `has_chlorine`）
+- **帳票PDF（`ChlorineSheet.jsx` / `useChlorinePdfExport.jsx`）**: 自主検査表PDFと同じ方式
+  （画面外に組んだA4縦のシートを html2canvas で撮り、jsPDF で1枚＝1ページにする → 短時間有効トークンで
+  アプリ内プレビュー表示。4-12参照）。年間52件前後が1枚に収まらないため**38行ごとに改ページ**し、
+  2ページ目以降にも見出しと表ヘッダを繰り返す。行の並びは実施順（古い順）。PDF出力用のプレビューAPIは
+  自主検査表用に作った `/api/report/inspection-pdf-preview` をそのまま使う（保存内容はPDF本体だけで種類を問わないため）
+- **測定施設**: `BKB`（＝備後町コイズミビル）/ `スイングビル` / `小泉本社`。実際の測定はBKBと小泉本社が中心だが、
+  現行アプリの選択肢に合わせてスイングビルも残している（サーバー側の許可リスト `VALID_CHLORINE_BUILDINGS`）
+- **API**: `GET/POST/PATCH/DELETE /api/report/chlorine`。GETは `year`（JST基準の1年）・`building` で絞り込め、
+  記録元の日報の日付（`report_date`）も返す。濃度は0〜99.99の範囲で小数第2位に丸め、範囲外・空欄は `null` にする
+- **未実装**: 過去データ（FileMaker）の移行、測定漏れ（週1回のペース）の警告表示
+
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
 メール/フォーム/FAX/Googleカレンダーから**自動登録**されたタスクについて、購読中のブラウザ/端末へWeb Push通知を送る。手動登録（画面の「＋」からの登録）は対象外（登録した本人が既に画面上にいるため）。
@@ -607,10 +643,11 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 | daily_reports | id / report_date(**unique**) / worker_am / worker_pm / work_start / work_end / created_by | 日報ヘッダ。**1日1件**（BKB＝備後町コイズミビルと小泉本社を1件にまとめる） |
 | report_entries | id / report_id(FK cascade) / entry_time / content / source_task_id(FK set null) / sort_order | 作業記録の明細。`source_task_id` はタスク管理からの転記元（タスクが消えても明細は残す） |
 | routine_templates | id / label / sort_order / is_active | 定型文マスタ（現行の「特記事項設定」に相当） |
-| report_photos | id / report_id(FK cascade) / category(`work`/`parking`/`chlorine`) / **parking_id**(FK cascade。2026-08-05追加) / storage_key(unique) / thumb_key(unique) / filename / mime / size / width / height / comment / taken_at / sort_order | 写真のメタ情報。実体は Supabase Storage の非公開バケット `report-photos`（4-11参照）。`parking_id` は違反車両の写真だけ持つ（4-13参照） |
+| report_photos | id / report_id(FK cascade) / category(`work`/`parking`/`chlorine`) / **parking_id**(FK cascade。2026-08-05追加) / **chlorine_id**(FK cascade。2026-08-10追加) / storage_key(unique) / thumb_key(unique) / filename / mime / size / width / height / comment / taken_at / sort_order | 写真のメタ情報。実体は Supabase Storage の非公開バケット `report-photos`（4-11参照）。`parking_id` は違反車両の写真だけ（4-13参照）、`chlorine_id` は残留塩素等検査の写真だけ（4-14参照）持つ |
 | fire_inspections | id / building / inspected_on / inspector / all_clear / items(jsonb) / note / periodic_result / confirmed_by | 自主検査表の実施記録。`(building, inspected_on)` で unique。休館日フラグ（`closed`）は2026-08-07に`closed_days`テーブルへ分離した（後述） |
 | parking_violations | id / report_id(FK cascade) / checked_at / plate_region / plate_number / maker / model / owner_company / violations(text[]) / note | 違反車両。`daily_reports`とは独立したテーブルで、日を跨って一覧できるようにしている（`/reports/parking`。4-13参照）。`plate_region`+`plate_number`で過去履歴・累計回数を名寄せする |
-| closed_days | closed_on(**PK**) / created_by | 休館日。**建物にも点検有無にも紐付かない日付単位のテーブル**（2026-08-07追加。自主検査表専用の`fire_inspections.closed`から分離し、日報一覧とも共有するプロジェクト共通情報にした。4-12・4-14参照） |
+| closed_days | closed_on(**PK**) / created_by | 休館日。**建物にも点検有無にも紐付かない日付単位のテーブル**（2026-08-07追加。自主検査表専用の`fire_inspections.closed`から分離し、日報一覧とも共有するプロジェクト共通情報にした。4-10・4-12参照） |
+| chlorine_tests | id / report_id(FK cascade) / building / location / tested_at / concentration(numeric(4,2)) / color_ok / turbidity_ok / odor_ok / taste_ok / inspector / note | 残留塩素等検査（2026-08-10追加。マイグレーション `add_chlorine_tests_phase5`）。日を跨って一覧するため独立した行として持つが、写真が日報に属する設計のため測定日の日報に紐付ける（無ければAPI側で作成）。判定4項目は `true`=OK / `false`=NG / `null`=未選択（4-14参照） |
 
 ### api_usage
 month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / **parking_calls**（違反車両写真AI読み取り分の内訳。マイグレーション `add_parking_usage_breakdown`。2026-08-05） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）・違反車両写真のAI読み取りは通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「メール」「FAX」「車両画像」の件数を分けて表示）

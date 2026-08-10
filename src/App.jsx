@@ -9,6 +9,7 @@ import ReportList from './pages/ReportList'
 import ReportTemplates from './pages/ReportTemplates'
 import Inspections from './pages/Inspections'
 import ParkingViolations from './pages/ParkingViolations'
+import Chlorine from './pages/Chlorine'
 import { isAuthenticated, getCurrentUser } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -103,6 +104,16 @@ function App() {
           element={
             <RequireAuth>
               <ParkingViolations />
+            </RequireAuth>
+          }
+        />
+        {/* 残留塩素等検査（2026-08-10）。オーナー（小泉産業様）は提出物の元データを
+            閲覧・PDF出力できるようにするため RequireAuth（書き込みはサーバー側で拒否） */}
+        <Route
+          path="/reports/chlorine"
+          element={
+            <RequireAuth>
+              <Chlorine />
             </RequireAuth>
           }
         />
