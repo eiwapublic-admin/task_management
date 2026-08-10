@@ -151,7 +151,7 @@ SVGアイコン**（`src/components/Icons.jsx`）に統一する（初回実装�
 |---|---|---|
 | id | uuid PK | |
 | report_id | uuid | daily_reports 参照（**not null**。測定日の日報が無ければAPI側で作成して紐付ける） |
-| building | text | `BKB` / `スイングビル` / `小泉本社` |
+| building | text | `BKB` / `小泉本社` |
 | location | text | 採水場所（1F給湯室 等） |
 | tested_at | timestamptz | |
 | concentration | numeric(4,2) | 濃度（0.10 等）。0〜99.99 |

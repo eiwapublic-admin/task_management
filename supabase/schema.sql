@@ -416,7 +416,7 @@ create index if not exists report_photos_parking_idx on report_photos (parking_i
 create table if not exists chlorine_tests (
   id            uuid primary key default gen_random_uuid(),
   report_id     uuid not null references daily_reports(id) on delete cascade,
-  -- BKB（＝備後町コイズミビル）/ スイングビル / 小泉本社
+  -- BKB（＝備後町コイズミビル）/ 小泉本社
   building      text not null,
   -- 採水場所（1F給湯室 等）
   location      text,

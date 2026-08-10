@@ -401,9 +401,10 @@ export async function recognizeParkingPhoto(photoId) {
 
 // ---- 残留塩素等検査（Phase 5。2026-08-10）----
 
-// 測定施設。BKB＝備後町コイズミビルの略称。実際の測定は BKB と小泉本社が中心だが、
-// 現行アプリ（FileMaker）の選択肢に合わせてスイングビルも残している。
-export const CHLORINE_BUILDINGS = ['BKB', 'スイングビル', '小泉本社']
+// 測定施設。BKB＝備後町コイズミビルの略称。
+// 現行アプリ（FileMaker）のTOP画面には「スイングビル」もあったが、実際に測定するのは
+// この2施設のみとの確認により対象外にした（2026-08-10）。
+export const CHLORINE_BUILDINGS = ['BKB', '小泉本社']
 
 // 帳票・入力欄に並ぶ官能検査の4項目（順序も紙の帳票に合わせる）
 export const CHLORINE_JUDGEMENT_ITEMS = [
