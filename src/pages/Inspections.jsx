@@ -295,6 +295,7 @@ export default function Inspections() {
       )}
 
       {pdf.previewModal}
+      {pdf.busyOverlay}
     </div>
   )
 }
