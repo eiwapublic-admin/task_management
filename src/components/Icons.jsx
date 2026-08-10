@@ -134,3 +134,13 @@ export function IconCalendar(props) {
     </Icon>
   )
 }
+
+// 日報一覧の作業記録検索（2026-08-08）
+export function IconSearch(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </Icon>
+  )
+}
