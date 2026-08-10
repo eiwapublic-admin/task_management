@@ -13,6 +13,7 @@ import {
   IconChevronRight,
   IconList,
   IconCalendar,
+  IconSearch,
 } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
@@ -55,6 +56,26 @@ const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土']
 // （ログイン情報等ではないため localStorage ほど長く残す必要はない）。
 const VIEW_STORAGE_KEY = 'reports_view'
 
+// 正規表現の特殊文字をエスケープする（検索語をそのままRegExpに渡すため）
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// 作業記録のテキスト中の一致箇所を <mark> で強調する
+function highlightMatch(text, query) {
+  if (!query) return text
+  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'ig'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <mark className="report-search-hit" key={i}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  )
+}
+
 // 自主検査表（Inspections.jsx）と同じ「月単位・＜＞で移動・1日から全日表示」の構成にする
 // （2026-08-07）。休館日はプロジェクト共通情報（closed_days）のため自主検査表とも共有する。
 // 表示は「リスト型」と「カレンダー型」を切り替えられる（カレンダー型はPC/iPad専用。2026-08-07）。
@@ -82,6 +103,13 @@ export default function ReportList() {
       ? 'calendar'
       : 'list',
   )
+  // 作業記録の検索（2026-08-08）。虫眼鏡タップで検索欄を開閉し、入力文字が
+  // 1文字でもあれば通常のリスト/カレンダー表示に代えて検索結果を出す。
+  // 対象は日報全般（表示中の月に限らず、一覧が既に保持している全期間分の
+  // reportsから探す。/api/reports は元々全期間を一度に取得している）。
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searching = searchQuery.trim().length > 0
   // カレンダー型を出せる画面幅か。回転（iPadの縦横）にも追従させる
   const [isWideScreen, setIsWideScreen] = useState(
     () => typeof window === 'undefined' || window.matchMedia(WIDE_SCREEN_QUERY).matches,
@@ -443,10 +471,75 @@ export default function ReportList() {
     )
   }
 
+  function handleToggleSearch() {
+    if (searchOpen) {
+      setSearchOpen(false)
+      setSearchQuery('')
+    } else {
+      setSearchOpen(true)
+    }
+  }
+
+  // 検索結果。表示中の月に関わらず、一覧が保持している全期間分のreportsから
+  // 作業記録のテキスト内容（entries[].content）に一致するものを探す。
+  // マッチした明細だけを、日付の新しい順（reportsの取得順のまま）に出す。
+  function renderSearchResults() {
+    const q = searchQuery.trim().toLowerCase()
+    const matches = reports
+      .map((r) => ({
+        report: r,
+        entries: sortEntriesByTime((r.entries || []).filter((e) => e.content)).filter((e) =>
+          e.content.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((m) => m.entries.length > 0)
+
+    if (matches.length === 0) {
+      return <p className="report-empty">「{searchQuery}」に一致する作業記録は見つかりませんでした。</p>
+    }
+
+    return (
+      <ul className="report-list">
+        {matches.map(({ report: r, entries }) => {
+          const wd = weekdayInfo(r.report_date, holidays)
+          return (
+            <li key={r.report_date}>
+              <button
+                type="button"
+                className="report-row"
+                onClick={() => navigate(`/reports/${r.report_date}`)}
+              >
+                <div className="report-row-main">
+                  <div className="report-row-date">
+                    <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
+                    <span className="report-workers">
+                      {r.worker_am || '—'} | {r.worker_pm || '—'}
+                    </span>
+                  </div>
+                  <div className="report-row-body">
+                    {entries.map((e) => (
+                      <div className="report-line" key={e.id}>
+                        <span className="report-line-time">{toHHMM(e.entry_time)}</span>
+                        <span className="report-line-text">{highlightMatch(e.content, searchQuery.trim())}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {renderIcons(r.report_date, dayState(r.report_date), 20)}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
   return (
     <div className="reports-page">
       <AppHeader />
-      <div className={`reports-container${activeView === 'calendar' ? ' is-calendar' : ''}`}>
+      {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
+          検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
+      <div className={`reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ''}`}>
         <div className="reports-toolbar">
           <div className="inspection-month">
             <button
@@ -495,11 +588,24 @@ export default function ReportList() {
                 </button>
               </div>
             )}
+            {/* 作業記録の検索（2026-08-08）。押すと下に検索欄が開く。「自主検査」ボタンの
+                左側に置く指定のため、ボタン群の並びの中でこの位置にしている */}
+            <button
+              type="button"
+              className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
+              onClick={handleToggleSearch}
+              aria-label="作業記録を検索"
+              aria-pressed={searchOpen}
+              title="作業記録を検索"
+            >
+              <IconSearch size={20} />
+            </button>
             {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
                 その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
                 （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
                 アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
-                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持 */}
+                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持。
+                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08） */}
             <button
               type="button"
               className="btn-plain"
@@ -508,7 +614,7 @@ export default function ReportList() {
               title="紙の様式でPDFに出力する（半月ごとに1ページ）"
             >
               <IconDownload size={18} />
-              {pdf.busy ? '作成中…' : '自主検査PDF'}
+              {pdf.busy ? '作成中…' : '自主検査'}
             </button>
             <button type="button" className="btn-plain" onClick={() => navigate('/reports/parking')}>
               <IconCar size={18} />
@@ -528,6 +634,31 @@ export default function ReportList() {
           </div>
         </div>
 
+        {searchOpen && (
+          <div className="reports-search-bar">
+            <IconSearch size={18} />
+            <input
+              type="search"
+              className="reports-search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="作業記録を検索"
+              aria-label="作業記録を検索"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="reports-search-clear"
+                onClick={() => setSearchQuery('')}
+                aria-label="検索文字をクリア"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
+
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
@@ -542,6 +673,8 @@ export default function ReportList() {
 
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
+        ) : searching ? (
+          renderSearchResults()
         ) : activeView === 'calendar' ? (
           renderCalendar()
         ) : (

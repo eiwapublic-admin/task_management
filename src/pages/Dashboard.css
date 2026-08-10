@@ -911,6 +911,10 @@
   margin-bottom: var(--space-3);
 }
 
+/* .page-title は他画面向けに下マージンを持つが、ここでは年月・各ボタンと
+   縦位置を揃えるため打ち消す（マージンが非対称だと中央揃えの基準がずれるため） */
+.reports-toolbar .page-title { margin: 0; }
+
 /* --- 一覧（自主検査表と同様、月単位で1日から全日を表示する。2026-08-07） --- */
 .report-list {
   list-style: none;
@@ -1094,6 +1098,81 @@
 /* カレンダー型のときはマス目を画面幅いっぱいに広げる（リスト型は900px中央寄せのまま） */
 .reports-container.is-calendar { max-width: none; }
 
+/* --- 作業記録の検索（2026-08-08） --- */
+
+/* 虫眼鏡アイコン。歯車ボタン（.icon-btn-gear）と同じ見た目だが、開いている間は
+   色を付けて状態が分かるようにする */
+.icon-btn-search {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-btn-search:hover { color: var(--color-primary); }
+
+.icon-btn-search.is-active {
+  color: #33604d;
+  background: rgba(51, 96, 77, 0.12);
+}
+
+.reports-search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}
+
+.reports-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-base);
+}
+
+.reports-search-input:focus { outline: none; }
+
+/* type="search" のブラウザ標準の×（Chromium等）を消す。独自の.reports-search-clear
+   と二重表示になるため（2026-08-08） */
+.reports-search-input::-webkit-search-cancel-button { display: none; }
+
+.reports-search-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.reports-search-clear:hover { color: var(--text-strong); }
+
+/* 検索結果内での一致箇所の強調表示。日報系ヘッダーバーと同じ黄色を流用する */
+.report-search-hit {
+  background: var(--reports-header-bg);
+  color: var(--reports-header-ink);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
 .report-calendar {
   display: flex;
   flex-direction: column;
@@ -1107,12 +1186,19 @@
   gap: var(--space-2);
 }
 
+/* 曜日の行に日報詳細と同じイエローの背景枠を付ける（2026-08-10） */
+.report-calendar-head {
+  background: var(--reports-header-bg);
+  border-radius: var(--radius-lg);
+  padding: 6px 0;
+}
+
 .report-calendar-head-cell {
   padding: 4px 0;
   text-align: center;
-  font-size: 13px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--reports-header-ink);
 }
 
 /* 曜日見出しも日付と同じ配色にする（土=青・日=赤） */
@@ -1123,7 +1209,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-height: 130px;
   padding: var(--space-2);
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -1153,7 +1238,7 @@
 }
 
 .report-calendar-day {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
@@ -1242,7 +1327,7 @@
   .reports-container.is-calendar { padding-left: var(--space-3); padding-right: var(--space-3); }
   .report-calendar-head,
   .report-calendar-week { gap: 4px; }
-  .report-calendar-cell { padding: 6px; min-height: 110px; }
+  .report-calendar-cell { padding: 6px; }
   .report-calendar-line { font-size: 12px; gap: 4px; }
   .report-calendar-line .report-line-time { width: 34px; }
   .report-calendar-workers { font-size: 11px; }
