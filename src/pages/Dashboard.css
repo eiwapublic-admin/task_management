@@ -5,7 +5,7 @@
 
 /* ヘッダー: 落ち着いたグリーン */
 .dashboard-header {
-  --header-bg: #33604d;
+  --header-bg: var(--color-brand);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -19,7 +19,7 @@
   border-bottom: 1px solid color-mix(in srgb, var(--header-bg) 80%, #000);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-header);
 }
 
 .dashboard-header-left {
@@ -50,7 +50,7 @@
   height: 36px;
   flex-shrink: 0;
   /* 濃い緑の上でも映えるよう白い円形の台座に載せる */
-  background: #fff;
+  background: var(--bg-surface);
   border-radius: 50%;
   padding: 5px;
   box-sizing: border-box;
@@ -65,16 +65,16 @@
 
 /* 表示用バージョン（ビルド時刻）。緑ヘッダー上で控えめに */
 .dashboard-version {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   line-height: 1.2;
   color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
 }
 
 .dashboard-header h1 {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   margin: 0;
-  color: #fff;
+  color: var(--ink-on-fill);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -84,7 +84,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: rgba(255, 255, 255, 0.92);
 }
 
@@ -97,9 +97,9 @@
 
 /* ハンバーガーメニュー左のログインユーザー名（緑ヘッダー上で白く表示） */
 .dashboard-user {
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-fill);
   white-space: nowrap;
 }
 
@@ -113,7 +113,7 @@
   margin: var(--space-3) var(--space-5) 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .dashboard-error {
@@ -140,10 +140,10 @@
   display: inline-block;
   padding: var(--space-2) var(--space-3);
   background: var(--due-overdue);
-  color: #fff;
+  color: var(--ink-on-fill);
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -158,12 +158,8 @@
 }
 
 /* 利用状況パネル（設定ページ） */
-/* 従量課金事項ページの本文コンテナ */
-.usage-container {
-  padding: var(--space-4) var(--space-5);
-  /* 月別の内訳テーブル（6列）が窮屈にならない幅にする（2026-08-03） */
-  max-width: 860px;
-}
+/* 従量課金事項の本文コンテナは .ui-container.is-narrow を使う（2026-08-11）。
+   以前は max-width:860px で margin:auto が無く、この画面だけ左寄せになっていた */
 
 /* 独立画面用のカード。従量課金事項は「Anthropic API利用状況」「日報の写真ストレージ」で
    枠を分け、見出し行に塗りつぶし色をつけてメリハリを出す（2026-08-05）。 */
@@ -178,19 +174,19 @@
 .usage-panel + .usage-panel { margin-top: var(--space-4); }
 
 .usage-panel h2 {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--text-strong);
   margin: 0;
 }
 
 /* 見出し行のグレー塗りつぶしバー。report-card-title と同じ、カード上端いっぱいに
    広げる負のマージンの手法。塗りつぶし色はグレー（2026-08-05: var(--bg-subtle) は
-   ほぼ白に近くメリハリが弱かったため濃いグレーに変更。#d1d5db でもまだ薄いとの
-   指摘を受け、さらに一段濃い #9ca3af に変更） */
+   ほぼ白に近くメリハリが弱かったため濃いグレーに変更。var(--border-strong) でもまだ薄いとの
+   指摘を受け、さらに一段濃い var(--text-faint) に変更） */
 .usage-panel-title {
   margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-4);
   padding: var(--space-3) var(--space-5);
-  background: #9ca3af;
+  background: var(--text-faint);
   border-bottom: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
@@ -217,18 +213,18 @@
   width: 150px;
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 
 .usage-fields dd {
   margin: 0;
   color: var(--text-base);
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 
 .usage-note {
   margin-top: var(--space-4);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .usage-cost {
@@ -239,12 +235,12 @@
 .usage-jpy {
   font-weight: 400;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 /* 月別の内訳テーブル */
 .usage-subtitle {
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-strong);
   margin: var(--space-5) 0 var(--space-2);
 }
@@ -257,7 +253,7 @@
 .usage-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--fs-base);
   white-space: nowrap;
 }
 
@@ -269,7 +265,7 @@
 }
 
 .usage-table thead th {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -285,17 +281,17 @@
 }
 
 .usage-table tbody tr.is-current {
-  background: rgba(51, 96, 77, 0.06);
+  background: var(--color-brand-softer);
 }
 
 .usage-badge {
   margin-left: 6px;
   padding: 1px 6px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
-  color: #33604d;
-  background: rgba(51, 96, 77, 0.12);
-  border-radius: 999px;
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-pill);
 }
 
 .usage-table tfoot th,
@@ -312,11 +308,11 @@
   display: inline-block;
   flex-shrink: 0;
   padding: var(--space-2) var(--space-4);
-  background: #1a1a1a;
-  color: #fff;
+  background: var(--scrim-heavy);
+  color: var(--ink-on-fill);
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   transition: filter var(--transition);
 }
@@ -337,7 +333,7 @@
 
 .dashboard-empty-hint {
   margin-top: var(--space-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -377,7 +373,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  z-index: 20;
+  z-index: var(--z-menu);
 }
 
 /* ドロップダウン内のボタンは全幅・左寄せで押しやすく。
@@ -386,7 +382,7 @@
   width: 100%;
   height: 36px;
   justify-content: flex-start;
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-strong);
 }
 
@@ -440,7 +436,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-3);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-base);
   cursor: pointer;
   transition: filter var(--transition);
@@ -458,12 +454,7 @@
 }
 
 /* 画面共通ページタイトル（コンテンツ側の見出し。ヘッダー自体は全画面共通のため画面名はここに出す） */
-.page-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 0 0 var(--space-4);
-}
+/* 画面タイトルは .ui-page-title（src/styles/ui.css）を使う */
 
 /* 設定ページ: ウインドウの高さに収め、業務背景欄が余った高さ・幅を埋めるようにする
    （ページ全体のスクロールではなく、はみ出す場合は左カラム側だけが内部スクロールする） */
@@ -478,9 +469,9 @@
   flex-shrink: 0;
 }
 
-/* 設定ページの本文コンテナ（横は画面いっぱいに使う） */
+/* 設定ページの本文コンテナ（横は画面いっぱいに使う。業務背景欄が残りの高さを埋める） */
 .settings-container {
-  padding: var(--space-4) var(--space-5);
+  padding: var(--page-pad-y) var(--page-pad-x);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -496,15 +487,12 @@
   flex-shrink: 0;
 }
 
-.settings-toolbar .page-title {
-  margin: 0;
-  margin-right: auto;
-}
+.settings-toolbar .ui-page-title { margin-right: auto; }
 
 .settings-toolbar .settings-saved {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--status-done, #33604d);
+  color: var(--status-done, var(--color-brand));
   min-height: 0;
 }
 
@@ -514,9 +502,9 @@
   align-items: center;
   border: 1px solid var(--color-primary);
   background: var(--color-primary);
-  color: #fff;
+  color: var(--ink-on-fill);
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-5);
   cursor: pointer;
@@ -542,10 +530,9 @@
   }
 }
 
-/* 操作ログ画面 */
-.logs-container {
-  padding: var(--space-4) var(--space-5);
-}
+/* 処理ログ・アーカイブ画面。表を素直に広げたいので max-width は付けない
+   （2026-07-18 に 1100px 制限を撤廃した経緯があるため、幅の制限を戻さないこと）。
+   余白は .ui-container が持つ */
 
 .logs-table {
   width: 100%;
@@ -554,7 +541,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .logs-table th {
@@ -587,7 +574,7 @@
   display: inline-block;
   padding: 1px var(--space-2);
   border-radius: var(--radius-pill);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -598,13 +585,13 @@
 }
 
 .logs-type-status_change {
-  background: color-mix(in srgb, #33604d 14%, var(--bg-surface));
-  color: #33604d;
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--bg-surface));
+  color: var(--color-brand);
 }
 
 .logs-note {
   margin-top: var(--space-3);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -621,7 +608,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -633,7 +620,7 @@
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-base);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .archive-filter-search {
@@ -651,8 +638,8 @@
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
   background: var(--color-primary);
-  color: #fff;
-  font-size: 14px;
+  color: var(--ink-on-fill);
+  font-size: var(--fs-base);
   font-weight: 600;
   cursor: pointer;
   transition: filter var(--transition);
@@ -674,7 +661,7 @@
 
 .archive-channel {
   text-align: center;
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .archive-channel img {
@@ -687,7 +674,7 @@
 /* タスクID列（T-123）。等幅で桁を揃え、user-select: all でコピーしやすくする */
 .archive-task-id {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   white-space: nowrap;
   user-select: all;
@@ -708,7 +695,7 @@
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   vertical-align: middle;
   white-space: nowrap;
@@ -724,7 +711,7 @@
 }
 
 .archive-action-btn {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-base);
   background: var(--bg-surface);
   border: 1px solid var(--border-strong);
@@ -739,7 +726,7 @@
 }
 
 .archive-action-select {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   padding: 3px 4px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -777,7 +764,7 @@
   }
 
   .dashboard-header h1 {
-    font-size: 17px;
+    font-size: var(--fs-lg);
   }
 
   .dashboard-header-left {
@@ -825,7 +812,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-modal);
   padding: var(--space-4);
 }
 
@@ -850,7 +837,7 @@
 
 .about-modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   color: var(--text-strong);
 }
 
@@ -865,42 +852,18 @@
    日報（2026-08-04〜）。詳細は docs/daily-report-plan.md
    ============================================================ */
 
-/* ヘッダのセクション切替（タスク ｜ 日報） */
+/* ヘッダのセクション切替（タスク ｜ 日報）。見た目は .ui-segmented.on-dark が持つ。
+   ここではヘッダー内での位置だけを決める */
 .app-switch {
-  display: flex;
   margin-left: var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 6px;
-  overflow: hidden;
   flex-shrink: 0;
-}
-
-.app-switch-btn {
-  padding: 5px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.app-switch-btn:hover { background: rgba(255, 255, 255, 0.16); }
-
-.app-switch-btn.is-active {
-  background: #fff;
-  color: #33604d;
 }
 
 /* 日報ページ全体 */
 .reports-page { min-height: 100vh; background: var(--bg-app); }
 
-.reports-container {
-  padding: var(--space-4) var(--space-5);
-  max-width: 900px;
-  margin: 0 auto;
-}
+/* 日報系の本文コンテナ。幅・中央寄せ・余白は .ui-container(.is-narrow) が持つ。
+   カレンダー型のときだけ .is-calendar で全幅に広げる */
 
 .reports-toolbar {
   display: flex;
@@ -911,9 +874,8 @@
   margin-bottom: var(--space-3);
 }
 
-/* .page-title は他画面向けに下マージンを持つが、ここでは年月・各ボタンと
-   縦位置を揃えるため打ち消す（マージンが非対称だと中央揃えの基準がずれるため） */
-.reports-toolbar .page-title { margin: 0; }
+/* 年月・各ボタンと縦位置を揃えるため下マージンを打ち消す（.ui-toolbar と同じ扱い） */
+.reports-toolbar .ui-page-title { margin: 0; }
 
 /* --- 一覧（自主検査表と同様、月単位で1日から全日を表示する。2026-08-07） --- */
 .report-list {
@@ -940,9 +902,9 @@
   color: inherit;
 }
 
-.report-row:hover { border-color: #33604d; }
+.report-row:hover { border-color: var(--color-brand); }
 /* 当日の帯はひと目で分かるよう大胆に太くする（2026-08-07。3px→8px） */
-.report-row.is-today { border-left: 8px solid #33604d; }
+.report-row.is-today { border-left: 8px solid var(--color-brand); }
 
 .report-row-main { flex: 1; min-width: 0; }
 
@@ -971,14 +933,14 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .report-row-icon.is-hidden { visibility: hidden; }
 
 /* 自主点検の実施有無。実施済みは落ち着いた緑、当日以前で未実施のときだけ
    黄色い丸背景で目立たせる（日報系ヘッダーバーと同じ配色を流用） */
-.report-inspection-icon.is-done { color: #33604d; }
+.report-inspection-icon.is-done { color: var(--color-brand); }
 .report-inspection-icon.is-pending {
   color: var(--reports-header-ink);
   background: var(--reports-header-bg);
@@ -992,27 +954,27 @@
   margin-bottom: 6px;
 }
 
-.report-date { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.report-date { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
 /* 土曜=青、日曜・祝日=赤（2026-08-05。自主検査表の日付列と同じ配色） */
-.report-date.is-saturday { color: #1d4ed8; }
-.report-date.is-holiday { color: #dc2626; }
+.report-date.is-saturday { color: var(--color-primary-hover); }
+.report-date.is-holiday { color: var(--color-danger); }
 
-.report-workers { font-size: 13px; color: var(--text-muted); }
+.report-workers { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .report-today-badge {
   margin-left: 8px;
   padding: 2px 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
-  color: #33604d;
-  background: rgba(51, 96, 77, 0.12);
-  border-radius: 999px;
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-pill);
   vertical-align: 2px;
 }
 
 .report-row-body { display: flex; flex-direction: column; gap: 2px; }
 
-.report-line { display: flex; gap: var(--space-3); font-size: 14px; }
+.report-line { display: flex; gap: var(--space-3); font-size: var(--fs-base); }
 
 .report-line-time {
   flex-shrink: 0;
@@ -1029,7 +991,7 @@
 }
 
 /* 「ほか N 件」の省略表示は廃止（2026-08-07。作業記録は全件出す）*/
-.report-empty { font-size: 13px; color: var(--text-muted); }
+.report-empty { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* 記録の無い日（未入力／休館日）の行。未入力かつ未来日でなければ<button>としてタップ可能
    （タップで新規作成。2026-08-07）、休館日・未来日は素の<div>にしている。 */
@@ -1049,10 +1011,10 @@
 
 /* 未入力の日をタップすると新規作成できる（2026-08-07。上部の「＋」ボタンを廃止した代わり） */
 .report-day-row.is-clickable { cursor: pointer; }
-.report-day-row.is-clickable:hover { border-color: #33604d; }
+.report-day-row.is-clickable:hover { border-color: var(--color-brand); }
 
 /* 当日をひと目で分かるよう枠の左端に色を付ける（.report-rowの当日表示と同じ配色・太さ。2026-08-07） */
-.report-day-row.is-today { border-left: 8px solid #33604d; }
+.report-day-row.is-today { border-left: 8px solid var(--color-brand); }
 
 /* 休館日は自主検査表の一覧と同じ配色でグレーアウトする */
 .report-day-row.is-closed { background: var(--border); }
@@ -1064,47 +1026,17 @@
   flex-wrap: wrap;
 }
 
-.report-day-empty-label { font-size: 13px; color: var(--text-muted); }
+.report-day-empty-label { font-size: var(--fs-sm); color: var(--text-muted); }
 .report-day-row.is-closed .report-day-empty-label { font-weight: 600; }
 
 .report-day-row-action { flex-shrink: 0; margin-left: auto; }
 
 /* --- カレンダー型の表示（2026-08-07。PC/iPad専用。リスト型とボタンで切り替える） --- */
 
-/* 表示切替のセグメントボタン。ヘッダの .app-switch と同じ形だが、
-   こちらは明るい背景の上に置くため配色だけ差し替えている */
-.report-view-switch {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.report-view-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.report-view-btn:hover { background: var(--bg-subtle); }
-
-.report-view-btn.is-active {
-  background: #33604d;
-  color: #fff;
-}
+/* リスト/カレンダーの表示切替は .ui-segmented を使う（見た目の定義は ui.css） */
 
 /* カレンダー型のときはマス目を画面幅いっぱいに広げる（リスト型は900px中央寄せのまま） */
-.reports-container.is-calendar { max-width: none; }
+.ui-container.reports-container.is-calendar { max-width: none; }
 
 /* --- 作業記録の検索（2026-08-08） --- */
 
@@ -1128,8 +1060,8 @@
 .icon-btn-search:hover { color: var(--color-primary); }
 
 .icon-btn-search.is-active {
-  color: #33604d;
-  background: rgba(51, 96, 77, 0.12);
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
 }
 
 .reports-search-bar {
@@ -1150,7 +1082,7 @@
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-base);
 }
 
@@ -1204,14 +1136,14 @@
 .report-calendar-head-cell {
   padding: 4px 0;
   text-align: center;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--reports-header-ink);
 }
 
 /* 曜日見出しも日付と同じ配色にする（土=青・日=赤） */
-.report-calendar-head-cell.is-sunday { color: #dc2626; }
-.report-calendar-head-cell.is-saturday { color: #1d4ed8; }
+.report-calendar-head-cell.is-sunday { color: var(--color-danger); }
+.report-calendar-head-cell.is-saturday { color: var(--color-primary-hover); }
 
 .report-calendar-cell {
   display: flex;
@@ -1231,10 +1163,10 @@
 }
 
 .report-calendar-cell.is-clickable { cursor: pointer; }
-.report-calendar-cell.is-clickable:hover { border-color: #33604d; }
+.report-calendar-cell.is-clickable:hover { border-color: var(--color-brand); }
 
 /* 当日の帯はリスト型と同じ配色・太さで左端に付ける */
-.report-calendar-cell.is-today { border-left: 8px solid #33604d; }
+.report-calendar-cell.is-today { border-left: 8px solid var(--color-brand); }
 
 .report-calendar-cell.is-closed { background: var(--border); }
 
@@ -1246,20 +1178,20 @@
 }
 
 .report-calendar-day {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
 }
 
-.report-calendar-day.is-saturday { color: #1d4ed8; }
-.report-calendar-day.is-holiday { color: #dc2626; }
+.report-calendar-day.is-saturday { color: var(--color-primary-hover); }
+.report-calendar-day.is-holiday { color: var(--color-danger); }
 
 /* マス目は狭いので「本日」バッジは余白を詰める */
 .report-calendar-cell-head .report-today-badge {
   margin-left: 0;
   padding: 1px 8px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 /* 上段アイコン（添付画像・自主点検）は日付と同じ行の右端に寄せる。マス目は1列＝画面幅の
@@ -1276,7 +1208,7 @@
 }
 
 .report-calendar-closed-label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -1295,7 +1227,7 @@
 .report-calendar-workers {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1313,13 +1245,13 @@
 .report-calendar-line {
   display: flex;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   min-width: 0;
 }
 
 .report-calendar-line .report-line-time { width: 38px; }
 
-.report-calendar-empty { font-size: 13px; color: var(--text-muted); }
+.report-calendar-empty { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* 休館日の指定／解除。マス目の下端に控えめに置く */
 .report-calendar-closed-btn {
@@ -1327,7 +1259,7 @@
   align-self: flex-start;
   padding: 2px 8px;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border);
@@ -1337,7 +1269,7 @@
 }
 
 .report-calendar-closed-btn:hover {
-  border-color: #33604d;
+  border-color: var(--color-brand);
   color: var(--text-base);
 }
 
@@ -1349,9 +1281,9 @@
   .report-calendar-head,
   .report-calendar-week { gap: 4px; }
   .report-calendar-cell { padding: 6px; }
-  .report-calendar-line { font-size: 12px; gap: 4px; }
+  .report-calendar-line { font-size: var(--fs-xs); gap: 4px; }
   .report-calendar-line .report-line-time { width: 34px; }
-  .report-calendar-workers { font-size: 11px; }
+  .report-calendar-workers { font-size: var(--fs-2xs); }
 }
 
 /* --- 詳細（2026-08-07に別画面から「一覧の上に重ねるモーダル」へ変更） ---
@@ -1362,7 +1294,7 @@
 .report-detail-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-modal);
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-start;
@@ -1394,7 +1326,7 @@
   flex-shrink: 0;
 }
 
-.report-detail-head .page-title { margin: 0; }
+.report-detail-head .ui-page-title { margin: 0; }
 
 /* モーダル本体（ヘッダを残して中身だけスクロールさせる） */
 .report-detail-body {
@@ -1415,7 +1347,7 @@
   margin-left: auto;
 }
 
-.report-saved { font-size: 12px; color: #33604d; font-weight: 700; }
+.report-saved { font-size: var(--fs-xs); color: var(--color-brand); font-weight: 700; }
 
 /* 自主点検・残留塩素ボタン。アイコンを持たせないぶん、通常のbtn-primary/btn-plainより
    横幅を詰める（2026-08-10。iPhone幅で×・削除ボタンが画面外にはみ出していたため）。
@@ -1431,7 +1363,7 @@
     height: 36px;
     padding-left: var(--space-2);
     padding-right: var(--space-2);
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 }
 
@@ -1452,7 +1384,7 @@
   padding: var(--space-3) var(--space-4);
   background: var(--reports-header-bg);
   color: var(--reports-header-ink);
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1462,18 +1394,18 @@
 /* 「作業者・時間」欄右端の「休館日」ボタン（2026-08-07）。見出しバーの一番右に寄せる */
 .report-card-title-action { margin-left: auto; flex-shrink: 0; font-weight: 400; }
 
-.report-count { font-size: 13px; color: var(--reports-header-ink); opacity: 0.75; font-weight: 600; }
+.report-count { font-size: var(--fs-sm); color: var(--reports-header-ink); opacity: 0.75; font-weight: 600; }
 
 .report-fields { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
 
 .report-field { display: flex; flex-direction: column; gap: 4px; }
-.report-field > span { font-size: 13px; color: var(--text-muted); }
+.report-field > span { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .report-field select, .report-field input {
   padding: 7px 10px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   min-width: 130px;
@@ -1511,9 +1443,9 @@
   flex-shrink: 0;
   width: 100px;
   padding: 7px 8px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   font-variant-numeric: tabular-nums;
@@ -1523,26 +1455,26 @@
   flex: 1;
   min-width: 0;
   padding: 7px 10px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   line-height: 1.6;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   resize: vertical;
   font-family: inherit;
 }
 
-.entry-content:focus, .entry-time:focus { outline: 2px solid #33604d; outline-offset: -1px; }
+.entry-content:focus, .entry-time:focus { outline: 2px solid var(--color-brand); outline-offset: -1px; }
 
 .entry-from-task {
   flex-shrink: 0;
   align-self: center;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
-  color: #33604d;
-  background: rgba(51, 96, 77, 0.12);
-  border-radius: 999px;
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
 }
 
@@ -1562,9 +1494,9 @@
   flex: 1;
   max-width: 320px;
   padding: 7px 10px;
-  font-size: 14px;
+  font-size: var(--fs-base);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
 }
@@ -1572,10 +1504,10 @@
 .template-textarea {
   width: 100%;
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   line-height: 1.8;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   font-family: inherit;
@@ -1584,10 +1516,11 @@
 
 /* モバイル: 明細は時刻を上に、内容を下に積む */
 @media (max-width: 640px) {
-  .reports-container { padding: var(--space-3); }
+  /* 狭幅の余白は --page-pad-x（index.css）で一括して詰めている */
   .app-switch { margin-left: var(--space-2); }
   .app-switch.app-switch-mobile { margin-left: 0; }
-  .app-switch-btn { padding: 5px 12px; font-size: 12px; }
+  /* 狭幅ではセグメントの左右余白を詰める（ツールバーを1行に収めるため） */
+  .app-switch .ui-segmented-btn { padding: 0 var(--space-2); }
   /* 自主検査表・違反車両・歯車のボタン群が2行目に折り返ったとき、space-betweenは
      単独の要素だと左端に置いてしまうため、margin-left:auto で右端に寄せる（2026-08-07） */
   .reports-toolbar-actions { margin-left: auto; }
@@ -1597,7 +1530,7 @@
   /* iOSでフォーカス時にズームされるのを防ぐため16px以上にする */
   .entry-content, .entry-time, .report-field select, .report-field input, .template-textarea,
   .entry-template-select {
-    font-size: 16px;
+    font-size: var(--fs-lg);
   }
 }
 
@@ -1619,7 +1552,7 @@
   aspect-ratio: 4 / 3;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--bg-subtle);
   cursor: pointer;
@@ -1629,9 +1562,9 @@
 }
 
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo-thumb:hover { border-color: #33604d; }
+.photo-thumb:hover { border-color: var(--color-brand); }
 
-.photo-loading, .photo-uploading { font-size: 12px; color: var(--text-muted); }
+.photo-loading, .photo-uploading { font-size: var(--fs-xs); color: var(--text-muted); }
 .photo-uploading { cursor: default; }
 
 /* 縮小後のファイルサイズ・撮影/変更日時。写真の下に小さく表示する（2026-08-05） */
@@ -1639,7 +1572,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1648,10 +1581,10 @@
   width: 100%;
   height: 44px;
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   font-family: inherit;
@@ -1669,16 +1602,16 @@
   justify-content: center;
   padding: var(--space-2);
   border: 2px dashed var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-subtle);
   text-align: center;
 }
 
 .photo-dropzone.is-dragover { border-color: var(--color-primary); background: var(--color-primary-weak); }
 
-.photo-dropzone-hint { font-size: 12px; color: var(--text-muted); }
+.photo-dropzone-hint { font-size: var(--fs-xs); color: var(--text-muted); }
 
-.photo-add-btn { width: 100%; height: 36px; font-size: 13px; padding: 0 var(--space-2); }
+.photo-add-btn { width: 100%; height: 36px; font-size: var(--fs-sm); padding: 0 var(--space-2); }
 
 .photo-hint { margin: 0; }
 
@@ -1686,7 +1619,7 @@
 .photo-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-preview);
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
@@ -1712,7 +1645,7 @@
   max-height: 80vh;
   max-height: 80dvh;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .photo-overlay-close {
@@ -1721,17 +1654,17 @@
   right: -8px;
   width: 36px;
   height: 36px;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   line-height: 1;
-  color: #333;
-  background: #fff;
+  color: var(--text-base);
+  background: var(--bg-surface);
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  z-index: 1;
+  z-index: 1;;
 }
 
-.photo-overlay-caption { color: #fff; font-size: 14px; margin: 0; text-align: center; }
+.photo-overlay-caption { color: var(--ink-on-fill); font-size: var(--fs-base); margin: 0; text-align: center; }
 
 /* 削除ボタン（・違反車両では読み取りボタンも）は一覧の狭いタイルではなく、
    拡大表示のここに置く（2026-08-05）。読み取りボタンは左、ダウンロード・削除は
@@ -1756,7 +1689,7 @@
 
 @media (max-width: 640px) {
   .photo-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-  .photo-comment { font-size: 16px; } /* iOSのフォーカス時ズームを抑止 */
+  .photo-comment { font-size: var(--fs-lg); } /* iOSのフォーカス時ズームを抑止 */
 }
 
 /* --- 違反車両（Phase 4。2026-08-05〜）。日報詳細では写真と同じ流れで登録する --- */
@@ -1775,11 +1708,11 @@
   gap: 6px;
   min-width: 0;
   padding: var(--space-2);
-  border: 1px solid #c7ccd4;
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   /* ページ背景に近い白系だと1件ごとの区切りが分かりにくかったため、
      はっきり濃いグレーにする（2026-08-10） */
-  background: #e8ebef;
+  background: var(--bg-muted);
 }
 
 /* 追加用の枠（空枠にドラッグ＆ドロップ）は登録済みカードと区別するため、
@@ -1803,7 +1736,7 @@
   aspect-ratio: 4 / 3;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--bg-subtle);
   cursor: pointer;
@@ -1812,7 +1745,7 @@
   justify-content: center;
 }
 
-.parking-card-photo:hover { border-color: #33604d; }
+.parking-card-photo:hover { border-color: var(--color-brand); }
 .parking-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* 2枚目までの追加枠。空枠タイルの簡易版（ドラッグ＆ドロップ無しでボタンのみ） */
@@ -1825,10 +1758,10 @@
 .parking-card-photo-add-btn {
   width: 36px;
   height: 36px;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   line-height: 1;
-  color: #fff;
+  color: var(--ink-on-fill);
   background: var(--color-primary);
   border: none;
   border-radius: var(--radius-sm);
@@ -1846,9 +1779,9 @@
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
 }
@@ -1859,17 +1792,17 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-base);
 }
 
 .parking-card-note {
   width: 100%;
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   font-family: inherit;
@@ -1879,7 +1812,7 @@
 @media (max-width: 640px) {
   .parking-grid { grid-template-columns: 1fr; }
   .parking-card-row input, .parking-card-fields > input, .parking-card-note {
-    font-size: 16px; /* iOSのフォーカス時ズームを抑止 */
+    font-size: var(--fs-lg); /* iOSのフォーカス時ズームを抑止 */
   }
 }
 
@@ -1896,57 +1829,42 @@
   flex: 1;
   min-width: 200px;
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: var(--fs-base);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
 }
 
-/* 2択の切替タブ（自主検査表の旧ビル切替と同じ考え方の汎用版） */
-.sort-toggle { display: flex; gap: 6px; flex-shrink: 0; }
-
-.sort-toggle-btn {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.sort-toggle-btn.is-active { color: #fff; background: #33604d; border-color: #33604d; }
+/* 日付順/累計回数順の切替は .ui-segmented を使う（見た目の定義は ui.css） */
 
 .parking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
 .parking-list-row {
   /* .parking-card と同じく、1件ごとの区切りが分かるようはっきり濃いグレーにする（2026-08-10） */
-  background: #e8ebef;
-  border: 1px solid #c7ccd4;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
 }
 
 .parking-list-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 
-.parking-list-date { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.parking-list-plate { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.parking-list-date { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.parking-list-plate { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
 
 .parking-list-count {
   padding: 1px 8px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-fill);
   background: var(--due-overdue);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .parking-list-link {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--color-primary);
   background: transparent;
   border: none;
@@ -1955,20 +1873,20 @@
   padding: 0;
 }
 
-.parking-list-sub { display: flex; gap: var(--space-3); font-size: 13px; color: var(--text-base); margin-top: 4px; }
+.parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-base); margin-top: 4px; }
 
 .parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
 .parking-list-tag {
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
-  color: #c81021;
+  color: var(--color-danger);
   background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
-.parking-list-note { margin: 6px 0 0; font-size: 13px; color: var(--text-muted); }
+.parking-list-note { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* ストレージ使用量のバー（従量課金事項画面。2026-08-04） */
 .storage-bar {
@@ -1976,31 +1894,30 @@
   height: 8px;
   background: var(--bg-subtle);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin-bottom: var(--space-2);
 }
 
 .storage-bar-fill {
   height: 100%;
-  background: #33604d;
-  border-radius: 999px;
+  background: var(--color-brand);
+  border-radius: var(--radius-pill);
   transition: width var(--transition);
 }
 
-/* --- 自主検査表（Phase 3。2026-08-04〜） --- */
-.inspections-container { max-width: 1000px; }
+/* --- 自主検査表（Phase 3。2026-08-04〜）。幅は .ui-container.is-wide --- */
 
 /* ホーム・年月・タイトルを1行にまとめる（2026-08-05。BKBのみ運用のためビル切替は廃止） */
 .inspection-toolbar { justify-content: flex-start; }
 
 .inspection-month { display: flex; align-items: center; gap: var(--space-3); }
 /* ページタイトルと同じ大きさに揃える（2026-08-07。日報一覧の月見出しとも共通） */
-.inspection-month-label { font-size: 20px; font-weight: 700; color: var(--text-strong); }
+.inspection-month-label { font-size: var(--fs-xl); font-weight: 700; color: var(--text-strong); }
 
 .inspection-table-wrap { overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
 
-.inspection-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.inspection-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 
 .inspection-table th, .inspection-table td {
   padding: 7px 12px;
@@ -2010,7 +1927,7 @@
 }
 
 .inspection-table thead th {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-weight: 600;
   background: var(--bg-subtle);
@@ -2018,7 +1935,7 @@
 }
 
 .inspection-table tbody tr:last-child td { border-bottom: none; }
-.inspection-table tbody tr.is-today { background: rgba(51, 96, 77, 0.06); }
+.inspection-table tbody tr.is-today { background: var(--color-brand-softer); }
 
 /* 休館日の行はグレーアウトして「対応不要」であることを一目で分かるようにする（2026-08-05）。
    日付の色（平日・土曜・日曜/祝日）は休館日でも変えない */
@@ -2042,14 +1959,14 @@
 
 /* 曜日・祝日の色分け。土曜=青、日曜・祝日=赤（2026-08-05） */
 .inspection-weekday { margin-left: 2px; font-weight: 600; }
-.inspection-day.is-saturday { color: #1d4ed8; }
-.inspection-day.is-holiday { color: #dc2626; }
+.inspection-day.is-saturday { color: var(--color-primary-hover); }
+.inspection-day.is-holiday { color: var(--color-danger); }
 
-.inspection-ok { color: #33604d; font-weight: 600; }
-.inspection-ng { color: #c81021; font-weight: 700; }
-.inspection-empty { color: var(--text-muted); font-size: 13px; }
-.inspection-closed-label { color: var(--text-muted); font-size: 13px; font-weight: 600; }
-.inspection-issues { font-size: 13px; color: var(--text-base); }
+.inspection-ok { color: var(--color-brand); font-weight: 600; }
+.inspection-ng { color: var(--color-danger); font-weight: 700; }
+.inspection-empty { color: var(--text-muted); font-size: var(--fs-sm); }
+.inspection-closed-label { color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; }
+.inspection-issues { font-size: var(--fs-sm); color: var(--text-base); }
 .inspection-note { display: block; color: var(--text-muted); }
 .inspection-legend { margin-top: var(--space-3); }
 
@@ -2060,7 +1977,7 @@
 .inspection-overlay {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  z-index: var(--z-modal-nested);
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
@@ -2093,7 +2010,7 @@
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
-.inspection-modal-head h3 { margin: 0; font-size: 16px; color: var(--text-strong); }
+.inspection-modal-head h3 { margin: 0; font-size: var(--fs-lg); color: var(--text-strong); }
 
 .inspection-modal-body {
   padding: var(--space-4);
@@ -2112,15 +2029,15 @@
   gap: var(--space-3);
   flex-wrap: wrap;
   padding: var(--space-3);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
   border: 1px solid var(--due-overdue);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .inspection-status.is-clear {
-  background: rgba(51, 96, 77, 0.08);
-  border-color: #33604d;
+  background: var(--color-brand-softer);
+  border-color: var(--color-brand);
 }
 
 /* 休館日はステータス表示をグレーにする（2026-08-05） */
@@ -2131,13 +2048,13 @@
 .inspection-status.is-closed strong { color: var(--text-muted); }
 
 .inspection-status strong { color: var(--text-strong); }
-.inspection-status span { font-size: 13px; color: var(--text-muted); }
+.inspection-status span { font-size: var(--fs-sm); color: var(--text-muted); }
 
-.inspection-hint { margin: 0; font-size: 13px; color: var(--text-muted); }
+.inspection-hint { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
 
 .inspection-group h4 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -2149,30 +2066,30 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: var(--fs-base);
   text-align: left;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   color: var(--text-base);
 }
 
-.inspection-item-mark { font-size: 16px; font-weight: 700; width: 18px; flex-shrink: 0; }
+.inspection-item-mark { font-size: var(--fs-lg); font-weight: 700; width: 18px; flex-shrink: 0; }
 .inspection-item-label { flex: 1; min-width: 0; }
 
-.inspection-item.is-ok .inspection-item-mark { color: #33604d; }
-.inspection-item.is-ng { border-color: #c81021; background: color-mix(in srgb, var(--due-overdue) 8%, var(--bg-surface)); }
-.inspection-item.is-ng .inspection-item-mark { color: #c81021; }
-.inspection-item.is-fixed { border-color: #a86a1f; background: rgba(168, 106, 31, 0.08); }
-.inspection-item.is-fixed .inspection-item-mark { color: #a86a1f; }
+.inspection-item.is-ok .inspection-item-mark { color: var(--color-brand); }
+.inspection-item.is-ng { border-color: var(--color-danger); background: color-mix(in srgb, var(--due-overdue) 8%, var(--bg-surface)); }
+.inspection-item.is-ng .inspection-item-mark { color: var(--color-danger); }
+.inspection-item.is-fixed { border-color: var(--color-warn); background: var(--color-warn-soft); }
+.inspection-item.is-fixed .inspection-item-mark { color: var(--color-warn); }
 
 .inspection-note-field textarea {
   width: 100%;
   padding: 8px 10px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   font-family: inherit;
@@ -2181,15 +2098,15 @@
 
 .inspection-periodic {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: var(--space-3);
   display: flex;
   gap: var(--space-4);
   align-items: center;
 }
 
-.inspection-periodic legend { font-size: 13px; color: var(--text-muted); padding: 0 6px; }
-.inspection-periodic label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.inspection-periodic legend { font-size: var(--fs-sm); color: var(--text-muted); padding: 0 6px; }
+.inspection-periodic label { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); }
 
 .inspection-modal-foot {
   display: flex;
@@ -2211,53 +2128,13 @@
   gap: var(--space-2);
 }
 
-/* オン/オフのスイッチ（休館日トグル等。2026-08-05） */
-.switch-field { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-
-.switch-field input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.switch-track {
-  position: relative;
-  flex-shrink: 0;
-  width: 40px;
-  height: 22px;
-  background: var(--border);
-  border-radius: var(--radius-pill);
-  transition: background var(--transition);
-}
-
-.switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition);
-}
-
-.switch-field input:checked + .switch-track { background: var(--color-primary); }
-.switch-field input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
-.switch-field input:focus-visible + .switch-track { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-
-.switch-label { font-size: 14px; font-weight: 600; color: var(--text-base); }
+/* オン/オフのスイッチ（.switch-field）は src/styles/ui.css へ移動した（2026-08-11） */
+.switch-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-base); }
 
 @media (max-width: 640px) {
   .inspection-items { grid-template-columns: 1fr 1fr; }
-  .inspection-item { font-size: 13px; padding: 10px 8px; }
-  .inspection-inspector input, .inspection-note-field textarea { font-size: 16px; }
+  .inspection-item { font-size: var(--fs-sm); padding: 10px 8px; }
+  .inspection-inspector input, .inspection-note-field textarea { font-size: var(--fs-lg); }
 }
 
 /* 日報一覧のツールバー右側のボタン群（2026-08-04。自主検査表への導線を追加） */
@@ -2272,7 +2149,7 @@
 .reports-toolbar-actions .btn-plain {
   height: 44px;
   padding: 0 var(--space-5);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
 }
 
@@ -2291,223 +2168,11 @@
 }
 
 /* ============================================================
-   共通ボタン標準（2026-08-05）。
-   タスク管理側の配色・フォント（"タスク管理標準"）に合わせつつ、
-   小さな文字・小さなボタンを避けて大きめ・アイコンベースに統一する。
-   日報系のページはこの標準クラスを使う。
+   共通ボタン標準は src/styles/ui.css へ移設した（2026-08-11 のUI標準化）。
+   .btn-primary / .btn-plain / .btn-danger / .icon-btn-* / .confirm-delete-* /
+   .ui-segmented / .ui-field 等はそちらが正。この Dashboard.css には
+   「その画面固有の見た目」だけを置くこと。
    ============================================================ */
-
-/* 主要アクション（大）。タスク管理の保存ボタン（.settings-toolbar .btn-save）と同系色。 */
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 var(--space-5);
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: filter var(--transition);
-  white-space: nowrap;
-}
-
-.btn-primary:hover { filter: brightness(0.92); }
-.btn-primary:disabled { opacity: 0.6; cursor: default; filter: none; }
-
-/* 控えめな操作（一覧へ戻る等）。枠のみで目立たせすぎない。 */
-.btn-plain {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 var(--space-4);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-base);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-plain:hover { border-color: var(--color-primary); color: var(--color-primary); }
-
-/* 見出し脇に置く「＋」正方形アイコンボタン（レコード・明細の追加）。
-   kanban-column-add と同系色・同じ考え方で、日報側でも共通化する。 */
-.icon-btn-add {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-  color: #fff;
-  background: var(--color-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  padding: 0;
-}
-
-.icon-btn-add:hover { background: var(--color-primary-hover); }
-.icon-btn-add:disabled { opacity: 0.5; cursor: default; }
-
-/* 表の行内など、大きすぎると窮屈な場所向けの小さめ版 */
-.icon-btn-add.is-compact { width: 30px; height: 30px; font-size: 18px; }
-
-/* 年月・日付の移動（‹ ›）。背景なしのフラットボタンで、アイコン自体を大きく目立たせる（2026-08-05）。 */
-.icon-btn-nav {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-base);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.icon-btn-nav:hover { color: var(--color-primary); }
-
-/* ホーム（一覧に戻る）。アイコンのみ・背景なしのフラットボタン。左上に置く（2026-08-05）。
-   よく使う操作のため大きめ・目立つ色にする（2026-08-05 追加調整）。 */
-.icon-btn-home {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-primary);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.icon-btn-home:hover { color: var(--color-primary-hover); }
-
-/* 定型文の設定など、滅多に使わない操作向けの歯車アイコンのみのボタン。
-   背景なしのフラットボタンで主要操作より控えめにする（2026-08-05）。 */
-.icon-btn-gear {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.icon-btn-gear:hover { color: var(--color-primary); }
-
-/* 削除（ゴミ箱）。タスク詳細の閉じるボタンと同系（枠なし・ホバーで色が付く）。
-   2026-08-05: 押しやすさのため一回り拡大（34px→40px）。 */
-.icon-btn-delete {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.icon-btn-delete:hover {
-  color: var(--due-overdue);
-  border-color: var(--due-overdue);
-  background: color-mix(in srgb, var(--due-overdue) 8%, transparent);
-}
-
-/* ダウンロード。削除ボタンと同じ大きさ・見た目（枠なし・ホバーで色が付く）。2026-08-05 */
-.icon-btn-download {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: 0;
-  text-decoration: none;
-}
-
-.icon-btn-download:hover {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-}
-
-/* 暗い背景（拡大表示）向けのダウンロードアイコン色。icon-btn-delete-dark と同じ考え方 */
-.icon-btn-download.icon-btn-download-dark { color: rgba(255, 255, 255, 0.85); }
-
-/* 削除の確認（2026-08-05。誤操作防止）。タスク詳細の「スパム」確認と同じ考え方・見た目。 */
-.confirm-delete-group {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.confirm-delete-message { color: var(--due-overdue); font-weight: 600; white-space: nowrap; }
-
-.confirm-delete-go, .confirm-delete-cancel {
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.confirm-delete-go { color: #fff; background: var(--due-overdue); border: 1px solid var(--due-overdue); }
-.confirm-delete-cancel { color: var(--text-base); background: var(--bg-surface); border: 1px solid var(--border); }
-
-/* モーダル/オーバーレイの閉じる×。task-detail-close / attachment-preview-close と同じ見た目。 */
-.icon-btn-close {
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  font-size: 24px;
-  line-height: 1;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-}
-
-.icon-btn-close:hover { color: var(--text-strong); }
 
 /* ============================================================
    残留塩素等検査（Phase 5。2026-08-10）。
@@ -2553,14 +2218,14 @@
   margin: 0;
   padding: var(--space-2) var(--space-4);
   background: var(--bg-subtle);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text-strong);
 }
 
 /* 曜日・祝日の色分けは自主検査表・日報一覧と揃える（土曜=青、日曜・祝日=赤） */
-.chlorine-day-head.is-saturday { color: #1d4ed8; }
-.chlorine-day-head.is-holiday { color: #dc2626; }
+.chlorine-day-head.is-saturday { color: var(--color-primary-hover); }
+.chlorine-day-head.is-holiday { color: var(--color-danger); }
 
 .chlorine-rows { list-style: none; margin: 0; padding: 0; }
 
@@ -2580,8 +2245,8 @@
   outline-offset: -2px;
 }
 
-.chlorine-row-building { font-size: 16px; font-weight: 700; color: var(--text-strong); min-width: 92px; }
-.chlorine-row-time { font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.chlorine-row-building { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); min-width: 92px; }
+.chlorine-row-time { font-size: var(--fs-base); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .chlorine-row-value {
   font-size: 18px;
@@ -2593,15 +2258,15 @@
 }
 
 /* 水道水質基準（0.1mg/L）を下回った測定値は赤で目立たせる */
-.chlorine-row-value.is-below { color: #c81021; }
+.chlorine-row-value.is-below { color: var(--color-danger); }
 
-.chlorine-row-location, .chlorine-row-inspector { font-size: 14px; color: var(--text-base); }
+.chlorine-row-location, .chlorine-row-inspector { font-size: var(--fs-base); color: var(--text-base); }
 
 .chlorine-row-ng {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
-  color: #c81021;
-  border: 1px solid #c81021;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
   border-radius: var(--radius-pill);
   padding: 1px 8px;
 }
@@ -2613,7 +2278,7 @@
 /* 測定施設。ドロップダウンではなく択一ボタンにする（2026-08-10。選択肢が2つだけなので
    タップで直接選べる方が早い） */
 .chlorine-building-field { display: flex; flex-direction: column; gap: 4px; }
-.chlorine-building-field > span { font-size: 13px; color: var(--text-muted); }
+.chlorine-building-field > span { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .chlorine-building-toggle { display: flex; gap: var(--space-2); }
 
@@ -2624,12 +2289,12 @@
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-base);
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   cursor: pointer;
 }
 
-.chlorine-building-btn.is-active { color: #fff; background: #33604d; border-color: #33604d; }
+.chlorine-building-btn.is-active { color: var(--ink-on-fill); background: var(--color-brand); border-color: var(--color-brand); }
 
 /* datetime-local は iOS で幅が詰まりやすいので明示しておく */
 .chlorine-datetime { min-width: 210px; }
@@ -2643,10 +2308,10 @@
   margin: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  background: #fdecec;
-  border: 1px solid #f0b4b4;
-  color: #c81021;
-  font-size: 13px;
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 
@@ -2658,7 +2323,7 @@
 .chlorine-judgement-label {
   width: 64px;
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-base);
 }
@@ -2672,20 +2337,20 @@
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
   cursor: pointer;
 }
 
-.chlorine-judgement-btn.is-ok.is-active { color: #fff; background: #33604d; border-color: #33604d; }
-.chlorine-judgement-btn.is-ng.is-active { color: #fff; background: #c81021; border-color: #c81021; }
+.chlorine-judgement-btn.is-ok.is-active { color: var(--ink-on-fill); background: var(--color-brand); border-color: var(--color-brand); }
+.chlorine-judgement-btn.is-ng.is-active { color: var(--ink-on-fill); background: var(--color-danger); border-color: var(--color-danger); }
 
 .chlorine-note-field textarea {
   width: 100%;
   padding: 8px 10px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
   resize: vertical;
@@ -2693,7 +2358,7 @@
 
 /* --- 測定写真（検査薬の色変化） --- */
 .chlorine-photos { display: flex; flex-direction: column; gap: 6px; }
-.chlorine-photos-label { font-size: 13px; color: var(--text-muted); }
+.chlorine-photos-label { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* 作業写真より小さめのタイルで十分（1回の測定で1〜2枚の想定） */
 .chlorine-photo-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -2714,9 +2379,9 @@
   .chlorine-note-field textarea,
   .chlorine-datetime,
   .chlorine-concentration-row input,
-  .chlorine-concentration-select { font-size: 16px; }
+  .chlorine-concentration-select { font-size: var(--fs-lg); }
   .chlorine-row-building { min-width: 0; }
-  .chlorine-controls .report-field span { font-size: 12px; }
+  .chlorine-controls .report-field span { font-size: var(--fs-xs); }
 }
 
 /* ============================================================
@@ -2728,7 +2393,7 @@
 .pdf-busy-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: var(--z-blocking);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2743,7 +2408,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text-strong);
 }

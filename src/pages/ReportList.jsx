@@ -558,8 +558,9 @@ export default function ReportList() {
       <AppHeader />
       {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
-      <div className={`reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ''}`}>
-        <div className="reports-toolbar">
+      <div className={`ui-container reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ' is-narrow'}`}>
+        <div className="ui-toolbar reports-toolbar">
+          <h2 className="ui-page-title">日報</h2>
           <div className="inspection-month">
             <button
               type="button"
@@ -581,15 +582,14 @@ export default function ReportList() {
               <IconChevronRight size={28} />
             </button>
           </div>
-          <h2 className="page-title">日報</h2>
-          <div className="reports-toolbar-actions">
+          <div className="ui-toolbar-actions reports-toolbar-actions">
             {/* 表示切替（リスト型／カレンダー型）。カレンダー型はマス目が狭くなりすぎるため
                 PC/iPad幅でのみ選べるようにし、スマートフォン幅では切替自体を出さない（2026-08-07） */}
             {isWideScreen && (
-              <div className="report-view-switch" role="group" aria-label="表示の切り替え">
+              <div className="ui-segmented report-view-switch" role="group" aria-label="表示の切り替え">
                 <button
                   type="button"
-                  className={`report-view-btn${view === 'list' ? ' is-active' : ''}`}
+                  className={`ui-segmented-btn${view === 'list' ? ' is-active' : ''}`}
                   aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
                 >
@@ -598,7 +598,7 @@ export default function ReportList() {
                 </button>
                 <button
                   type="button"
-                  className={`report-view-btn${view === 'calendar' ? ' is-active' : ''}`}
+                  className={`ui-segmented-btn${view === 'calendar' ? ' is-active' : ''}`}
                   aria-pressed={view === 'calendar'}
                   onClick={() => setView('calendar')}
                 >

@@ -356,7 +356,7 @@ export default function ReportDetail({ date, onClose }) {
       <div className="report-detail-overlay" role="dialog" aria-modal="true" onClick={handleClose}>
         <div className="report-detail-modal" onClick={(e) => e.stopPropagation()}>
           <div className="report-detail-head">
-            <h2 className="page-title">
+            <h2 className="ui-page-title">
               {formatReportDate(date)}
               {isToday && <span className="report-today-badge">本日</span>}
             </h2>

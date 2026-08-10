@@ -1,0 +1,753 @@
+/* =========================================================================
+   共通部品（UI プリミティブ）
+   画面を作るときは、まずここにある部品で組み立てる。ここに無い見た目が
+   必要になったら、その画面だけで書く前に「本当にこの画面固有か」を疑い、
+   汎用的ならこのファイルに足す。
+
+   ・色・寸法は src/index.css のトークンだけを参照する（生値を書かない）
+   ・使い方とルールは docs/ui-standard.md
+
+   目次
+     1. ページの骨格   .ui-page / .ui-container / .ui-toolbar / .ui-page-title
+     2. ボタン         .btn-primary / .btn-plain / .btn-danger / .icon-btn-*
+     3. セグメント切替 .ui-segmented
+     4. 入力欄         .ui-field / .ui-input / .ui-select / .ui-textarea
+     5. カード         .ui-card / .ui-card-title
+     6. 表             .ui-table
+     7. バッジ         .ui-badge
+     8. モーダル       .ui-overlay / .ui-modal
+     9. 空状態・注記   .ui-empty / .ui-note
+   ========================================================================= */
+
+/* =========================================================================
+   1. ページの骨格
+   ========================================================================= */
+
+/* 画面の地。各ページのルート要素に付ける */
+.ui-page {
+  min-height: 100vh;
+  background: var(--bg-app);
+}
+
+/* 本文の器。幅は画面の性格で3種類から選ぶ（既定＝全幅）。
+   いずれも中央寄せする（従量課金だけ左寄せ、のような揺れを作らない） */
+.ui-container {
+  padding: var(--page-pad-y) var(--page-pad-x);
+  margin-inline: auto;
+  width: 100%;
+}
+
+/* 一覧・フォームが主役の画面 */
+.ui-container.is-narrow { max-width: var(--page-narrow); }
+/* 表が主役の画面 */
+.ui-container.is-wide { max-width: var(--page-wide); }
+
+/* タイトルと操作ボタンを並べる1行。左＝現在地の情報、右＝操作、が原則。
+   狭幅では折り返し、操作群は .ui-toolbar-actions で右端に寄せる */
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.ui-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* 画面名。ツールバーの中に置くときは margin を持たせない */
+.ui-page-title {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-4);
+}
+
+.ui-toolbar .ui-page-title { margin: 0; }
+
+/* =========================================================================
+   2. ボタン
+
+   使い分け（迷ったらこの3つだけで足りる）
+     .btn-primary … その画面で一番やってほしいこと（保存・記録する・検索）
+     .btn-plain   … それ以外の操作（一覧へ戻る・切替・補助的な遷移）
+     .btn-danger  … 消える・戻せない操作（削除の確定）
+   1画面に .btn-primary は原則1つ。2つ以上並べたくなったら優先順位を見直す。
+   ========================================================================= */
+
+.btn-primary,
+.btn-plain,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-15);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.btn-primary:disabled,
+.btn-plain:disabled,
+.btn-danger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 主要アクション（アクション色＝ブルー） */
+.btn-primary {
+  height: var(--control-h-lg);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+/* 二次アクション。枠のみ。ホバーでアクション色になり「押せる」と分かる */
+.btn-plain {
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-base);
+  font-size: var(--fs-sm);
+}
+
+.btn-plain:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* 選択中の二次ボタン（フィルタの選択状態など）は「現在地」なのでブランド色 */
+.btn-plain.is-active {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: var(--color-brand-ink);
+}
+
+.btn-plain.is-active:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
+  color: var(--color-brand-ink);
+}
+
+/* 破壊的操作の確定 */
+.btn-danger {
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-danger-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+}
+
+/* --- アイコンのみのボタン ---------------------------------------------
+   共通の骨格。個別クラスは色と大きさだけを変える。
+   文字ラベルを持たないので、必ず title と aria-label を付けること。
+   ---------------------------------------------------------------------- */
+.icon-btn-add,
+.icon-btn-nav,
+.icon-btn-home,
+.icon-btn-gear,
+.icon-btn-delete,
+.icon-btn-download,
+.icon-btn-search {
+  flex-shrink: 0;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.icon-btn-add:disabled,
+.icon-btn-nav:disabled,
+.icon-btn-gear:disabled,
+.icon-btn-delete:disabled,
+.icon-btn-download:disabled,
+.icon-btn-search:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 追加（＋）。レコード・明細を足す操作なのでアクション色の塗り */
+.icon-btn-add {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-ink);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--shadow-card);
+}
+
+.icon-btn-add:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+/* 表の行内など、40px では窮屈な場所向け */
+.icon-btn-add.is-compact {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  font-size: var(--fs-lg);
+}
+
+/* 年月・日付の移動（‹ ›）。背景を持たずアイコンだけを大きく見せる */
+.icon-btn-nav {
+  color: var(--text-base);
+}
+
+.icon-btn-nav:hover:not(:disabled) { color: var(--color-primary); }
+
+/* 一覧へ戻る（ホーム）。よく使う動線なので大きめ・アクション色 */
+.icon-btn-home {
+  width: 56px;
+  height: 56px;
+  color: var(--color-primary);
+}
+
+.icon-btn-home:hover { color: var(--color-primary-hover); }
+
+/* 滅多に使わない設定への導線 */
+.icon-btn-gear:hover:not(:disabled) { color: var(--color-primary); }
+
+/* 検索。開いている間は「現在地」なので選択状態を持てる */
+.icon-btn-search:hover:not(:disabled) { color: var(--color-primary); }
+
+.icon-btn-search.is-active {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-brand-ink);
+}
+
+/* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
+.icon-btn-delete:hover:not(:disabled) {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+/* ダウンロード */
+.icon-btn-download:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* 暗い背景（写真・PDFの拡大表示）の上に置くときの色 */
+.icon-btn-delete.icon-btn-delete-dark,
+.icon-btn-download.icon-btn-download-dark {
+  color: var(--text-on-dark);
+}
+
+/* モーダル・オーバーレイを閉じる × */
+.icon-btn-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  font-size: var(--fs-2xl);
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+
+.icon-btn-close:hover {
+  color: var(--text-strong);
+  background: var(--bg-muted);
+}
+
+/* --- 削除の確認（押しただけでは消さない）---------------------------------
+   ゴミ箱を押すとその場でこの確認が開き、〈削除〉〈キャンセル〉を選ばせる。
+   共通コンポーネントは src/components/ConfirmDeleteButton.jsx
+   ---------------------------------------------------------------------- */
+.confirm-delete-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-15);
+  font-size: var(--fs-xs);
+}
+
+.confirm-delete-message {
+  color: var(--color-danger);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.confirm-delete-go,
+.confirm-delete-cancel {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.confirm-delete-go {
+  color: var(--color-danger-ink);
+  background: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.confirm-delete-go:hover {
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
+}
+
+.confirm-delete-cancel {
+  color: var(--text-base);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+}
+
+.confirm-delete-cancel:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* =========================================================================
+   3. セグメント切替
+   「同じ対象の見せ方を切り替える」ときに使う（リスト/カレンダー、日付順/回数順）。
+   選択中＝現在地なのでブランド色。押すと画面が遷移する類はボタンを使うこと。
+   ========================================================================= */
+.ui-segmented {
+  display: inline-flex;
+  padding: var(--space-05);
+  gap: var(--space-05);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+
+.ui-segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-15);
+  height: calc(var(--control-h) - 2 * var(--space-05) - 2px);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: calc(var(--radius-control) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.ui-segmented-btn:hover { color: var(--text-strong); }
+
+.ui-segmented-btn.is-active {
+  background: var(--color-brand);
+  color: var(--color-brand-ink);
+}
+
+.ui-segmented-btn.is-active:hover { color: var(--color-brand-ink); }
+
+/* 濃い地（グリーンヘッダー）の上に置く版 */
+.ui-segmented.on-dark {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+}
+
+.ui-segmented.on-dark .ui-segmented-btn { color: var(--color-brand-ink); }
+.ui-segmented.on-dark .ui-segmented-btn:hover { background: rgba(255, 255, 255, 0.16); }
+
+.ui-segmented.on-dark .ui-segmented-btn.is-active {
+  background: var(--bg-surface);
+  color: var(--color-brand);
+}
+
+/* =========================================================================
+   4. 入力欄
+   ラベルと入力を縦に積む .ui-field が基本形。高さ・角丸・フォーカスの見え方を
+   全画面で揃える（フォーカスリングはアクション色）。
+   ========================================================================= */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ui-field > span,
+.ui-field > label,
+.ui-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ui-input,
+.ui-select,
+.ui-textarea {
+  width: 100%;
+  padding: 0 var(--space-3);
+  height: var(--control-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.ui-textarea {
+  height: auto;
+  min-height: calc(var(--control-h) * 2);
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.ui-input:focus,
+.ui-select:focus,
+.ui-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-weak);
+}
+
+.ui-input:disabled,
+.ui-select:disabled,
+.ui-textarea:disabled {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.ui-input::placeholder,
+.ui-textarea::placeholder { color: var(--text-faint); }
+
+/* 表の行内など、密度が要るところ */
+.ui-input.is-compact,
+.ui-select.is-compact {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--fs-sm);
+}
+
+/* iOS Safari はフォーカスした入力の文字が 16px 未満だと自動でズームする。
+   個々の画面で対処せず、ここで一括して止める */
+@media (max-width: 768px) {
+  .ui-input,
+  .ui-select,
+  .ui-textarea,
+  input[type='text'],
+  input[type='search'],
+  input[type='number'],
+  input[type='password'],
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* --- オン/オフのスイッチ ------------------------------------------------ */
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.switch-field input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition);
+}
+
+.switch-field input:checked + .switch-track { background: var(--color-primary); }
+.switch-field input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+.switch-field input:focus-visible + .switch-track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* =========================================================================
+   5. カード
+   白い面＋淡い罫線＋ごく薄い影。影だけ・罫線だけに寄せず、両方を弱く使う。
+   ========================================================================= */
+.ui-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+}
+
+/* カード上端いっぱいに広げる見出し帯。負のマージンでパディングを打ち消す */
+.ui-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--bg-subtle);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.ui-card-title-action { margin-left: auto; flex-shrink: 0; font-weight: 400; }
+
+/* 日報の入力セクションはイエローの帯で「記入する場所」だと分かるようにする。
+   この色は見出し専用で、押せる要素には使わない */
+.ui-card-title.is-reports {
+  background: var(--reports-header-bg);
+  border-bottom-color: transparent;
+  color: var(--reports-header-ink);
+}
+
+/* =========================================================================
+   6. 表
+   ヘッダ行は薄い地＋小さめの文字。行の区切りは下罫線だけにして軽く見せる。
+   ========================================================================= */
+.ui-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+
+.ui-table th,
+.ui-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.ui-table th {
+  background: var(--bg-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ui-table tbody tr:last-child td { border-bottom: none; }
+
+.ui-table tbody tr.is-today { background: var(--color-brand-softer); }
+
+/* 数値の列。桁を揃えて読ませる */
+.ui-table .is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================================
+   7. バッジ
+   状態や件数を短く示す。色は意味に従う（灰＝中立 / 緑＝現在地 / 赤＝要注意 /
+   黄＝注意 / 青＝新着）。押せる要素には見せないこと。
+   ========================================================================= */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-05) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.ui-badge.is-current { background: var(--color-brand-soft); color: var(--color-brand); }
+.ui-badge.is-action { background: var(--color-primary); color: var(--color-primary-ink); }
+.ui-badge.is-danger { background: color-mix(in srgb, var(--color-danger) 12%, var(--bg-surface)); color: var(--color-danger); }
+.ui-badge.is-warn { background: color-mix(in srgb, var(--due-soon) 16%, var(--bg-surface)); color: #92400e; }
+
+/* =========================================================================
+   8. モーダル
+   iOS の「アドレスバーで高さが変わる」「ノッチに隠れる」「ホームインジケータに
+   かぶる」の3点は、ここで一度だけ面倒を見る。個々の画面で書き直さないこと。
+   ========================================================================= */
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-3)
+           calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--scrim);
+  /* 高さが足りないときでも必ずスクロールで上端に到達できるようにする保険 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: ui-overlay-in var(--transition);
+}
+
+@keyframes ui-overlay-in {
+  from { opacity: 0; }
+}
+
+/* モーダルの上に重ねるモーダル（入力フォーム等） */
+.ui-overlay.is-nested { z-index: var(--z-modal-nested); }
+/* 写真・PDFの拡大表示 */
+.ui-overlay.is-preview { z-index: var(--z-preview); background: var(--scrim-heavy); }
+/* 上端から出すモーダル（縦に長い内容） */
+.ui-overlay.is-top { align-items: flex-start; }
+
+.ui-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--page-narrow);
+  /* dvh 対応ブラウザでは実際に見えている高さを使う。未対応は vh にフォールバック */
+  max-height: calc(100vh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+}
+
+.ui-modal.is-sm { max-width: 620px; }
+.ui-modal.is-lg { max-width: 1000px; }
+
+.ui-modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ui-modal-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+  min-width: 0;
+}
+
+.ui-modal-head .icon-btn-close { margin-left: auto; }
+
+.ui-modal-body {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.ui-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* 主要アクションは右端に置く（左＝取り消し系、右＝進める系） */
+.ui-modal-foot-end { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* =========================================================================
+   9. 空状態・注記
+   ========================================================================= */
+.ui-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.ui-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+}

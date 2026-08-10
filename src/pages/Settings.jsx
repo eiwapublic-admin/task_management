@@ -60,7 +60,7 @@ export default function Settings() {
       <AppHeader />
       <div className="settings-container">
         <div className="settings-toolbar">
-          <h2 className="page-title">設定</h2>
+          <h2 className="ui-page-title">設定</h2>
           <span className="settings-saved" role="status" aria-live="polite">
             {status}
           </span>

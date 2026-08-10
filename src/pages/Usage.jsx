@@ -8,8 +8,8 @@ export default function Usage() {
   return (
     <div className="dashboard-page">
       <AppHeader />
-      <div className="usage-container">
-        <h2 className="page-title">従量課金事項</h2>
+      <div className="ui-container is-narrow">
+        <h2 className="ui-page-title">従量課金事項</h2>
         <UsagePanel />
       </div>
     </div>

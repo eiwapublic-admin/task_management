@@ -140,8 +140,8 @@ export default function Archive() {
   return (
     <div className="dashboard-page">
       <AppHeader />
-      <div className="logs-container">
-        <h2 className="page-title">アーカイブ</h2>
+      <div className="ui-container logs-container">
+        <h2 className="ui-page-title">アーカイブ</h2>
         <form className="archive-filters" onSubmit={handleSearch}>
           <label className="archive-filter">
             担当者

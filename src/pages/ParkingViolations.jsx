@@ -101,7 +101,7 @@ export default function ParkingViolations() {
   return (
     <div className="reports-page">
       <AppHeader />
-      <div className="reports-container">
+      <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">
           <button
             type="button"
@@ -112,7 +112,7 @@ export default function ParkingViolations() {
           >
             <IconHome size={32} />
           </button>
-          <h2 className="page-title">違反車両一覧</h2>
+          <h2 className="ui-page-title">違反車両一覧</h2>
           {!isOwner && (
             <button
               type="button"
@@ -136,10 +136,10 @@ export default function ParkingViolations() {
             onChange={(e) => setQuery(e.target.value)}
             aria-label="検索"
           />
-          <div className="sort-toggle" role="group" aria-label="並び順">
+          <div className="ui-segmented sort-toggle" role="group" aria-label="並び順">
             <button
               type="button"
-              className={`sort-toggle-btn${sort === 'date' ? ' is-active' : ''}`}
+              className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
               aria-pressed={sort === 'date'}
               onClick={() => setSort('date')}
             >
@@ -147,7 +147,7 @@ export default function ParkingViolations() {
             </button>
             <button
               type="button"
-              className={`sort-toggle-btn${sort === 'rank' ? ' is-active' : ''}`}
+              className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
               aria-pressed={sort === 'rank'}
               onClick={() => setSort('rank')}
             >
