@@ -56,11 +56,11 @@ export default function Settings() {
   }
 
   return (
-    <div className="dashboard-page settings-page">
+    <div className="ui-page settings-page">
       <AppHeader />
       <div className="settings-container">
         <div className="settings-toolbar">
-          <h2 className="page-title">設定</h2>
+          <h2 className="ui-page-title">設定</h2>
           <span className="settings-saved" role="status" aria-live="polite">
             {status}
           </span>

@@ -154,7 +154,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="ui-page">
       <AppHeader />
 
       {creditAlert && (

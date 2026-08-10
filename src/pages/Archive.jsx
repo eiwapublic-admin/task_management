@@ -138,10 +138,10 @@ export default function Archive() {
   const assigneeOptions = Array.from(new Set([...assignees, UNASSIGNED]))
 
   return (
-    <div className="dashboard-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="logs-container">
-        <h2 className="page-title">アーカイブ</h2>
+      <div className="ui-container logs-container">
+        <h2 className="ui-page-title">アーカイブ</h2>
         <form className="archive-filters" onSubmit={handleSearch}>
           <label className="archive-filter">
             担当者
@@ -189,7 +189,7 @@ export default function Archive() {
         ) : tasks.length === 0 ? (
           <p className="dashboard-loading">該当するアーカイブはありません。</p>
         ) : (
-          <table className="logs-table archive-table">
+          <table className="logs-table">
             <thead>
               <tr>
                 <th>情報源</th>

@@ -120,9 +120,9 @@ export default function Chlorine() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="reports-container">
+      <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">
           <button
             type="button"
@@ -133,7 +133,7 @@ export default function Chlorine() {
           >
             <IconHome size={32} />
           </button>
-          <h2 className="page-title">残留塩素等検査</h2>
+          <h2 className="ui-page-title">残留塩素等検査</h2>
           <div className="reports-toolbar-actions">
             {!readOnly && (
               <button type="button" className="btn-primary" onClick={() => setEditing('new')}>

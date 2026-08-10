@@ -41,9 +41,9 @@ export default function ReportTemplates() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="reports-container">
+      <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">
           <button
             type="button"
@@ -54,7 +54,7 @@ export default function ReportTemplates() {
           >
             <IconHome size={32} />
           </button>
-          <h2 className="page-title">定型文の設定</h2>
+          <h2 className="ui-page-title">定型文の設定</h2>
           <div className="report-head-right">
             {message && <span className="report-saved">{message}</span>}
             <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || loading}>

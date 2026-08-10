@@ -24,7 +24,7 @@
 
 .kanban-lastfetch {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -32,11 +32,11 @@
 .kanban-archive-btn {
   height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid #6b7280;
+  border: 1px solid var(--text-muted);
   border-radius: var(--radius-sm);
-  background: #6b7280;
-  color: #fff;
-  font-size: 14px;
+  background: var(--text-muted);
+  color: var(--ink-on-fill);
+  font-size: var(--fs-base);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -56,7 +56,7 @@
 }
 
 .filter-bar-label {
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   margin-right: var(--space-1);
 }
@@ -69,7 +69,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-base);
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), color var(--transition);
@@ -81,7 +81,7 @@
 
 .filter-chip.active {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--ink-on-fill);
   border-color: var(--color-primary);
 }
 
@@ -92,7 +92,7 @@
 }
 
 .filter-chip.active .filter-chip-dot {
-  background: #fff !important;
+  background: var(--bg-surface) !important;
 }
 
 /* ---------- カンバン列 ---------- */
@@ -104,7 +104,7 @@
 
 .kanban-column {
   /* ステータス色を薄く混ぜた濃いめの背景で列ごとのメリハリを付ける */
-  background: color-mix(in srgb, var(--column-accent, #64748b) 12%, #e3e8ee);
+  background: color-mix(in srgb, var(--column-accent, var(--status-todo)) 12%, var(--bg-muted));
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   min-height: 400px;
@@ -117,7 +117,7 @@
 
 /* 「対応中」列は既定の混色だと暗くなるため、視認性の高い薄い黄色にする */
 .kanban-column[data-status='対応中'] {
-  background: #fdf6cf;
+  background: var(--status-progress-surface);
 }
 
 /* ドラッグ中のカードが列に重なったときのフィードバック */
@@ -137,11 +137,11 @@
 .kanban-column-add {
   border: 1px solid var(--color-primary);
   background: var(--color-primary);
-  color: #fff;
+  color: var(--ink-on-fill);
   border-radius: var(--radius-sm);
   width: 28px;
   height: 28px;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
@@ -163,7 +163,7 @@
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   padding: var(--space-1) var(--space-1) var(--space-2);
   border-bottom: 2px solid var(--column-accent, var(--border-strong));
 }
@@ -184,7 +184,7 @@
 .kanban-column-count {
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   background: var(--bg-surface);
   border-radius: var(--radius-pill);
   min-width: 22px;
@@ -204,7 +204,7 @@
 
 .kanban-column-empty {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   text-align: center;
   padding: var(--space-5) 0;
   border: 1px dashed var(--border-strong);
@@ -229,8 +229,8 @@
   top: var(--space-2);
   right: var(--space-2);
   background: var(--color-primary);
-  color: #fff;
-  font-size: 10px;
+  color: var(--ink-on-fill);
+  font-size: var(--fs-2xs);
   font-weight: 700;
   line-height: 1;
   padding: 3px 6px;
@@ -250,7 +250,7 @@
 
 .task-card-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-base);
   color: var(--text-strong);
   margin-bottom: var(--space-2);
   line-height: 1.4;
@@ -271,7 +271,7 @@
    user-select: all でクリック（ダブルクリック）だけで全選択・コピーしやすくする。 */
 .task-card-task-id {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
   margin: calc(-1 * var(--space-1)) 0 var(--space-2);
   user-select: all;
@@ -279,7 +279,7 @@
 
 /* 送信元の会社・氏名 */
 .task-card-sender {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-base);
   margin: calc(-1 * var(--space-1)) 0 var(--space-2);
   display: flex;
@@ -289,7 +289,7 @@
 
 .task-card-sender::before {
   content: '👤';
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 
 .task-card-meta {
@@ -297,7 +297,7 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -318,8 +318,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  color: #fff;
-  font-size: 11px;
+  color: var(--ink-on-fill);
+  font-size: var(--fs-2xs);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -340,7 +340,7 @@
 .task-card-due-flag {
   margin-top: var(--space-2);
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
@@ -350,15 +350,15 @@
    淡い背景＋中間色ではなく、彩度の高い背景＋濃い文字で明確に目立たせる（2026-07-30）。
    完了タスクは対応済みなので下の .task-card.is-done 側で従来の控えめな配色に戻す。 */
 .task-card-due-flag.due-overdue {
-  color: #7f1d1d;
-  background: #fecaca;
-  border: 1px solid #f87171;
+  color: var(--color-danger-hover);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
 }
 
 .task-card-due-flag.due-soon {
-  color: #78350f;
-  background: #fde68a;
-  border: 1px solid #f59e0b;
+  color: var(--color-warn-ink);
+  background: var(--color-warn-surface);
+  border: 1px solid var(--color-warn-border);
 }
 
 /* 完了タスクは対応済みで注意喚起の必要が無いので、期限まわりの彩度を落として静かに見せる */
@@ -376,7 +376,7 @@
 }
 
 .task-card-received {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
   margin-top: var(--space-1);
 }
@@ -384,7 +384,7 @@
 /* スパム判定（タスク詳細の保存ボタン左）。主要操作ではないので通常時は控えめにし、
    確認中だけ赤系を出して「アーカイブへ消える操作」であることを伝える（2026-07-31にカードから移設）。 */
 .task-detail-spam-btn {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
@@ -396,7 +396,7 @@
 .task-detail-spam-btn:hover {
   color: var(--due-overdue);
   border-color: var(--due-overdue);
-  background: #fef2f2;
+  background: var(--color-danger-surface);
 }
 
 .task-detail-spam-confirm {
@@ -404,7 +404,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .task-detail-spam-message {
@@ -414,7 +414,7 @@
 
 .task-detail-spam-go,
 .task-detail-spam-cancel {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   border-radius: var(--radius-sm);
   padding: 6px 12px;
@@ -423,7 +423,7 @@
 }
 
 .task-detail-spam-go {
-  color: #fff;
+  color: var(--ink-on-fill);
   background: var(--due-overdue);
   border: 1px solid var(--due-overdue);
 }
@@ -436,7 +436,7 @@
 
 .task-card-remarks {
   margin-top: var(--space-2);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--color-primary);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -451,7 +451,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-modal);
   padding: var(--space-4);
   animation: overlay-in var(--transition);
   /* iOSのSafariはアドレスバーの表示/非表示でvh単位の基準（実際に見えている
@@ -489,7 +489,7 @@
 .task-detail-header {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 1;;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -501,7 +501,7 @@
 
 .task-detail-modal h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   color: var(--text-strong);
   line-height: 1.4;
 }
@@ -519,7 +519,7 @@
   flex-shrink: 0;
   border: none;
   background: none;
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   line-height: 1;
   cursor: pointer;
   color: var(--text-muted);
@@ -542,7 +542,7 @@
   margin: var(--space-4) 0;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border);
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .task-detail-topitem {
@@ -554,7 +554,7 @@
 
 .task-detail-topitem-label {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--fs-base);
   white-space: nowrap;
 }
 
@@ -578,7 +578,7 @@
   display: grid;
   grid-template-columns: 110px 1fr;
   gap: var(--space-3) var(--space-4);
-  font-size: 16px;
+  font-size: var(--fs-lg);
   margin: var(--space-4) 0;
 }
 
@@ -611,7 +611,7 @@
 .task-detail-footer {
   position: sticky;
   bottom: 0;
-  z-index: 1;
+  z-index: 1;;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -623,7 +623,7 @@
 }
 
 .task-detail-footer-label {
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
@@ -646,7 +646,7 @@
   align-items: center;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
   text-decoration: none;
   border: 1px solid var(--border-strong);
@@ -664,7 +664,7 @@
 .task-action-btn.task-action-reply {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #fff;
+  color: var(--ink-on-fill);
 }
 
 .task-action-btn.task-action-reply:hover {
@@ -673,9 +673,9 @@
 
 /* 「返信」「ダウンロード」は黒背景 */
 .task-action-btn.task-action-dark {
-  background: #1f2937;
-  border-color: #1f2937;
-  color: #fff;
+  background: var(--surface-inverse);
+  border-color: var(--surface-inverse);
+  color: var(--ink-on-fill);
 }
 
 .task-action-btn.task-action-dark:hover {
@@ -687,7 +687,7 @@
   background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-base);
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), color var(--transition);
@@ -699,9 +699,9 @@
 
 /* 現在のステータスは緑で示す（ヘッダーの配色に合わせる） */
 .status-btn.active {
-  background: #33604d;
-  color: #fff;
-  border-color: #33604d;
+  background: var(--color-brand);
+  color: var(--ink-on-fill);
+  border-color: var(--color-brand);
 }
 
 /* ---------- 詳細画面の編集フォーム（担当者・期限・留意事項） ---------- */
@@ -713,7 +713,7 @@
 
 .task-detail-input {
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-base);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -736,7 +736,7 @@ select.task-detail-input.is-unassigned {
 
 .task-detail-warn {
   margin-left: var(--space-2);
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--due-soon);
   white-space: nowrap;
@@ -749,12 +749,12 @@ select.task-detail-input.is-unassigned {
 }
 
 .task-detail-save-error {
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--due-overdue);
 }
 
 .task-detail-save-ok {
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--status-done);
   font-weight: 600;
 }
@@ -767,12 +767,12 @@ select.task-detail-input.is-unassigned {
   display: inline-block;
   margin-right: var(--space-2);
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
   color: var(--text-base);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   vertical-align: middle;
   white-space: nowrap;
@@ -787,18 +787,18 @@ select.task-detail-input.is-unassigned {
   gap: 6px;
   margin-left: var(--space-3);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-subtle);
   border: 1px solid var(--border-strong);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   vertical-align: middle;
   white-space: nowrap;
 }
 
 .task-detail-spam-clear {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   color: var(--text-base);
   background: var(--bg-surface);
@@ -815,11 +815,11 @@ select.task-detail-input.is-unassigned {
   gap: 4px;
   margin-left: var(--space-3);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-primary-weak);
   color: var(--color-primary-hover);
   border: 1px solid var(--color-primary);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   vertical-align: middle;
   white-space: nowrap;
@@ -856,7 +856,7 @@ select.task-detail-input.is-unassigned {
 
 .task-detail-attachment-size {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .task-detail-attachment-download,
@@ -864,7 +864,7 @@ select.task-detail-input.is-unassigned {
   margin-left: var(--space-1);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -872,9 +872,9 @@ select.task-detail-input.is-unassigned {
 }
 
 .task-detail-attachment-download {
-  border: 1px solid #1f2937;
-  background: #1f2937;
-  color: #fff;
+  border: 1px solid var(--surface-inverse);
+  background: var(--surface-inverse);
+  color: var(--ink-on-fill);
 }
 
 .task-detail-attachment-download:hover {
@@ -911,7 +911,7 @@ select.task-detail-input.is-unassigned {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 60; /* タスク詳細モーダル（z-index:50）より上に重ねる */
+  z-index: var(--z-preview); /* タスク詳細モーダル（z-index:50）より上に重ねる */
   padding: var(--space-4);
 }
 
@@ -958,7 +958,7 @@ select.task-detail-input.is-unassigned {
   width: 28px;
   height: 28px;
   line-height: 1;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   cursor: pointer;
 }
@@ -966,14 +966,14 @@ select.task-detail-input.is-unassigned {
 .attachment-preview-zoom-controls button[aria-label='ズームをリセット'] {
   width: auto;
   padding: 0 var(--space-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
 .attachment-preview-zoom-level {
   min-width: 3.5em;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -985,7 +985,7 @@ select.task-detail-input.is-unassigned {
   color: var(--text-strong);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-3);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
@@ -995,7 +995,7 @@ select.task-detail-input.is-unassigned {
 .attachment-preview-close {
   border: none;
   background: transparent;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   line-height: 1;
   color: var(--text-muted);
   cursor: pointer;
@@ -1011,7 +1011,7 @@ select.task-detail-input.is-unassigned {
   justify-content: center;
   padding: var(--space-3);
   overflow: hidden;
-  background: #111;
+  background: var(--scrim-heavy);
   touch-action: none;
 }
 
@@ -1027,11 +1027,11 @@ select.task-detail-input.is-unassigned {
   width: 100%;
   height: 100%;
   border: none;
-  background: #fff;
+  background: var(--bg-surface);
 }
 
 .attachment-preview-unsupported {
-  color: #fff;
+  color: var(--ink-on-fill);
 }
 
 @media (max-width: 768px) {
@@ -1061,7 +1061,7 @@ select.task-detail-input.is-unassigned {
 }
 
 .task-form-label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -1070,7 +1070,7 @@ select.task-detail-input.is-unassigned {
 .task-form-field select,
 .task-form-field textarea {
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--fs-base);
   color: var(--text-base);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -1154,19 +1154,11 @@ select.task-detail-input.is-unassigned {
   .task-detail-fields dt {
     margin-top: var(--space-3);
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 
   .task-detail-fields dt:first-of-type {
     margin-top: 0;
-  }
-
-  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
-  .task-detail-input,
-  .task-form-field input,
-  .task-form-field select,
-  .task-form-field textarea {
-    font-size: 16px;
   }
 
   /* タッチ操作しやすいようステータス/操作ボタンを大きめに */

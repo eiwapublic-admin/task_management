@@ -122,10 +122,10 @@ export default function Inspections() {
   }
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="reports-container inspections-container">
-        <div className="reports-toolbar inspection-toolbar">
+      <div className="ui-container is-wide">
+        <div className="ui-toolbar reports-toolbar inspection-toolbar">
           <button
             type="button"
             className="icon-btn-home"
@@ -135,6 +135,7 @@ export default function Inspections() {
           >
             <IconHome size={32} />
           </button>
+          <h2 className="ui-page-title">自主検査表（日常）</h2>
           <div className="inspection-month">
             <button
               type="button"
@@ -156,7 +157,7 @@ export default function Inspections() {
               <IconChevronRight size={28} />
             </button>
           </div>
-          <h2 className="page-title">自主検査表（日常）</h2>
+          <div className="ui-toolbar-actions">
           <button
             type="button"
             className="btn-plain inspection-pdf-btn"
@@ -167,6 +168,7 @@ export default function Inspections() {
             <IconDownload size={18} />
             {pdf.busy ? '作成中…' : 'PDF'}
           </button>
+          </div>
         </div>
 
         {error && (

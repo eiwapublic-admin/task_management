@@ -25,10 +25,10 @@ export default function Logs() {
   }, [])
 
   return (
-    <div className="dashboard-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="logs-container">
-        <h2 className="page-title">処理ログ</h2>
+      <div className="ui-container logs-container">
+        <h2 className="ui-page-title">処理ログ</h2>
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}
@@ -39,7 +39,7 @@ export default function Logs() {
         ) : logs.length === 0 ? (
           <p className="dashboard-loading">まだログがありません。</p>
         ) : (
-          <table className="logs-table">
+          <table className="ui-table logs-table">
             <thead>
               <tr>
                 <th>日時</th>
@@ -62,7 +62,7 @@ export default function Logs() {
                     </span>
                   </td>
                   <td className="logs-actor">{log.actor}</td>
-                  <td className="logs-message">{log.message}</td>
+                  <td>{log.message}</td>
                 </tr>
                 )
               })}

@@ -55,15 +55,10 @@
     resize: vertical;
   }
 
-  /* iOS Safari のフォーカス時ズームを避けるため入力は 16px 以上に */
-  .settings-panel input,
-  .settings-panel textarea {
-    font-size: 16px;
-  }
 }
 
 .settings-panel section h2 {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   margin: 0 0 var(--space-2);
   color: var(--text-strong);
 }
@@ -72,7 +67,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  font-size: 15px;
+  font-size: var(--fs-md);
   color: var(--text-base);
   margin-bottom: var(--space-2);
 }
@@ -83,7 +78,7 @@
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-family: inherit;
   color: var(--text-strong);
 }
@@ -106,7 +101,7 @@
 }
 
 .settings-hint {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin: 0;
 }
@@ -117,8 +112,8 @@
   border: none;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
-  color: #fff;
-  font-size: 14px;
+  color: var(--ink-on-fill);
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: background var(--transition);
 }
@@ -129,7 +124,7 @@
 
 .settings-saved {
   color: var(--status-done);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   margin: var(--space-3) 0 0;
   min-height: 18px;

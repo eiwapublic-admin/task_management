@@ -117,10 +117,10 @@ export default function AppHeader() {
             <span className="dashboard-version">ver.{formatBuildTime()}</span>
           </div>
           {!isOwner && (
-            <nav className="app-switch" aria-label="表示するセクション">
+            <nav className="ui-segmented on-dark app-switch" aria-label="表示するセクション">
               <button
                 type="button"
-                className={`app-switch-btn${inReports ? '' : ' is-active'}`}
+                className={`ui-segmented-btn${inReports ? '' : ' is-active'}`}
                 aria-current={inReports ? undefined : 'page'}
                 onClick={() => goTo('/')}
               >
@@ -128,7 +128,7 @@ export default function AppHeader() {
               </button>
               <button
                 type="button"
-                className={`app-switch-btn${inReports ? ' is-active' : ''}`}
+                className={`ui-segmented-btn${inReports ? ' is-active' : ''}`}
                 aria-current={inReports ? 'page' : undefined}
                 onClick={() => goTo('/reports')}
               >
@@ -143,10 +143,10 @@ export default function AppHeader() {
             もう一方の要素にすることで、切替＝左端／ハンバーガー側＝右端に振り分ける。
             desktop幅では常に非表示（.app-switch-mobile参照） */}
         {!isOwner && (
-          <nav className="app-switch app-switch-mobile" aria-label="表示するセクション">
+          <nav className="ui-segmented on-dark app-switch app-switch-mobile" aria-label="表示するセクション">
             <button
               type="button"
-              className={`app-switch-btn${inReports ? '' : ' is-active'}`}
+              className={`ui-segmented-btn${inReports ? '' : ' is-active'}`}
               aria-current={inReports ? undefined : 'page'}
               onClick={() => goTo('/')}
             >
@@ -154,7 +154,7 @@ export default function AppHeader() {
             </button>
             <button
               type="button"
-              className={`app-switch-btn${inReports ? ' is-active' : ''}`}
+              className={`ui-segmented-btn${inReports ? ' is-active' : ''}`}
               aria-current={inReports ? 'page' : undefined}
               onClick={() => goTo('/reports')}
             >

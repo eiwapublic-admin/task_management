@@ -424,9 +424,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                   <ul className="task-detail-attachments">
                     {attachments.map((att) => (
                       <li key={`${att.messageId || ''}-${att.attachmentId}`} className="task-detail-attachment">
-                        <span className="task-detail-attachment-icon" aria-hidden="true">
-                          📎
-                        </span>
+                        <span aria-hidden="true">📎</span>
                         <span className="task-detail-attachment-name">{att.filename}</span>
                         {att.size > 0 && (
                           <span className="task-detail-attachment-size">

@@ -99,9 +99,9 @@ export default function ParkingViolations() {
   }, [violations, query, sort, countByPlate])
 
   return (
-    <div className="reports-page">
+    <div className="ui-page">
       <AppHeader />
-      <div className="reports-container">
+      <div className="ui-container is-narrow reports-container">
         <div className="reports-toolbar">
           <button
             type="button"
@@ -112,7 +112,7 @@ export default function ParkingViolations() {
           >
             <IconHome size={32} />
           </button>
-          <h2 className="page-title">違反車両一覧</h2>
+          <h2 className="ui-page-title">違反車両一覧</h2>
           {!isOwner && (
             <button
               type="button"
@@ -136,10 +136,10 @@ export default function ParkingViolations() {
             onChange={(e) => setQuery(e.target.value)}
             aria-label="検索"
           />
-          <div className="sort-toggle" role="group" aria-label="並び順">
+          <div className="ui-segmented" role="group" aria-label="並び順">
             <button
               type="button"
-              className={`sort-toggle-btn${sort === 'date' ? ' is-active' : ''}`}
+              className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
               aria-pressed={sort === 'date'}
               onClick={() => setSort('date')}
             >
@@ -147,7 +147,7 @@ export default function ParkingViolations() {
             </button>
             <button
               type="button"
-              className={`sort-toggle-btn${sort === 'rank' ? ' is-active' : ''}`}
+              className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
               aria-pressed={sort === 'rank'}
               onClick={() => setSort('rank')}
             >
@@ -219,15 +219,15 @@ export default function ParkingViolations() {
       {/* ヘッダーの「＋」からの新規登録（2026-08-10）。この一覧は日を跨るため常に本日分として扱い、
           日報詳細と同じ入力欄（写真撮影・ナンバー等・AI読み取り）をそのままモーダルで開く */}
       {quickAddReportId && (
-        <div className="inspection-overlay" role="dialog" aria-modal="true" onClick={handleCloseQuickAdd}>
-          <div className="inspection-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="inspection-modal-head">
-              <h3>違反車両を記録（本日 {formatReportDate(todayJST())}）</h3>
+        <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={handleCloseQuickAdd}>
+          <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="ui-modal-head">
+              <h3 className="ui-modal-title">違反車両を記録（本日 {formatReportDate(todayJST())}）</h3>
               <button type="button" className="icon-btn-close" onClick={handleCloseQuickAdd} aria-label="閉じる">
                 ×
               </button>
             </div>
-            <div className="inspection-modal-body">
+            <div className="ui-modal-body is-stacked">
               <ReportParkingViolations reportId={quickAddReportId} readOnly={false} />
             </div>
           </div>
