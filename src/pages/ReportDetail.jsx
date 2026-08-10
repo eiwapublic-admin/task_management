@@ -5,6 +5,7 @@ import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
 import ChlorineForm from '../components/ChlorineForm'
 import { getCurrentUser } from '../lib/auth'
+import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   fetchReport,
   createReport,
@@ -93,6 +94,10 @@ export default function ReportDetail({ date, onClose }) {
       setLoading(false)
     }
   }, [date])
+
+  // 開いている間は裏の一覧を固定する。これが無いと、モーダル内のスクロールが
+  // 裏の一覧へ伝わり、iPhoneで見出しが画面上端の外へ隠れることがあった（2026-08-10）
+  useBodyScrollLock()
 
   useEffect(() => {
     load()
@@ -353,9 +358,9 @@ export default function ReportDetail({ date, onClose }) {
 
   return (
     <>
-      <div className="report-detail-overlay" role="dialog" aria-modal="true" onClick={handleClose}>
-        <div className="report-detail-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="report-detail-head">
+      <div className="ui-overlay is-top" role="dialog" aria-modal="true" onClick={handleClose}>
+        <div className="ui-modal report-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="ui-modal-head report-detail-head">
             <h2 className="ui-page-title">
               {formatReportDate(date)}
               {isToday && <span className="report-today-badge">本日</span>}
@@ -400,7 +405,7 @@ export default function ReportDetail({ date, onClose }) {
             </div>
           </div>
 
-          <div className="report-detail-body">
+          <div className="ui-modal-body">
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}

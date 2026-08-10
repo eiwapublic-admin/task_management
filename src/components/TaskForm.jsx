@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { UNASSIGNED } from '../lib/status'
+import useBodyScrollLock from '../lib/useBodyScrollLock'
 
 // タスクの手動登録フォーム（モーダル）。
 // 未処理列の「＋」ボタンから開き、タイトル・担当者・期限・留意事項を入力して登録する。
@@ -12,9 +13,9 @@ export default function TaskForm({ assignees, onClose, onCreate }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  useBodyScrollLock()
+
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     modalRef.current?.querySelector('input, textarea, select')?.focus()
     function handleKeyDown(e) {
       if (e.key === 'Escape') onClose()
@@ -22,7 +23,6 @@ export default function TaskForm({ assignees, onClose, onCreate }) {
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = prevOverflow
     }
   }, [onClose])
 

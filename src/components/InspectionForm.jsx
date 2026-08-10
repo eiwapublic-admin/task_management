@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   INSPECTION_ITEMS,
   JUDGEMENT_MARKS,
@@ -29,6 +30,9 @@ export default function InspectionForm({
   onSaved,
   onDelete,
 }) {
+  // 開いている間は裏の画面を固定する（共通フック。入れ子でも数えて管理する）
+  useBodyScrollLock()
+
   const [inspector, setInspector] = useState(existing?.inspector || defaultInspector)
   const [items, setItems] = useState(existing?.items || {})
   const [note, setNote] = useState(existing?.note || '')

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import useBodyScrollLock from '../lib/useBodyScrollLock'
 import ChlorinePhotos from './ChlorinePhotos'
 import {
   CHLORINE_BUILDINGS,
@@ -32,6 +33,9 @@ export default function ChlorineForm({
   onSaved,
   onDelete,
 }) {
+  // 開いている間は裏の画面を固定する（共通フック。入れ子でも数えて管理する）
+  useBodyScrollLock()
+
   const [building, setBuilding] = useState(existing?.building || defaultBuilding || CHLORINE_BUILDINGS[0])
   const [location, setLocation] = useState(existing?.location || '')
   // 新規登録時、測定場所は施設ごとの最後の入力値をデフォルト表示する（2026-08-10）。
