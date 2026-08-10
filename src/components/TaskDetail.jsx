@@ -6,6 +6,7 @@ import { listAttachments, downloadAttachment, fetchAttachmentBlob, getAttachment
 import { channelIconSrc, channelLabel } from '../lib/channel'
 import { formatTaskId } from '../lib/taskId'
 import AttachmentPreview from './AttachmentPreview'
+import useBodyScrollLock from '../lib/useBodyScrollLock'
 
 // アプリ内プレビューに対応する形式（画像・PDF）。それ以外はダウンロードのみ。
 function isPreviewable(mimeType) {
@@ -21,6 +22,9 @@ function formatBytes(n) {
 }
 
 export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam, onAddToReport }) {
+  // 開いている間は裏のカンバンを固定する（共通フックへ集約。2026-08-10）
+  useBodyScrollLock(Boolean(task))
+
   const modalRef = useRef(null)
   const previouslyFocused = useRef(null)
   // プレビューが開いている間はタスク詳細側のEscape/Tab処理を無効化する
@@ -108,9 +112,6 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     if (!task) return
 
     previouslyFocused.current = document.activeElement
-    // 背景のスクロールを止める
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
 
     // 開いたらモーダル内にフォーカスを移す
     modalRef.current?.querySelector('.task-detail-close')?.focus()
@@ -142,7 +143,6 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = prevOverflow
       // 閉じたら元の要素へフォーカスを戻す
       previouslyFocused.current?.focus?.()
     }

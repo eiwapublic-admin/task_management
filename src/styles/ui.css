@@ -661,6 +661,10 @@
   /* 高さが足りないときでも必ずスクロールで上端に到達できるようにする保険 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* モーダル内の端までスクロールしたあと、裏の一覧まで一緒に動いてしまう
+     （スクロールチェーン）のを止める。iOSではこれが無いと、裏側が動いた拍子に
+     固定表示のオーバーレイがずれて見えることがある */
+  overscroll-behavior: contain;
   animation: ui-overlay-in var(--transition);
 }
 
@@ -680,9 +684,12 @@
   flex-direction: column;
   width: 100%;
   max-width: var(--page-narrow);
-  /* dvh 対応ブラウザでは実際に見えている高さを使う。未対応は vh にフォールバック */
-  max-height: calc(100vh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  max-height: calc(100dvh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  /* 高さは「オーバーレイの内側」を基準にする（100% = .ui-overlay の内容領域）。
+     vh / dvh / lvh は iOS では固定表示要素の実寸と一致しないことがあり、
+     計算値が実際の枠より大きいとモーダルがオーバーレイからはみ出して、
+     見出しが画面上端の外へ追い出される（＝下にスワイプしないと出てこない）。
+     100% なら常に枠と一致するので、その状態が起こり得ない（2026-08-10） */
+  max-height: 100%;
   background: var(--bg-surface);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-overlay);

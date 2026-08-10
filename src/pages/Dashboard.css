@@ -1266,52 +1266,22 @@
 /* --- 詳細（2026-08-07に別画面から「一覧の上に重ねるモーダル」へ変更） ---
    左: 日付。右: 保存状態・自主点検・削除・×（閉じる）。
    ホームボタンと前日/翌日の移動ボタンは廃止し、×だけで閉じる。
-   自主点検モーダル（.inspection-overlay。z-index:55）はこの上に重なる必要があるため、
-   こちらは 50 にしている */
-.report-detail-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-3)
-           calc(var(--space-4) + env(safe-area-inset-bottom));
-  overflow-y: auto;
-}
+   骨格（オーバーレイ・枠・見出し帯・本文のスクロール）は共通部品
+   .ui-overlay.is-top / .ui-modal / .ui-modal-head / .ui-modal-body に任せ、
+   ここには日報詳細だけの違いを書く（2026-08-10に共通部品へ統合）。
+   自主点検・残留塩素の入力（.ui-overlay.is-nested）はこの上に重なる */
 
-.report-detail-modal {
-  background: var(--bg-app);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 900px;
-  max-height: calc(100dvh - 2 * var(--space-4) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-}
+/* 中にカード（.report-card）を並べるため、枠の地はページと同じ薄いグレーにする */
+.report-detail-modal { background: var(--bg-app); }
 
+/* ボタンが多く、狭い画面では折り返しが要る。地は白のままカードと区別する */
 .report-detail-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  flex-shrink: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
 }
 
 .report-detail-head .ui-page-title { margin: 0; }
-
-/* モーダル本体（ヘッダを残して中身だけスクロールさせる） */
-.report-detail-body {
-  padding: var(--space-4);
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
 
 /* 自主点検・残留塩素ボタン＋削除＋×が並ぶため、幅が足りない画面では折り返して
    ×ボタンが画面外へはみ出すのを防ぐ（2026-08-10。安全策。通常幅では1行に収まる） */
