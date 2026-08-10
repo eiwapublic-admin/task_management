@@ -149,7 +149,7 @@ export default function Chlorine() {
             （2026-08-10。「帳票の出力」の見出しラベルも省略） */}
         <div className="chlorine-controls">
           <label className="report-field chlorine-year-field">
-            <span>対象年</span>
+            <span>表示対象年</span>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
               {years.map((y) => (
                 <option key={y} value={y}>
@@ -275,6 +275,7 @@ export default function Chlorine() {
       )}
 
       {pdf.previewModal}
+      {pdf.busyOverlay}
     </div>
   )
 }

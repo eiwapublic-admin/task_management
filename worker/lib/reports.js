@@ -930,16 +930,26 @@ export async function handleInspectionDelete(req) {
 const PDF_PREVIEW_TTL_SECONDS = 180
 const MAX_PDF_PREVIEW_BYTES = 20 * 1024 * 1024 // 自主検査表PDFは通常1MB未満。念のため上限を設ける
 
-function pdfPreviewKey(userId) {
-  return `inspection-pdf-preview/${userId}.pdf`
+// 種類ごとに別の保存キーにする（2026-08-10）。以前はユーザーごとに単一のキーを自主検査表・
+// 残留塩素等検査の両方で共有していたため、片方のPDF生成が完了する前にもう片方を生成すると、
+// 後から書き込みが完了した方の内容で上書きされ「違う種類の帳票が表示される」ことがあった
+// （どちらも非同期でアップロードに数秒かかるため、続けて別のPDFを操作すると起こりうる）。
+const VALID_PDF_KINDS = new Set(['inspection', 'chlorine'])
+
+function pdfPreviewKey(userId, kind) {
+  return `inspection-pdf-preview/${kind}/${userId}.pdf`
 }
 
-// POST /api/report/inspection-pdf-preview — 生成済みPDF（本体そのもの）を一時保存し、
-// プレビュー用の短時間有効トークンを発行する。ログイン必須（書き込み権限は不要）
+// POST /api/report/inspection-pdf-preview?kind=inspection|chlorine — 生成済みPDF
+// （本体そのもの）を一時保存し、プレビュー用の短時間有効トークンを発行する。
+// ログイン必須（書き込み権限は不要）
 export async function handleInspectionPdfPreviewCreate(req) {
   const { auth, error } = await requireAuth(req)
   if (error) return error
   try {
+    const kind = new URL(req.url).searchParams.get('kind') || ''
+    if (!VALID_PDF_KINDS.has(kind)) return json({ error: 'kind が不正です' }, 400)
+
     const bytes = await req.arrayBuffer()
     if (!bytes.byteLength) return json({ error: 'PDFが空です' }, 400)
     if (bytes.byteLength > MAX_PDF_PREVIEW_BYTES) return json({ error: 'PDFが大きすぎます' }, 413)
@@ -950,7 +960,7 @@ export async function handleInspectionPdfPreviewCreate(req) {
       return json({ error: 'サーバー設定エラーが発生しました' }, 500)
     }
 
-    const key = pdfPreviewKey(auth.sub)
+    const key = pdfPreviewKey(auth.sub, kind)
     await putObject(key, bytes, 'application/pdf', { upsert: true })
     const token = await signJwt(
       { purpose: 'inspection-pdf-preview', key },

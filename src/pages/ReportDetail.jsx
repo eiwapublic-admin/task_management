@@ -4,7 +4,6 @@ import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
 import ChlorineForm from '../components/ChlorineForm'
-import { IconClipboard, IconDroplet } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchReport,
@@ -365,26 +364,27 @@ export default function ReportDetail({ date, onClose }) {
               {savedAt && <span className="report-saved">保存しました</span>}
               {!readOnly && (
                 // 未記載（この日の記録がまだ無い）のときは青地・白字で目立たせて登録を促し、
-                // 記載済みのときは控えめな見た目のまま「修正」に変える（2026-08-07）
+                // 記載済みのときは控えめな見た目のまま「修正」に変える（2026-08-07）。
+                // iPhone幅で×・削除ボタンが画面外にはみ出していたため、アイコンは省いて
+                // 幅を詰めている（2026-08-10。残留塩素ボタンも同じ理由・同じクラスで統一）
                 <button
                   type="button"
-                  className={dateInspection ? 'btn-plain' : 'btn-primary'}
+                  className={`report-head-btn ${dateInspection ? 'btn-plain' : 'btn-primary'}`}
                   onClick={openInspection}
                   disabled={inspectionStatusLoading}
                 >
-                  <IconClipboard size={18} />
                   {inspectionStatusLoading ? '読み込み中…' : dateInspection ? '自主点検修正' : '自主点検登録'}
                 </button>
               )}
               {!readOnly && (
-                // 自主点検ボタンと同じ考え方（未記載=青地で登録を促す／記載済み=控えめに修正）
+                // 自主点検ボタンと全く同じクラス・状態分岐にしているため、記録の有無が
+                // 同じ日であれば常に同じ色になる（2026-08-10）
                 <button
                   type="button"
-                  className={dateChlorine ? 'btn-plain' : 'btn-primary'}
+                  className={`report-head-btn ${dateChlorine ? 'btn-plain' : 'btn-primary'}`}
                   onClick={openChlorine}
                   disabled={chlorineStatusLoading}
                 >
-                  <IconDroplet size={18} />
                   {chlorineStatusLoading ? '読み込み中…' : dateChlorine ? '残留塩素修正' : '残留塩素登録'}
                 </button>
               )}

@@ -1404,12 +1404,36 @@
   min-height: 0;
 }
 
-.report-head-right { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+/* 自主点検・残留塩素ボタン＋削除＋×が並ぶため、幅が足りない画面では折り返して
+   ×ボタンが画面外へはみ出すのを防ぐ（2026-08-10。安全策。通常幅では1行に収まる） */
+.report-head-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-left: auto;
+}
 
 .report-saved { font-size: 12px; color: #33604d; font-weight: 700; }
 
+/* 自主点検・残留塩素ボタン。アイコンを持たせないぶん、通常のbtn-primary/btn-plainより
+   横幅を詰める（2026-08-10。iPhone幅で×・削除ボタンが画面外にはみ出していたため）。
+   共通ボタン標準（.btn-primary/.btn-plain）より後ろで定義しても確実に上書きされるよう、
+   単独クラスではなく親要素との組み合わせ（詳細度2）にしている */
+.report-head-right .report-head-btn { padding-left: var(--space-3); padding-right: var(--space-3); }
+
 /* 削除は誤操作を防ぐため自主検査入力ボタンと少し間隔を空ける */
 .report-head-delete { margin-left: var(--space-3); }
+
+@media (max-width: 640px) {
+  .report-head-right .report-head-btn {
+    height: 36px;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+    font-size: 13px;
+  }
+}
 
 .report-card {
   background: var(--bg-surface);
@@ -1751,12 +1775,16 @@
   gap: 6px;
   min-width: 0;
   padding: var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid #c7ccd4;
   border-radius: 6px;
-  background: var(--bg-surface);
+  /* ページ背景に近い白系だと1件ごとの区切りが分かりにくかったため、
+     はっきり濃いグレーにする（2026-08-10） */
+  background: #e8ebef;
 }
 
-.parking-add-item { justify-content: flex-start; }
+/* 追加用の枠（空枠にドラッグ＆ドロップ）は登録済みカードと区別するため、
+   通常カードの塗りは付けず破線のままにする */
+.parking-add-item { justify-content: flex-start; background: transparent; border-style: dashed; }
 
 /* 写真は1件につき最大2枚まで横並びで表示する（2026-08-05） */
 /* Grid にする（flexだと iOS Safari で子要素が縮みきらずカードからはみ出すことがあるため。
@@ -1895,8 +1923,9 @@
 .parking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
 .parking-list-row {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  /* .parking-card と同じく、1件ごとの区切りが分かるようはっきり濃いグレーにする（2026-08-10） */
+  background: #e8ebef;
+  border: 1px solid #c7ccd4;
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
 }
@@ -2688,4 +2717,47 @@
   .chlorine-concentration-select { font-size: 16px; }
   .chlorine-row-building { min-width: 0; }
   .chlorine-controls .report-field span { font-size: 12px; }
+}
+
+/* ============================================================
+   PDF作成中のブロッキングオーバーレイ（2026-08-10）。
+   自主検査表・残留塩素等検査帳票のどちらのPDF出力からも共通で使う
+   （PdfBusyOverlay.jsx）。既存モーダル（.attachment-preview-overlay z-index:60）
+   よりも確実に前面に出す必要があるため、余裕を持って高い値にしている。
+   ============================================================ */
+.pdf-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.pdf-busy-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.pdf-busy-spinner {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: pdf-busy-spin 0.8s linear infinite;
+}
+
+@keyframes pdf-busy-spin {
+  to { transform: rotate(360deg); }
 }

@@ -619,23 +619,6 @@ export default function ReportList() {
             >
               <IconSearch size={20} />
             </button>
-            {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
-                その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
-                （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
-                アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
-                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持。
-                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08）。
-                iPhone幅では文字を隠しアイコンのみにする（下の.btn-plain-label参照。2026-08-10） */}
-            <button
-              type="button"
-              className="btn-plain"
-              onClick={pdf.download}
-              disabled={pdf.busy}
-              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
-            >
-              <IconDownload size={18} />
-              <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
-            </button>
             <button
               type="button"
               className="btn-plain"
@@ -654,6 +637,25 @@ export default function ReportList() {
             >
               <IconDroplet size={18} />
               <span className="btn-plain-label">残留塩素</span>
+            </button>
+            {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
+                その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
+                （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
+                アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
+                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持。
+                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08）。
+                iPhone幅では文字を隠しアイコンのみにする（下の.btn-plain-label参照。2026-08-10）。
+                ツールバーの右端に配置する（2026-08-10。他のPDFボタンより先に押されやすい
+                位置だったため、末尾に移動してほしいとの依頼） */}
+            <button
+              type="button"
+              className="btn-plain"
+              onClick={pdf.download}
+              disabled={pdf.busy}
+              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
+            >
+              <IconDownload size={18} />
+              <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
             </button>
           </div>
         </div>
@@ -721,6 +723,7 @@ export default function ReportList() {
 
       {pdf.sheetsPortal}
       {pdf.previewModal}
+      {pdf.busyOverlay}
     </div>
   )
 }

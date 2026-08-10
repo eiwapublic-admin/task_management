@@ -253,7 +253,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/report/storage` | JWT | 写真のストレージ使用量（枚数・バイト数・無料枠1GBに対する使用率）。「従量課金事項」画面に表示する |
 | GET/POST/DELETE `/api/report/inspections` | JWT（書込はowner不可） | 自主検査表の実施記録。GET は `month=YYYY-MM` か `date=` で絞り込み。POST は `(building, inspected_on)` で upsert（同じビル・同じ日は上書き）。休館日は含まない（下記 `/api/report/closed-days` 参照。2026-08-07に分離） |
 | GET `/api/report/holidays` | JWT | 日本の祝日一覧 `{日付: 祝日名}`（`holidays-jp.github.io/api/v1/date.json` を Worker 側でエッジキャッシュして中継。CSP `connect-src 'self'` によりブラウザから直接は取得できないため。取得に失敗しても空オブジェクトを返し画面自体は表示できるようにする。2026-08-05追加） |
-| POST `/api/report/inspection-pdf-preview` | JWT | 日報系で生成したPDF（本体そのもの。`application/pdf`）を受け取り、Supabase Storage（ユーザーごとに固定キーでupsert）に一時保存して、プレビュー用の180秒だけ有効な署名トークンを返す（4-12参照。2026-08-07追加） |
+| POST `/api/report/inspection-pdf-preview?kind=inspection\|chlorine` | JWT | 日報系で生成したPDF（本体そのもの。`application/pdf`）を受け取り、Supabase Storage（ユーザー×種類ごとに固定キーでupsert）に一時保存して、プレビュー用の180秒だけ有効な署名トークンを返す（4-12参照。2026-08-07追加）。**`kind`は2026-08-10に必須化**（自主検査表PDF・残留塩素等検査PDFが保存キーを共有していたため、片方の生成が完了する前にもう片方を生成すると後勝ちで内容が入れ替わる不具合があった。種類ごとにキー（`inspection-pdf-preview/${kind}/${userId}.pdf`）を分けて解消） |
 | GET `/api/report/inspection-pdf-preview` | 上記トークン（クエリ`token=`） | PDF本体を`Content-Disposition: inline`で返す。`<iframe src>`はAuthorizationヘッダを送れないため、通常のBearer認証の代わりに短時間トークンで認証する（`/api/attachment`のpreview_tokenと同じ方式）。このレスポンスだけ`X-Frame-Options: SAMEORIGIN`/CSP `frame-ancestors 'self'`で自オリジンのiframe埋め込みを許可する（2026-08-07追加） |
 | GET/POST/DELETE `/api/report/closed-days` | JWT（書込はowner不可） | 休館日（4-10・4-12参照）。自主検査表専用ではなく日報一覧とも共有するプロジェクト共通情報。GET は `month=YYYY-MM` で絞り込み（省略で全期間）、`{closed_days:["YYYY-MM-DD",...]}` を返す。POST は `{date}` を休館日にする（既にその日の日報があれば400で拒否。自主検査表の記録があれば削除してから登録）。DELETE は `date=` で解除（2026-08-07追加） |
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
@@ -551,6 +551,10 @@ FileMaker の「不正駐車記録」タブ・一覧画面に相当する機能�
   暗い背景向けの `.icon-btn-download-dark`。削除アイコンと同じ大きさ・配置ルール）
 - **削除アイコンの拡大（2026-08-05）**: 共通CSS `.icon-btn-delete` を34px→40pxに拡大し、各画面の
   `ConfirmDeleteButton`の`size`指定も合わせて引き上げた
+- **カードの背景色（2026-08-10）**: 1件ごとの区切りが分かりにくいとの指摘を受け、`.parking-card`
+  （日報詳細・クイック登録モーダルの1件分の枠）・`.parking-list-row`（一覧の1行）とも背景を白
+  （`var(--bg-surface)`）から`#e8ebef`、枠線も`#c7ccd4`に変更した。枠内の入力欄は白のまま残るため、
+  枠と項目のコントラストで見やすさも向上している
 - **未実装**: 入力時に同一ナンバーの過去履歴・累計回数を自動表示する機能（一覧画面の「累計回数順」はあるが、
   登録画面での即時表示はまだ無い）、一覧画面での統計・写真サムネイル表示、過去データ（FileMaker）の移行
 
@@ -608,6 +612,7 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
   **上段＝添付写真・自主点検／下段＝違反車両・残留塩素**の2段（`renderIconsRow1`/`renderIconsRow2`）にした。
   リスト型は右端に縦積み（`.report-row-icons-stack`）、カレンダー型は上段を日付と同じ行、下段を担当者名と同じ行
   （`.report-calendar-workers-row`）に配置する。検索結果でも同じ2段表示を使う
+- **PDF作成中のブロッキングオーバーレイ（2026-08-10）**: PDF生成には数秒かかるが、ボタンの`disabled`だけでは他の操作を防げず「反応が無い」ように感じられていたため、生成中は`PdfBusyOverlay.jsx`（スピナー付き全画面オーバーレイ）で他の操作を受け付けないようにした。自主検査表PDF（`useInspectionPdfExport`）・残留塩素等検査PDF（`useChlorinePdfExport`）の両方に適用
 - **未実装**: 過去データ（FileMaker）の移行、測定漏れ（週1回のペース）の警告表示
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）

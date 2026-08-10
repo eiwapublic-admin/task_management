@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ChlorineSheet, { CHLORINE_SHEET_ROWS } from '../components/ChlorineSheet'
 import AttachmentPreview from '../components/AttachmentPreview'
+import PdfBusyOverlay from '../components/PdfBusyOverlay'
 import { fetchChlorineTests, getReportPdfPreviewUrl } from '../lib/reports'
 
 // 残留塩素等検査実施記録表（年・測定施設ごと）のPDF出力（2026-08-10）。
@@ -67,7 +68,7 @@ export default function useChlorinePdfExport(year, building) {
         // 画面が真っ白になるため、実URLへの<iframe>ナビゲーションでアプリ内に表示する
         // （プロジェクトスキル print-and-pdf-download Gotcha 8。自主検査表PDFと同じ方式）
         const pdfBlob = pdf.output('blob')
-        const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename)
+        const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename, 'chlorine')
         setPreview({ filename, url: previewUrl, blob: pdfBlob })
       } finally {
         // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す
@@ -138,5 +139,7 @@ export default function useChlorinePdfExport(year, building) {
     />
   ) : null
 
-  return { busy, error, download, sheetsPortal, previewModal }
+  const busyOverlay = <PdfBusyOverlay show={busy} />
+
+  return { busy, error, download, sheetsPortal, previewModal, busyOverlay }
 }

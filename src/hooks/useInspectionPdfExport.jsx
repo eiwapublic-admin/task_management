@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import InspectionSheet from '../components/InspectionSheet'
 import AttachmentPreview from '../components/AttachmentPreview'
+import PdfBusyOverlay from '../components/PdfBusyOverlay'
 import {
   fetchInspections,
   fetchClosedDays,
@@ -93,7 +94,7 @@ export default function useInspectionPdfExport(month, building) {
         // アプリ内にプレビュー表示し、×で閉じても画面遷移が無いので復帰できるようにする
         // （プロジェクトスキル print-and-pdf-download Gotcha 8）。
         const pdfBlob = pdf.output('blob')
-        const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename)
+        const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename, 'inspection')
         setPreview({ filename, url: previewUrl, blob: pdfBlob })
       } finally {
         // ここを外し忘れるとシートが画面外に出たままになるため必ず finally で戻す
@@ -169,5 +170,7 @@ export default function useInspectionPdfExport(month, building) {
     />
   ) : null
 
-  return { busy, error, download, sheetsPortal, previewModal }
+  const busyOverlay = <PdfBusyOverlay show={busy} />
+
+  return { busy, error, download, sheetsPortal, previewModal, busyOverlay }
 }

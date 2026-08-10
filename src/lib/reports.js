@@ -269,8 +269,13 @@ export async function deleteInspection(id) {
 // にすることで、共有シートも画面遷移も発生させずアプリ内で開いて×で戻れるようにする。
 // APIパスは自主検査表PDF用に作ったものをそのまま使う（保存内容はPDF本体だけで
 // 種類を問わないため。残留塩素等検査の帳票PDFも同じ経路を通す。2026-08-10）。
-export async function getReportPdfPreviewUrl(pdfBlob, filename) {
-  const { token } = await authFetch('/api/report/inspection-pdf-preview', {
+//
+// kind: 'inspection' | 'chlorine'。保存先はユーザーごとに固定キー（upsert）だが、
+// 種類ごとに別キーへ分ける（2026-08-10）。以前は種類を問わず同じキーを共有していたため、
+// 片方のPDF生成がまだバックグラウンドで完了していない間にもう片方を生成すると、
+// 後から書き込まれた方が勝ってしまい「違う種類の帳票が表示される」ことがあった。
+export async function getReportPdfPreviewUrl(pdfBlob, filename, kind) {
+  const { token } = await authFetch(`/api/report/inspection-pdf-preview?kind=${encodeURIComponent(kind)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/pdf' },
     body: pdfBlob,
