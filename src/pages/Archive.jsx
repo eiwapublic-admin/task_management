@@ -195,8 +195,11 @@ export default function Archive() {
         ) : tasks.length === 0 ? (
           <p className="dashboard-loading">該当するアーカイブはありません。</p>
         ) : (
+          <div className="logs-table-wrap">
           <table className="logs-table">
-            {/* 列見出しはタイトル＋絞り込みの下に重ねて固定表示する（2026-08-11） */}
+            {/* 列見出しはタイトル＋絞り込みの下に重ねて固定表示する（2026-08-11）。
+                狭幅では表を横スクロールさせる都合上、この固定表示はPC幅限定になる
+                （src/pages/Dashboard.css の @media (max-width: 768px) 参照） */}
             <thead>
               <tr>
                 <th className="ui-sticky-head-2">情報源</th>
@@ -280,6 +283,7 @@ export default function Archive() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
         <p className="logs-note">
           「完了」から設定日数を超えたタスクが自動的にアーカイブされます（最新500件・行をタップで詳細表示）。

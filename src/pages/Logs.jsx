@@ -39,6 +39,7 @@ export default function Logs() {
         ) : logs.length === 0 ? (
           <p className="dashboard-loading">まだログがありません。</p>
         ) : (
+          <div className="logs-table-wrap">
           <table className="ui-table logs-table">
             <thead>
               <tr>
@@ -68,6 +69,7 @@ export default function Logs() {
               })}
             </tbody>
           </table>
+          </div>
         )}
         <p className="logs-note">直近200件を表示しています（60日より古いログは自動削除されます）。</p>
       </div>
