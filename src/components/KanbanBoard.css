@@ -1113,21 +1113,32 @@ select.task-detail-input.is-unassigned {
     padding-bottom: var(--space-2);
   }
 
+  /* overflow-x を指定した要素は、CSSの仕様上 overflow-y も自動的に visible から
+     auto へ変わり、意図せず縦のスクロールコンテナになる（overflow-y: visible を
+     明示しても上書きできない）。これにより .kanban-columns が縦のスクロール
+     コンテナを兼ねてしまい、列見出し（.ui-sticky-head-2）がページ基準ではなく
+     この要素基準で固定されて位置がずれる不具合になっていた（2026-08-11）。
+     ページ全体ではなく「列ごと」に縦スクロールさせる設計に変えることで、
+     この土台とうまく噛み合わせる：列自身に高さの上限と overflow-y を持たせ、
+     列見出しはページではなくその列の中で固定表示する（top: 0）。
+     高さの計算式は、列の開始位置（AppHeader＋ツールバー＋隙間）を実測値
+     （--app-header-h・--sticky2-h）から逆算し、画面の残り高さぶんだけ確保する */
   .kanban-column {
     flex: 0 0 82%;
     scroll-snap-align: start;
-    min-height: 60vh;
+    /* 既定の min-height: 400px（カードが少ない列を寂しく見せない用途）が
+       この height を下から突き上げて無効化してしまうため、ここで解除する */
+    min-height: 0;
+    height: calc(
+      100dvh - var(--app-header-h) - var(--sticky2-h, 0px) - var(--space-4) -
+        env(safe-area-inset-bottom) - var(--space-3) * 3 - var(--space-2)
+    );
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* overflow-x を指定した要素は、CSSの仕様上 overflow-y も自動的に visible から
-     auto へ変わり、意図せず縦のスクロールコンテナになる（overflow-y: visible を
-     明示しても上書きできない）。それが列見出し（.ui-sticky-head-2）の固定位置の
-     基準（最も近い祖先のスクロールコンテナ）をページではなくこの要素にすり替えて
-     しまい、見出しが列の下端に張り付く不具合になっていた（2026-08-11）。
-     列が短くページ全体でも大きくスクロールしない狭幅では効果も薄いため、
-     この幅では列見出しの固定表示自体を諦めて通常位置に戻す */
   .kanban-column-header {
-    position: static;
+    top: 0;
   }
 }
 
