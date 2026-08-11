@@ -253,6 +253,12 @@ iOS では固定表示（`position: fixed`）要素の実寸と一致しない�
 
 一覧・カンバンの見出しをスクロールしても画面上部に残したいときに使う。
 
+> **横スクロール（狭幅対応）と組み合わせるなら、先にプロジェクトスキル
+> `sticky-header-overflow-trap` を読むこと。** `overflow-x: auto` は
+> `overflow-y` も自動的に `auto` にしてしまい、`position: sticky` の基準を
+> ページからその要素にすり替える——このリポジトリで3回連続で踏んだ罠と、
+> それぞれの対処・デバッグ技法をまとめてある。
+
 ```jsx
 const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 // ...
