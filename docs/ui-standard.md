@@ -249,6 +249,32 @@ iOS では固定表示（`position: fixed`）要素の実寸と一致しない�
 | `--z-preview` (60) | 写真・PDFの拡大表示 |
 | `--z-blocking` (200) | PDF作成中など、操作を止める全画面オーバーレイ |
 
+### 固定表示ヘッダー（`.ui-sticky-head` / `.ui-sticky-head-2`）
+
+一覧・カンバンの見出しをスクロールしても画面上部に残したいときに使う。
+
+```jsx
+const stickyHeadRef = useStickyHeightVar('--sticky2-h')
+// ...
+<div className="ui-toolbar ui-sticky-head" ref={stickyHeadRef}>…</div>
+<div className="…-header ui-sticky-head-2">…</div>
+```
+
+`useStickyHeightVar`（`src/lib/`）が1段目の実測高さを CSS 変数化し、2段目はその下に
+`top: calc(var(--app-header-h) + var(--sticky2-h, 0px))` で積み上がる。
+
+> **横スクロールできる要素の中では使わない。** `overflow-x: auto` を持つ要素は、
+> CSS の仕様上 `overflow-y` も自動的に `visible` から `auto` に変わる
+> （`overflow-y: visible` を明示しても上書きできない）。これによりその要素が
+> 意図せず縦のスクロールコンテナになり、中の `position: sticky` 要素の固定位置の
+> 基準（最も近い祖先のスクロールコンテナ）が**ページからその要素へすり替わって**
+> しまう。結果、見出しが本来より大きく下にずれて表示される（2026-08-11に
+> カンバン列見出し・アーカイブ表で発生）。横スクロールが要る一覧では、
+> スクロール対象を専用のラッパー（例: `.logs-table-wrap`）に絞り、
+> `.ui-sticky-head` 系の要素はその外側に置く。どうしても同じ要素の中に置く
+> 必要があるなら、その幅では固定表示自体を諦めて `position: static` に戻す
+> （`.kanban-column-header` の狭幅時の扱いを参照）
+
 ### 空状態・注記
 
 - `.ui-empty` … 「まだ記録がありません」
@@ -267,6 +293,7 @@ iOS では固定表示（`position: fixed`）要素の実寸と一致しない�
 | 画面ごとにモーダルの高さ・safe-area を書く | 同上 |
 | モーダルの高さを `vh` / `dvh` で計算する | iOSで枠とずれ、見出しが画面の外へ隠れる。`max-height: 100%` を使う |
 | モーダルを開いても裏のページを固定しない | 裏が一緒に動き、iOSで表示がずれて見える。`useBodyScrollLock()` を呼ぶ |
+| `overflow-x: auto` な要素の中で `.ui-sticky-head` 系を使う | `overflow-y` が自動で `auto` になり、固定位置の基準がページからその要素にすり替わって見出しが下にずれる |
 | バッジを押せるように見せる | バッジは表示専用。押せるなら `.btn-plain` を使う |
 | アイコンのみのボタンに `aria-label` を付けない | スクリーンリーダーで何のボタンか分からない |
 

@@ -794,14 +794,30 @@
     white-space: nowrap;
   }
 
-  /* 処理ログ: 4列テーブルは横スクロールで各列の可読幅を確保する */
-  .logs-container {
+  /* 処理ログ・アーカイブ: 複数列テーブルは横スクロールで各列の可読幅を確保する。
+     以前は .logs-container 自体に overflow-x を指定していたが、CSSの仕様上
+     overflow-x を指定すると overflow-y も自動的に visible から auto へ変わり、
+     この要素が意図せず縦のスクロールコンテナになる。それがアーカイブ画面の
+     タイトル・絞り込み（.ui-sticky-head）や列見出し（.ui-sticky-head-2）の
+     固定位置の基準（最も近い祖先のスクロールコンテナ）をページからすり替えて
+     しまい、見出しが画面の下の方にずれる不具合になっていた（2026-08-11）。
+     横スクロールの対象を table 自身を包む専用ラッパーに絞ることで、
+     この要素の外側（タイトル・絞り込み）は影響を受けないようにする */
+  .logs-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 
   .logs-table {
     min-width: 560px;
+  }
+
+  /* .logs-table-wrap 自身も overflow-x を持つ以上、この中の .ui-sticky-head-2
+     （列見出し）は同じ問題を再び抱える（Kanbanの列見出しと同一の理由）。
+     表を横スクロールさせる幅では列見出しの固定表示を諦めて通常位置に戻す。
+     タイトル・絞り込み（.ui-sticky-head）はラッパーの外側にあるため無関係に効き続ける */
+  .logs-table th.ui-sticky-head-2 {
+    position: static;
   }
 }
 
