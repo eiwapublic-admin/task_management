@@ -83,14 +83,14 @@
 .ui-sticky-head {
   position: sticky;
   top: var(--app-header-h);
-  z-index: var(--z-header);
+  z-index: var(--z-header-2);
   background: var(--bg-app);
 }
 
 .ui-sticky-head-2 {
   position: sticky;
   top: calc(var(--app-header-h) + var(--sticky2-h, 0px));
-  z-index: var(--z-header);
+  z-index: var(--z-header-2);
 }
 
 /* =========================================================================
@@ -499,6 +499,25 @@
 /* テキスト入力＋候補選択（Combobox.jsx）。<input list>+<datalist> は Safari で
    実機の挙動が大きく崩れるため使わない（2026-08-12）。この組み合わせで代替する */
 .ui-combobox { position: relative; }
+/* ×クリアボタン分、入力文字がボタンの下に隠れないよう右側を空ける */
+.ui-combobox .ui-input { padding-right: calc(var(--control-h) - var(--space-2)); }
+.ui-combobox-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--control-h);
+  height: var(--control-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  font-size: var(--fs-lg);
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.ui-combobox-clear:hover { color: var(--text-muted); }
 .ui-combobox-list {
   position: absolute;
   z-index: 5;

@@ -92,11 +92,11 @@ export default function Equipment() {
           <h2 className="ui-page-title">備品</h2>
           {!readOnly && (
             <div className="ui-toolbar-actions">
-              <button type="button" className="btn-plain" onClick={() => setMode('in')}>
-                入庫
-              </button>
               <button type="button" className="btn-primary" onClick={() => setMode('out')}>
                 出庫
+              </button>
+              <button type="button" className="btn-primary" onClick={() => setMode('in')}>
+                入庫
               </button>
             </div>
           )}
@@ -165,11 +165,11 @@ export default function Equipment() {
                                 <thead>
                                   <tr>
                                     <th>日付</th>
-                                    <th>理由</th>
-                                    <th className="is-numeric">入庫</th>
-                                    <th className="is-numeric">出庫</th>
-                                    <th className="is-numeric">残</th>
                                     <th>設置先</th>
+                                    <th className="is-numeric">出庫</th>
+                                    <th className="is-numeric">入庫</th>
+                                    <th className="is-numeric">残</th>
+                                    <th>理由</th>
                                     <th>担当</th>
                                   </tr>
                                 </thead>
@@ -181,15 +181,15 @@ export default function Equipment() {
                                       onClick={readOnly ? undefined : () => setEditing(t)}
                                     >
                                       <td>{formatEquipmentDate(t.occurred_at)}</td>
-                                      <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
-                                      <td className="is-numeric equipment-history-in">
-                                        {t.kind === 'in' ? t.quantity : ''}
-                                      </td>
+                                      <td>{t.tenant_short_name || t.location || ''}</td>
                                       <td className="is-numeric equipment-history-out">
                                         {t.kind === 'out' ? t.quantity : ''}
                                       </td>
+                                      <td className="is-numeric equipment-history-in">
+                                        {t.kind === 'in' ? t.quantity : ''}
+                                      </td>
                                       <td className="is-numeric">{t.balance}</td>
-                                      <td>{t.tenant_short_name || t.location || ''}</td>
+                                      <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
                                       <td>{t.staff_name || ''}</td>
                                     </tr>
                                   ))}

@@ -36,6 +36,13 @@ export default function Combobox({ value, onChange, onSelect, options, placehold
     setOpen(false)
   }
 
+  // ×ボタン: 一旦文字を入れると候補が絞り込まれて選び直しにくくなるため、
+  // ワンタップで空にして候補リストを全件表示し直せるようにする（2026-08-12）
+  function clear() {
+    onChange('')
+    setOpen(true)
+  }
+
   return (
     <div className={`ui-combobox ${className}`} ref={wrapRef}>
       <input
@@ -50,6 +57,17 @@ export default function Combobox({ value, onChange, onSelect, options, placehold
         }}
         onFocus={() => setOpen(true)}
       />
+      {value && !disabled && (
+        <button
+          type="button"
+          className="ui-combobox-clear"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={clear}
+          aria-label="入力をクリア"
+        >
+          ×
+        </button>
+      )}
       {open && !disabled && filtered.length > 0 && (
         <ul className="ui-combobox-list">
           {filtered.map((opt) => (
