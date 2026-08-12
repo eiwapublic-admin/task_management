@@ -40,7 +40,9 @@
   font: inherit;
   color: var(--text-strong);
 }
-.equipment-stock-row.is-static { border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+/* 備品の切り替わり位置が一目でわかるよう、他の見出し帯より濃いめの背景にする
+   （2026-08-12。実機フィードバックで薄くて区切りが見づらいとの指摘） */
+.equipment-stock-row.is-static { border-bottom: 1px solid var(--border); background: var(--bg-muted); }
 
 .equipment-stock-detail { padding: var(--space-3) var(--space-4); }
 .equipment-stock-detail .ui-empty { padding: var(--space-2) 0; text-align: left; }

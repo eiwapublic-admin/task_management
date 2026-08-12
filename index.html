@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- 画面全体のピンチ拡大を禁止する（2026-08-12。意図せず一覧画面が拡大されたまま
+         気づかず、画面の一部がはみ出して見える不具合の報告を受けて）。写真・PDFの
+         拡大表示は AttachmentPreview.jsx が独自のJS実装で行っており、この設定と無関係 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#33604d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

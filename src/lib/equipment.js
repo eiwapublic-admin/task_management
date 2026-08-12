@@ -128,13 +128,16 @@ export function equipmentSignatureUrl(txnId) {
   return `/api/equipment/signature?txn_id=${encodeURIComponent(txnId)}`
 }
 
-// 入出庫明細の日付表示（年月日のみ。時刻は出さない。2026-08-12、iPhone幅の一覧で
-// 時刻まで出すと列が狭くなりすぎるとの指摘を受けて日付のみに変更）
+// 入出庫明細の日付表示（年月日＋曜日。時刻は出さない。2026-08-12、iPhone幅の一覧で
+// 時刻まで出すと列が狭くなりすぎるとの指摘を受けて日付のみに変更。同日に実機フィードバックで
+// 曜日も欲しいとの要望があり追加。ja-JPロケールは weekday を含めると自動で
+// "yyyy/mm/dd(曜)" の形式になる）
 export function formatEquipmentDate(value) {
   return new Date(value).toLocaleDateString('ja-JP', {
     timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+    weekday: 'short',
   })
 }
