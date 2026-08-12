@@ -1,8 +1,8 @@
 // 備品管理機能の API ハンドラ（2026-08-12〜）。
 // 蛍光ランプ等の入出庫・在庫管理。現行 FileMaker「備品管理」アプリの移行。
 // 権限: staff/admin は読み書き、owner は GET のみ（他画面と同じ方針。docs/equipment-plan.md 9章）。
-// 新規入替（reason='replace'）はまだ扱わない。テナント設置（reason='tenant'）・署名は対応済み
-// （2026-08-12 追加）。テナントは FileMaker からの同期（Phase 4・7-1）が入るまでは手動投入のみ。
+// テナント設置（reason='tenant'）・新規入替（reason='replace'）・署名は対応済み（2026-08-12 追加）。
+// テナントは FileMaker からの同期（Phase 4・7-1）が入るまでは手動投入のみ。
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
@@ -21,8 +21,8 @@ const REASONS_BY_KIND = {
   in: new Set(['procure', 'deferred', 'adjust']),
   out: new Set(['tenant', 'common', 'replace', 'discard']),
 }
-// 画面から送信できる理由（replace=新規入替 はまだ解禁していない。2026-08-12、tenant=テナント設置を解禁）
-const SUPPORTED_REASONS = new Set(['procure', 'deferred', 'adjust', 'common', 'discard', 'tenant'])
+// 画面から送信できる理由（2026-08-12、tenant=テナント設置・replace=新規入替を解禁）
+const SUPPORTED_REASONS = new Set(['procure', 'deferred', 'adjust', 'common', 'discard', 'tenant', 'replace'])
 
 function trimOrNull(value, max = 500) {
   if (typeof value !== 'string') return null

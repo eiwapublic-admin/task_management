@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import Combobox from './Combobox'
 import SignaturePad from './SignaturePad'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
@@ -18,9 +19,8 @@ function tenantLabel(t) {
   return t.floor ? `${name}（${t.floor}F）` : name
 }
 
-// 出庫・設置モーダル（5-4）。新規入替・署名の後付け導線は未対応
-// （docs/equipment-plan.md 5-4・5-5・11章。テナント設置・署名は2026-08-12〜対応）。
-// existing を渡すと編集モード（履歴画面の行タップから開く）になる
+// 出庫・設置モーダル（5-4）。docs/equipment-plan.md 5-4・5-5・11章。
+// existing を渡すと編集モード（履歴画面・在庫一覧の明細タップから開く）になる
 export default function EquipmentOutForm({ items, existing, onClose, onSaved, onDelete }) {
   useBodyScrollLock()
 
@@ -38,7 +38,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // テナント選択（5-4）。入力で絞り込む <input list> + <datalist> 方式
+  // テナント選択（5-4）
   const [tenants, setTenants] = useState([])
   const [tenantId, setTenantId] = useState(existing?.tenant_id || '')
   const [tenantInput, setTenantInput] = useState(existing?.tenant_short_name || existing?.tenant_name || '')
@@ -80,16 +80,16 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
   }, [activeTenants, tenants, tenantId])
   const selectedTenant = tenants.find((t) => t.id === tenantId) || null
 
-  function handleTenantInputChange(value) {
+  function handleTenantChange(value) {
     setTenantInput(value)
-    const match = tenantOptions.find((t) => tenantLabel(t) === value)
-    if (match) {
-      setTenantId(match.id)
-      if (!itemTouchedRef.current && match.default_item_id && trackedItems.some((i) => i.id === match.default_item_id)) {
-        setItemId(match.default_item_id)
-      }
-    } else {
-      setTenantId('')
+    if (!tenantOptions.some((t) => tenantLabel(t) === value)) setTenantId('')
+  }
+
+  function handleTenantSelect(id) {
+    setTenantId(id)
+    const match = tenantOptions.find((t) => t.id === id)
+    if (match && !itemTouchedRef.current && match.default_item_id && trackedItems.some((i) => i.id === match.default_item_id)) {
+      setItemId(match.default_item_id)
     }
   }
 
@@ -162,8 +162,8 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
           )}
 
           <div className="equipment-reason-field">
-            <span>出庫理由</span>
-            <div className="equipment-reason-toggle" role="group" aria-label="出庫理由">
+            <span>設置先／出庫理由</span>
+            <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
               {EQUIPMENT_OUT_REASONS.map((r) => (
                 <button
                   key={r.key}
@@ -177,9 +177,6 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
                 </button>
               ))}
             </div>
-            {reason !== 'tenant' && (
-              <p className="ui-note">新規入替は次のフェーズで対応予定です。それまでは備考にテナント名等を記載してください。</p>
-            )}
           </div>
 
           <label className="ui-field">
@@ -217,22 +214,16 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
           </label>
 
           {reason === 'tenant' && (
-            <label className="ui-field">
+            <div className="ui-field">
               <span>設置先テナント</span>
-              <input
-                type="text"
-                className="ui-input"
-                list="equipment-tenant-options"
-                placeholder="テナント名で検索"
+              <Combobox
                 value={tenantInput}
+                onChange={handleTenantChange}
+                onSelect={handleTenantSelect}
+                options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
+                placeholder="テナント名で検索"
                 disabled={isSigned}
-                onChange={(e) => handleTenantInputChange(e.target.value)}
               />
-              <datalist id="equipment-tenant-options">
-                {tenantOptions.map((t) => (
-                  <option key={t.id} value={tenantLabel(t)} />
-                ))}
-              </datalist>
               {selectedTenant ? (
                 <p className="equipment-tenant-summary">
                   設置階: {selectedTenant.floor ? `${selectedTenant.floor}F` : '—'}
@@ -241,27 +232,20 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
               ) : (
                 tenantInput && <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
               )}
-            </label>
+            </div>
           )}
 
           {reason === 'common' && (
-            <label className="ui-field">
+            <div className="ui-field">
               <span>設置場所</span>
-              <input
-                type="text"
-                className="ui-input"
-                list="equipment-location-options"
-                placeholder="喫煙室 / 通路 / 玄関ホール"
+              <Combobox
                 value={location}
+                onChange={setLocation}
+                options={locationOptions}
+                placeholder="喫煙室 / 通路 / 玄関ホール"
                 disabled={isSigned}
-                onChange={(e) => setLocation(e.target.value)}
               />
-              <datalist id="equipment-location-options">
-                {locationOptions.map((v) => (
-                  <option key={v} value={v} />
-                ))}
-              </datalist>
-            </label>
+            </div>
           )}
 
           <label className="ui-field">
@@ -284,22 +268,10 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
             </p>
           )}
 
-          <label className="ui-field">
+          <div className="ui-field">
             <span>担当者</span>
-            <input
-              type="text"
-              className="ui-input"
-              list="equipment-staff-options"
-              value={staffName}
-              disabled={isSigned}
-              onChange={(e) => setStaffName(e.target.value)}
-            />
-            <datalist id="equipment-staff-options">
-              {staffOptions.map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
-          </label>
+            <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={isSigned} />
+          </div>
 
           <label className="ui-field">
             <span>備考</span>
@@ -314,7 +286,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
 
           {reason === 'tenant' && (
             <div className="ui-field">
-              <span>受領サイン（任意）</span>
+              <span className="equipment-signature-label">受領サイン</span>
               {isSigned ? (
                 <div className="equipment-signature-status">
                   <img

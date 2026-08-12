@@ -1,8 +1,7 @@
 import { authFetch } from './api'
 import { getToken } from './auth'
 
-// 備品管理（Phase 1。2026-08-12〜）の API 呼び出し・共通定数をまとめる。
-// docs/equipment-plan.md 参照。テナント設置・新規入替・署名は Phase 2 で追加する。
+// 備品管理（2026-08-12〜）の API 呼び出し・共通定数をまとめる。docs/equipment-plan.md 参照。
 
 // 入庫理由（择一ボタンの選択肢。表示順）
 export const EQUIPMENT_IN_REASONS = [
@@ -11,15 +10,18 @@ export const EQUIPMENT_IN_REASONS = [
   { key: 'adjust', label: '在庫調整' },
 ]
 
-// 出庫理由。replace（新規入替）はまだ未対応
+// 出庫理由（择一ボタンの選択肢。表示順）。iPhone幅で1行に収まるよう短いラベルにしている
+// （2026-08-12。「テナント設置」等の5文字ラベルだと明細一覧の理由欄で縦一文字ずつに
+// 折り返ってしまっていたため、この短縮表記に統一した）
 export const EQUIPMENT_OUT_REASONS = [
-  { key: 'tenant', label: 'テナント設置' },
-  { key: 'common', label: '共用部設置' },
-  { key: 'discard', label: '不良品処分' },
+  { key: 'tenant', label: 'テナント' },
+  { key: 'common', label: '共用部' },
+  { key: 'discard', label: '不良品' },
+  { key: 'replace', label: '新規入替' },
 ]
 
 export const EQUIPMENT_REASON_LABELS = Object.fromEntries(
-  [...EQUIPMENT_IN_REASONS, ...EQUIPMENT_OUT_REASONS, { key: 'replace', label: '新規入替' }].map((r) => [r.key, r.label])
+  [...EQUIPMENT_IN_REASONS, ...EQUIPMENT_OUT_REASONS].map((r) => [r.key, r.label])
 )
 
 // ---- カテゴリ ----
@@ -124,4 +126,15 @@ export async function uploadEquipmentSignature(txnId, blob) {
 // 署名画像の表示用URL（<img>のsrcにそのまま使う。Blob化はコンポーネント側の必要に応じて）
 export function equipmentSignatureUrl(txnId) {
   return `/api/equipment/signature?txn_id=${encodeURIComponent(txnId)}`
+}
+
+// 入出庫明細の日付表示（年月日のみ。時刻は出さない。2026-08-12、iPhone幅の一覧で
+// 時刻まで出すと列が狭くなりすぎるとの指摘を受けて日付のみに変更）
+export function formatEquipmentDate(value) {
+  return new Date(value).toLocaleDateString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
 }

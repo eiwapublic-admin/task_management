@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import Combobox from './Combobox'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
 import {
@@ -145,21 +146,10 @@ export default function EquipmentInForm({ items, existing, onClose, onSaved, onD
             </select>
           </label>
 
-          <label className="ui-field">
+          <div className="ui-field">
             <span>調達先</span>
-            <input
-              type="text"
-              className="ui-input"
-              list="equipment-supplier-options"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-            />
-            <datalist id="equipment-supplier-options">
-              {supplierOptions.map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
-          </label>
+            <Combobox value={supplier} onChange={setSupplier} options={supplierOptions} />
+          </div>
 
           <label className="ui-field">
             <span>入庫数量</span>
@@ -178,21 +168,10 @@ export default function EquipmentInForm({ items, existing, onClose, onSaved, onD
             </p>
           )}
 
-          <label className="ui-field">
+          <div className="ui-field">
             <span>担当者</span>
-            <input
-              type="text"
-              className="ui-input"
-              list="equipment-staff-options"
-              value={staffName}
-              onChange={(e) => setStaffName(e.target.value)}
-            />
-            <datalist id="equipment-staff-options">
-              {staffOptions.map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
-          </label>
+            <Combobox value={staffName} onChange={setStaffName} options={staffOptions} />
+          </div>
 
           <label className="ui-field">
             <span>備考</span>

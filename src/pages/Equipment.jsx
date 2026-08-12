@@ -8,6 +8,7 @@ import {
   deleteEquipmentTransaction,
   fetchEquipmentItems,
   fetchEquipmentTransactionsAll,
+  formatEquipmentDate,
 } from '../lib/equipment'
 import './Dashboard.css'
 import './Equipment.css'
@@ -17,17 +18,6 @@ const PERIODS = [
   { key: '1y', label: '1年' },
   { key: 'all', label: '全期間' },
 ]
-
-function formatDate(value) {
-  return new Date(value).toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // 在庫一覧（備品セクションのホーム画面）。
 // 各備品の入出庫明細は行をタップしなくてもその場に展開表示する（2026-08-12〜）。
@@ -171,7 +161,7 @@ export default function Equipment() {
                             <p className="ui-empty">この期間の入出庫記録はありません。</p>
                           ) : (
                             <div className="ui-table-wrap">
-                              <table className="ui-table">
+                              <table className="ui-table equipment-txn-table">
                                 <thead>
                                   <tr>
                                     <th>日付</th>
@@ -190,7 +180,7 @@ export default function Equipment() {
                                       className={readOnly ? '' : 'equipment-history-row'}
                                       onClick={readOnly ? undefined : () => setEditing(t)}
                                     >
-                                      <td>{formatDate(t.occurred_at)}</td>
+                                      <td>{formatEquipmentDate(t.occurred_at)}</td>
                                       <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
                                       <td className="is-numeric equipment-history-in">
                                         {t.kind === 'in' ? t.quantity : ''}
