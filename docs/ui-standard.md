@@ -187,6 +187,29 @@ export default function NewScreen() {
 > 16px 未満だと自動でズームするが、`ui.css` が 768px 以下で一括して 16px に
 > 引き上げている。**画面ごとに `font-size: 16px` を書かないこと。**
 
+### 候補リストからの選択（`Combobox.jsx`）
+
+「既存データから選ぶ、または自由入力もできる」欄（設置場所・担当者・テナント名等）は
+`<input list>` + `<datalist>` を**使わない**。Safari（iOS/iPadOS）で候補が正しく出ない・
+キーボードの上に数件だけ表示される等、実機で動作が大きく崩れることが分かっている
+（2026-08-12）。代わりに `src/components/Combobox.jsx` を使う。
+
+```jsx
+<Combobox
+  value={location}
+  onChange={setLocation}
+  onSelect={(key, label) => {...}}  // 候補をタップして選んだときだけ呼ばれる（任意）
+  options={locationOptions}          // 文字列の配列、または {key, label} の配列
+  placeholder="喫煙室 / 通路 / 玄関ホール"
+/>
+```
+
+右端に×のクリアボタンが常設（値が入っているとき）。一度入力すると候補が絞り込まれて
+選び直しにくくなるため、ワンタップで空にして候補を出し直せるようにしている（2026-08-12）。
+**新しく候補リスト付き入力欄を作るときはこの部品を使うこと。** 現状まだ `<datalist>` の
+ままの画面（違反車両一覧 `ParkingViolations.jsx`）が残っているが、これは実機不具合が
+確認できていないため未着手の別タスク。
+
 ### カード（`.ui-card`）
 
 白い面＋淡い罫線＋ごく薄い影。見出し帯が要るときは `.ui-card-title` を中に置く。
