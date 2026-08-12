@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import SignaturePad from './SignaturePad'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
 import {
@@ -7,16 +8,25 @@ import {
   createEquipmentTransaction,
   updateEquipmentTransaction,
   fetchEquipmentSuggest,
+  fetchEquipmentTenants,
+  uploadEquipmentSignature,
+  equipmentSignatureUrl,
 } from '../lib/equipment'
 
-// 出庫・設置モーダル（5-4）。Phase 1 は共用部設置／不良品処分のみ
-// （テナント設置・新規入替・署名は Phase 2 で追加。docs/equipment-plan.md 5-4・11章）。
+function tenantLabel(t) {
+  const name = t.short_name || t.name
+  return t.floor ? `${name}（${t.floor}F）` : name
+}
+
+// 出庫・設置モーダル（5-4）。新規入替・署名の後付け導線は未対応
+// （docs/equipment-plan.md 5-4・5-5・11章。テナント設置・署名は2026-08-12〜対応）。
 // existing を渡すと編集モード（履歴画面の行タップから開く）になる
 export default function EquipmentOutForm({ items, existing, onClose, onSaved, onDelete }) {
   useBodyScrollLock()
 
   const trackedItems = useMemo(() => items.filter((i) => !i.disabled || i.id === existing?.item_id), [items, existing])
   const [itemId, setItemId] = useState(existing?.item_id || trackedItems[0]?.id || '')
+  const itemTouchedRef = useRef(Boolean(existing)) // 既存編集時は自動デフォルト備品で上書きしない
   const [reason, setReason] = useState(existing?.reason || 'common')
   const [occurredAt, setOccurredAt] = useState(() => toDateTimeLocal(existing?.occurred_at))
   const [location, setLocation] = useState(existing?.location || '')
@@ -28,9 +38,19 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // テナント選択（5-4）。入力で絞り込む <input list> + <datalist> 方式
+  const [tenants, setTenants] = useState([])
+  const [tenantId, setTenantId] = useState(existing?.tenant_id || '')
+  const [tenantInput, setTenantInput] = useState(existing?.tenant_short_name || existing?.tenant_name || '')
+  const signatureRef = useRef(null)
+  const isSigned = Boolean(existing?.signed_at)
+
   useEffect(() => {
     fetchEquipmentSuggest('location').then(setLocationOptions).catch(() => {})
     fetchEquipmentSuggest('staff').then(setStaffOptions).catch(() => {})
+    // 退去済みも含めて取得する（編集中の記録が過去に退去済みテナントへ設置していた場合、
+    // 一覧から消えて選択欄の表示が壊れないようにするため。候補としては後で絞り込む）
+    fetchEquipmentTenants({ includeMovedOut: true }).then(setTenants).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -51,6 +71,28 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
     return [...map.values()]
   }, [trackedItems])
 
+  const activeTenants = useMemo(() => tenants.filter((t) => !t.moved_out), [tenants])
+  // 編集中の記録が退去済みテナント宛てだった場合も候補に混ぜて、選択欄の表示が空にならないようにする
+  const tenantOptions = useMemo(() => {
+    if (!tenantId || activeTenants.some((t) => t.id === tenantId)) return activeTenants
+    const current = tenants.find((t) => t.id === tenantId)
+    return current ? [current, ...activeTenants] : activeTenants
+  }, [activeTenants, tenants, tenantId])
+  const selectedTenant = tenants.find((t) => t.id === tenantId) || null
+
+  function handleTenantInputChange(value) {
+    setTenantInput(value)
+    const match = tenantOptions.find((t) => tenantLabel(t) === value)
+    if (match) {
+      setTenantId(match.id)
+      if (!itemTouchedRef.current && match.default_item_id && trackedItems.some((i) => i.id === match.default_item_id)) {
+        setItemId(match.default_item_id)
+      }
+    } else {
+      setTenantId('')
+    }
+  }
+
   const selectedItem = trackedItems.find((i) => i.id === itemId)
   const beforeQty = selectedItem?.track_stock ? selectedItem.stock_qty ?? 0 : null
   const numericQty = quantity === '' ? null : Number(quantity)
@@ -60,6 +102,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
     setError('')
     if (!itemId) return setError('備品を選択してください')
     if (!Number.isFinite(numericQty) || numericQty <= 0) return setError('出庫数量を入力してください')
+    if (reason === 'tenant' && !tenantId) return setError('設置先テナントを選択してください')
 
     setSaving(true)
     try {
@@ -70,11 +113,27 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
         staff_name: staffName || null,
         note: note || null,
         quantity: numericQty,
+        ...(reason === 'tenant' ? { tenant_id: tenantId } : {}),
       }
       const saved = existing
         ? await updateEquipmentTransaction(existing.id, payload)
         : await createEquipmentTransaction({ item_id: itemId, kind: 'out', ...payload })
-      onSaved(saved)
+
+      // 署名は同じ保存操作の中で続けて登録する（新規保存と同時／未署名の記録への後付け、両方をこの1本でまかなう）
+      let finalSaved = saved
+      if (reason === 'tenant' && signatureRef.current && !signatureRef.current.isEmpty()) {
+        const blob = await signatureRef.current.getBlob()
+        if (blob) {
+          try {
+            finalSaved = await uploadEquipmentSignature(saved.id, blob)
+          } catch (sigErr) {
+            // 記録自体は保存済みなので、署名だけ失敗しても登録は成功として扱う
+            // （履歴一覧の「署名待ち」バッジから後で再度足せる）
+            setError(`記録は保存しましたが、署名の登録に失敗しました: ${sigErr.message}`)
+          }
+        }
+      }
+      onSaved(finalSaved)
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -98,6 +157,10 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
             </p>
           )}
 
+          {isSigned && (
+            <p className="ui-note">署名済みの記録です。修正できません（内容の確認のみできます）。</p>
+          )}
+
           <div className="equipment-reason-field">
             <span>出庫理由</span>
             <div className="equipment-reason-toggle" role="group" aria-label="出庫理由">
@@ -107,15 +170,16 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
                   type="button"
                   className={`btn-plain equipment-reason-btn${reason === r.key ? ' is-active' : ''}`}
                   aria-pressed={reason === r.key}
+                  disabled={isSigned}
                   onClick={() => setReason(r.key)}
                 >
                   {r.label}
                 </button>
               ))}
             </div>
-            <p className="ui-note">
-              テナント設置・新規入替は次のフェーズで対応予定です。それまでは備考にテナント名等を記載してください。
-            </p>
+            {reason !== 'tenant' && (
+              <p className="ui-note">新規入替は次のフェーズで対応予定です。それまでは備考にテナント名等を記載してください。</p>
+            )}
           </div>
 
           <label className="ui-field">
@@ -124,6 +188,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
               type="datetime-local"
               className="ui-input"
               value={occurredAt}
+              disabled={isSigned}
               onChange={(e) => setOccurredAt(e.target.value)}
             />
           </label>
@@ -133,8 +198,11 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
             <select
               className="ui-select"
               value={itemId}
-              disabled={Boolean(existing)}
-              onChange={(e) => setItemId(e.target.value)}
+              disabled={Boolean(existing) || isSigned}
+              onChange={(e) => {
+                itemTouchedRef.current = true
+                setItemId(e.target.value)
+              }}
             >
               {groups.map((g) => (
                 <optgroup key={g.name} label={g.name}>
@@ -148,6 +216,34 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
             </select>
           </label>
 
+          {reason === 'tenant' && (
+            <label className="ui-field">
+              <span>設置先テナント</span>
+              <input
+                type="text"
+                className="ui-input"
+                list="equipment-tenant-options"
+                placeholder="テナント名で検索"
+                value={tenantInput}
+                disabled={isSigned}
+                onChange={(e) => handleTenantInputChange(e.target.value)}
+              />
+              <datalist id="equipment-tenant-options">
+                {tenantOptions.map((t) => (
+                  <option key={t.id} value={tenantLabel(t)} />
+                ))}
+              </datalist>
+              {selectedTenant ? (
+                <p className="equipment-tenant-summary">
+                  設置階: {selectedTenant.floor ? `${selectedTenant.floor}F` : '—'}
+                  {selectedTenant.moved_out && '（退去済み）'}
+                </p>
+              ) : (
+                tenantInput && <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
+              )}
+            </label>
+          )}
+
           {reason === 'common' && (
             <label className="ui-field">
               <span>設置場所</span>
@@ -157,6 +253,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
                 list="equipment-location-options"
                 placeholder="喫煙室 / 通路 / 玄関ホール"
                 value={location}
+                disabled={isSigned}
                 onChange={(e) => setLocation(e.target.value)}
               />
               <datalist id="equipment-location-options">
@@ -175,6 +272,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
               inputMode="numeric"
               min="1"
               value={quantity}
+              disabled={isSigned}
               onChange={(e) => setQuantity(e.target.value)}
             />
           </label>
@@ -193,6 +291,7 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
               className="ui-input"
               list="equipment-staff-options"
               value={staffName}
+              disabled={isSigned}
               onChange={(e) => setStaffName(e.target.value)}
             />
             <datalist id="equipment-staff-options">
@@ -204,21 +303,54 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
 
           <label className="ui-field">
             <span>備考</span>
-            <textarea className="ui-textarea" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+            <textarea
+              className="ui-textarea"
+              rows={3}
+              value={note}
+              disabled={isSigned}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </label>
+
+          {reason === 'tenant' && (
+            <div className="ui-field">
+              <span>受領サイン（任意）</span>
+              {isSigned ? (
+                <div className="equipment-signature-status">
+                  <img
+                    className="equipment-signature-thumb"
+                    src={equipmentSignatureUrl(existing.id)}
+                    alt="受領サイン"
+                  />
+                  <span className="ui-badge is-current">署名済み</span>
+                </div>
+              ) : (
+                <>
+                  <SignaturePad ref={signatureRef} />
+                  <p className="ui-note">
+                    署名は必須ではありません。その場でもらえない場合は空欄のまま保存し、あとでこの記録を開いて署名だけ追加できます。
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
-            {existing && <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />}
+            {existing && !isSigned && (
+              <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
+            )}
           </div>
           <div className="ui-modal-foot-end">
             <button type="button" className="btn-plain" onClick={onClose}>
-              キャンセル
+              {isSigned ? '閉じる' : 'キャンセル'}
             </button>
-            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中…' : '記録する'}
-            </button>
+            {!isSigned && (
+              <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+                {saving ? '保存中…' : '記録する'}
+              </button>
+            )}
           </div>
         </div>
       </div>

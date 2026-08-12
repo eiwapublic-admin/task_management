@@ -1,38 +1,68 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
 import { getCurrentUser } from '../lib/auth'
-import { fetchEquipmentItems } from '../lib/equipment'
+import {
+  EQUIPMENT_REASON_LABELS,
+  deleteEquipmentTransaction,
+  fetchEquipmentItems,
+  fetchEquipmentTransactionsAll,
+} from '../lib/equipment'
 import './Dashboard.css'
 import './Equipment.css'
 
-// 在庫一覧（Phase 1。2026-08-12〜）。備品セクションのホーム画面。
-// 現行 FileMaker の「入出庫記録」に相当するが、密な1画面にはせず「在庫を見る」だけに絞る
-// （履歴は行タップで /equipment/items/:itemNo へ。docs/equipment-plan.md 5-1）。
+const PERIODS = [
+  { key: '3m', label: '3ヶ月' },
+  { key: '1y', label: '1年' },
+  { key: 'all', label: '全期間' },
+]
+
+function formatDate(value) {
+  return new Date(value).toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// 在庫一覧（備品セクションのホーム画面）。
+// 各備品の入出庫明細は行をタップしなくてもその場に展開表示する（2026-08-12〜）。
+// 表示期間（3ヶ月/1年/全期間）はこの画面の上部でまとめて切り替える
+// （docs/equipment-plan.md 5-1・5-2 を統合。旧・備品履歴画面は EquipmentItemHistory.jsx に残るが、
+// この画面からのリンクは廃止した）。
 export default function Equipment() {
-  const navigate = useNavigate()
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
 
+  const [period, setPeriod] = useState('3m')
   const [items, setItems] = useState([])
+  const [transactionsByItem, setTransactionsByItem] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showDisabled, setShowDisabled] = useState(false)
   const [mode, setMode] = useState(null) // null | 'in' | 'out'
+  const [editing, setEditing] = useState(null) // 編集対象の入出庫レコード
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      setItems(await fetchEquipmentItems({ includeDisabled: showDisabled }))
+      const [itemsData, txnData] = await Promise.all([
+        fetchEquipmentItems({ includeDisabled: showDisabled }),
+        fetchEquipmentTransactionsAll({ period }),
+      ])
+      setItems(itemsData)
+      setTransactionsByItem(txnData)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [showDisabled])
+  }, [showDisabled, period])
 
   useEffect(() => {
     load()
@@ -48,9 +78,20 @@ export default function Equipment() {
     return [...map.values()]
   }, [items])
 
-  function handleSaved() {
+  function handleModalSaved() {
     setMode(null)
+    setEditing(null)
     load()
+  }
+
+  async function handleDelete(id) {
+    setEditing(null)
+    try {
+      await deleteEquipmentTransaction(id)
+      load()
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
@@ -70,6 +111,20 @@ export default function Equipment() {
             </div>
           )}
         </div>
+
+        <nav className="ui-segmented" aria-label="明細の表示期間">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`ui-segmented-btn${period === p.key ? ' is-active' : ''}`}
+              aria-current={period === p.key ? 'page' : undefined}
+              onClick={() => setPeriod(p.key)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </nav>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
@@ -93,13 +148,10 @@ export default function Equipment() {
                       item.warn_qty != null &&
                       item.stock_qty != null &&
                       item.stock_qty <= item.warn_qty
+                    const txns = transactionsByItem[item.id] || []
                     return (
-                      <li key={item.id}>
-                        <button
-                          type="button"
-                          className="equipment-stock-row"
-                          onClick={() => navigate(`/equipment/items/${item.item_no}`)}
-                        >
+                      <li key={item.id} className="equipment-stock-item">
+                        <div className="equipment-stock-row is-static">
                           <span className="equipment-stock-name">
                             {item.name}
                             {item.disabled && <span className="ui-badge">無効</span>}
@@ -113,7 +165,49 @@ export default function Equipment() {
                             <span className="equipment-stock-qty is-muted">—</span>
                           )}
                           {warn && <span className="ui-badge is-danger">発注依頼してください</span>}
-                        </button>
+                        </div>
+                        <div className="equipment-stock-detail">
+                          {txns.length === 0 ? (
+                            <p className="ui-empty">この期間の入出庫記録はありません。</p>
+                          ) : (
+                            <div className="ui-table-wrap">
+                              <table className="ui-table">
+                                <thead>
+                                  <tr>
+                                    <th>日付</th>
+                                    <th>理由</th>
+                                    <th className="is-numeric">入庫</th>
+                                    <th className="is-numeric">出庫</th>
+                                    <th className="is-numeric">残</th>
+                                    <th>設置先</th>
+                                    <th>担当</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {txns.map((t) => (
+                                    <tr
+                                      key={t.id}
+                                      className={readOnly ? '' : 'equipment-history-row'}
+                                      onClick={readOnly ? undefined : () => setEditing(t)}
+                                    >
+                                      <td>{formatDate(t.occurred_at)}</td>
+                                      <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
+                                      <td className="is-numeric equipment-history-in">
+                                        {t.kind === 'in' ? t.quantity : ''}
+                                      </td>
+                                      <td className="is-numeric equipment-history-out">
+                                        {t.kind === 'out' ? t.quantity : ''}
+                                      </td>
+                                      <td className="is-numeric">{t.balance}</td>
+                                      <td>{t.tenant_short_name || t.location || ''}</td>
+                                      <td>{t.staff_name || ''}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
                       </li>
                     )
                   })}
@@ -129,8 +223,28 @@ export default function Equipment() {
         </label>
       </div>
 
-      {mode === 'in' && <EquipmentInForm items={items} onClose={() => setMode(null)} onSaved={handleSaved} />}
-      {mode === 'out' && <EquipmentOutForm items={items} onClose={() => setMode(null)} onSaved={handleSaved} />}
+      {mode === 'in' && <EquipmentInForm items={items} onClose={() => setMode(null)} onSaved={handleModalSaved} />}
+      {mode === 'out' && <EquipmentOutForm items={items} onClose={() => setMode(null)} onSaved={handleModalSaved} />}
+
+      {editing &&
+        !readOnly &&
+        (editing.kind === 'in' ? (
+          <EquipmentInForm
+            items={items}
+            existing={editing}
+            onClose={() => setEditing(null)}
+            onSaved={handleModalSaved}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <EquipmentOutForm
+            items={items}
+            existing={editing}
+            onClose={() => setEditing(null)}
+            onSaved={handleModalSaved}
+            onDelete={handleDelete}
+          />
+        ))}
     </div>
   )
 }
