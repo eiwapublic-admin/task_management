@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
 import { IconHome } from '../components/Icons'
@@ -77,18 +78,20 @@ export default function EquipmentItemHistory() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        <div className="ui-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/equipment')}
-            aria-label="在庫一覧に戻る"
-            title="在庫一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">{item?.name || '備品の履歴'}</h2>
-        </div>
+        <FeatureHeader
+          title={item?.name || '備品の履歴'}
+          leading={
+            <button
+              type="button"
+              className="icon-btn-home"
+              onClick={() => navigate('/equipment')}
+              aria-label="在庫一覧に戻る"
+              title="在庫一覧に戻る"
+            >
+              <IconHome size={32} />
+            </button>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

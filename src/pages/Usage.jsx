@@ -1,4 +1,5 @@
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import UsagePanel from '../components/UsagePanel'
 import './Dashboard.css'
 
@@ -9,7 +10,7 @@ export default function Usage() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        <h2 className="ui-page-title">従量課金事項</h2>
+        <FeatureHeader title="従量課金事項" />
         <UsagePanel />
       </div>
     </div>

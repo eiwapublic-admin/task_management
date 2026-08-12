@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import { IconHome } from '../components/Icons'
 import { fetchTemplates, saveTemplates } from '../lib/reports'
 import './Dashboard.css'
@@ -44,24 +45,28 @@ export default function ReportTemplates() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
-        <div className="reports-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/reports')}
-            aria-label="日報一覧に戻る"
-            title="日報一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">定型文の設定</h2>
-          <div className="report-head-right">
-            {message && <span className="report-saved">{message}</span>}
-            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || loading}>
-              {saving ? '保存中…' : '保存'}
+        <FeatureHeader
+          title="定型文の設定"
+          leading={
+            <button
+              type="button"
+              className="icon-btn-home"
+              onClick={() => navigate('/reports')}
+              aria-label="日報一覧に戻る"
+              title="日報一覧に戻る"
+            >
+              <IconHome size={32} />
             </button>
-          </div>
-        </div>
+          }
+          actions={
+            <>
+              {message && <span className="report-saved">{message}</span>}
+              <button type="button" className="btn-primary" onClick={handleSave} disabled={saving || loading}>
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

@@ -8,8 +8,20 @@ import { runFetch } from '../lib/api'
 import { isPushSupported, getPushStatus, enablePush, disablePush } from '../lib/push'
 import useStickyHeightVar from '../lib/useStickyHeightVar'
 
-// 全画面共通のヘッダー。ロゴ・タイトル・ログインユーザー名・ハンバーガーメニューを持つ。
-// 各画面はハンバーガーメニューから自由に行き来できるため、画面ごとの「×で閉じる」ボタンは不要。
+// アプリヘッダ（画面構成の1層目）。全画面で共通。
+//
+//   左: アプリアイコン（ロゴ）＋ セクション切替（タスク／日報／備品）
+//   右: ログインユーザー名（広い画面のみ）＋ ハンバーガーメニュー
+//
+// 2026-08-12 の画面構成見直しで「栄和　タスク管理システム」の文字表示をやめた。
+// アプリ名は常時見えている必要が薄く、その幅をセクション切替に回した方が、どの機能を
+// 見ているかが一目で分かる。合わせて、狭幅用に複製していたセクション切替
+// （.app-switch-mobile）と grid-template-areas での行割り当ても不要になったので撤去した
+// （タイトルが無くなり、1行に収まるようになったため）。
+//
+// ロゴの役割も変えた（設計書 4-3）:
+//   - 各機能画面 … タップでダッシュボード（ポータル）へ移動
+//   - ダッシュボード … タップでアプリの更新・再表示（従来の最新化と同じ挙動）
 export default function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -80,7 +92,7 @@ export default function AppHeader() {
   }
 
   // メニューの「今すぐ取得」。どの画面からでも実行できるようにするため、
-  // 完了後は画面を再読み込みしてダッシュボードへ戻り、最新の取得結果を反映する
+  // 完了後は画面を再読み込みしてカンバンへ戻り、最新の取得結果を反映する
   // （個別画面のstateに依存しないよう、あえてフルリロードにしている）。
   async function handleRunFetch() {
     if (fetching) return
@@ -95,15 +107,18 @@ export default function AppHeader() {
     }
   }
 
-  // 現在どのセクションを見ているか。'tasks' | 'reports' | 'equipment' の3値
-  // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理の追加でセクションが1つ増えた）。
+  // 現在どのセクションを見ているか。'portal' | 'tasks' | 'reports' | 'equipment'
+  // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理とダッシュボードが増えた）。
   // 各セクションのパスは /reports・/equipment 配下にまとめている。window.location ではなく
   // useLocation を使い、クライアント側遷移でも確実に再評価されるようにする。
-  const section = location.pathname.startsWith('/equipment')
-    ? 'equipment'
-    : location.pathname.startsWith('/reports')
-      ? 'reports'
-      : 'tasks'
+  const section = location.pathname.startsWith('/portal')
+    ? 'portal'
+    : location.pathname.startsWith('/equipment')
+      ? 'equipment'
+      : location.pathname.startsWith('/reports')
+        ? 'reports'
+        : 'tasks'
+  const inPortal = section === 'portal'
   const inReports = section === 'reports'
   const inEquipment = section === 'equipment'
   // owner（小泉産業様）は日報・備品（閲覧のみ）。タスク管理のメニュー・切替は出さない
@@ -116,24 +131,29 @@ export default function AppHeader() {
     { key: 'equipment', label: '備品', path: '/equipment' },
   ]
 
+  // ロゴは「ダッシュボードへ戻る」ボタン。ダッシュボードにいるときだけ最新化を担う
+  function handleLogoClick() {
+    if (inPortal) {
+      reloadApp({ to: '/portal' })
+      return
+    }
+    navigate('/portal')
+  }
+
   return (
     <>
-      <header className="dashboard-header" ref={headerRef}>
-        <div className="dashboard-header-left">
+      <header className="app-header" ref={headerRef}>
+        <div className="app-header-left">
           <button
             type="button"
-            className="dashboard-logo-button"
-            onClick={() => reloadApp()}
-            aria-label="最新の状態に更新"
-            title="タップで最新の状態に更新"
+            className="app-logo-button"
+            onClick={handleLogoClick}
+            aria-label={inPortal ? '最新の状態に更新' : 'ダッシュボードへ移動'}
+            title={inPortal ? 'タップで最新の状態に更新' : 'ダッシュボードへ移動'}
             style={{ touchAction: 'manipulation' }}
           >
-            <img className="dashboard-logo" src="/logo.svg" alt="栄和ロゴ" />
+            <img className="app-logo" src="/logo.svg" alt="栄和ロゴ" />
           </button>
-          <div className="dashboard-title-wrap">
-            <h1>栄和　タスク管理システム</h1>
-            <span className="dashboard-version">ver.{formatBuildTime()}</span>
-          </div>
           <nav className="ui-segmented on-dark app-switch" aria-label="表示するセクション">
             {sections.map((s) => (
               <button
@@ -148,38 +168,27 @@ export default function AppHeader() {
             ))}
           </nav>
         </div>
-        {/* 狭幅ではヘッダーが2行に折り返り、通常はヘッダー右側（ユーザー名・ハンバーガー）
-            だけが2行目に単独で残るため space-between が効かず左寄りに表示されていた
-            （2026-08-07）。同じセクション切替をモバイル専用にもう1つ用意し、2行目の
-            もう一方の要素にすることで、切替＝左端／ハンバーガー側＝右端に振り分ける。
-            desktop幅では常に非表示（.app-switch-mobile参照） */}
-        <nav className="ui-segmented on-dark app-switch app-switch-mobile" aria-label="表示するセクション">
-          {sections.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`ui-segmented-btn${section === s.key ? ' is-active' : ''}`}
-              aria-current={section === s.key ? 'page' : undefined}
-              onClick={() => goTo(s.path)}
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
-        <div className="dashboard-header-right">
-          {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
-          <div className="dashboard-menu" ref={menuRef}>
+        <div className="app-header-right">
+          {user?.display_name && <span className="app-header-user">{user.display_name} さん</span>}
+          <div className="app-menu" ref={menuRef}>
             <button
               type="button"
-              className="dashboard-menu-toggle"
+              className="app-menu-toggle"
               aria-label="メニュー"
               aria-haspopup="true"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
             >
-              <span className="dashboard-menu-icon" aria-hidden="true"></span>
+              <span className="app-menu-icon" aria-hidden="true"></span>
             </button>
-            <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
+            <div className={`app-menu-panel${menuOpen ? ' is-open' : ''}`}>
+              {/* ユーザー名はヘッダーでは広い画面にしか出さない（狭幅では場所を取るため）。
+                  誰でログインしているかはここで必ず確認できるようにしておく */}
+              {user?.display_name && (
+                <p className="app-menu-user">{user.display_name} さん</p>
+              )}
+              <button onClick={() => goTo('/portal')}>ダッシュボード</button>
+              <div className="app-menu-divider" role="separator" />
               {inEquipment ? (
                 <>
                   {/* 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
@@ -201,14 +210,14 @@ export default function AppHeader() {
                 </>
               ) : (
                 <>
-                  <button onClick={() => goTo('/')}>メイン</button>
+                  <button onClick={() => goTo('/')}>カンバン</button>
                   <button onClick={() => goTo('/archive')}>アーカイブ</button>
                   <button className="btn-settings" onClick={() => goTo('/settings')}>設定</button>
                   <button onClick={() => goTo('/usage')}>従量課金事項</button>
                   <button onClick={() => goTo('/logs')}>処理ログ</button>
                 </>
               )}
-              <div className="dashboard-menu-divider" role="separator" />
+              <div className="app-menu-divider" role="separator" />
               {!inReports && !inEquipment && !isOwner && (
                 <button onClick={handleRunFetch} disabled={fetching}>
                   {fetching ? '取得中…' : '今すぐ取得'}
@@ -239,6 +248,9 @@ export default function AppHeader() {
                 当システムについて
               </button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
+              {/* ビルド時刻。ヘッダーからここへ移した（2026-08-12）。端末が最新の
+                  デプロイを取得できているかの確認用で、常時見えている必要はない */}
+              <p className="app-menu-version">ver.{formatBuildTime()}</p>
             </div>
           </div>
         </div>

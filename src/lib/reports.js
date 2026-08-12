@@ -96,6 +96,15 @@ export function formatReportDate(date) {
   ).padStart(2, '0')} (${WEEKDAYS[d.getUTCDay()]})`
 }
 
+// timestamptz（ISO文字列）→ JST の 'YYYY-MM-DD'。
+// 測定日時・確認日時のように時刻を持つ値を「その日」として扱いたいときに使う。
+// ISO文字列をそのまま slice(0, 10) すると UTC 基準になり、JSTの夕方以降が前日に
+// ずれてしまうため、必ずこの関数を通す（2026-08-12に違反車両一覧から共通化）。
+export function jstDateOnly(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
 // 作業記録を時刻順に並べる（保存順＝sort_order とは独立）。時刻が同じ／未入力のものは
 // 追加順を保つため sort_order をタイブレークに使う。日報詳細と一覧（リスト型・カレンダー型）
 // で並び順が食い違わないよう、両方からこの関数を使う（2026-08-07）。

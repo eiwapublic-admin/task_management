@@ -71,26 +71,131 @@
 
 .ui-toolbar .ui-page-title { margin: 0; }
 
-/* 縦スクロールしてもヘッダー扱いの部分を固定表示するための2段目・3段目
-   （2026-08-11）。AppHeader（1段目。.dashboard-header）は既にそれ自身が
-   position: sticky; top: 0 だが、折り返し・safe-areaで高さが可変なため、
-   その下に重ねる段はJSで測った実測値（useStickyHeightVar.js）を
-   var(--app-header-h) / var(--sticky2-h) として使う。
-   使い方: 2段目にしたいツールバー等に .ui-sticky-head を付け、
-   useStickyHeightVar('--sticky2-h') の ref をそこに渡す。3段目
-   （一覧の列見出し・カレンダーの曜日行など）には .ui-sticky-head-2 を付ける
-   （3段目自体の高さを測る必要はない＝4段目が無いため ref は不要）。 */
-.ui-sticky-head {
-  position: sticky;
-  top: var(--app-header-h);
-  z-index: var(--z-header-2);
-  background: var(--bg-app);
+/* 一覧の中の「集計見出し」（備品なら備品名、残留塩素なら測定日）。
+   どこで区切れているかを一目で分からせるのが役目なので、本文より一段大きく・太くする
+   （2026-08-12 の画面構成見直しで標準化）。補助情報は .ui-group-head-sub で添える */
+.ui-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  color: var(--text-strong);
 }
 
+.ui-group-head-sub {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* 縦スクロールしても固定表示し続ける3段目（2026-08-11）。
+   1段目 AppHeader（.app-header）はそれ自身が position: sticky; top: 0、
+   2段目は機能ヘッダ（.ui-feature-head。下記）。どちらも折り返し・safe-area で
+   高さが可変なため、その下に重ねる段は JS で測った実測値
+   （useStickyHeightVar.js）を var(--app-header-h) / var(--sticky2-h) として使う。
+   3段目（一覧の列見出し・カレンダーの曜日行など）には .ui-sticky-head-2 を付ける
+   だけでよい（3段目自体の高さを測る必要はない＝4段目が無いため ref は不要）。 */
 .ui-sticky-head-2 {
   position: sticky;
   top: calc(var(--app-header-h) + var(--sticky2-h, 0px));
   z-index: var(--z-header-2);
+}
+
+/* --- 機能ヘッダ（2段目の固定ヘッダー。2026-08-12）------------------------
+   画面は次の3層で構成する（docs/ui-standard.md 2章）。
+
+     1. アプリヘッダ … AppHeader（グリーンの帯）。アプリアイコンとセクション切替
+     2. 機能ヘッダ  … この部品。左＝年月・表示切替・絞り込み（検索を含む）、
+                       右＝その機能のボタン群
+     3. 本体        … 一覧。縦にスクロールしても 1・2 は固定表示される
+
+   機能名（タスク／日報／備品）はアプリヘッダのセクション切替が示すので、
+   主要3画面ではタイトルを置かない。サブ画面（アーカイブ・自主検査表など）は
+   現在地が切替から読み取れないため title を渡す。
+   コンポーネントは src/components/FeatureHeader.jsx（高さの実測もそこで行う）。
+   -------------------------------------------------------------------- */
+.ui-feature-head {
+  position: sticky;
+  top: var(--app-header-h);
+  z-index: var(--z-header-2);
+  /* 本体がこの下を通り抜けるので、地の色で必ず塗りつぶす（透けさせない） */
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+  padding-block: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* 下の余白を親（flex の gap 等）が持っている画面用。二重に空けないための打ち消し */
+.ui-feature-head.is-flush { margin-bottom: 0; }
+
+.ui-feature-head-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* 左側＝いま何を見ているかを決める操作（年月・表示切替・絞り込み）。
+   余った幅はこちらが吸収する（絞り込みの入力欄を広く使いたい画面があるため）。
+   機能ボタン側は margin-left: auto で右端に貼り付くので押し出されはしない */
+.ui-feature-head-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 右側＝その機能のボタン群 */
+.ui-feature-head-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* 機能ヘッダの中のタイトル（サブ画面のみ）。ツールバー内なので margin は持たせない */
+.ui-feature-head .ui-page-title { margin: 0; }
+
+/* 機能ボタンは画面をまたいで同じ大きさにする（2026-08-05に日報で決めた寸法を、
+   2026-08-12 に全機能共通へ格上げした）。押す頻度が高いので少し大きめ・太字 */
+.ui-feature-head-actions .btn-plain {
+  height: var(--control-h-lg);
+  padding: 0 var(--space-5);
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+
+/* iPhone幅では文字ラベルを隠し、アイコンのみの正方形ボタンにして1行に収める
+   （2026-08-10。日報のツールバーはボタンが4つ並ぶため）。ラベルは title 属性で
+   引き続き参照できる。隠せるラベル（.btn-plain-label）を持つボタンだけを対象に
+   するので、文字だけのボタンが潰れることはない */
+@media (max-width: 480px) {
+  .ui-feature-head-actions .btn-plain:has(.btn-plain-label) {
+    width: var(--icon-btn);
+    padding: 0;
+    gap: 0;
+  }
+  .ui-feature-head-actions .btn-plain-label { display: none; }
+}
+
+/* 狭幅では「左＝1行目・右＝2行目の右端」に必ず分ける。
+   自然な折り返しに任せると、タイトルの文字数や端末のフォント設定で折り返し位置が
+   変わり、実機で「反映されない」ように見える不具合を過去に踏んでいる
+   （2026-08-07 のアプリヘッダー・ツールバー。設計書 4-3 参照）。
+   ここでは折り返し位置を幅に依存させず、行の割り当てとして固定する。 */
+@media (max-width: 768px) {
+  .ui-feature-head-main { flex: 1 1 100%; }
+  .ui-feature-head-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* =========================================================================

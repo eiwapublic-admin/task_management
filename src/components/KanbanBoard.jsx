@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import KanbanColumn from './KanbanColumn'
+import FeatureHeader from './FeatureHeader'
 import FilterBar from './FilterBar'
 import TaskDetail from './TaskDetail'
 import TaskForm from './TaskForm'
+import { IconArchive } from './Icons'
 import { STATUS_LIST } from '../lib/status'
 import { formatDateTime } from '../lib/format'
-import useStickyHeightVar from '../lib/useStickyHeightVar'
 import './KanbanBoard.css'
 
 export default function KanbanBoard({
@@ -23,9 +24,6 @@ export default function KanbanBoard({
   const [selectedAssignee, setSelectedAssignee] = useState(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [showForm, setShowForm] = useState(false)
-  // ツールバーをAppHeaderの下に固定表示し、各列のステータス見出しはさらにその下に
-  // 重ねて固定表示する（2026-08-11。KanbanColumn.jsx の .ui-sticky-head-2 参照）
-  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const filteredTasks = useMemo(() => {
     if (!selectedAssignee) return tasks
@@ -65,23 +63,33 @@ export default function KanbanBoard({
 
   return (
     <div className="kanban-board">
-      <div className="kanban-toolbar ui-sticky-head" ref={stickyHeadRef}>
-        <FilterBar
-          assignees={assignees}
-          selectedAssignee={selectedAssignee}
-          onChange={setSelectedAssignee}
-        />
-        <div className="kanban-toolbar-right">
-          {lastFetchAt && (
-            <span className="kanban-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
-          )}
-          {onOpenArchive && (
-            <button type="button" className="kanban-archive-btn" onClick={onOpenArchive}>
-              アーカイブ
-            </button>
-          )}
-        </div>
-      </div>
+      {/* 機能ヘッダ（左＝絞り込み / 右＝機能ボタン）。カンバンは機能名がアプリヘッダの
+          セクション切替に出ているので title は置かない。列の見出しはこの下に
+          さらに重ねて固定表示する（KanbanColumn.jsx の .ui-sticky-head-2）。
+          下の余白は .kanban-board の gap が持つので is-flush で二重取りを避ける */}
+      <FeatureHeader
+        className="is-flush"
+        filters={
+          <FilterBar
+            assignees={assignees}
+            selectedAssignee={selectedAssignee}
+            onChange={setSelectedAssignee}
+          />
+        }
+        actions={
+          <>
+            {lastFetchAt && (
+              <span className="kanban-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
+            )}
+            {onOpenArchive && (
+              <button type="button" className="btn-plain" onClick={onOpenArchive} title="アーカイブ">
+                <IconArchive size={18} />
+                <span className="btn-plain-label">アーカイブ</span>
+              </button>
+            )}
+          </>
+        }
+      />
       <div className="kanban-columns">
         {STATUS_LIST.map((status) => (
           <KanbanColumn

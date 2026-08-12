@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
 import { getCurrentUser } from '../lib/auth'
@@ -88,33 +89,50 @@ export default function Equipment() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        <div className="ui-toolbar">
-          <h2 className="ui-page-title">備品</h2>
-          {!readOnly && (
-            <div className="ui-toolbar-actions">
-              <button type="button" className="btn-primary" onClick={() => setMode('out')}>
-                出庫
-              </button>
-              <button type="button" className="btn-primary" onClick={() => setMode('in')}>
-                入庫
-              </button>
-            </div>
-          )}
-        </div>
-
-        <nav className="ui-segmented" aria-label="明細の表示期間">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`ui-segmented-btn${period === p.key ? ' is-active' : ''}`}
-              aria-current={period === p.key ? 'page' : undefined}
-              onClick={() => setPeriod(p.key)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </nav>
+        {/* 機能ヘッダ。機能名「備品」はアプリヘッダのセクション切替が示すのでタイトルは置かない。
+            左＝表示期間・絞り込み、右＝入出庫の操作（2026-08-12） */}
+        <FeatureHeader
+          filters={
+            <>
+              <nav className="ui-segmented" aria-label="明細の表示期間">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    className={`ui-segmented-btn${period === p.key ? ' is-active' : ''}`}
+                    aria-current={period === p.key ? 'page' : undefined}
+                    onClick={() => setPeriod(p.key)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </nav>
+              {/* 絞り込みは機能ヘッダの左側にまとめる（2026-08-12。以前は一覧の下端にあり、
+                  スクロールしないと見つからなかった） */}
+              <label className="equipment-toggle-disabled">
+                <input
+                  type="checkbox"
+                  checked={showDisabled}
+                  onChange={(e) => setShowDisabled(e.target.checked)}
+                />
+                無効な備品も表示
+              </label>
+            </>
+          }
+          actions={
+            readOnly ? null : (
+              <>
+                {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外） */}
+                <button type="button" className="btn-primary" onClick={() => setMode('out')}>
+                  出庫
+                </button>
+                <button type="button" className="btn-primary" onClick={() => setMode('in')}>
+                  入庫
+                </button>
+              </>
+            )
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
@@ -207,10 +225,6 @@ export default function Equipment() {
           </div>
         )}
 
-        <label className="equipment-toggle-disabled">
-          <input type="checkbox" checked={showDisabled} onChange={(e) => setShowDisabled(e.target.checked)} />
-          無効な備品も表示する
-        </label>
       </div>
 
       {mode === 'in' && <EquipmentInForm items={items} onClose={() => setMode(null)} onSaved={handleModalSaved} />}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import { fetchLogs } from '../lib/tasks'
 import { formatDateTime } from '../lib/format'
 import './Dashboard.css'
@@ -28,7 +29,7 @@ export default function Logs() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container logs-container">
-        <h2 className="ui-page-title">処理ログ</h2>
+        <FeatureHeader title="処理ログ" />
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}

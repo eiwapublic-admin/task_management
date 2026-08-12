@@ -4,8 +4,8 @@ import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import { IconHome } from '../components/Icons'
+import FeatureHeader from '../components/FeatureHeader'
 import { getCurrentUser } from '../lib/auth'
-import useStickyHeightVar from '../lib/useStickyHeightVar'
 import {
   fetchParkingViolations,
   deleteParkingViolation,
@@ -13,6 +13,7 @@ import {
   todayJST,
   VIOLATION_LABELS,
   formatReportDate,
+  jstDateOnly,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -22,11 +23,9 @@ function plateKey(v) {
   return `${v.plate_region || ''}|${v.plate_number || ''}`
 }
 
-// checked_at（タイムスタンプ）からJSTの日付だけを取り出す（残留塩素一覧の日付見出しと同じ考え方。
-// 2026-08-11。以前は時刻まで表示していたが、日付だけで十分＋時刻は目立たせたい項目の邪魔になるため外した）
-function jstDateOnly(iso) {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-}
+// checked_at（タイムスタンプ）からJSTの日付だけを取り出す処理は、ダッシュボードでも
+// 使うため src/lib/reports.js の jstDateOnly() へ共通化した（2026-08-12）。
+// 日付見出しは日付だけで十分＋時刻は目立たせたい項目の邪魔になるため時刻は出さない（2026-08-11）。
 
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
@@ -44,8 +43,6 @@ export default function ParkingViolations() {
   const [preparingQuickAdd, setPreparingQuickAdd] = useState(false)
   // 明細クリックで開く詳細（写真・項目の閲覧/編集）モーダル。選んだレコードを保持する（2026-08-11）
   const [selected, setSelected] = useState(null)
-  // ツールバー＋検索・並び順欄をAppHeaderの下に固定表示する（2026-08-11）
-  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -139,62 +136,66 @@ export default function ParkingViolations() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
-        {/* ツールバー＋検索・並び順欄はAppHeaderの下に固定表示する（2026-08-11） */}
-        <div className="ui-sticky-head" ref={stickyHeadRef}>
-        <div className="reports-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/reports')}
-            aria-label="日報一覧に戻る"
-            title="日報一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">違反車両一覧</h2>
-          {!isOwner && (
+        {/* 機能ヘッダ（2026-08-12）。左＝検索・並び順、右＝記録の追加。
+            日報のサブ画面なので、現在地が分かるよう title を置く */}
+        <FeatureHeader
+          title="違反車両一覧"
+          leading={
             <button
               type="button"
-              className="icon-btn-add"
-              onClick={handleOpenQuickAdd}
-              disabled={preparingQuickAdd}
-              aria-label="違反車両を記録（本日分）"
-              title="違反車両を記録（本日分）"
+              className="icon-btn-home"
+              onClick={() => navigate('/reports')}
+              aria-label="日報一覧に戻る"
+              title="日報一覧に戻る"
             >
-              ＋
+              <IconHome size={32} />
             </button>
-          )}
-        </div>
-
-        <div className="parking-list-controls">
-          <input
-            type="text"
-            className="parking-search"
-            placeholder="ナンバー・会社名などで検索"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="検索"
-          />
-          <div className="ui-segmented" role="group" aria-label="並び順">
-            <button
-              type="button"
-              className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
-              aria-pressed={sort === 'date'}
-              onClick={() => setSort('date')}
-            >
-              日付順
-            </button>
-            <button
-              type="button"
-              className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
-              aria-pressed={sort === 'rank'}
-              onClick={() => setSort('rank')}
-            >
-              累計回数順
-            </button>
-          </div>
-        </div>
-        </div>
+          }
+          filters={
+            <>
+              <input
+                type="text"
+                className="parking-search"
+                placeholder="ナンバー・会社名などで検索"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="検索"
+              />
+              <div className="ui-segmented" role="group" aria-label="並び順">
+                <button
+                  type="button"
+                  className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
+                  aria-pressed={sort === 'date'}
+                  onClick={() => setSort('date')}
+                >
+                  日付順
+                </button>
+                <button
+                  type="button"
+                  className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
+                  aria-pressed={sort === 'rank'}
+                  onClick={() => setSort('rank')}
+                >
+                  累計回数順
+                </button>
+              </div>
+            </>
+          }
+          actions={
+            isOwner ? null : (
+              <button
+                type="button"
+                className="icon-btn-add"
+                onClick={handleOpenQuickAdd}
+                disabled={preparingQuickAdd}
+                aria-label="違反車両を記録（本日分）"
+                title="違反車両を記録（本日分）"
+              >
+                ＋
+              </button>
+            )
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
