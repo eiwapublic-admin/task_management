@@ -21,13 +21,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-4);
+}
+
+.equipment-stock-item {
   border-radius: var(--radius-card);
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-surface);
 }
-.equipment-stock-rows li + li { border-top: 1px solid var(--border); }
 
 .equipment-stock-row {
   display: flex;
@@ -35,14 +37,13 @@
   gap: var(--space-3);
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
   font: inherit;
   color: var(--text-strong);
 }
-.equipment-stock-row:hover { background: var(--bg-subtle); }
+.equipment-stock-row.is-static { border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+
+.equipment-stock-detail { padding: var(--space-3) var(--space-4); }
+.equipment-stock-detail .ui-empty { padding: var(--space-2) 0; text-align: left; }
 
 .equipment-stock-name {
   flex: 1 1 auto;
@@ -117,6 +118,52 @@
   gap: var(--space-2);
   font-size: var(--fs-sm);
   color: var(--text-base);
+}
+
+/* 署名入力（5-5） */
+.signature-pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.signature-pad-canvas {
+  width: 100%;
+  max-height: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  touch-action: none;
+  cursor: crosshair;
+}
+.signature-pad-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.signature-pad-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+/* テナント検索選択（5-4） */
+.equipment-tenant-summary {
+  margin-top: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.equipment-tenant-summary.is-danger { color: var(--color-danger); }
+.equipment-signature-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.equipment-signature-thumb {
+  max-width: 200px;
+  max-height: 100px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
 }
 
 .equipment-master-group-head {

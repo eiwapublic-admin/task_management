@@ -53,6 +53,9 @@ import {
   handleEquipmentTransactionUpdate,
   handleEquipmentTransactionDelete,
   handleEquipmentSuggest,
+  handleEquipmentTenantList,
+  handleEquipmentSignatureUpload,
+  handleEquipmentSignatureGet,
 } from './lib/equipment.js'
 
 // Cloudflare Worker 本体。
@@ -998,6 +1001,14 @@ async function route(req, env) {
   }
   if (pathname === '/api/equipment/suggest') {
     return req.method === 'GET' ? handleEquipmentSuggest(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/tenants') {
+    return req.method === 'GET' ? handleEquipmentTenantList(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/signature') {
+    if (req.method === 'GET') return handleEquipmentSignatureGet(req)
+    if (req.method === 'POST') return handleEquipmentSignatureUpload(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

@@ -1,16 +1,17 @@
-// 備品管理機能の API ハンドラ（Phase 1。2026-08-12〜）。
+// 備品管理機能の API ハンドラ（2026-08-12〜）。
 // 蛍光ランプ等の入出庫・在庫管理。現行 FileMaker「備品管理」アプリの移行。
 // 権限: staff/admin は読み書き、owner は GET のみ（他画面と同じ方針。docs/equipment-plan.md 9章）。
-// Phase 1 ではテナント設置（reason='tenant'）・新規入替（reason='replace'）・署名は扱わない
-// （Phase 2 で追加）。DB・API は将来の拡張を見込んだ形にしてあるが、この段階で作れる画面・
-// 入力は「調達／繰延登録／在庫調整」の入庫と「共用部設置／不良品処分」の出庫のみ。
+// 新規入替（reason='replace'）はまだ扱わない。テナント設置（reason='tenant'）・署名は対応済み
+// （2026-08-12 追加）。テナントは FileMaker からの同期（Phase 4・7-1）が入るまでは手動投入のみ。
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
+import { putObject, getObject, deleteObject } from './storage.js'
 
 const ITEM_COLUMNS =
   'id, item_no, category_code, name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
 const CATEGORY_COLUMNS = 'code, name, sort_order, note, created_at, updated_at'
+const TENANT_COLUMNS = 'id, billing_code, name, short_name, floor, moved_out, default_item_id, note, synced_at'
 const TXN_COLUMNS =
   'id, txn_no, item_id, kind, reason, occurred_at, quantity, supplier, tenant_id, tenant_code, tenant_name, ' +
   'tenant_short_name, floor, location, staff_name, signature_key, signed_at, note, created_by, updated_by, created_at, updated_at'
@@ -20,8 +21,8 @@ const REASONS_BY_KIND = {
   in: new Set(['procure', 'deferred', 'adjust']),
   out: new Set(['tenant', 'common', 'replace', 'discard']),
 }
-// Phase 1 の画面から送信できる理由（tenant/replace は Phase 2 で解禁する）
-const PHASE1_REASONS = new Set(['procure', 'deferred', 'adjust', 'common', 'discard'])
+// 画面から送信できる理由（replace=新規入替 はまだ解禁していない。2026-08-12、tenant=テナント設置を解禁）
+const SUPPORTED_REASONS = new Set(['procure', 'deferred', 'adjust', 'common', 'discard', 'tenant'])
 
 function trimOrNull(value, max = 500) {
   if (typeof value !== 'string') return null
@@ -300,6 +301,62 @@ export async function handleEquipmentItemDelete(req) {
 // 入出庫
 // ============================================================
 
+// period（3m/1y/all）から絞り込みの起点日時を返す。null なら絞り込みなし（全期間）
+function periodCutoff(period) {
+  if (period === '3m') {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 3)
+    return d
+  }
+  if (period === '1y') {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 1)
+    return d
+  }
+  return null
+}
+
+// GET /api/equipment/transactions?period=3m|1y|all — 全備品分の入出庫明細を備品ごとにまとめて返す
+// （在庫一覧の各行に明細をその場で展開表示するため。2026-08-12〜。item_no を省略した場合はこちら）。
+// 残高は各備品の全履歴を古い順に積み上げてから期間で絞り込む（期間フィルタで残高がずれないため）。
+async function handleEquipmentTransactionListAll(req, period) {
+  try {
+    const supabase = getAdminClient()
+    const { data: rows, error: txnErr } = await supabase
+      .from('equipment_transactions')
+      .select(TXN_COLUMNS)
+      .order('occurred_at', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (txnErr) {
+      console.error('equipment-txn-list-all:', txnErr.message)
+      return json({ error: '入出庫の取得に失敗しました' }, 500)
+    }
+
+    const byItem = new Map()
+    for (const r of rows || []) {
+      if (!byItem.has(r.item_id)) byItem.set(r.item_id, [])
+      byItem.get(r.item_id).push(r)
+    }
+
+    const cutoff = periodCutoff(period)
+    const transactionsByItem = {}
+    for (const [itemId, list] of byItem) {
+      let balance = 0
+      const withBalance = list.map((r) => {
+        balance += r.kind === 'in' ? r.quantity : -r.quantity
+        return { ...r, balance }
+      })
+      const filtered = cutoff ? withBalance.filter((r) => new Date(r.occurred_at) >= cutoff) : withBalance
+      filtered.reverse()
+      transactionsByItem[itemId] = filtered
+    }
+    return json({ transactionsByItem })
+  } catch (err) {
+    console.error('equipment-txn-list-all 失敗:', err)
+    return json({ error: '入出庫の取得に失敗しました' }, 500)
+  }
+}
+
 // GET /api/equipment/transactions?item_no=…&period=3m|1y|all — 指定した備品の入出庫明細。
 // 残高（その時点の在庫）は対象備品の全履歴を古い順に積み上げて計算してから、
 // 表示期間で絞り込む（期間フィルタで残高がずれないようにするため）。
@@ -309,8 +366,9 @@ export async function handleEquipmentTransactionList(req) {
   try {
     const params = new URL(req.url).searchParams
     const itemNo = params.get('item_no')
-    if (!itemNo || !/^\d+$/.test(itemNo)) return json({ error: 'item_no が必要です' }, 400)
     const period = params.get('period') || '3m'
+    if (!itemNo) return handleEquipmentTransactionListAll(req, period)
+    if (!/^\d+$/.test(itemNo)) return json({ error: 'item_no が不正です' }, 400)
 
     const supabase = getAdminClient()
     const { data: item, error: itemErr } = await supabase
@@ -351,14 +409,7 @@ export async function handleEquipmentTransactionList(req) {
     // 全履歴を積み上げた最終値＝現在庫（equipment_stock ビューと同じ計算を再利用できる）
     const itemWithStock = { ...item, stock_qty: item.track_stock ? balance : null, year_in_qty: yearIn, year_out_qty: yearOut }
 
-    let cutoff = null
-    if (period === '3m') {
-      cutoff = new Date()
-      cutoff.setMonth(cutoff.getMonth() - 3)
-    } else if (period === '1y') {
-      cutoff = new Date()
-      cutoff.setFullYear(cutoff.getFullYear() - 1)
-    }
+    const cutoff = periodCutoff(period)
     const filtered = cutoff ? withBalance.filter((r) => new Date(r.occurred_at) >= cutoff) : withBalance
     filtered.reverse() // 新しい順で返す（一覧の表示順）
 
@@ -395,7 +446,7 @@ export async function handleEquipmentTransactionCreate(req) {
     if (!VALID_KINDS.has(kind)) return json({ error: 'kind が不正です' }, 400)
     const reason = payload.reason
     if (!REASONS_BY_KIND[kind]?.has(reason)) return json({ error: 'reason が不正です' }, 400)
-    if (!PHASE1_REASONS.has(reason)) {
+    if (!SUPPORTED_REASONS.has(reason)) {
       return json({ error: 'この入出庫理由はまだ利用できません（Phase 2 で対応予定）' }, 400)
     }
     const quantity = Number(payload.quantity)
@@ -411,6 +462,34 @@ export async function handleEquipmentTransactionCreate(req) {
     const tenantErr = validateTenantFields(reason, payload)
     if (tenantErr) return json({ error: tenantErr }, 400)
 
+    const supabase = getAdminClient()
+
+    // テナント設置は請求先そのものなので、名称・コードはクライアントの送信値を
+    // 信用せず、必ずサーバー側で equipment_tenants を引いて確定する（3-4・4-1）
+    let tenantFields = { tenant_id: null, tenant_code: null, tenant_name: null, tenant_short_name: null }
+    let tenantFloor = trimOrNull(payload.floor, 20)
+    if (reason === 'tenant') {
+      const tenantId = typeof payload.tenant_id === 'string' ? payload.tenant_id : ''
+      if (!tenantId) return json({ error: 'テナント設置には設置先テナントの指定が必要です' }, 400)
+      const { data: tenant, error: tenantErr2 } = await supabase
+        .from('equipment_tenants')
+        .select('id, billing_code, name, short_name, floor')
+        .eq('id', tenantId)
+        .maybeSingle()
+      if (tenantErr2) {
+        console.error('equipment-txn-create(tenant):', tenantErr2.message)
+        return json({ error: '入出庫の登録に失敗しました' }, 500)
+      }
+      if (!tenant) return json({ error: '指定されたテナントが見つかりません' }, 404)
+      tenantFields = {
+        tenant_id: tenant.id,
+        tenant_code: tenant.billing_code,
+        tenant_name: tenant.name,
+        tenant_short_name: tenant.short_name,
+      }
+      tenantFloor = tenant.floor
+    }
+
     const row = {
       item_id: itemId,
       kind,
@@ -418,15 +497,15 @@ export async function handleEquipmentTransactionCreate(req) {
       occurred_at: occurredAt,
       quantity,
       supplier: trimOrNull(payload.supplier, 200),
-      floor: trimOrNull(payload.floor, 20),
-      location: trimOrNull(payload.location, 200),
+      ...tenantFields,
+      floor: tenantFloor,
+      location: reason === 'tenant' ? null : trimOrNull(payload.location, 200),
       staff_name: trimOrNull(payload.staff_name, 200),
       note: trimOrNull(payload.note, 1000),
       created_by: auth.sub,
       updated_by: auth.sub,
     }
 
-    const supabase = getAdminClient()
     const { data, error: err } = await supabase.from('equipment_transactions').insert(row).select(TXN_COLUMNS).single()
     if (err) {
       console.error('equipment-txn-create:', err.message)
@@ -452,7 +531,7 @@ export async function handleEquipmentTransactionUpdate(req) {
     const supabase = getAdminClient()
     const { data: existing, error: existErr } = await supabase
       .from('equipment_transactions')
-      .select('id, item_id, kind, reason, signed_at')
+      .select('id, item_id, kind, reason, signed_at, tenant_id')
       .eq('id', id)
       .maybeSingle()
     if (existErr) {
@@ -467,6 +546,9 @@ export async function handleEquipmentTransactionUpdate(req) {
 
     const reason = 'reason' in payload ? payload.reason : existing.reason
     if (!REASONS_BY_KIND[existing.kind]?.has(reason)) return json({ error: 'reason が不正です' }, 400)
+    if (!SUPPORTED_REASONS.has(reason)) {
+      return json({ error: 'この入出庫理由はまだ利用できません' }, 400)
+    }
     const tenantErr = validateTenantFields(reason, payload)
     if (tenantErr) return json({ error: tenantErr }, 400)
 
@@ -485,8 +567,34 @@ export async function handleEquipmentTransactionUpdate(req) {
       patch.quantity = quantity
     }
     if ('supplier' in payload) patch.supplier = trimOrNull(payload.supplier, 200)
-    if ('floor' in payload) patch.floor = trimOrNull(payload.floor, 20)
-    if ('location' in payload) patch.location = trimOrNull(payload.location, 200)
+
+    // テナント設置は、選び直された（tenant_id が渡された）場合のみサーバー側で再解決する。
+    // それ以外（reason を tenant のまま維持しただけ）は既存の tenant_id・floor 等を保つ
+    if (reason === 'tenant') {
+      const tenantId = typeof payload.tenant_id === 'string' ? payload.tenant_id : existing.tenant_id
+      if (!tenantId) return json({ error: 'テナント設置には設置先テナントの指定が必要です' }, 400)
+      if ('tenant_id' in payload) {
+        const { data: tenant, error: tenantErr2 } = await supabase
+          .from('equipment_tenants')
+          .select('id, billing_code, name, short_name, floor')
+          .eq('id', tenantId)
+          .maybeSingle()
+        if (tenantErr2) {
+          console.error('equipment-txn-update(tenant):', tenantErr2.message)
+          return json({ error: '入出庫の更新に失敗しました' }, 500)
+        }
+        if (!tenant) return json({ error: '指定されたテナントが見つかりません' }, 404)
+        patch.tenant_id = tenant.id
+        patch.tenant_code = tenant.billing_code
+        patch.tenant_name = tenant.name
+        patch.tenant_short_name = tenant.short_name
+        patch.floor = tenant.floor
+        patch.location = null
+      }
+    } else {
+      if ('floor' in payload) patch.floor = trimOrNull(payload.floor, 20)
+      if ('location' in payload) patch.location = trimOrNull(payload.location, 200)
+    }
     if ('staff_name' in payload) patch.staff_name = trimOrNull(payload.staff_name, 200)
     if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
 
@@ -519,7 +627,7 @@ export async function handleEquipmentTransactionDelete(req) {
     const supabase = getAdminClient()
     const { data: existing } = await supabase
       .from('equipment_transactions')
-      .select('item_id, signed_at')
+      .select('item_id, signed_at, signature_key')
       .eq('id', id)
       .maybeSingle()
     if (existing?.signed_at && auth.role !== 'admin') {
@@ -531,6 +639,7 @@ export async function handleEquipmentTransactionDelete(req) {
       console.error('equipment-txn-delete:', err.message)
       return json({ error: '入出庫の削除に失敗しました' }, 500)
     }
+    if (existing?.signature_key) await deleteObject(existing.signature_key)
     if (existing?.item_id) await refreshWarning(supabase, existing.item_id)
     return json({ ok: true })
   } catch (err) {
@@ -596,5 +705,116 @@ export async function handleEquipmentSuggest(req) {
   } catch (err) {
     console.error('equipment-suggest 失敗:', err)
     return json({ error: '候補の取得に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// テナント
+// ============================================================
+
+// GET /api/equipment/tenants?include_moved_out=1 — テナント一覧（階・名称順）。
+// FileMaker との同期（Phase 4・7-1）が入るまでは手動投入のデータを参照する
+export async function handleEquipmentTenantList(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const includeMovedOut = new URL(req.url).searchParams.get('include_moved_out') === '1'
+    const supabase = getAdminClient()
+    let query = supabase.from('equipment_tenants').select(TENANT_COLUMNS)
+    if (!includeMovedOut) query = query.eq('moved_out', false)
+    const { data, error: err } = await query.order('floor', { ascending: true }).order('name', { ascending: true })
+    if (err) {
+      console.error('equipment-tenant-list:', err.message)
+      return json({ error: 'テナント一覧の取得に失敗しました' }, 500)
+    }
+    return json({ tenants: data || [] })
+  } catch (err) {
+    console.error('equipment-tenant-list 失敗:', err)
+    return json({ error: 'テナント一覧の取得に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 署名（テナント設置のみ。5-5。記録の保存と同時、または後から足すのどちらも
+// このエンドポイントで扱う＝「先に記録だけ保存→後日、署名だけ足す」運用の受け口を兼ねる）
+// ============================================================
+
+const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024 // 実際は長辺600px程度に縮小したPNGなので数十KB程度で収まる想定
+
+// POST /api/equipment/signature（multipart: txn_id, file） — 署名の登録
+export async function handleEquipmentSignatureUpload(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const form = await req.formData().catch(() => null)
+    const txnId = String(form?.get('txn_id') || '')
+    const file = form?.get('file')
+    if (!txnId) return json({ error: 'txn_id は必須です' }, 400)
+    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
+    if (file.size > MAX_SIGNATURE_BYTES) return json({ error: '署名画像が大きすぎます' }, 413)
+    if (file.type !== 'image/png') return json({ error: 'PNG形式のみ対応しています' }, 415)
+
+    const supabase = getAdminClient()
+    const { data: txn, error: loadErr } = await supabase
+      .from('equipment_transactions')
+      .select('id, reason, signed_at')
+      .eq('id', txnId)
+      .maybeSingle()
+    if (loadErr) {
+      console.error('equipment-signature-upload(load):', loadErr.message)
+      return json({ error: '署名の登録に失敗しました' }, 500)
+    }
+    if (!txn) return json({ error: '対象が見つかりません' }, 404)
+    if (txn.reason !== 'tenant') return json({ error: 'テナント設置以外には署名を登録できません' }, 400)
+    if (txn.signed_at) return json({ error: 'この記録はすでに署名済みです' }, 400)
+
+    const key = `equipment/signatures/${txnId}.png`
+    await putObject(key, file.stream(), file.type, { upsert: true })
+
+    const { data, error: err } = await supabase
+      .from('equipment_transactions')
+      .update({ signature_key: key, signed_at: new Date().toISOString() })
+      .eq('id', txnId)
+      .select(TXN_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('equipment-signature-upload:', err.message)
+      return json({ error: '署名の登録に失敗しました' }, 500)
+    }
+    return json({ transaction: data })
+  } catch (err) {
+    console.error('equipment-signature-upload 失敗:', err)
+    return json({ error: '署名の登録に失敗しました' }, 500)
+  }
+}
+
+// GET /api/equipment/signature?txn_id=… — 署名画像の本体（非公開バケット。JWT認証必須。4-3）
+export async function handleEquipmentSignatureGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const txnId = new URL(req.url).searchParams.get('txn_id') || ''
+    if (!txnId) return json({ error: 'txn_id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: txn } = await supabase
+      .from('equipment_transactions')
+      .select('signature_key')
+      .eq('id', txnId)
+      .maybeSingle()
+    if (!txn?.signature_key) return json({ error: '署名が見つかりません' }, 404)
+
+    const res = await getObject(txn.signature_key)
+    if (!res.ok) {
+      console.error('equipment-signature-get: storage が', res.status, 'を返した')
+      return json({ error: '署名の取得に失敗しました' }, 404)
+    }
+    return new Response(res.body, {
+      status: 200,
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=3600' },
+    })
+  } catch (err) {
+    console.error('equipment-signature-get 失敗:', err)
+    return json({ error: '署名の取得に失敗しました' }, 500)
   }
 }

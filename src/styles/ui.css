@@ -742,6 +742,10 @@
 .ui-modal-body {
   padding: var(--space-4);
   overflow-y: auto;
+  /* 縦スクロール専用にする。中の要素が僅かでも幅をはみ出すと、iOSでは
+     縦スクロール中に横方向へゴムのように揺れ戻る（ラバーバンド）ため、
+     横方向のスクロール余地そのものを断つ（2026-08-12、備品入出庫モーダルで発生） */
+  overflow-x: hidden;
   flex: 1;
   min-height: 0;
 }
