@@ -10,6 +10,9 @@ import ReportTemplates from './pages/ReportTemplates'
 import Inspections from './pages/Inspections'
 import ParkingViolations from './pages/ParkingViolations'
 import Chlorine from './pages/Chlorine'
+import Equipment from './pages/Equipment'
+import EquipmentItemHistory from './pages/EquipmentItemHistory'
+import EquipmentItems from './pages/EquipmentItems'
 import { isAuthenticated, getCurrentUser } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -114,6 +117,32 @@ function App() {
           element={
             <RequireAuth>
               <Chlorine />
+            </RequireAuth>
+          }
+        />
+        {/* 備品管理（Phase 1。2026-08-12〜）。owner も閲覧できるため RequireAuth
+            （書き込みはサーバー側で拒否。docs/equipment-plan.md 9章） */}
+        <Route
+          path="/equipment"
+          element={
+            <RequireAuth>
+              <Equipment />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/equipment/items"
+          element={
+            <RequireAuth>
+              <EquipmentItems />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/equipment/items/:itemNo"
+          element={
+            <RequireAuth>
+              <EquipmentItemHistory />
             </RequireAuth>
           }
         />

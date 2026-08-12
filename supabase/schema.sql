@@ -449,3 +449,153 @@ revoke all on chlorine_tests from anon, authenticated;
 -- 検査薬の色変化の写真をどの検査レコードの分か紐付ける（category='chlorine' のときのみ使う）
 alter table report_photos add column if not exists chlorine_id uuid references chlorine_tests(id) on delete cascade;
 create index if not exists report_photos_chlorine_idx on report_photos (chlorine_id);
+
+-- ============================================================
+-- 備品管理（蛍光ランプの入出庫・設置記録。Phase 1〜。2026-08-12〜）。
+-- 現行 FileMaker「備品管理」アプリの移行。詳細は docs/equipment-plan.md 参照。
+-- ============================================================
+
+-- カテゴリマスタ（A2 蛍光灯 20 / A4 蛍光灯 40 / …）
+create table if not exists equipment_categories (
+  code       text primary key,                 -- A2 / A4 / A6 / A9 / B1 / C1 / D1
+  name       text not null,
+  sort_order int  not null default 99,
+  note       text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 備品マスタ
+create table if not exists equipment_items (
+  id            uuid primary key default gen_random_uuid(),
+  -- FileMaker の「備品ID」（2, 3, 5, 42, 53…）。CSV移行・外部APIの突合キーなので必ず保持する
+  item_no       int  not null unique,
+  category_code text references equipment_categories(code),
+  name          text not null,                 -- FLR40SW (白色)
+  product_code  text,                          -- FLR40SW/M/36（発注用情報）
+  sort_order    int  not null default 99,
+  warn_qty      int,                           -- 警告数量。在庫がこの値以下で「発注依頼してください」
+                                               -- Web Push のしきい値も兼ねる。null なら通知しない
+  -- 在庫警告を最後に通知した日時。「下回っていない→下回った」に変化した時だけ鳴らすために持つ。
+  -- 在庫が warn_qty を上回ったら null に戻す（入庫で解消したら次回また鳴らせる）
+  warned_at     timestamptz,
+  disabled      boolean not null default false, -- 無効（選択肢に出さない。過去の記録は残す）
+  -- 「予備40型（在庫管理外）」のように在庫を管理しない備品。一覧では在庫欄を出さない
+  track_stock   boolean not null default true,
+  note          text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists equipment_items_category_idx
+  on equipment_items (category_code, sort_order, item_no);
+
+-- テナント（正は FileMaker の検針記録DB。当システムは同期したコピーを持つ）
+create table if not exists equipment_tenants (
+  -- 主キーは uuid（サロゲート）。実データに請求先コードが空のテナントがあったため NULL を許す
+  id              uuid primary key default gen_random_uuid(),
+  billing_code    text unique,                 -- 請求先コード（8桁）。NULL 可・あれば一意
+  name            text not null,               -- 正式名称（修理伝票に出すのはこちら＋「様」）
+  short_name      text,                        -- 略称（入出庫の設置先・請求データの表記はこちら）
+  floor           text,                        -- 階（共用エリアは空）
+  -- 退去済み。FileMaker からの全件洗い替え同期（6-3・7-1）で、送信された有効テナント一覧に
+  -- 含まれなくなった行は自動でこれが true になる（論理削除。物理削除はしない）
+  moved_out       boolean not null default false,
+  -- ここだけ当システム側の設定値。同期で上書きしない
+  default_item_id uuid references equipment_items(id),
+  note            text,                        -- 検針に関する備考（同期対象）
+  source          text not null default 'filemaker',  -- filemaker / manual
+  synced_at       timestamptz,                 -- 最後に FileMaker から同期を受信した日時
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists equipment_tenants_floor_idx on equipment_tenants (floor, billing_code);
+
+-- 入出庫（このテーブルが在庫の唯一の正）
+create sequence if not exists equipment_txn_no_seq;
+
+create table if not exists equipment_transactions (
+  id          uuid primary key default gen_random_uuid(),
+  -- 問い合わせ・調査で特定しやすい短い連番（tasks.task_no と同じ考え方。画面上は「E-123」）
+  txn_no      bigint not null unique default nextval('equipment_txn_no_seq'),
+  item_id     uuid not null references equipment_items(id),
+  kind        text not null check (kind in ('in', 'out')),
+  -- in : procure=調達 / deferred=繰延登録 / adjust=在庫調整
+  -- out: tenant=テナント設置 / common=共用部設置 / replace=新規入替 / discard=不良品処分
+  reason      text not null check (reason in
+                ('procure','deferred','adjust','tenant','common','replace','discard')),
+  occurred_at timestamptz not null,            -- 入出庫日時（日付＋時刻）
+  -- 入庫は正（在庫調整のみ負を許す）／出庫は正。0 は許さない
+  quantity    int not null check (quantity <> 0),
+  supplier    text,                            -- 調達先（入庫）※実データでは未使用
+  -- テナント設置＝請求対象。この欄が入っている＝そのテナントへ請求する、という意味を持つ
+  tenant_id   uuid references equipment_tenants(id),
+  -- 名称・コードは記録時点のスナップショットも持つ（テナントの改称・退去後も帳票と請求履歴が崩れない）
+  tenant_code text,
+  tenant_name text,                            -- 正式名称（修理伝票用）
+  tenant_short_name text,                      -- 略称（請求データ用。現行の表記に合わせる）
+  -- 階・場所は「どこに設置したか」であって請求とは無関係。共用部設置に加え、
+  -- 新規入替でも実際に使われている（8-4(2)）ため、reason では縛らない
+  floor       text,                            -- 設置階（テナント設置時はテナントの階を写す）
+  location    text,                            -- 設置場所（喫煙室 / 通路 / 玄関ホール …）
+  staff_name  text,                            -- 担当者（複数名は「廣畑・岡田」のように1欄）
+  signature_key text,                          -- 署名画像の Storage キー（テナント設置のみ）
+  -- 署名を受け取った時刻。移行データは FileMaker の受領タイムスタンプをそのまま入れる。
+  -- 「signed_at あり・signature_key なし」＝署名済みだが画像は現行 FileMaker 側
+  signed_at   timestamptz,
+  -- 移行元 FileMaker の「入出荷ID」。再取込の冪等性と、問い合わせ時の突合のために持つ
+  legacy_txn_id int unique,
+  note        text,
+  created_by  uuid references users(id),
+  updated_by  uuid references users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  -- 区分と理由の整合（入庫の理由で出庫を登録する等の取り違えを DB 側でも止める）
+  constraint equipment_txn_kind_reason check (
+    (kind = 'in'  and reason in ('procure','deferred','adjust')) or
+    (kind = 'out' and reason in ('tenant','common','replace','discard'))
+  ),
+  -- 負数は在庫調整のときだけ
+  constraint equipment_txn_negative_only_adjust check (quantity > 0 or reason = 'adjust'),
+  -- 署名はテナント設置のときだけ持つ
+  constraint equipment_txn_signature_only_tenant check (signature_key is null or reason = 'tenant')
+  -- 「請求先（tenant_id等）を持てるのはテナント設置のときだけ」は、あえて DB の CHECK 制約には
+  -- しない。過去データに例外が実在したことに加え、この業務ルールは「新規登録の画面でテナントを
+  -- 選ばせない」という入力制御が本質であり、DB が一律拒否すると移行のたびに手当てが要る。
+  -- worker/lib/equipment.js の保存時バリデーション（アプリ層）でのみ強制する（docs/equipment-plan.md 4-1）
+);
+create index if not exists equipment_txn_item_idx     on equipment_transactions (item_id, occurred_at desc);
+create index if not exists equipment_txn_occurred_idx on equipment_transactions (occurred_at desc);
+create index if not exists equipment_txn_tenant_idx   on equipment_transactions (tenant_code, occurred_at desc);
+
+drop trigger if exists equipment_transactions_set_updated_at on equipment_transactions;
+create trigger equipment_transactions_set_updated_at before update on equipment_transactions
+  for each row execute function set_updated_at();
+
+-- 既存方針どおり anon/authenticated からは一切触れない（Worker の service role 経由のみ）
+alter table equipment_categories   enable row level security;
+alter table equipment_items        enable row level security;
+alter table equipment_tenants      enable row level security;
+alter table equipment_transactions enable row level security;
+revoke all on equipment_categories, equipment_items, equipment_tenants, equipment_transactions
+  from anon, authenticated;
+
+-- 現在庫（PostgREST から group by 相当が使えないためビューで持つ）
+create or replace view equipment_stock as
+  select i.id as item_id,
+         coalesce(sum(case when t.kind = 'in' then t.quantity else -t.quantity end), 0)::int as stock_qty,
+         max(t.occurred_at) as last_moved_at
+    from equipment_items i
+    left join equipment_transactions t on t.item_id = i.id
+   group by i.id;
+
+-- 年計（画面の「年計： 52  8」）。年は JST 基準
+create or replace view equipment_yearly_totals as
+  select item_id,
+         extract(year from (occurred_at at time zone 'Asia/Tokyo'))::int as year,
+         sum(case when kind = 'in'  then quantity else 0 end)::int as in_qty,
+         sum(case when kind = 'out' then quantity else 0 end)::int as out_qty
+    from equipment_transactions
+   group by 1, 2;
+
+-- create or replace はビューの権限を PUBLIC に戻すことがあるため、変更のたびに revoke を必ずセットで流す
+revoke all on equipment_stock, equipment_yearly_totals from anon, authenticated;

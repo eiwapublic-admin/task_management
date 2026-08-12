@@ -1,0 +1,132 @@
+/* 備品管理（Phase 1。2026-08-12〜）共通スタイル。
+   在庫一覧・入出庫モーダル・履歴・マスタ画面で使う。docs/ui-standard.md 準拠。 */
+
+.equipment-stock-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.equipment-stock-group-head {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.equipment-stock-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.equipment-stock-rows li + li { border-top: 1px solid var(--border); }
+
+.equipment-stock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-strong);
+}
+.equipment-stock-row:hover { background: var(--bg-subtle); }
+
+.equipment-stock-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+}
+
+.equipment-stock-code {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.equipment-stock-qty {
+  flex: 0 0 auto;
+  min-width: 2.5em;
+  text-align: right;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.equipment-stock-qty.is-danger { color: var(--color-danger); }
+.equipment-stock-qty.is-muted { color: var(--text-faint); font-weight: 400; }
+
+.equipment-toggle-disabled {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/* 入出庫モーダルの理由選択（择一ボタン） */
+.equipment-reason-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.equipment-reason-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.equipment-reason-btn.is-active {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+/* 履歴画面 */
+.equipment-history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0;
+}
+.equipment-history-head h3 { margin: 0; font-size: var(--fs-lg); }
+.equipment-history-stat { font-size: var(--fs-sm); color: var(--text-muted); }
+.equipment-history-stat strong { color: var(--text-strong); font-size: var(--fs-md); }
+
+.equipment-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+}
+
+.equipment-master-group-head {
+  background: var(--bg-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.equipment-history-in { color: var(--color-brand); font-weight: 600; }
+.equipment-history-out { color: var(--color-primary); font-weight: 600; }
+.equipment-history-row { cursor: pointer; }
+.equipment-history-row:hover { background: var(--bg-subtle); }

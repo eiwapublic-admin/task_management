@@ -41,6 +41,19 @@ import {
   handleChlorineUpdate,
   handleChlorineDelete,
 } from './lib/reports.js'
+import {
+  handleEquipmentCategoryList,
+  handleEquipmentCategorySave,
+  handleEquipmentItemList,
+  handleEquipmentItemCreate,
+  handleEquipmentItemUpdate,
+  handleEquipmentItemDelete,
+  handleEquipmentTransactionList,
+  handleEquipmentTransactionCreate,
+  handleEquipmentTransactionUpdate,
+  handleEquipmentTransactionDelete,
+  handleEquipmentSuggest,
+} from './lib/equipment.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -961,6 +974,30 @@ async function route(req, env) {
     if (req.method === 'PATCH') return handleChlorineUpdate(req)
     if (req.method === 'DELETE') return handleChlorineDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- 備品管理（Phase 1。2026-08-12〜。ハンドラは worker/lib/equipment.js） ---
+  if (pathname === '/api/equipment/categories') {
+    if (req.method === 'GET') return handleEquipmentCategoryList(req)
+    if (req.method === 'PUT') return handleEquipmentCategorySave(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/items') {
+    if (req.method === 'GET') return handleEquipmentItemList(req)
+    if (req.method === 'POST') return handleEquipmentItemCreate(req)
+    if (req.method === 'PATCH') return handleEquipmentItemUpdate(req)
+    if (req.method === 'DELETE') return handleEquipmentItemDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/transactions') {
+    if (req.method === 'GET') return handleEquipmentTransactionList(req)
+    if (req.method === 'POST') return handleEquipmentTransactionCreate(req)
+    if (req.method === 'PATCH') return handleEquipmentTransactionUpdate(req)
+    if (req.method === 'DELETE') return handleEquipmentTransactionDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/suggest') {
+    return req.method === 'GET' ? handleEquipmentSuggest(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

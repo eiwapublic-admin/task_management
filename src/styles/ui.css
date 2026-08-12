@@ -785,3 +785,4 @@
   line-height: var(--leading-normal);
   color: var(--text-muted);
 }
+.ui-note.is-danger { color: var(--color-danger); }
