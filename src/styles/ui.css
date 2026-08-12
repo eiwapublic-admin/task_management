@@ -11,7 +11,7 @@
      1. ページの骨格   .ui-page / .ui-container / .ui-toolbar / .ui-page-title
      2. ボタン         .btn-primary / .btn-plain / .btn-danger / .icon-btn-*
      3. セグメント切替 .ui-segmented
-     4. 入力欄         .ui-field / .ui-input / .ui-select / .ui-textarea
+     4. 入力欄         .ui-field / .ui-input / .ui-select / .ui-textarea / .ui-combobox
      5. カード         .ui-card / .ui-card-title
      6. 表             .ui-table
      7. バッジ         .ui-badge
@@ -485,6 +485,51 @@
 
 .ui-input::placeholder,
 .ui-textarea::placeholder { color: var(--text-faint); }
+
+/* 数値入力のスピンボタン（上下矢印）を消す。Mac Safari 等でクリックの挙動が不安定に
+   見えることがあり（2026-08-12、備品の数量欄で報告）、そもそもこのアプリでは
+   キーボード入力を主にしているため、無くても困らない */
+.ui-input[type='number'] { -moz-appearance: textfield; }
+.ui-input[type='number']::-webkit-outer-spin-button,
+.ui-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* テキスト入力＋候補選択（Combobox.jsx）。<input list>+<datalist> は Safari で
+   実機の挙動が大きく崩れるため使わない（2026-08-12）。この組み合わせで代替する */
+.ui-combobox { position: relative; }
+.ui-combobox-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-raised);
+}
+.ui-combobox-list li + li { margin-top: var(--space-05); }
+.ui-combobox-list button {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: none;
+  border-radius: var(--radius-control);
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+.ui-combobox-list button:hover { background: var(--bg-subtle); color: var(--color-primary); }
 
 /* 表の行内など、密度が要るところ */
 .ui-input.is-compact,

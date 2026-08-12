@@ -94,6 +94,12 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+/* 選択肢が4つ（テナント/共用部/不良品/新規入替）でもiPhone幅で1行に収まるよう、
+   このボタン列だけ左右パディングを詰める（2026-08-12） */
+.equipment-reason-toggle .btn-plain {
+  padding: 0 var(--space-3);
+  flex: 1 1 0;
+}
 .equipment-reason-btn.is-active {
   background: var(--color-brand-soft);
   color: var(--color-brand);
@@ -129,11 +135,23 @@
 .signature-pad-canvas {
   width: 100%;
   max-height: 100%;
-  border: 1px solid var(--border-strong);
+  border: 2px solid var(--text-muted);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
+  /* テナント様に「ここに書いてください」と一目で伝わるよう、枠の内側が
+     少し凹んで見える影を付ける（2026-08-12。単なる罫線だと入力欄に見えにくいとの指摘） */
+  box-shadow: inset 0 2px 5px rgba(17, 24, 39, 0.18), inset 0 0 0 1px rgba(17, 24, 39, 0.04);
   touch-action: none;
   cursor: crosshair;
+}
+
+/* 「受領サイン」ラベル。テナント様への案内箇所なので他のラベルより濃く・太くする。
+   .ui-field > span（ui.css）と詳細度が同点だとそちらが後勝ちすることがあるため、
+   親子セレクタで明示的に上書きする */
+.ui-field > .equipment-signature-label {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
 }
 .signature-pad-actions {
   display: flex;
@@ -177,3 +195,23 @@
 .equipment-history-out { color: var(--color-primary); font-weight: 600; }
 .equipment-history-row { cursor: pointer; }
 .equipment-history-row:hover { background: var(--bg-subtle); }
+
+/* 入出庫明細の表（在庫一覧のその場展開・備品履歴で共通）。
+   2026-08-12: 日本語ラベルは空白を含まないため、狭い列だと1文字ずつ縦に折り返って
+   しまう（ブラウザの行分割規則でCJK文字間は改行可能点になるため）。折り返さず、
+   横スクロールで見せる。あわせて先頭列（日付）だけ横スクロールでも常に見えるよう
+   固定する（frozen column。.ui-table-wrap の overflow-x: auto が基準になる） */
+.equipment-txn-table th,
+.equipment-txn-table td {
+  white-space: nowrap;
+}
+.equipment-txn-table th:first-child,
+.equipment-txn-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+.equipment-txn-table th:first-child { background: var(--bg-subtle); }
+.equipment-txn-table td:first-child { background: var(--bg-surface); }
+.equipment-txn-table .equipment-history-row:hover td:first-child { background: var(--bg-subtle); }

@@ -10,6 +10,7 @@ import {
   fetchEquipmentItems,
   fetchEquipmentTransactions,
   deleteEquipmentTransaction,
+  formatEquipmentDate,
 } from '../lib/equipment'
 import './Dashboard.css'
 import './Equipment.css'
@@ -72,17 +73,6 @@ export default function EquipmentItemHistory() {
     }
   }
 
-  function formatDate(value) {
-    return new Date(value).toLocaleString('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
   return (
     <div className="ui-page">
       <AppHeader />
@@ -140,7 +130,7 @@ export default function EquipmentItemHistory() {
               <p className="ui-empty">この期間の入出庫記録はありません。</p>
             ) : (
               <div className="ui-table-wrap">
-                <table className="ui-table">
+                <table className="ui-table equipment-txn-table">
                   <thead>
                     <tr>
                       <th>日付</th>
@@ -159,7 +149,7 @@ export default function EquipmentItemHistory() {
                         className={readOnly ? '' : 'equipment-history-row'}
                         onClick={readOnly ? undefined : () => setEditing(t)}
                       >
-                        <td>{formatDate(t.occurred_at)}</td>
+                        <td>{formatEquipmentDate(t.occurred_at)}</td>
                         <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
                         <td className="is-numeric equipment-history-in">{t.kind === 'in' ? t.quantity : ''}</td>
                         <td className="is-numeric equipment-history-out">{t.kind === 'out' ? t.quantity : ''}</td>
