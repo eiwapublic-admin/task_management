@@ -95,12 +95,26 @@ export default function AppHeader() {
     }
   }
 
-  // 現在どちらのセクションを見ているか（2026-08-04。日報機能の追加に伴う切替）。
-  // 日報系のパスは /reports 配下にまとめている。window.location ではなく useLocation を
-  // 使い、クライアント側遷移でも確実に再評価されるようにする。
-  const inReports = location.pathname.startsWith('/reports')
-  // owner（小泉産業様）は日報のみ。タスク管理のメニュー・切替は出さない
+  // 現在どのセクションを見ているか。'tasks' | 'reports' | 'equipment' の3値
+  // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理の追加でセクションが1つ増えた）。
+  // 各セクションのパスは /reports・/equipment 配下にまとめている。window.location ではなく
+  // useLocation を使い、クライアント側遷移でも確実に再評価されるようにする。
+  const section = location.pathname.startsWith('/equipment')
+    ? 'equipment'
+    : location.pathname.startsWith('/reports')
+      ? 'reports'
+      : 'tasks'
+  const inReports = section === 'reports'
+  const inEquipment = section === 'equipment'
+  // owner（小泉産業様）は日報・備品（閲覧のみ）。タスク管理のメニュー・切替は出さない
   const isOwner = user?.role === 'owner'
+  // セクション切替の選択肢。owner には「タスク」を出さない（2026-08-12、備品セクションの追加で
+  // owner にもセクション切替そのものが必要になった。従来は日報1本だったため切替UI自体が無かった）
+  const sections = [
+    ...(isOwner ? [] : [{ key: 'tasks', label: 'タスク', path: '/' }]),
+    { key: 'reports', label: '日報', path: '/reports' },
+    { key: 'equipment', label: '備品', path: '/equipment' },
+  ]
 
   return (
     <>
@@ -120,52 +134,38 @@ export default function AppHeader() {
             <h1>栄和　タスク管理システム</h1>
             <span className="dashboard-version">ver.{formatBuildTime()}</span>
           </div>
-          {!isOwner && (
-            <nav className="ui-segmented on-dark app-switch" aria-label="表示するセクション">
+          <nav className="ui-segmented on-dark app-switch" aria-label="表示するセクション">
+            {sections.map((s) => (
               <button
+                key={s.key}
                 type="button"
-                className={`ui-segmented-btn${inReports ? '' : ' is-active'}`}
-                aria-current={inReports ? undefined : 'page'}
-                onClick={() => goTo('/')}
+                className={`ui-segmented-btn${section === s.key ? ' is-active' : ''}`}
+                aria-current={section === s.key ? 'page' : undefined}
+                onClick={() => goTo(s.path)}
               >
-                タスク
+                {s.label}
               </button>
-              <button
-                type="button"
-                className={`ui-segmented-btn${inReports ? ' is-active' : ''}`}
-                aria-current={inReports ? 'page' : undefined}
-                onClick={() => goTo('/reports')}
-              >
-                日報
-              </button>
-            </nav>
-          )}
+            ))}
+          </nav>
         </div>
         {/* 狭幅ではヘッダーが2行に折り返り、通常はヘッダー右側（ユーザー名・ハンバーガー）
             だけが2行目に単独で残るため space-between が効かず左寄りに表示されていた
-            （2026-08-07）。同じタスク/日報切替をモバイル専用にもう1つ用意し、2行目の
+            （2026-08-07）。同じセクション切替をモバイル専用にもう1つ用意し、2行目の
             もう一方の要素にすることで、切替＝左端／ハンバーガー側＝右端に振り分ける。
             desktop幅では常に非表示（.app-switch-mobile参照） */}
-        {!isOwner && (
-          <nav className="ui-segmented on-dark app-switch app-switch-mobile" aria-label="表示するセクション">
+        <nav className="ui-segmented on-dark app-switch app-switch-mobile" aria-label="表示するセクション">
+          {sections.map((s) => (
             <button
+              key={s.key}
               type="button"
-              className={`ui-segmented-btn${inReports ? '' : ' is-active'}`}
-              aria-current={inReports ? undefined : 'page'}
-              onClick={() => goTo('/')}
+              className={`ui-segmented-btn${section === s.key ? ' is-active' : ''}`}
+              aria-current={section === s.key ? 'page' : undefined}
+              onClick={() => goTo(s.path)}
             >
-              タスク
+              {s.label}
             </button>
-            <button
-              type="button"
-              className={`ui-segmented-btn${inReports ? ' is-active' : ''}`}
-              aria-current={inReports ? 'page' : undefined}
-              onClick={() => goTo('/reports')}
-            >
-              日報
-            </button>
-          </nav>
-        )}
+          ))}
+        </nav>
         <div className="dashboard-header-right">
           {user?.display_name && <span className="dashboard-user">{user.display_name} さん</span>}
           <div className="dashboard-menu" ref={menuRef}>
@@ -180,7 +180,15 @@ export default function AppHeader() {
               <span className="dashboard-menu-icon" aria-hidden="true"></span>
             </button>
             <div className={`dashboard-actions${menuOpen ? ' is-open' : ''}`}>
-              {inReports || isOwner ? (
+              {inEquipment ? (
+                <>
+                  {/* 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
+                      （マスタ編集は出さない。docs/equipment-plan.md 5-0） */}
+                  <button onClick={() => goTo('/equipment')}>在庫一覧</button>
+                  {!isOwner && <button onClick={() => goTo('/equipment/items')}>備品マスタ</button>}
+                  {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
+                </>
+              ) : inReports || isOwner ? (
                 <>
                   {/* 自主検査表は日報一覧画面の見える位置に移動済み（2026-08-05）。
                       ここには日報セクションへ戻る導線だけを残す */}
@@ -201,7 +209,7 @@ export default function AppHeader() {
                 </>
               )}
               <div className="dashboard-menu-divider" role="separator" />
-              {!inReports && !isOwner && (
+              {!inReports && !inEquipment && !isOwner && (
                 <button onClick={handleRunFetch} disabled={fetching}>
                   {fetching ? '取得中…' : '今すぐ取得'}
                 </button>
