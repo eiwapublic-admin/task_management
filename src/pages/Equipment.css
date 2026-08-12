@@ -40,17 +40,14 @@
   font: inherit;
   color: var(--text-strong);
 }
-/* 備品の切り替わり位置が一目でわかるよう、カンバンの「完了」ステータスと同じグリーンにする
-   （2026-08-12。実機フィードバックで薄くて区切りが見づらいとの指摘 → --bg-muted で反映済み
-   → さらに目立たせたいとの要望で --status-done に変更。地の色が濃くなった分、文字色も
-   白系に揃えて読める組み合わせにする） */
+/* 備品の切り替わり位置が一目でわかるよう、カンバンの「完了」列と同じ淡いグリーンにする
+   （2026-08-12。実機フィードバックで薄くて区切りが見づらい → --bg-muted で反映
+   → --status-done そのままだと彩度が高くけばしいとの指摘 → カンバンの列背景と同じ
+   color-mix式（KanbanBoard.css の .kanban-column）に変更。文字色は据え置きでよい淡さ） */
 .equipment-stock-row.is-static {
   border-bottom: 1px solid var(--border);
-  background: var(--status-done);
-  color: var(--ink-on-fill);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
 }
-.equipment-stock-row.is-static .equipment-stock-code { color: color-mix(in srgb, var(--ink-on-fill) 75%, transparent); }
-.equipment-stock-row.is-static .equipment-stock-qty.is-muted { color: color-mix(in srgb, var(--ink-on-fill) 60%, transparent); }
 
 .equipment-stock-detail { padding: var(--space-3) var(--space-4); }
 .equipment-stock-detail .ui-empty { padding: var(--space-2) 0; text-align: left; }
