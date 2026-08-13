@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
-import useStickyHeightVar from '../lib/useStickyHeightVar'
+import FeatureHeader from '../components/FeatureHeader'
 import {
   IconDownload,
   IconCar,
@@ -115,10 +115,9 @@ export default function ReportList() {
   const [isWideScreen, setIsWideScreen] = useState(
     () => typeof window === 'undefined' || window.matchMedia(WIDE_SCREEN_QUERY).matches,
   )
-  // ツールバー（＋開いていれば検索欄）をAppHeaderの下に固定表示するための2段目
-  // （2026-08-11）。カレンダー型の曜日行はさらにその下の3段目として重ねる
-  // （.report-calendar-head の .ui-sticky-head-2。renderCalendar 内）
-  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
+  // 機能ヘッダ（＋開いていれば検索欄）を AppHeader の下に固定表示する2段目は
+  // FeatureHeader が受け持つ（高さの実測も含む。2026-08-12）。カレンダー型の曜日行は
+  // さらにその下の3段目として重ねる（.report-calendar-head の .ui-sticky-head-2。renderCalendar 内）
 
   useEffect(() => {
     if (typeof window !== 'undefined') sessionStorage.setItem(VIEW_STORAGE_KEY, view)
@@ -565,134 +564,137 @@ export default function ReportList() {
       {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
       <div className={`ui-container reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ' is-narrow'}`}>
-        {/* ツールバー（＋検索欄）はAppHeaderの下に固定表示する（2026-08-11） */}
-        <div className="ui-sticky-head" ref={stickyHeadRef}>
-        <div className="ui-toolbar reports-toolbar">
-          <h2 className="ui-page-title">日報</h2>
-          <div className="inspection-month">
-            <button
-              type="button"
-              className="icon-btn-nav"
-              onClick={() => setMonth(shiftMonth(month, -1))}
-              aria-label="前月"
-              title="前月"
-            >
-              <IconChevronLeft size={28} />
-            </button>
-            <span className="inspection-month-label">{month.replace('-', '年')}月</span>
-            <button
-              type="button"
-              className="icon-btn-nav"
-              onClick={() => setMonth(shiftMonth(month, 1))}
-              aria-label="翌月"
-              title="翌月"
-            >
-              <IconChevronRight size={28} />
-            </button>
-          </div>
-          <div className="ui-toolbar-actions reports-toolbar-actions">
-            {/* 表示切替（リスト型／カレンダー型）。カレンダー型はマス目が狭くなりすぎるため
-                PC/iPad幅でのみ選べるようにし、スマートフォン幅では切替自体を出さない（2026-08-07） */}
-            {isWideScreen && (
-              <div className="ui-segmented" role="group" aria-label="表示の切り替え">
+        {/* 機能ヘッダ（AppHeader の下に固定表示）。機能名「日報」はアプリヘッダの
+            タイトルが示すので、ここではタイトルを置かない（2026-08-12）。
+            左＝年月の移動・表示切替・検索、右＝機能ボタン。開閉する検索欄は
+            children としてこのヘッダーに追従させる */}
+        <FeatureHeader
+          filters={
+            <>
+              <div className="inspection-month">
                 <button
                   type="button"
-                  className={`ui-segmented-btn${view === 'list' ? ' is-active' : ''}`}
-                  aria-pressed={view === 'list'}
-                  onClick={() => setView('list')}
+                  className="icon-btn-nav"
+                  onClick={() => setMonth(shiftMonth(month, -1))}
+                  aria-label="前月"
+                  title="前月"
                 >
-                  <IconList size={18} />
-                  リスト
+                  <IconChevronLeft size={28} />
                 </button>
+                <span className="inspection-month-label">{month.replace('-', '年')}月</span>
                 <button
                   type="button"
-                  className={`ui-segmented-btn${view === 'calendar' ? ' is-active' : ''}`}
-                  aria-pressed={view === 'calendar'}
-                  onClick={() => setView('calendar')}
+                  className="icon-btn-nav"
+                  onClick={() => setMonth(shiftMonth(month, 1))}
+                  aria-label="翌月"
+                  title="翌月"
                 >
-                  <IconCalendar size={18} />
-                  カレンダー
+                  <IconChevronRight size={28} />
                 </button>
               </div>
-            )}
-            {/* 作業記録の検索（2026-08-08）。押すと下に検索欄が開く。「自主検査」ボタンの
-                左側に置く指定のため、ボタン群の並びの中でこの位置にしている */}
-            <button
-              type="button"
-              className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
-              onClick={handleToggleSearch}
-              aria-label="作業記録を検索"
-              aria-pressed={searchOpen}
-              title="作業記録を検索"
-            >
-              <IconSearch size={20} />
-            </button>
-            <button
-              type="button"
-              className="btn-plain"
-              onClick={() => navigate('/reports/parking')}
-              title="違反車両一覧"
-            >
-              <IconCar size={18} />
-              <span className="btn-plain-label">違反車両</span>
-            </button>
-            {/* 残留塩素等検査（2026-08-10）。入力も帳票PDFの出力も専用画面で行う */}
-            <button
-              type="button"
-              className="btn-plain"
-              onClick={() => navigate('/reports/chlorine')}
-              title="残留塩素等検査"
-            >
-              <IconDroplet size={18} />
-              <span className="btn-plain-label">残留塩素</span>
-            </button>
-            {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
-                その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
-                （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
-                アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
-                ハンバーガーメニューに入れず見える位置に置く方針（2026-08-05）は維持。
-                キャプションは「自主検査PDF」から「自主検査」に短縮した（2026-08-08）。
-                iPhone幅では文字を隠しアイコンのみにする（下の.btn-plain-label参照。2026-08-10）。
-                ツールバーの右端に配置する（2026-08-10。他のPDFボタンより先に押されやすい
-                位置だったため、末尾に移動してほしいとの依頼） */}
-            <button
-              type="button"
-              className="btn-plain"
-              onClick={pdf.download}
-              disabled={pdf.busy}
-              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
-            >
-              <IconDownload size={18} />
-              <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
-            </button>
-          </div>
-        </div>
-
-        {searchOpen && (
-          <div className="reports-search-bar">
-            <IconSearch size={18} />
-            <input
-              type="search"
-              className="reports-search-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="作業記録を検索"
-              aria-label="作業記録を検索"
-              autoFocus
-            />
-            {searchQuery && (
+              {/* 表示切替（リスト型／カレンダー型）。カレンダー型はマス目が狭くなりすぎるため
+                  PC/iPad幅でのみ選べるようにし、スマートフォン幅では切替自体を出さない（2026-08-07） */}
+              {isWideScreen && (
+                <div className="ui-segmented" role="group" aria-label="表示の切り替え">
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${view === 'list' ? ' is-active' : ''}`}
+                    aria-pressed={view === 'list'}
+                    onClick={() => setView('list')}
+                  >
+                    <IconList size={18} />
+                    リスト
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${view === 'calendar' ? ' is-active' : ''}`}
+                    aria-pressed={view === 'calendar'}
+                    onClick={() => setView('calendar')}
+                  >
+                    <IconCalendar size={18} />
+                    カレンダー
+                  </button>
+                </div>
+              )}
+              {/* 作業記録の検索（2026-08-08）。押すと下に検索欄が開く。絞り込みの操作なので
+                  機能ボタン側ではなく左側（表示条件のグループ）に置く（2026-08-12） */}
               <button
                 type="button"
-                className="reports-search-clear"
-                onClick={() => setSearchQuery('')}
-                aria-label="検索文字をクリア"
+                className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
+                onClick={handleToggleSearch}
+                aria-label="作業記録を検索"
+                aria-pressed={searchOpen}
+                title="作業記録を検索"
               >
-                ×
+                <IconSearch size={20} />
               </button>
-            )}
-          </div>
-        )}
-        </div>
+            </>
+          }
+          actions={
+            <>
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={() => navigate('/reports/parking')}
+                title="違反車両一覧"
+              >
+                <IconCar size={18} />
+                <span className="btn-plain-label">違反車両</span>
+              </button>
+              {/* 残留塩素等検査（2026-08-10）。入力も帳票PDFの出力も専用画面で行う */}
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={() => navigate('/reports/chlorine')}
+                title="残留塩素等検査"
+              >
+                <IconDroplet size={18} />
+                <span className="btn-plain-label">残留塩素</span>
+              </button>
+              {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
+                  その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
+                  （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
+                  アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
+                  ツールバーの右端に配置する（2026-08-10。他のPDFボタンより先に押されやすい
+                  位置だったため、末尾に移動してほしいとの依頼） */}
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={pdf.download}
+                disabled={pdf.busy}
+                title="紙の様式でPDFに出力する（半月ごとに1ページ）"
+              >
+                <IconDownload size={18} />
+                <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
+              </button>
+            </>
+          }
+        >
+          {searchOpen && (
+            <div className="reports-search-bar">
+              <IconSearch size={18} />
+              <input
+                type="search"
+                className="reports-search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="作業記録を検索"
+                aria-label="作業記録を検索"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="reports-search-clear"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="検索文字をクリア"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+        </FeatureHeader>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

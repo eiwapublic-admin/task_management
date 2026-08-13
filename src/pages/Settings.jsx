@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import SettingsPanel from '../components/SettingsPanel'
 import { fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
@@ -59,15 +60,22 @@ export default function Settings() {
     <div className="ui-page settings-page">
       <AppHeader />
       <div className="settings-container">
-        <div className="settings-toolbar">
-          <h2 className="ui-page-title">設定</h2>
-          <span className="settings-saved" role="status" aria-live="polite">
-            {status}
-          </span>
-          <button className="btn-save" type="submit" form="settings-form">
-            保存
-          </button>
-        </div>
+        {/* 機能ヘッダ（2026-08-12）。この画面はウインドウ高さに収める設計で本体が
+            スクロールしないため固定表示は効かないが、構成（左＝現在地／右＝操作）は
+            他画面と揃えておく */}
+        <FeatureHeader
+          className="is-flush settings-head"
+          actions={
+            <>
+              <span className="settings-saved" role="status" aria-live="polite">
+                {status}
+              </span>
+              <button className="btn-primary" type="submit" form="settings-form">
+                保存
+              </button>
+            </>
+          }
+        />
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}

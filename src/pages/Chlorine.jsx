@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import ChlorineForm from '../components/ChlorineForm'
 import useChlorinePdfExport from '../hooks/useChlorinePdfExport'
 import { IconHome, IconDownload, IconDroplet } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
-import useStickyHeightVar from '../lib/useStickyHeightVar'
 import {
   CHLORINE_BUILDINGS,
   CHLORINE_JUDGEMENT_ITEMS,
@@ -46,8 +46,6 @@ export default function Chlorine() {
   // 入力モーダル。'new' なら新規、レコードなら編集
   const [editing, setEditing] = useState(null)
   const pdf = useChlorinePdfExport(year, pdfBuilding)
-  // ツールバー＋年月・施設・PDF出力欄をAppHeaderの下に固定表示する（2026-08-11）
-  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -126,69 +124,70 @@ export default function Chlorine() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
-        {/* ツールバー＋年月・施設・PDF出力欄はAppHeaderの下に固定表示する（2026-08-11） */}
-        <div className="ui-sticky-head" ref={stickyHeadRef}>
-        <div className="reports-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/reports')}
-            aria-label="日報一覧に戻る"
-            title="日報一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">残留塩素等検査</h2>
-          <div className="reports-toolbar-actions">
-            {!readOnly && (
-              <button type="button" className="btn-primary" onClick={() => setEditing('new')}>
-                <IconDroplet size={18} />
-                測定を記録
+        {/* 機能ヘッダ（2026-08-12）。左＝表示対象年・帳票の対象施設、右＝機能ボタン
+            （記録する／PDF出力）。日報のサブ画面なので、現在地が分かるよう title を置く。
+            iPhone幅でも収まるよう、PDF出力はアイコンのみのボタンにしている（2026-08-10） */}
+        <FeatureHeader
+          leading={
+            <button
+              type="button"
+              className="icon-btn-home"
+              onClick={() => navigate('/reports')}
+              aria-label="日報一覧に戻る"
+              title="日報一覧に戻る"
+            >
+              <IconHome size={32} />
+            </button>
+          }
+          filters={
+            <>
+              <label className="report-field chlorine-year-field">
+                <span>表示対象年</span>
+                <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y} 年
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="report-field chlorine-building-filter-field">
+                <span>測定施設</span>
+                <select value={pdfBuilding} onChange={(e) => setPdfBuilding(e.target.value)}>
+                  {CHLORINE_BUILDINGS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          }
+          actions={
+            <>
+              {!readOnly && (
+                <button type="button" className="btn-primary" onClick={() => setEditing('new')}>
+                  <IconDroplet size={18} />
+                  測定を記録
+                </button>
+              )}
+              <button
+                type="button"
+                className="icon-btn-download chlorine-pdf-btn"
+                onClick={pdf.download}
+                disabled={pdf.busy || loading}
+                aria-label="残留塩素等検査一覧表をPDF出力"
+                title={
+                  pdf.busy
+                    ? '作成中…'
+                    : `${year}年の${pdfBuilding}分を「残留塩素等検査実施記録表」としてPDFに出力する`
+                }
+              >
+                <IconDownload size={20} />
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* 年（一覧の絞り込み・帳票の対象年を兼ねる）・帳票の出力対象施設・PDF出力を1行にまとめる。
-            iPhone幅でも折り返さず収まるよう、施設フィルタは置かず出力ボタンもアイコンのみにした
-            （2026-08-10。「帳票の出力」の見出しラベルも省略） */}
-        <div className="chlorine-controls">
-          <label className="report-field chlorine-year-field">
-            <span>表示対象年</span>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y} 年
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="report-field chlorine-building-filter-field">
-            <span>測定施設</span>
-            <select value={pdfBuilding} onChange={(e) => setPdfBuilding(e.target.value)}>
-              {CHLORINE_BUILDINGS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="icon-btn-download chlorine-pdf-btn"
-            onClick={pdf.download}
-            disabled={pdf.busy || loading}
-            aria-label="残留塩素等検査一覧表をPDF出力"
-            title={
-              pdf.busy
-                ? '作成中…'
-                : `${year}年の${pdfBuilding}分を「残留塩素等検査実施記録表」としてPDFに出力する`
-            }
-          >
-            <IconDownload size={20} />
-          </button>
-        </div>
-        </div>
+            </>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

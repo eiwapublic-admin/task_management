@@ -144,6 +144,53 @@ export function IconDroplet(props) {
   )
 }
 
+// --- ダッシュボード（ポータル）の機能アイコン（2026-08-12）--------------------
+
+// タスク（カンバン）。3列のボードを模した形
+export function IconKanban(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="5" height="16" rx="1" />
+      <rect x="9.5" y="4" width="5" height="10" rx="1" />
+      <rect x="16" y="4" width="5" height="13" rx="1" />
+    </Icon>
+  )
+}
+
+// 備品（在庫）。箱を模した形
+export function IconBox(props) {
+  return (
+    <Icon {...props}>
+      <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" />
+      <path d="M3 7.5 12 12l9-4.5" />
+      <path d="M12 12v9" />
+    </Icon>
+  )
+}
+
+// アーカイブ（完了・スパムの保管）
+export function IconArchive(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
+    </Icon>
+  )
+}
+
+// 従量課金事項（利用料金）
+export function IconYen(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 7.5 12 12l3.5-4.5" />
+      <path d="M12 12v4.5" />
+      <path d="M9 13h6M9 15.5h6" />
+    </Icon>
+  )
+}
+
 // 日報一覧の作業記録検索（2026-08-08）
 export function IconSearch(props) {
   return (

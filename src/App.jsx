@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
+import Portal from './pages/Portal'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Logs from './pages/Logs'
@@ -37,6 +38,20 @@ function App() {
       <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* ダッシュボード 兼 ポータル（2026-08-12）。各機能への入口。
+            アプリ起動時の既定表示はカンバン（/）のままにしてあり、この画面へは
+            ヘッダーのロゴ（またはハンバーガーメニュー）から入る。
+            owner（小泉産業様）も自分が見られる機能のカードだけを見られる */}
+        <Route
+          path="/portal"
+          element={
+            <RequireAuth>
+              <Portal />
+            </RequireAuth>
+          }
+        />
+        {/* 起動時の既定表示。カンバン以外はまだ正式リリースではないため、
+            ルート（/）はダッシュボードではなくカンバンのままにしている */}
         <Route
           path="/"
           element={

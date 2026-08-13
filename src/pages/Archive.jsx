@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import TaskDetail from '../components/TaskDetail'
 import { fetchArchive, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
 import { updateTask } from '../lib/api'
@@ -9,7 +10,6 @@ import { formatDate, formatDateTime } from '../lib/format'
 import { channelIconSrc, channelLabel, CHANNEL_OPTIONS } from '../lib/channel'
 import { formatTaskId } from '../lib/taskId'
 import { STATUS_LIST, UNASSIGNED } from '../lib/status'
-import useStickyHeightVar from '../lib/useStickyHeightVar'
 import './Dashboard.css'
 
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
@@ -38,8 +38,8 @@ export default function Archive() {
   const [appliedQ, setAppliedQ] = useState('')
 
   const [selectedTask, setSelectedTask] = useState(null)
-  // タイトル＋絞り込みをAppHeaderの下に固定表示し、表の列見出しはさらにその下に重ねる（2026-08-11）
-  const stickyHeadRef = useStickyHeightVar('--sticky2-h')
+  // タイトル＋絞り込みの固定表示（と高さの実測）は FeatureHeader が受け持つ。
+  // 表の列見出しはさらにその下に .ui-sticky-head-2 で重ねる（2026-08-11）
 
   const load = useCallback(async (filters) => {
     setError('')
@@ -144,46 +144,48 @@ export default function Archive() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container logs-container">
-        {/* タイトル＋絞り込みはAppHeaderの下に固定表示する（2026-08-11） */}
-        <div className="ui-sticky-head" ref={stickyHeadRef}>
-        <h2 className="ui-page-title">アーカイブ</h2>
-        <form className="archive-filters" onSubmit={handleSearch}>
-          <label className="archive-filter">
-            担当者
-            <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-              <option value="">すべて</option>
-              {assigneeOptions.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="archive-filter">
-            情報源
-            <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-              <option value="">すべて</option>
-              {CHANNEL_OPTIONS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.icon} {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="archive-filter archive-filter-search">
-            キーワード検索
-            <input
-              type="search"
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="タイトル・本文・送信者などを全文検索"
-            />
-          </label>
-          <button type="submit" className="archive-search-btn">
-            検索
-          </button>
-        </form>
-        </div>
+        {/* 機能ヘッダ（2026-08-12）。タスク管理のサブ画面なので title を置く。
+            左＝絞り込み（検索ボタンを含む）、右＝機能ボタン（この画面には無し） */}
+        <FeatureHeader
+          filters={
+            <form className="archive-filters" onSubmit={handleSearch}>
+              <label className="archive-filter">
+                担当者
+                <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+                  <option value="">すべて</option>
+                  {assigneeOptions.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="archive-filter">
+                情報源
+                <select value={channel} onChange={(e) => setChannel(e.target.value)}>
+                  <option value="">すべて</option>
+                  {CHANNEL_OPTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.icon} {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="archive-filter archive-filter-search">
+                キーワード検索
+                <input
+                  type="search"
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
+                  placeholder="タイトル・本文・送信者などを全文検索"
+                />
+              </label>
+              <button type="submit" className="btn-primary archive-search-btn">
+                検索
+              </button>
+            </form>
+          }
+        />
 
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">

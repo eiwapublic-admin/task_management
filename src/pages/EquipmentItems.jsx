@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import EquipmentItemForm from '../components/EquipmentItemForm'
 import EquipmentCategoryForm from '../components/EquipmentCategoryForm'
 import { IconHome } from '../components/Icons'
@@ -68,26 +69,29 @@ export default function EquipmentItems() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        <div className="ui-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/equipment')}
-            aria-label="在庫一覧に戻る"
-            title="在庫一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">備品マスタ</h2>
-          <div className="ui-toolbar-actions">
-            <button type="button" className="btn-plain" onClick={() => setEditingCategories(true)}>
-              カテゴリ
+        <FeatureHeader
+          leading={
+            <button
+              type="button"
+              className="icon-btn-home"
+              onClick={() => navigate('/equipment')}
+              aria-label="在庫一覧に戻る"
+              title="在庫一覧に戻る"
+            >
+              <IconHome size={32} />
             </button>
-            <button type="button" className="btn-primary" onClick={() => setEditingItem('new')}>
-              備品を追加
-            </button>
-          </div>
-        </div>
+          }
+          actions={
+            <>
+              <button type="button" className="btn-plain" onClick={() => setEditingCategories(true)}>
+                カテゴリ
+              </button>
+              <button type="button" className="btn-primary" onClick={() => setEditingItem('new')}>
+                備品を追加
+              </button>
+            </>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

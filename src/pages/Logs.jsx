@@ -28,7 +28,7 @@ export default function Logs() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container logs-container">
-        <h2 className="ui-page-title">処理ログ</h2>
+        {/* 画面名はアプリヘッダが出すので、ここに見出し行は置かない（2026-08-12） */}
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}

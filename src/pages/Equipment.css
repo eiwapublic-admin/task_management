@@ -8,10 +8,14 @@
   margin-top: var(--space-4);
 }
 
+/* カテゴリ名。備品名（集計見出し）より一段控えめにして、
+   「カテゴリ → 備品 → 明細」の階層が読み取れるようにする */
 .equipment-stock-group-head {
   margin: 0 0 var(--space-2);
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-md);
+  font-weight: 700;
   color: var(--text-muted);
 }
 
@@ -49,16 +53,30 @@
   background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
 }
 
+/* 狭幅では備品名（集計見出し）に1行まるごと使い、製品番号・在庫数・警告バッジは
+   次の行にまとめる。同じ行に押し込むと備品名が2〜3行に折り返って読みにくいため
+   （2026-08-12。集計見出しを大きくしたのに伴う調整） */
+@media (max-width: 640px) {
+  .equipment-stock-row.is-static { flex-wrap: wrap; }
+  .equipment-stock-name { flex: 1 1 100%; }
+}
+
 .equipment-stock-detail { padding: var(--space-3) var(--space-4); }
 .equipment-stock-detail .ui-empty { padding: var(--space-2) 0; text-align: left; }
 
+/* 備品名は「その下の入出庫明細の集計見出し」。どこで備品が切り替わるかを一目で
+   分からせるため、本文より一段大きく・太くする（2026-08-12 の画面構成見直し。
+   docs/ui-standard.md の .ui-group-head と同じ考え方） */
 .equipment-stock-name {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  color: var(--text-strong);
 }
 
 .equipment-stock-code {
@@ -79,13 +97,15 @@
 .equipment-stock-qty.is-danger { color: var(--color-danger); }
 .equipment-stock-qty.is-muted { color: var(--text-faint); font-weight: 400; }
 
+/* 「無効な備品も表示」の絞り込み。機能ヘッダの左側（表示条件のグループ）に置く */
 .equipment-toggle-disabled {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-4);
   font-size: var(--fs-sm);
   color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 /* 入出庫モーダルの理由選択（择一ボタン） */

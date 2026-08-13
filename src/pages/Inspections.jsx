@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
+import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import { IconHome, IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
@@ -125,51 +126,56 @@ export default function Inspections() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-wide">
-        <div className="ui-toolbar reports-toolbar inspection-toolbar">
-          <button
-            type="button"
-            className="icon-btn-home"
-            onClick={() => navigate('/reports')}
-            aria-label="日報一覧に戻る"
-            title="日報一覧に戻る"
-          >
-            <IconHome size={32} />
-          </button>
-          <h2 className="ui-page-title">自主検査表（日常）</h2>
-          <div className="inspection-month">
+        {/* 機能ヘッダ（2026-08-12）。左＝年月の移動、右＝PDF出力。
+            日報のサブ画面なので、現在地が分かるよう title を置く */}
+        <FeatureHeader
+          leading={
             <button
               type="button"
-              className="icon-btn-nav"
-              onClick={() => setMonth(shiftMonth(month, -1))}
-              aria-label="前月"
-              title="前月"
+              className="icon-btn-home"
+              onClick={() => navigate('/reports')}
+              aria-label="日報一覧に戻る"
+              title="日報一覧に戻る"
             >
-              <IconChevronLeft size={28} />
+              <IconHome size={32} />
             </button>
-            <span className="inspection-month-label">{month.replace('-', '年')}月</span>
+          }
+          filters={
+            <div className="inspection-month">
+              <button
+                type="button"
+                className="icon-btn-nav"
+                onClick={() => setMonth(shiftMonth(month, -1))}
+                aria-label="前月"
+                title="前月"
+              >
+                <IconChevronLeft size={28} />
+              </button>
+              <span className="inspection-month-label">{month.replace('-', '年')}月</span>
+              <button
+                type="button"
+                className="icon-btn-nav"
+                onClick={() => setMonth(shiftMonth(month, 1))}
+                aria-label="翌月"
+                title="翌月"
+              >
+                <IconChevronRight size={28} />
+              </button>
+            </div>
+          }
+          actions={
             <button
               type="button"
-              className="icon-btn-nav"
-              onClick={() => setMonth(shiftMonth(month, 1))}
-              aria-label="翌月"
-              title="翌月"
+              className="btn-plain inspection-pdf-btn"
+              onClick={pdf.download}
+              disabled={pdf.busy || loading}
+              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
             >
-              <IconChevronRight size={28} />
+              <IconDownload size={18} />
+              <span className="btn-plain-label">{pdf.busy ? '作成中…' : 'PDF'}</span>
             </button>
-          </div>
-          <div className="ui-toolbar-actions">
-          <button
-            type="button"
-            className="btn-plain inspection-pdf-btn"
-            onClick={pdf.download}
-            disabled={pdf.busy || loading}
-            title="紙の様式でPDFに出力する（半月ごとに1ページ）"
-          >
-            <IconDownload size={18} />
-            {pdf.busy ? '作成中…' : 'PDF'}
-          </button>
-          </div>
-        </div>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

@@ -1,8 +1,18 @@
 /* ページのルートは共通部品 .ui-page（ui.css）に統一済み（2026-08-10）。
    以前あった .dashboard-page / .reports-page は同じ役割の重複だったため削除した。 */
 
-/* ヘッダー: 落ち着いたグリーン */
-.dashboard-header {
+/* =========================================================================
+   アプリヘッダ（画面構成の1層目。全画面共通。2026-08-12 に再構成）
+
+     左: アプリアイコン（ロゴ）＋ 機能名（.app-header-title）
+     右: ログインユーザー名（769px以上）＋ ハンバーガーメニュー
+
+   アプリ名「栄和　タスク管理システム」の文字表示は廃止し、その幅は一度セクション
+   切替に回したあと、機能名のタイトルに置き換えた（機能の選択はダッシュボードに
+   一本化したため。設計書4-3）。狭幅でも1行に収まるので、モバイル専用に複製して
+   いた切替（.app-switch-mobile）と grid-template-areas での行割り当ても撤去済み。
+   ========================================================================= */
+.app-header {
   --header-bg: var(--color-brand);
   display: flex;
   justify-content: space-between;
@@ -10,25 +20,27 @@
   gap: var(--space-3);
   /* viewport-fit=cover によりホーム画面追加（スタンドアロン）時はコンテンツが
      ノッチ/ステータスバーの裏側まで広がるため、その分を上パディングに加算し、
-     ロゴ・タイトルがステータスバーに隠れないようにする（通常のブラウザ表示では
+     ロゴがステータスバーに隠れないようにする（通常のブラウザ表示では
      env(safe-area-inset-top) が0のため見た目は変わらない）。 */
-  padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-5) var(--space-3);
-  background: var(--header-bg);
-  border-bottom: 1px solid color-mix(in srgb, var(--header-bg) 80%, #000);
+  padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--page-pad-x) var(--space-2);
+  /* 単色ではなくごく浅い縦グラデーションにして、帯に奥行きを持たせる */
+  background: linear-gradient(180deg, var(--header-bg), var(--color-brand-deep));
+  border-bottom: 1px solid var(--color-brand-deep);
   position: sticky;
   top: 0;
   z-index: var(--z-header);
 }
 
-.dashboard-header-left {
+.app-header-left {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
 }
 
-/* ロゴはタップで最新化するボタン。見た目は素のロゴのまま */
-.dashboard-logo-button {
+/* ロゴはボタンを兼ねる。各機能画面ではダッシュボードへの移動、ダッシュボードでは
+   アプリの最新化（AppHeader.jsx の handleLogoClick 参照） */
+.app-logo-button {
   border: none;
   background: transparent;
   padding: 0;
@@ -39,11 +51,15 @@
   border-radius: 50%;
 }
 
-.dashboard-logo-button:hover .dashboard-logo {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+.app-logo-button:hover .app-logo {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45);
 }
 
-.dashboard-logo {
+.app-logo-button:active .app-logo {
+  transform: scale(0.94);
+}
+
+.app-logo {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
@@ -52,58 +68,24 @@
   border-radius: 50%;
   padding: 5px;
   box-sizing: border-box;
-  transition: box-shadow var(--transition);
+  transition: box-shadow var(--transition), transform var(--transition);
 }
 
-.dashboard-title-wrap {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* 表示用バージョン（ビルド時刻）。緑ヘッダー上で控えめに */
-.dashboard-version {
-  font-size: var(--fs-2xs);
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.7);
-  white-space: nowrap;
-}
-
-.dashboard-header h1 {
-  font-size: var(--fs-2xl);
-  margin: 0;
-  color: var(--ink-on-fill);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dashboard-header-right {
+.app-header-right {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   font-size: var(--fs-sm);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-on-dark);
 }
 
-/* デスクトップ幅では出さない。狭幅時のみ表示する（@media (max-width: 768px) 参照）。
-   このモバイル専用ボタンは共有クラス .app-switch も持つため、下の方に定義されている
-   無条件の `.app-switch { display:flex; margin-left:... }`（同じ詳細度）と常にぶつかる。
-   単純な `.app-switch-mobile` セレクタだと、そちらが後勝ちして幅に関係なく表示されて
-   しまう不具合を実際に踏んだため、詳細度で確実に勝つよう複合セレクタにしている。 */
-.app-switch.app-switch-mobile { display: none; }
-
-/* ハンバーガーメニュー左のログインユーザー名（緑ヘッダー上で白く表示） */
-.dashboard-user {
+/* ハンバーガー左のログインユーザー名。狭幅では場所を取るので隠し、
+   代わりにドロップダウンの先頭（.app-menu-user）で確認できるようにする */
+.app-header-user {
   font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink-on-fill);
   white-space: nowrap;
-}
-
-.dashboard-header-right button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 /* 通知・エラーバナー */
@@ -335,28 +317,43 @@
   color: var(--text-muted);
 }
 
-/* 操作ボタン群のラッパー。常に3本線（ハンバーガー）メニューに畳む */
-.dashboard-menu {
+/* --- ハンバーガーメニュー ------------------------------------------------ */
+.app-menu {
   display: inline-flex;
   align-items: center;
   position: relative;
 }
 
 /* 3本線（ハンバーガー）ボタン。画面幅によらず常に表示する。
-   （.dashboard-header-right button より詳細度を上げて display を確実に上書きする） */
-.dashboard-header-right .dashboard-menu-toggle {
+   グリーンの帯の上に置くので、面を持たせず線画だけを白く見せる */
+.app-menu-toggle {
+  box-sizing: border-box;
   display: inline-flex;
-  width: 40px;
+  align-items: center;
   justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-on-fill);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.app-menu-toggle:hover,
+.app-menu-toggle[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* 通常はドロップダウンを隠し、開いたときだけ縦並びで表示する */
-.dashboard-actions {
+.app-menu-panel {
   display: none;
 }
 
-.dashboard-actions.is-open {
+.app-menu-panel.is-open {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -365,40 +362,74 @@
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
-  min-width: 190px;
+  min-width: 210px;
   padding: var(--space-2);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
   z-index: var(--z-menu);
 }
 
 /* ドロップダウン内のボタンは全幅・左寄せで押しやすく。
    文字は読みやすさ優先で少し大きく・濃くし、高さを詰めて項目間を狭める（2026-07-30） */
-.dashboard-actions.is-open button {
+.app-menu-panel.is-open button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
   width: 100%;
   height: 36px;
-  justify-content: flex-start;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  font-family: inherit;
   font-size: var(--fs-md);
   color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
 }
 
-.dashboard-actions.is-open button:disabled {
+.app-menu-panel.is-open button:hover:not(:disabled) {
+  background: var(--color-primary-weak);
+  color: var(--color-primary);
+}
+
+.app-menu-panel.is-open button:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
+/* 誰でログインしているか（狭幅ではヘッダーに出さないためここで必ず分かるようにする） */
+.app-menu-user {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ビルド時刻。押せない表示専用なので、項目と区別できるよう淡く小さく */
+.app-menu-version {
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  text-align: right;
+}
+
 /* メニュー項目の区切り線（処理ログ / 今すぐ取得の間など） */
-.dashboard-menu-divider {
+.app-menu-divider {
   height: 1px;
   margin: 3px 0;
   background: var(--border);
 }
 
-.dashboard-menu-icon,
-.dashboard-menu-icon::before,
-.dashboard-menu-icon::after {
+.app-menu-icon,
+.app-menu-icon::before,
+.app-menu-icon::after {
   display: block;
   width: 18px;
   height: 2px;
@@ -406,49 +437,22 @@
   border-radius: 1px;
 }
 
-.dashboard-menu-icon {
+.app-menu-icon {
   position: relative;
 }
 
-.dashboard-menu-icon::before {
+.app-menu-icon::before {
   content: '';
   position: absolute;
   top: -6px;
   left: 0;
 }
 
-.dashboard-menu-icon::after {
+.app-menu-icon::after {
   content: '';
   position: absolute;
   top: 6px;
   left: 0;
-}
-
-/* ヘッダー内のボタンは高さと縦位置を統一する */
-.dashboard-header-right button {
-  box-sizing: border-box;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid transparent;
-  background: var(--bg-surface);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-3);
-  font-size: var(--fs-sm);
-  color: var(--text-base);
-  cursor: pointer;
-  transition: filter var(--transition);
-}
-
-.dashboard-header-right button:hover {
-  filter: brightness(0.92);
-}
-
-/* ハンバーガーメニュー内の項目は全て白で統一する（メイン・アーカイブ・設定・処理ログ・ログアウト共通） */
-.dashboard-header-right .btn-settings,
-.dashboard-header-right .btn-logout {
-  background: var(--bg-surface);
-  color: var(--text-base);
 }
 
 /* 画面共通ページタイトル（コンテンツ側の見出し。ヘッダー自体は全画面共通のため画面名はここに出す） */
@@ -463,7 +467,7 @@
   overflow: hidden;
 }
 
-.settings-page .dashboard-header {
+.settings-page .app-header {
   flex-shrink: 0;
 }
 
@@ -477,40 +481,17 @@
 }
 
 /* 設定ページ: タイトル・保存結果メッセージ・保存ボタンを1行に */
-.settings-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+/* 設定画面の機能ヘッダ。ウインドウ高さに収める作りなので、縮まないようにしておく
+   （下の余白は .settings-container の並びが持つので is-flush を付けている） */
+.settings-head {
   flex-shrink: 0;
+  margin-bottom: var(--space-4);
 }
 
-.settings-toolbar .ui-page-title { margin-right: auto; }
-
-.settings-toolbar .settings-saved {
+.settings-saved {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--status-done, var(--color-brand));
-  min-height: 0;
-}
-
-.settings-toolbar .btn-save {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--ink-on-fill);
-  font-weight: 700;
-  font-size: var(--fs-sm);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-5);
-  cursor: pointer;
-  transition: filter var(--transition);
-}
-
-.settings-toolbar .btn-save:hover {
-  filter: brightness(0.92);
+  color: var(--status-done);
 }
 
 @media (max-width: 900px) {
@@ -597,12 +578,15 @@
 }
 
 /* ---------- アーカイブ画面 ---------- */
+/* 絞り込みは機能ヘッダの左側（.ui-feature-head-main）に入る。
+   ラベルを上に積んだ入力が並ぶので、この中だけは下端揃えにする */
 .archive-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .archive-filter {
@@ -633,21 +617,12 @@
   width: 100%;
 }
 
+/* 見た目は共通の .btn-primary（ui.css）。ラベル付きの入力欄と下端を揃えるため
+   高さだけ入力欄に合わせる（2026-08-12にUI標準の部品へ寄せた） */
 .archive-search-btn {
   height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--ink-on-fill);
   font-size: var(--fs-base);
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter var(--transition);
-}
-
-.archive-search-btn:hover {
-  filter: brightness(0.92);
 }
 
 /* 行タップで詳細を開くため、ホバー・フォーカスで押せることを示す */
@@ -746,52 +721,12 @@
 }
 
 @media (max-width: 768px) {
-  /* 狭幅では2行固定のグリッドにする：1行目はロゴ・タイトルのみ、2行目は
-     タスク/日報切替（左端）とユーザー名＋ハンバーガー（右端）。
-     以前はflex-wrapの自然な折り返しに任せていたが、折り返し位置は要素の実際の
-     幅（実データのタイトル文字数・端末フォント設定等）次第で変わってしまい、
-     「ツールバー側は直ったのに共通ヘッダー側だけ実機で反映されない」という
-     再現できない不具合報告につながった（2026-08-07）。grid-template-areas で
-     行・列の割り当てを明示することで、幅に関わらず必ず同じ形になるようにする。 */
-  .dashboard-header {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'title title'
-      'switch menu';
-    row-gap: var(--space-2);
-    column-gap: var(--space-3);
-    padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3) var(--space-3);
-  }
-
-  .dashboard-header h1 {
-    font-size: var(--fs-lg);
-  }
-
-  .dashboard-header-left {
-    grid-area: title;
-    min-width: 0;
-  }
-
-  /* 1行目はロゴ・タイトルのみにする（タスク/日報切替は2行目のモバイル専用ボタンへ） */
-  .dashboard-header-left .app-switch { display: none; }
-
-  .app-switch.app-switch-mobile {
-    display: flex;
-    grid-area: switch;
-    justify-self: start;
-    align-self: center;
-    margin-left: 0;
-  }
-
-  .dashboard-header-right {
-    grid-area: menu;
-    justify-self: end;
-    align-self: center;
-  }
-
-  .dashboard-header-right button {
-    white-space: nowrap;
+  /* 狭幅は1行のまま（ロゴ＋機能名 ／ ハンバーガー）。
+     アプリ名の文字表示を廃止したことで折り返しが起きなくなったため、
+     2026-08-07 に入れていた grid-template-areas での2行固定は不要になった。
+     ユーザー名だけはここで隠し、ドロップダウンの先頭で確認させる。 */
+  .app-header-user {
+    display: none;
   }
 
   /* 処理ログ・アーカイブ: 複数列テーブルは横スクロールで各列の可読幅を確保する。
@@ -869,11 +804,20 @@
    日報（2026-08-04〜）。詳細は docs/daily-report-plan.md
    ============================================================ */
 
-/* ヘッダのセクション切替（タスク ｜ 日報）。見た目は .ui-segmented.on-dark が持つ。
-   ここではヘッダー内での位置だけを決める */
-.app-switch {
-  margin-left: var(--space-4);
-  flex-shrink: 0;
+/* ヘッダに大きく出す機能名（2026-08-12。セクション切替＝.app-switch の置き換え）。
+   機能の選択はダッシュボードに一本化したので、ヘッダーは「いまどの機能を開いているか」を
+   示すだけでよくなった。長い機能名（従量課金事項・残留塩素等検査）でも折り返さず、
+   入り切らない場合だけ末尾を … で省く（ヘッダーは常に1行に保つ） */
+.app-header-title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink-on-fill);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 日報ページ全体 */
@@ -881,17 +825,8 @@
 /* 日報系の本文コンテナ。幅・中央寄せ・余白は .ui-container(.is-narrow) が持つ。
    カレンダー型のときだけ .is-calendar で全幅に広げる */
 
-.reports-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-3);
-}
-
-/* 年月・各ボタンと縦位置を揃えるため下マージンを打ち消す（.ui-toolbar と同じ扱い） */
-.reports-toolbar .ui-page-title { margin: 0; }
+/* 日報系のツールバーは機能ヘッダ（.ui-feature-head。src/styles/ui.css）へ統合した
+   （2026-08-12）。画面ごとのツールバー定義は持たない。 */
 
 /* --- 一覧（自主検査表と同様、月単位で1日から全日を表示する。2026-08-07） --- */
 .report-list {
@@ -1485,13 +1420,8 @@
 /* モバイル: 明細は時刻を上に、内容を下に積む */
 @media (max-width: 640px) {
   /* 狭幅の余白は --page-pad-x（index.css）で一括して詰めている */
-  .app-switch { margin-left: var(--space-2); }
-  .app-switch.app-switch-mobile { margin-left: 0; }
-  /* 狭幅ではセグメントの左右余白を詰める（ツールバーを1行に収めるため） */
-  .app-switch .ui-segmented-btn { padding: 0 var(--space-2); }
-  /* 自主検査表・違反車両・歯車のボタン群が2行目に折り返ったとき、space-betweenは
-     単独の要素だと左端に置いてしまうため、margin-left:auto で右端に寄せる（2026-08-07） */
-  .reports-toolbar-actions { margin-left: auto; }
+  /* 機能ボタンが2行目に折り返ったときに右端へ寄せる処理は、機能ヘッダ
+     （.ui-feature-head-actions。src/styles/ui.css）が全画面共通で持つ（2026-08-12） */
   .entry-row { flex-wrap: wrap; }
   .entry-time { width: 110px; }
   .entry-content { flex-basis: 100%; order: 3; }
@@ -1778,16 +1708,10 @@
 }
 
 /* --- 違反車両一覧（/reports/parking。日を跨って横断的に見る独立画面。2026-08-05〜） --- */
-.parking-list-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-3);
-}
-
+/* 検索・並び順は機能ヘッダの左側にまとめた（2026-08-12。専用の .parking-list-controls
+   行は廃止し、.ui-feature-head-main の並びに任せる） */
 .parking-search {
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 200px;
   padding: 8px 12px;
   font-size: var(--fs-base);
@@ -1886,8 +1810,6 @@
 /* --- 自主検査表（Phase 3。2026-08-04〜）。幅は .ui-container.is-wide --- */
 
 /* ホーム・年月・タイトルを1行にまとめる（2026-08-05。BKBのみ運用のためビル切替は廃止） */
-.inspection-toolbar { justify-content: flex-start; }
-
 .inspection-month { display: flex; align-items: center; gap: var(--space-3); }
 /* ページタイトルと同じ大きさに揃える（2026-08-07。日報一覧の月見出しとも共通） */
 .inspection-month-label { font-size: var(--fs-xl); font-weight: 700; color: var(--text-strong); }
@@ -2053,35 +1975,8 @@
   .inspection-inspector input, .inspection-note-field textarea { font-size: var(--fs-lg); }
 }
 
-/* 日報一覧のツールバー右側のボタン群（2026-08-04。自主検査表への導線を追加） */
-.reports-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-/* 「自主検査表」「違反車両」のボタンは大きさ・フォントを統一する（2026-08-05） */
-.reports-toolbar-actions .btn-plain {
-  height: 44px;
-  padding: 0 var(--space-5);
-  font-size: var(--fs-md);
-  font-weight: 700;
-}
-
-/* iPhone幅でもツールバー（虫眼鏡・自主検査・違反車両・残留塩素）が1行に収まるよう、
-   狭い画面では文字ラベルを隠しアイコンのみの正方形ボタンにする（2026-08-05に横パディングを
-   詰める対応をしたが、2026-08-10に残留塩素ボタンが増えて文字入りのままでは収まらなくなった
-   ため、アイコンのみ化に変更）。ラベルは title 属性で引き続き参照できる */
-@media (max-width: 480px) {
-  .reports-toolbar-actions .btn-plain {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    gap: 0;
-  }
-  .reports-toolbar-actions .btn-plain-label { display: none; }
-}
+/* 機能ヘッダのボタン群の見た目は src/styles/ui.css（.ui-feature-head-actions）へ
+   移した（2026-08-12）。日報だけでなく全機能で同じ大きさ・同じ折り畳み方にするため。 */
 
 /* ============================================================
    共通ボタン標準は src/styles/ui.css へ移設した（2026-08-11 のUI標準化）。
@@ -2097,28 +1992,14 @@
    ============================================================ */
 
 /* 対象年（一覧の絞り込み・帳票の対象年を兼ねる）・帳票の出力対象施設・PDF出力ボタンを
-   1行にまとめる（2026-08-10）。iPhone幅でも折り返さないよう、施設フィルタは置かず
-   出力ボタンもアイコンのみ（IconDownload）にした。select は現行アプリの選択肢が
-   少ない（年4桁／施設2択）ため、汎用の .report-field select の min-width: 130px を
-   このコンテキストだけ狭めて詰める */
-.chlorine-controls {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  flex-wrap: nowrap;
-  margin-bottom: var(--space-3);
-}
-
-.chlorine-year-field { flex: 1 1 0; min-width: 0; }
-.chlorine-building-filter-field { flex: 1 1 0; min-width: 0; }
+   機能ヘッダの左側（表示条件のグループ）に置く（2026-08-12。以前は専用の
+   .chlorine-controls 行だったが、機能ヘッダに統合した）。select は現行アプリの
+   選択肢が少ない（年4桁／施設2択）ため、汎用の .report-field select の
+   min-width: 130px をこのコンテキストだけ狭めて詰める */
 .chlorine-year-field select,
 .chlorine-building-filter-field select {
-  width: 100%;
-  min-width: 0;
+  min-width: 104px;
 }
-
-/* select と同じ高さ（ラベル分の余白込み）に揃える */
-.chlorine-pdf-btn { margin-bottom: 1px; }
 
 /* 一覧（測定日ごとの見出し＋その日の測定行） */
 .chlorine-list { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -2130,12 +2011,15 @@
   overflow: hidden;
 }
 
+/* 測定日ごとの集計見出し。どこで日が切り替わるかを一目で分からせるため、
+   一覧の本文より一段大きく・太くする（2026-08-12。備品名と同じ扱い） */
 .chlorine-day-head {
   margin: 0;
   padding: var(--space-2) var(--space-4);
   background: var(--bg-subtle);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
   font-weight: 700;
+  line-height: var(--leading-tight);
   color: var(--text-strong);
 }
 
@@ -2308,7 +2192,8 @@
 
 @media (max-width: 640px) {
   .chlorine-row-building { min-width: 0; }
-  .chlorine-controls .report-field span { font-size: var(--fs-xs); }
+  .chlorine-year-field > span,
+  .chlorine-building-filter-field > span { font-size: var(--fs-xs); }
 }
 
 /* ============================================================

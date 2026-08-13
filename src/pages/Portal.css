@@ -1,0 +1,219 @@
+/* ダッシュボード 兼 ポータル画面（2026-08-12）。
+   機能ごとの象徴的な統計値をボタンにして並べ、押すとその機能へ移動する。
+   色・寸法は index.css のトークンだけを参照する（docs/ui-standard.md 原則2）。 */
+
+.portal-container {
+  padding-bottom: var(--space-6);
+}
+
+/* --- 見出し（挨拶と今日の日付）--- */
+.portal-hero {
+  margin-bottom: var(--space-5);
+}
+
+.portal-hero-date {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.portal-hero-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  color: var(--text-strong);
+}
+
+/* --- 機能カード ---------------------------------------------------------
+   1枚が1機能への入口。押すと遷移するので、面ではなく「押せる合図」として
+   ホバーで持ち上げる（アクション色の枠＋影）。数字そのものを読ませたいので、
+   統計値だけ極端に大きくし、ラベル・補足は小さく添える。
+   ---------------------------------------------------------------------- */
+.portal-grid {
+  display: grid;
+  /* 画面幅に応じて 1〜3 列。240px を下回る列は作らない（数字が窮屈になるため） */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.portal-card {
+  --card-accent: var(--color-brand);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* 機能ごとの色味は上辺の細い帯だけで示す（面を塗ると数字が読みにくくなる） */
+  border-top: 3px solid var(--card-accent);
+  transition: box-shadow var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.portal-card:hover {
+  border-color: var(--color-primary);
+  border-top-color: var(--card-accent);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.portal-card:active {
+  transform: translateY(0);
+}
+
+.portal-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.portal-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  /* 機能色を薄く敷いてアイコンを載せる。塗りはここだけに留める */
+  background: color-mix(in srgb, var(--card-accent) 12%, var(--bg-surface));
+  color: var(--card-accent);
+}
+
+.portal-card-label {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.portal-card-stat {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.portal-card-value {
+  font-size: var(--fs-4xl);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 対応が要る数字（期限超過・在庫わずか・日報未入力）は赤くして気付かせる */
+.portal-card-value.is-alert {
+  color: var(--color-danger);
+}
+
+.portal-card-unit {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.portal-card-caption {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.portal-card-sub {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/* 機能ごとのアクセント。6枚を見分けられるようトークンから色相を散らす。
+   ここでの色は「どの機能か」の目印であって操作の意味は持たない（帯とアイコンだけに
+   使い、ボタンには使わない）ので、原則1（緑＝現在地／青＝操作）とは衝突しない。
+   - タスク＝ブランド色、日報＝日報セクションのイエロー系、備品＝在庫の緑
+   - 違反車両は「不良の記録」なので赤、残留塩素は水なので青 */
+.portal-card.is-tasks { --card-accent: var(--color-brand); }
+.portal-card.is-reports { --card-accent: var(--status-progress); }
+.portal-card.is-equipment { --card-accent: var(--status-done); }
+.portal-card.is-inspections { --card-accent: var(--status-todo); }
+.portal-card.is-parking { --card-accent: var(--color-danger); }
+.portal-card.is-chlorine { --card-accent: var(--color-primary); }
+
+/* --- その他の画面への導線（統計を出すほどではないもの）--- */
+.portal-links-section {
+  margin-top: var(--space-6);
+}
+
+.portal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.portal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-base);
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
+}
+
+.portal-link:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-weak);
+}
+
+.portal-link-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.portal-link:hover .portal-link-icon {
+  color: var(--color-primary);
+}
+
+/* iPhone 幅。1列にすると6枚で3画面分の縦スクロールになり、下の機能に気付けないため
+   2列に詰める（2026-08-12）。数字は主役なので大きさを保ち、周りの余白と
+   補足の文字を先に削る */
+@media (max-width: 600px) {
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .portal-card {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .portal-card-icon {
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+  }
+
+  .portal-card-value { font-size: var(--fs-3xl); }
+
+  /* 「未処理」「8月の記録」は数字の真下に置く（横に並べると2列では溢れる） */
+  .portal-card-caption {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+
+  .portal-hero-title { font-size: var(--fs-2xl); }
+}
