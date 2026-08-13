@@ -187,10 +187,13 @@ export default function AppHeader({ lastFetchAt } = {}) {
           {featureTitle && <h1 className="app-header-title">{featureTitle}</h1>}
         </div>
         <div className="app-header-right">
-          {user?.display_name && <span className="app-header-user">{user.display_name} さん</span>}
+          {/* 最終取得はユーザー名の左側に置く（2026-08-13。以前はユーザー名とメニューの
+              間だったが「ユーザー名の左側に」との依頼で並び順を変更）。モバイルでも常に
+              見えるようにする（ユーザー名は狭幅で隠れるが、こちらは隠さない） */}
           {lastFetchAt && (
-            <span className="app-header-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
+            <span className="app-header-lastfetch">{formatDateTime(lastFetchAt)} 取得</span>
           )}
+          {user?.display_name && <span className="app-header-user">{user.display_name} さん</span>}
           <div className="app-menu" ref={menuRef}>
             <button
               type="button"
@@ -240,16 +243,9 @@ export default function AppHeader({ lastFetchAt } = {}) {
               )}
               <div className="app-menu-divider" role="separator" />
               {!inReports && !inEquipment && !isOwner && (
-                <>
-                  {/* ヘッダー本体では狭幅（≤768px）で最終取得時刻を隠すため、
-                      メニュー内にも同じ表示を残しモバイルでも確認できるようにする */}
-                  {lastFetchAt && (
-                    <p className="app-menu-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</p>
-                  )}
-                  <button onClick={handleRunFetch} disabled={fetching}>
-                    {fetching ? '取得中…' : '今すぐ取得'}
-                  </button>
-                </>
+                <button onClick={handleRunFetch} disabled={fetching}>
+                  {fetching ? '取得中…' : '今すぐ取得'}
+                </button>
               )}
               {pushStatus !== 'unsupported' && (
                 <button

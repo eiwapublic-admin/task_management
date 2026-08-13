@@ -149,9 +149,10 @@ export default function ParkingViolations() {
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
         {/* 機能ヘッダ（2026-08-13。ホームボタンは廃止。機能間の移動はダッシュボード経由に
-            一本化済み）。1行目は左から ソート順・虫眼鏡・＋ の順（日報一覧の検索欄と
-            同じ挙動に統一。押すと下に検索欄が開く。文字ラベルを持たない検索・並び順は
-            絞り込み側＝filters、記録の追加は機能ボタン側＝actions に置く） */}
+            一本化済み）。1行目は左から ソート順・虫眼鏡・＋ の順で必ず1行に収める
+            （`actions` は狭幅で2行目に分かれる仕様のため、＋も含めて全て `filters` に
+            まとめている。以前は＋だけ `actions` に残していたためモバイルで2行目に
+            落ちていた） */}
         <FeatureHeader
           filters={
             <>
@@ -183,21 +184,19 @@ export default function ParkingViolations() {
               >
                 <IconSearch size={20} />
               </button>
+              {!isOwner && (
+                <button
+                  type="button"
+                  className="icon-btn-add"
+                  onClick={handleOpenQuickAdd}
+                  disabled={preparingQuickAdd}
+                  aria-label="違反車両を記録（本日分）"
+                  title="違反車両を記録（本日分）"
+                >
+                  ＋
+                </button>
+              )}
             </>
-          }
-          actions={
-            isOwner ? null : (
-              <button
-                type="button"
-                className="icon-btn-add"
-                onClick={handleOpenQuickAdd}
-                disabled={preparingQuickAdd}
-                aria-label="違反車両を記録（本日分）"
-                title="違反車両を記録（本日分）"
-              >
-                ＋
-              </button>
-            )
           }
         >
           {searchOpen && (

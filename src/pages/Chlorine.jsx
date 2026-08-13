@@ -14,6 +14,7 @@ import {
   formatReportDate,
   currentMonthJST,
   shiftMonth,
+  todayJST,
 } from '../lib/reports'
 import './Dashboard.css'
 // AttachmentPreview（PDFのアプリ内プレビュー）の見た目はタスク管理側の KanbanBoard.css で
@@ -31,6 +32,10 @@ import '../components/KanbanBoard.css'
 // 開く。帳票PDFの出力は各グループ見出しの「↓」から起動する — 帳票そのものは「年単位・
 // 施設別」の紙様式（`ChlorineSheet.jsx`）なので、どの月の「↓」を押しても、その月が属する
 // "年"の年間分をまとめて出力する（対象施設だけをその場のダイアログで選ぶ）。
+//
+// 2026-08-13: BKB・小泉本社は1日にペアで実施する運用のため、新規保存の直後に同じ日の
+// もう片方がまだ未記録なら、閉じずにそのままもう片方の入力へ続ける（handleSaved参照）。
+// 「＋」を押した時点でも、その日まだ記録の無い施設を自動で選んでおく（pickBuildingFor）。
 export default function Chlorine() {
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
@@ -40,6 +45,12 @@ export default function Chlorine() {
   const [error, setError] = useState('')
   // 入力モーダル。'new' なら新規、レコードなら編集
   const [editing, setEditing] = useState(null)
+  // 新規登録時の対象施設。「＋」を押した時点、またはペア記録の続きを開く時点で決める
+  // （下記 pickBuildingFor 参照。BKB・小泉本社は1日にペアで実施するため、片方を保存したら
+  // もう片方が未記録ならその場で続けて開けるようにする。2026-08-13）
+  const [newBuilding, setNewBuilding] = useState(CHLORINE_BUILDINGS[0])
+  // ペア記録の続きを開いた時だけ出す案内文（通常の「＋」では空のまま）
+  const [pairNotice, setPairNotice] = useState('')
   // PDFダウンロードダイアログ。開いている間は対象年（グループの「↓」から渡される）を持つ
   const [pdfDialogYear, setPdfDialogYear] = useState(null)
   const [pdfBuilding, setPdfBuilding] = useState(CHLORINE_BUILDINGS[0])
@@ -95,11 +106,44 @@ export default function Chlorine() {
     setCollapseOverrides((prev) => ({ ...prev, [yearMonth]: !isGroupOpen(yearMonth) }))
   }
 
+  // 指定日（JST）に測定済みの施設の集合。ペア記録の判定に使う
+  function buildingsRecordedOn(date, list) {
+    const set = new Set()
+    for (const t of list) {
+      const d = new Date(t.tested_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+      if (d === date) set.add(t.building)
+    }
+    return set
+  }
+
+  // その日まだ記録の無い施設を返す（両方記録済み・両方未記録ならBKBを優先）
+  function pickBuildingFor(date, list) {
+    const recorded = buildingsRecordedOn(date, list)
+    return CHLORINE_BUILDINGS.find((b) => !recorded.has(b)) || CHLORINE_BUILDINGS[0]
+  }
+
   function handleSaved(saved) {
-    setTests((prev) => [saved, ...prev.filter((t) => t.id !== saved.id)])
-    setEditing(null)
+    const wasNew = editing === 'new'
+    const nextTests = [saved, ...tests.filter((t) => t.id !== saved.id)]
+    setTests(nextTests)
     // 測定日を変更した場合など、一覧の並び・グループが変わりうるので取り直す
     load()
+
+    // 新規保存の直後は、同じ日にもう片方の施設がまだ未記録なら続けて開く
+    // （BKB・小泉本社はペアで実施するため。2026-08-13。既存レコードの編集時は対象外）
+    if (wasNew) {
+      const savedDate = new Date(saved.tested_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+      const pairBuilding = CHLORINE_BUILDINGS.find((b) => b !== saved.building)
+      const recorded = buildingsRecordedOn(savedDate, nextTests)
+      if (pairBuilding && !recorded.has(pairBuilding)) {
+        setNewBuilding(pairBuilding)
+        setPairNotice(`${saved.building}を記録しました。続けて${pairBuilding}も記録してください。`)
+        setEditing('new')
+        return
+      }
+    }
+    setPairNotice('')
+    setEditing(null)
   }
 
   async function handleDelete(id) {
@@ -131,7 +175,11 @@ export default function Chlorine() {
               <button
                 type="button"
                 className="icon-btn-add"
-                onClick={() => setEditing('new')}
+                onClick={() => {
+                  setPairNotice('')
+                  setNewBuilding(pickBuildingFor(todayJST(), tests))
+                  setEditing('new')
+                }}
                 aria-label="測定を記録"
                 title="測定を記録"
               >
@@ -246,11 +294,15 @@ export default function Chlorine() {
 
       {editing && (
         <ChlorineForm
-          key={editing === 'new' ? 'new' : editing.id}
+          key={editing === 'new' ? `new-${newBuilding}` : editing.id}
           existing={editing === 'new' ? null : editing}
-          defaultBuilding={tests[0]?.building || CHLORINE_BUILDINGS[0]}
+          defaultBuilding={editing === 'new' ? newBuilding : undefined}
           defaultInspector={user?.display_name || ''}
-          onClose={() => setEditing(null)}
+          noticeMessage={editing === 'new' ? pairNotice : ''}
+          onClose={() => {
+            setPairNotice('')
+            setEditing(null)
+          }}
           onSaved={handleSaved}
           onDelete={handleDelete}
         />

@@ -29,6 +29,7 @@ export default function ChlorineForm({
   defaultBuilding,
   defaultInspector,
   defaultDate,
+  noticeMessage,
   onClose,
   onSaved,
   onDelete,
@@ -152,6 +153,14 @@ export default function ChlorineForm({
           {error && (
             <p className="dashboard-error dashboard-banner" role="alert">
               {error}
+            </p>
+          )}
+
+          {/* BKB・小泉本社のペア記録の続き（2026-08-13。Chlorine.jsx の handleSaved 参照）。
+              通常の新規登録・既存編集では渡されない */}
+          {noticeMessage && (
+            <p className="chlorine-pair-hint" role="status">
+              {noticeMessage}
             </p>
           )}
 

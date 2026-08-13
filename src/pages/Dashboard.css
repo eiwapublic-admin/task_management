@@ -89,19 +89,14 @@
 }
 
 /* メール取得パイプラインの最終取得時刻。カンバン画面の機能ヘッダから移設し、
-   ハンバーガーメニューの左側に置く（2026-08-13）。ユーザー名と同じく狭幅では隠し、
-   代わりにメニュー内（.app-menu-lastfetch）で確認できるようにする */
+   ユーザー名の左側（＝ハンバーガーメニューから見て2つ左）に置く（2026-08-13）。
+   狭幅ではユーザー名が隠れて場所が空くため、**こちらは隠さず常時表示する**
+   （モバイルで見えなくなっていたとの指摘への対応。ユーザー名の右マージンで間隔を空ける） */
 .app-header-lastfetch {
+  margin-right: var(--space-2);
   font-size: var(--fs-xs);
   color: var(--text-on-dark);
   white-space: nowrap;
-}
-
-.app-menu-lastfetch {
-  margin: 0 0 var(--space-1);
-  padding: 0 var(--space-3);
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
 }
 
 /* 通知・エラーバナー */
@@ -737,12 +732,13 @@
 }
 
 @media (max-width: 768px) {
-  /* 狭幅は1行のまま（ロゴ＋機能名 ／ ハンバーガー）。
+  /* 狭幅は1行のまま（ロゴ＋機能名 ／ 最終取得＋ハンバーガー）。
      アプリ名の文字表示を廃止したことで折り返しが起きなくなったため、
      2026-08-07 に入れていた grid-template-areas での2行固定は不要になった。
-     ユーザー名だけはここで隠し、ドロップダウンの先頭で確認させる。 */
-  .app-header-user,
-  .app-header-lastfetch {
+     ユーザー名はここで隠し、ドロップダウンの先頭で確認させる。最終取得時刻は
+     モバイルで見えなくなっていたとの指摘（2026-08-13）を受け、狭幅でも隠さない
+     （ハンバーガーメニューの左側に表示され続ける） */
+  .app-header-user {
     display: none;
   }
 
@@ -2092,6 +2088,19 @@
   background: var(--color-danger-surface);
   border: 1px solid var(--color-danger-border);
   color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* BKB・小泉本社のペア記録の続きであることを知らせる案内（2026-08-13）。
+   警告ではなく案内なので .chlorine-warning の赤系ではなくブランド緑系にする */
+.chlorine-pair-hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-soft);
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
   font-size: var(--fs-sm);
   font-weight: 700;
 }
