@@ -89,7 +89,7 @@ export default function Equipment() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        {/* 機能ヘッダ。機能名「備品」はアプリヘッダのセクション切替が示すのでタイトルは置かない。
+        {/* 機能ヘッダ。機能名「備品」はアプリヘッダのタイトルが示すのでここには置かない。
             左＝表示期間・絞り込み、右＝入出庫の操作（2026-08-12） */}
         <FeatureHeader
           filters={

@@ -128,7 +128,6 @@ export default function Chlorine() {
             （記録する／PDF出力）。日報のサブ画面なので、現在地が分かるよう title を置く。
             iPhone幅でも収まるよう、PDF出力はアイコンのみのボタンにしている（2026-08-10） */}
         <FeatureHeader
-          title="残留塩素等検査"
           leading={
             <button
               type="button"

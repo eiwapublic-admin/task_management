@@ -565,7 +565,7 @@ export default function ReportList() {
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
       <div className={`ui-container reports-container${activeView === 'calendar' && !searching ? ' is-calendar' : ' is-narrow'}`}>
         {/* 機能ヘッダ（AppHeader の下に固定表示）。機能名「日報」はアプリヘッダの
-            セクション切替が示すので、ここではタイトルを置かない（2026-08-12）。
+            タイトルが示すので、ここではタイトルを置かない（2026-08-12）。
             左＝年月の移動・表示切替・検索、右＝機能ボタン。開閉する検索欄は
             children としてこのヘッダーに追従させる */}
         <FeatureHeader

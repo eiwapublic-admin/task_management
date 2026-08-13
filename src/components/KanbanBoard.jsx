@@ -63,8 +63,8 @@ export default function KanbanBoard({
 
   return (
     <div className="kanban-board">
-      {/* 機能ヘッダ（左＝絞り込み / 右＝機能ボタン）。カンバンは機能名がアプリヘッダの
-          セクション切替に出ているので title は置かない。列の見出しはこの下に
+      {/* 機能ヘッダ（左＝絞り込み / 右＝機能ボタン）。機能名「タスク」はアプリヘッダの
+          タイトルが示すので title は置かない。列の見出しはこの下に
           さらに重ねて固定表示する（KanbanColumn.jsx の .ui-sticky-head-2）。
           下の余白は .kanban-board の gap が持つので is-flush で二重取りを避ける */}
       <FeatureHeader

@@ -1,5 +1,4 @@
 import AppHeader from '../components/AppHeader'
-import FeatureHeader from '../components/FeatureHeader'
 import UsagePanel from '../components/UsagePanel'
 import './Dashboard.css'
 
@@ -10,7 +9,7 @@ export default function Usage() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow">
-        <FeatureHeader title="従量課金事項" />
+        {/* 画面名はアプリヘッダが出すので、ここに見出し行は置かない（2026-08-12） */}
         <UsagePanel />
       </div>
     </div>

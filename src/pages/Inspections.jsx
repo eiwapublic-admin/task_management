@@ -129,7 +129,6 @@ export default function Inspections() {
         {/* 機能ヘッダ（2026-08-12）。左＝年月の移動、右＝PDF出力。
             日報のサブ画面なので、現在地が分かるよう title を置く */}
         <FeatureHeader
-          title="自主検査表（日常）"
           leading={
             <button
               type="button"

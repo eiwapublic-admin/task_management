@@ -10,18 +10,48 @@ import useStickyHeightVar from '../lib/useStickyHeightVar'
 
 // アプリヘッダ（画面構成の1層目）。全画面で共通。
 //
-//   左: アプリアイコン（ロゴ）＋ セクション切替（タスク／日報／備品）
+//   左: アプリアイコン（ロゴ）＋ いま開いている機能名（タイトル）
 //   右: ログインユーザー名（広い画面のみ）＋ ハンバーガーメニュー
 //
-// 2026-08-12 の画面構成見直しで「栄和　タスク管理システム」の文字表示をやめた。
-// アプリ名は常時見えている必要が薄く、その幅をセクション切替に回した方が、どの機能を
-// 見ているかが一目で分かる。合わせて、狭幅用に複製していたセクション切替
-// （.app-switch-mobile）と grid-template-areas での行割り当ても不要になったので撤去した
-// （タイトルが無くなり、1行に収まるようになったため）。
+// 2026-08-12 の画面構成見直しで「栄和　タスク管理システム」の文字表示をやめ、その幅を
+// セクション切替（タスク／日報／備品）に回していたが、**同日さらに切替そのものを廃止し、
+// 機能名を大きく表示するタイトルに置き換えた**。機能の選択はダッシュボード（/portal）に
+// 一本化したため、ヘッダーに選択ボタンを常駐させる必要がなくなったのが理由。
+// 機能間の移動はロゴ（＝ダッシュボードへ戻る）とメニュー先頭の「ダッシュボード」から行う。
 //
-// ロゴの役割も変えた（設計書 4-3）:
+// ロゴの役割（設計書 4-3）:
 //   - 各機能画面 … タップでダッシュボード（ポータル）へ移動
 //   - ダッシュボード … タップでアプリの更新・再表示（従来の最新化と同じ挙動）
+
+// パス → 機能名。ダッシュボードのカード・リンクの名前と対応させる。
+// 上から順に判定するので、より深いパスを先に置くこと。exact を付けたものだけ完全一致で見る
+// （/equipment/items は「備品マスタ」だが、/equipment/items/:itemNo は個別備品の履歴なので
+//  前方一致にすると誤って「備品マスタ」と表示されてしまうため）。
+const FEATURE_TITLES = [
+  { path: '/portal', title: 'ダッシュボード' },
+  { path: '/logs', title: '処理ログ' },
+  { path: '/archive', title: 'アーカイブ' },
+  { path: '/usage', title: '従量課金事項' },
+  { path: '/settings', title: '設定' },
+  { path: '/reports/templates', title: '作業定型文' },
+  { path: '/reports/inspections', title: '自主検査表' },
+  { path: '/reports/parking', title: '違反車両' },
+  { path: '/reports/chlorine', title: '残留塩素等検査' },
+  { path: '/equipment/items', title: '備品マスタ', exact: true },
+  { path: '/equipment', title: '備品' },
+  { path: '/reports', title: '日報' },
+  { path: '/', title: 'タスク' },
+]
+
+function featureTitleFor(pathname) {
+  const hit = FEATURE_TITLES.find(({ path, exact }) =>
+    exact ? pathname === path : pathname === path || pathname.startsWith(`${path}/`),
+  )
+  // 未知のパス（今後ルートを足してここへの追記を忘れた場合）はタイトル無しで描画する。
+  // 誤った機能名を出すより空のほうが安全なので、ここでは既定値を当てない
+  return hit?.title ?? ''
+}
+
 export default function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -121,15 +151,10 @@ export default function AppHeader() {
   const inPortal = section === 'portal'
   const inReports = section === 'reports'
   const inEquipment = section === 'equipment'
-  // owner（小泉産業様）は日報・備品（閲覧のみ）。タスク管理のメニュー・切替は出さない
+  // owner（小泉産業様）は日報・備品（閲覧のみ）。タスク管理のメニューは出さない
   const isOwner = user?.role === 'owner'
-  // セクション切替の選択肢。owner には「タスク」を出さない（2026-08-12、備品セクションの追加で
-  // owner にもセクション切替そのものが必要になった。従来は日報1本だったため切替UI自体が無かった）
-  const sections = [
-    ...(isOwner ? [] : [{ key: 'tasks', label: 'タスク', path: '/' }]),
-    { key: 'reports', label: '日報', path: '/reports' },
-    { key: 'equipment', label: '備品', path: '/equipment' },
-  ]
+  // ヘッダーに大きく出す機能名（2026-08-12。従来のセクション切替の置き換え）
+  const featureTitle = featureTitleFor(location.pathname)
 
   // ロゴは「ダッシュボードへ戻る」ボタン。ダッシュボードにいるときだけ最新化を担う
   function handleLogoClick() {
@@ -154,19 +179,7 @@ export default function AppHeader() {
           >
             <img className="app-logo" src="/logo.svg" alt="栄和ロゴ" />
           </button>
-          <nav className="ui-segmented on-dark app-switch" aria-label="表示するセクション">
-            {sections.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className={`ui-segmented-btn${section === s.key ? ' is-active' : ''}`}
-                aria-current={section === s.key ? 'page' : undefined}
-                onClick={() => goTo(s.path)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </nav>
+          {featureTitle && <h1 className="app-header-title">{featureTitle}</h1>}
         </div>
         <div className="app-header-right">
           {user?.display_name && <span className="app-header-user">{user.display_name} さん</span>}

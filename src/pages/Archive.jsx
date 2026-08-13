@@ -147,7 +147,6 @@ export default function Archive() {
         {/* 機能ヘッダ（2026-08-12）。タスク管理のサブ画面なので title を置く。
             左＝絞り込み（検索ボタンを含む）、右＝機能ボタン（この画面には無し） */}
         <FeatureHeader
-          title="アーカイブ"
           filters={
             <form className="archive-filters" onSubmit={handleSearch}>
               <label className="archive-filter">

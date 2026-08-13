@@ -70,7 +70,6 @@ export default function EquipmentItems() {
       <AppHeader />
       <div className="ui-container is-narrow">
         <FeatureHeader
-          title="備品マスタ"
           leading={
             <button
               type="button"

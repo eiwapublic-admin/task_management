@@ -65,7 +65,6 @@ export default function Settings() {
             他画面と揃えておく */}
         <FeatureHeader
           className="is-flush settings-head"
-          title="設定"
           actions={
             <>
               <span className="settings-saved" role="status" aria-live="polite">

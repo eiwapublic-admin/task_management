@@ -139,7 +139,6 @@ export default function ParkingViolations() {
         {/* 機能ヘッダ（2026-08-12）。左＝検索・並び順、右＝記録の追加。
             日報のサブ画面なので、現在地が分かるよう title を置く */}
         <FeatureHeader
-          title="違反車両一覧"
           leading={
             <button
               type="button"

@@ -46,7 +46,6 @@ export default function ReportTemplates() {
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
         <FeatureHeader
-          title="定型文の設定"
           leading={
             <button
               type="button"
