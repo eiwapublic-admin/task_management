@@ -68,6 +68,11 @@ export default function ChlorineForm({
   const [pendingPhotos, setPendingPhotos] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // 新規登録で検査レコード自体は作成できたが、そのあとの写真アップロードで失敗/タイムアウト
+  // した場合に覚えておく（2026-08-13）。再試行時にこれが無いと、既にできているレコードとは
+  // 別にもう1件 createChlorineTest してしまい重複登録になる（`existing` は再試行後も null の
+  // ままのため）。以後の再試行はこれを使って updateChlorineTest に切り替える
+  const [createdRecord, setCreatedRecord] = useState(null)
 
   useEffect(() => {
     function onKey(e) {
@@ -112,7 +117,10 @@ export default function ChlorineForm({
         note,
         ...judgements,
       }
-      const saved = existing ? await updateChlorineTest(existing.id, payload) : await createChlorineTest(payload)
+      // レコード自体は既にできている（写真アップロードの再試行）場合は作り直さず更新にする
+      const targetId = createdRecord?.id || existing?.id
+      const saved = targetId ? await updateChlorineTest(targetId, payload) : await createChlorineTest(payload)
+      if (!existing) setCreatedRecord(saved)
 
       // 新規登録時に選んでおいた写真は、レコードができてからアップロードする。
       // 1枚でも失敗したら理由を出す（記録自体は保存済みなので閉じずに再試行できる）
@@ -131,6 +139,12 @@ export default function ChlorineForm({
       onSaved(saved)
     } catch (err) {
       setError(err.message)
+    } finally {
+      // 成功時は「保存中」ボタンの意味自体が消える（呼び出し元がモーダルを閉じる/
+      // 次の入力へ進める）ため従来は catch 側でしか戻していなかったが、それだと
+      // 万一 onSaved 後もこのフォームが表示され続けるケースで「保存中…」のまま
+      // 固まって見える（2026-08-13。写真アップロードのタイムアウト対策と合わせて
+      // 必ず戻すようにした）
       setSaving(false)
     }
   }

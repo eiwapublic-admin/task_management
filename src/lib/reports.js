@@ -184,11 +184,28 @@ export async function uploadPhoto({
   if (takenAt) form.append('taken_at', takenAt)
   if (comment) form.append('comment', comment)
 
-  const res = await fetch('/api/report/photos', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-    body: form,
-  })
+  // アップロード中に通信が切れる/固まると、呼び出し元（ChlorineForm等）の「保存中…」が
+  // 画面上いつまでも動かないまま止まって見える不具合があった（2026-08-13。残留塩素の
+  // 追加登録で写真付きの2件目を保存した際に発生・報告）。fetch自体には既定のタイムアウトが
+  // 無いため、45秒で打ち切って明確なエラーにする（再試行できるようにするため）
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 45000)
+  let res
+  try {
+    res = await fetch('/api/report/photos', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('写真のアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || '写真の保存に失敗しました')
   return data.photo
