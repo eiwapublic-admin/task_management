@@ -88,6 +88,22 @@
   white-space: nowrap;
 }
 
+/* メール取得パイプラインの最終取得時刻。カンバン画面の機能ヘッダから移設し、
+   ハンバーガーメニューの左側に置く（2026-08-13）。ユーザー名と同じく狭幅では隠し、
+   代わりにメニュー内（.app-menu-lastfetch）で確認できるようにする */
+.app-header-lastfetch {
+  font-size: var(--fs-xs);
+  color: var(--text-on-dark);
+  white-space: nowrap;
+}
+
+.app-menu-lastfetch {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
 /* 通知・エラーバナー */
 .dashboard-banner {
   margin: var(--space-3) var(--space-5) 0;
@@ -725,7 +741,8 @@
      アプリ名の文字表示を廃止したことで折り返しが起きなくなったため、
      2026-08-07 に入れていた grid-template-areas での2行固定は不要になった。
      ユーザー名だけはここで隠し、ドロップダウンの先頭で確認させる。 */
-  .app-header-user {
+  .app-header-user,
+  .app-header-lastfetch {
     display: none;
   }
 
@@ -1220,55 +1237,34 @@
 }
 
 /* --- 詳細（2026-08-07に別画面から「一覧の上に重ねるモーダル」へ変更） ---
-   左: 日付。右: 保存状態・自主点検・削除・×（閉じる）。
+   左: 日付。右: 保存状態・削除・×（閉じる）。
    ホームボタンと前日/翌日の移動ボタンは廃止し、×だけで閉じる。
    骨格（オーバーレイ・枠・見出し帯・本文のスクロール）は共通部品
    .ui-overlay.is-top / .ui-modal / .ui-modal-head / .ui-modal-body に任せ、
    ここには日報詳細だけの違いを書く（2026-08-10に共通部品へ統合）。
-   自主点検・残留塩素の入力（.ui-overlay.is-nested）はこの上に重なる */
+   自主点検・残留塩素の入力ショートカットは2026-08-13に廃止（各専用画面へ一本化） */
 
 /* 中にカード（.report-card）を並べるため、枠の地はページと同じ薄いグレーにする */
 .report-detail-modal { background: var(--bg-app); }
 
-/* ボタンが多く、狭い画面では折り返しが要る。地は白のままカードと区別する */
 .report-detail-head {
-  flex-wrap: wrap;
   background: var(--bg-surface);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
 }
 
 .report-detail-head .ui-page-title { margin: 0; }
 
-/* 自主点検・残留塩素ボタン＋削除＋×が並ぶため、幅が足りない画面では折り返して
-   ×ボタンが画面外へはみ出すのを防ぐ（2026-08-10。安全策。通常幅では1行に収まる） */
+/* 削除＋×だけになったため、日付と同じ行（トップ）に必ず収まる（2026-08-13。
+   以前は自主点検・残留塩素ボタンもここに並び、狭い画面では折り返していた） */
 .report-head-right {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-shrink: 0;
   gap: var(--space-3);
   margin-left: auto;
 }
 
 .report-saved { font-size: var(--fs-xs); color: var(--color-brand); font-weight: 700; }
-
-/* 自主点検・残留塩素ボタン。アイコンを持たせないぶん、通常のbtn-primary/btn-plainより
-   横幅を詰める（2026-08-10。iPhone幅で×・削除ボタンが画面外にはみ出していたため）。
-   共通ボタン標準（.btn-primary/.btn-plain）より後ろで定義しても確実に上書きされるよう、
-   単独クラスではなく親要素との組み合わせ（詳細度2）にしている */
-.report-head-right .report-head-btn { padding-left: var(--space-3); padding-right: var(--space-3); }
-
-/* 削除は誤操作を防ぐため自主検査入力ボタンと少し間隔を空ける */
-.report-head-delete { margin-left: var(--space-3); }
-
-@media (max-width: 640px) {
-  .report-head-right .report-head-btn {
-    height: 36px;
-    padding-left: var(--space-2);
-    padding-right: var(--space-2);
-    font-size: var(--fs-sm);
-  }
-}
 
 .report-card {
   background: var(--bg-surface);
@@ -1709,17 +1705,9 @@
 
 /* --- 違反車両一覧（/reports/parking。日を跨って横断的に見る独立画面。2026-08-05〜） --- */
 /* 検索・並び順は機能ヘッダの左側にまとめた（2026-08-12。専用の .parking-list-controls
-   行は廃止し、.ui-feature-head-main の並びに任せる） */
-.parking-search {
-  flex: 1 1 200px;
-  min-width: 200px;
-  padding: 8px 12px;
-  font-size: var(--fs-base);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  color: var(--text-base);
-}
+   行は廃止し、.ui-feature-head-main の並びに任せる）。検索欄は2026-08-13に日報一覧と
+   同じ「虫眼鏡タップで開閉」方式へ変更し、常設の入力欄（旧 .parking-search）は廃止した。
+   開いたときの検索欄は日報一覧と共通の .reports-search-bar をそのまま使う（本ファイル内） */
 
 /* 日付順/累計回数順の切替は .ui-segmented を使う（見た目の定義は ui.css） */
 

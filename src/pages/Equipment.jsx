@@ -90,47 +90,49 @@ export default function Equipment() {
       <AppHeader />
       <div className="ui-container is-narrow">
         {/* 機能ヘッダ。機能名「備品」はアプリヘッダのタイトルが示すのでここには置かない。
-            左＝表示期間・絞り込み、右＝入出庫の操作（2026-08-12） */}
+            表示期間・絞り込み・入出庫の操作を全て filters 側にまとめ、モバイルでも
+            1行に収まるようにする（2026-08-13。actions 側は狭幅で2行目に分かれる仕様の
+            ため使わない）。表示期間はセグメント切替からドロップダウンに変更して幅を節約 */}
         <FeatureHeader
           filters={
             <>
-              <nav className="ui-segmented" aria-label="明細の表示期間">
+              <select
+                className="equipment-period-select"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                aria-label="明細の表示期間"
+              >
                 {PERIODS.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    className={`ui-segmented-btn${period === p.key ? ' is-active' : ''}`}
-                    aria-current={period === p.key ? 'page' : undefined}
-                    onClick={() => setPeriod(p.key)}
-                  >
+                  <option key={p.key} value={p.key}>
                     {p.label}
-                  </button>
+                  </option>
                 ))}
-              </nav>
+              </select>
               {/* 絞り込みは機能ヘッダの左側にまとめる（2026-08-12。以前は一覧の下端にあり、
-                  スクロールしないと見つからなかった） */}
+                  スクロールしないと見つからなかった）。文言は2026-08-13に「無効品込み」へ短縮 */}
               <label className="equipment-toggle-disabled">
                 <input
                   type="checkbox"
                   checked={showDisabled}
                   onChange={(e) => setShowDisabled(e.target.checked)}
                 />
-                無効な備品も表示
+                無効品込み
               </label>
+              {!readOnly && (
+                <>
+                  {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外）。
+                      表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
+                      専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
+                      iPhone幅で「入庫」だけ2行目に折り返していた） */}
+                  <button type="button" className="btn-primary equipment-header-btn" onClick={() => setMode('out')}>
+                    出庫
+                  </button>
+                  <button type="button" className="btn-primary equipment-header-btn" onClick={() => setMode('in')}>
+                    入庫
+                  </button>
+                </>
+              )}
             </>
-          }
-          actions={
-            readOnly ? null : (
-              <>
-                {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外） */}
-                <button type="button" className="btn-primary" onClick={() => setMode('out')}>
-                  出庫
-                </button>
-                <button type="button" className="btn-primary" onClick={() => setMode('in')}>
-                  入庫
-                </button>
-              </>
-            )
           }
         />
 

@@ -155,7 +155,7 @@ export default function Dashboard() {
 
   return (
     <div className="ui-page">
-      <AppHeader />
+      <AppHeader lastFetchAt={lastFetchAt} />
 
       {creditAlert && (
         <div className="dashboard-banner dashboard-credit-alert" role="alert">
@@ -198,7 +198,6 @@ export default function Dashboard() {
           onOpenArchive={() => navigate('/archive')}
           onSpamTask={handleSpamTask}
           onAddToReport={handleAddToReport}
-          lastFetchAt={lastFetchAt}
           sharedGmail={sharedGmail}
         />
       )}

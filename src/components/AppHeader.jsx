@@ -4,6 +4,7 @@ import AboutModal from './AboutModal'
 import { getCurrentUser, logout } from '../lib/auth'
 import { reloadApp } from '../pwa/reloadApp'
 import { formatBuildTime } from '../lib/version'
+import { formatDateTime } from '../lib/format'
 import { runFetch } from '../lib/api'
 import { isPushSupported, getPushStatus, enablePush, disablePush } from '../lib/push'
 import useStickyHeightVar from '../lib/useStickyHeightVar'
@@ -52,7 +53,11 @@ function featureTitleFor(pathname) {
   return hit?.title ?? ''
 }
 
-export default function AppHeader() {
+// lastFetchAt: メール取得パイプラインの最終取得日時（'今すぐ取得'の結果）。
+// タスク画面（Dashboard.jsx＝カンバン）だけがこの値を持つため、渡さない画面では
+// 何も表示しない（2026-08-13。以前はカンバンの機能ヘッダ右側に置いていたが、
+// 「今すぐ取得」ボタンと同じくハンバーガーメニューの近くにまとめてほしいとの依頼で移設）
+export default function AppHeader({ lastFetchAt } = {}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [fetching, setFetching] = useState(false)
@@ -183,6 +188,9 @@ export default function AppHeader() {
         </div>
         <div className="app-header-right">
           {user?.display_name && <span className="app-header-user">{user.display_name} さん</span>}
+          {lastFetchAt && (
+            <span className="app-header-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
+          )}
           <div className="app-menu" ref={menuRef}>
             <button
               type="button"
@@ -232,9 +240,16 @@ export default function AppHeader() {
               )}
               <div className="app-menu-divider" role="separator" />
               {!inReports && !inEquipment && !isOwner && (
-                <button onClick={handleRunFetch} disabled={fetching}>
-                  {fetching ? '取得中…' : '今すぐ取得'}
-                </button>
+                <>
+                  {/* ヘッダー本体では狭幅（≤768px）で最終取得時刻を隠すため、
+                      メニュー内にも同じ表示を残しモバイルでも確認できるようにする */}
+                  {lastFetchAt && (
+                    <p className="app-menu-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</p>
+                  )}
+                  <button onClick={handleRunFetch} disabled={fetching}>
+                    {fetching ? '取得中…' : '今すぐ取得'}
+                  </button>
+                </>
               )}
               {pushStatus !== 'unsupported' && (
                 <button

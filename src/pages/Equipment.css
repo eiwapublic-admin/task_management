@@ -97,16 +97,37 @@
 .equipment-stock-qty.is-danger { color: var(--color-danger); }
 .equipment-stock-qty.is-muted { color: var(--text-faint); font-weight: 400; }
 
-/* 「無効な備品も表示」の絞り込み。機能ヘッダの左側（表示条件のグループ）に置く */
+/* 明細の表示期間（3ヶ月/1年/全期間）。以前はセグメント切替（3ボタン）だったが、
+   出庫・入庫ボタンまでモバイル幅で1行に収めるため、2026-08-13にドロップダウンへ
+   変更して幅を節約した。汎用の .ui-select は width:100% で伸びてしまうため使わず、
+   同じ見た目を内容幅だけで持たせる専用クラスにしている */
+.equipment-period-select {
+  flex-shrink: 0;
+  height: var(--control-h);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+}
+
+/* 「無効品込み」の絞り込み。機能ヘッダの左側（表示条件のグループ）に置く */
 .equipment-toggle-disabled {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
   cursor: pointer;
 }
+
+/* 出庫・入庫ボタン。表示期間・絞り込みと同じ行にモバイルでも収まるよう、
+   標準の .btn-primary（左右 24px）より左右パディングを詰める（2026-08-13） */
+.equipment-header-btn { padding: 0 var(--space-3); }
 
 /* 入出庫モーダルの理由選択（择一ボタン） */
 .equipment-reason-field {

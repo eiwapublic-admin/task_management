@@ -299,7 +299,8 @@
 .icon-btn-gear,
 .icon-btn-delete,
 .icon-btn-download,
-.icon-btn-search {
+.icon-btn-search,
+.icon-btn-archive {
   flex-shrink: 0;
   width: var(--icon-btn);
   height: var(--icon-btn);
@@ -376,6 +377,14 @@
   border-color: var(--color-brand);
   color: var(--color-brand-ink);
 }
+
+/* アーカイブ。機能ヘッダの絞り込みと同じ行（filters側）に置くことが多いため、
+   自身をその行の右端に寄せる margin-left: auto を既定で持たせる（2026-08-13。
+   カンバン画面の唯一の呼び出し元に合わせた。他画面で使う場合は打ち消せばよい） */
+.icon-btn-archive {
+  margin-left: auto;
+}
+.icon-btn-archive:hover:not(:disabled) { color: var(--color-primary); }
 
 /* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
 .icon-btn-delete:hover:not(:disabled) {

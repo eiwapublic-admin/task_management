@@ -473,6 +473,13 @@ CSS に生値を書かない。
 - 行は**カテゴリごとにグルーピング**（`.ui-sticky-head-2` でカテゴリ見出しを固定表示）
 - 在庫が `warn_qty` 以下なら `.ui-badge.is-danger` ＋「発注依頼してください」（現行と同じ文言）
 - `disabled` の備品は既定で非表示（トグルで表示）。`track_stock=false` は在庫欄を「—」にする
+- **実装後の機能ヘッダ調整（2026-08-13）**: 実機フィードバックにより、表示期間（3ヶ月/1年/全期間）は
+  当初セグメント切替で実装したが、出庫・入庫ボタンまでモバイル幅で1行に収めるため`<select>`
+  （`.equipment-period-select`）に変更した。「無効な備品も表示」は「無効品込み」に短縮。出庫・入庫ボタンも
+  専用クラス（`.equipment-header-btn`。左右パディングを`.btn-primary`既定の24pxから12pxに詰める）にして、
+  期間選択・絞り込みと同じ1行（`FeatureHeader`の`filters`側。`actions`は狭幅で2行目に分かれる仕様のため
+  使わない）にモバイルでも収まるようにした。詳細は `docs/task-management-spec-cloudflare.md` 4-3 および
+  `docs/HANDOFF.md` を参照
 - **横スクロールする要素の中で `.ui-sticky-head` 系を使わない**
   （`sticky-header-overflow-trap` スキル参照。過去に3回踏んだ罠）
 

@@ -6,7 +6,6 @@ import TaskDetail from './TaskDetail'
 import TaskForm from './TaskForm'
 import { IconArchive } from './Icons'
 import { STATUS_LIST } from '../lib/status'
-import { formatDateTime } from '../lib/format'
 import './KanbanBoard.css'
 
 export default function KanbanBoard({
@@ -18,7 +17,6 @@ export default function KanbanBoard({
   onOpenArchive,
   onSpamTask,
   onAddToReport,
-  lastFetchAt,
   sharedGmail,
 }) {
   const [selectedAssignee, setSelectedAssignee] = useState(null)
@@ -63,28 +61,29 @@ export default function KanbanBoard({
 
   return (
     <div className="kanban-board">
-      {/* 機能ヘッダ（左＝絞り込み / 右＝機能ボタン）。機能名「タスク」はアプリヘッダの
-          タイトルが示すので title は置かない。列の見出しはこの下に
-          さらに重ねて固定表示する（KanbanColumn.jsx の .ui-sticky-head-2）。
-          下の余白は .kanban-board の gap が持つので is-flush で二重取りを避ける */}
+      {/* 機能ヘッダ（左＝絞り込み・アーカイブ / 右＝無し）。機能名「タスク」はアプリヘッダの
+          タイトルが示すので title は置かない。最終取得時刻はアプリヘッダのハンバーガー
+          メニュー横へ移設した（2026-08-13。AppHeader.jsx参照）。アーカイブは
+          actions（狭幅で2行目に分かれる）ではなく filters 側に置き、モバイルでも
+          絞り込みと同じ1行目の右端に収まるようにする（margin-left: autoで右寄せ） */}
       <FeatureHeader
         className="is-flush"
         filters={
-          <FilterBar
-            assignees={assignees}
-            selectedAssignee={selectedAssignee}
-            onChange={setSelectedAssignee}
-          />
-        }
-        actions={
           <>
-            {lastFetchAt && (
-              <span className="kanban-lastfetch">最終取得: {formatDateTime(lastFetchAt)}</span>
-            )}
+            <FilterBar
+              assignees={assignees}
+              selectedAssignee={selectedAssignee}
+              onChange={setSelectedAssignee}
+            />
             {onOpenArchive && (
-              <button type="button" className="btn-plain" onClick={onOpenArchive} title="アーカイブ">
-                <IconArchive size={18} />
-                <span className="btn-plain-label">アーカイブ</span>
+              <button
+                type="button"
+                className="icon-btn-archive"
+                onClick={onOpenArchive}
+                aria-label="アーカイブ"
+                title="アーカイブ"
+              >
+                <IconArchive size={20} />
               </button>
             )}
           </>

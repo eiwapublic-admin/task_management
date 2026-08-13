@@ -4,6 +4,7 @@ import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import FeatureHeader from '../components/FeatureHeader'
+import { IconSearch } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchParkingViolations,
@@ -36,6 +37,9 @@ export default function ParkingViolations() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('date') // 'date'（日付順） | 'rank'（累計回数順）
+  // 検索（2026-08-13。日報一覧の検索欄と同じ挙動に統一: 虫眼鏡タップで開閉し、
+  // 閉じると入力文字もクリアする）
+  const [searchOpen, setSearchOpen] = useState(false)
   // ヘッダーの「＋」から直接登録するとき用。本日の日報の id を持つ（2026-08-10）。
   // 準備中（日報の取得/作成中）は null のまま、準備できたらモーダルを開く
   const [quickAddReportId, setQuickAddReportId] = useState(null)
@@ -76,6 +80,15 @@ export default function ParkingViolations() {
   function handleCloseQuickAdd() {
     setQuickAddReportId(null)
     load()
+  }
+
+  function handleToggleSearch() {
+    if (searchOpen) {
+      setSearchOpen(false)
+      setQuery('')
+    } else {
+      setSearchOpen(true)
+    }
   }
 
   // 明細クリックで開く詳細モーダルの保存・削除。フィールドの更新結果には report_date が
@@ -136,18 +149,12 @@ export default function ParkingViolations() {
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
         {/* 機能ヘッダ（2026-08-13。ホームボタンは廃止。機能間の移動はダッシュボード経由に
-            一本化済み）。左＝検索・並び順、右＝記録の追加 */}
+            一本化済み）。1行目は左から ソート順・虫眼鏡・＋ の順（日報一覧の検索欄と
+            同じ挙動に統一。押すと下に検索欄が開く。文字ラベルを持たない検索・並び順は
+            絞り込み側＝filters、記録の追加は機能ボタン側＝actions に置く） */}
         <FeatureHeader
           filters={
             <>
-              <input
-                type="text"
-                className="parking-search"
-                placeholder="ナンバー・会社名などで検索"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="検索"
-              />
               <div className="ui-segmented" role="group" aria-label="並び順">
                 <button
                   type="button"
@@ -166,6 +173,16 @@ export default function ParkingViolations() {
                   累計回数順
                 </button>
               </div>
+              <button
+                type="button"
+                className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
+                onClick={handleToggleSearch}
+                aria-label="ナンバー・会社名などで検索"
+                aria-pressed={searchOpen}
+                title="ナンバー・会社名などで検索"
+              >
+                <IconSearch size={20} />
+              </button>
             </>
           }
           actions={
@@ -182,7 +199,32 @@ export default function ParkingViolations() {
               </button>
             )
           }
-        />
+        >
+          {searchOpen && (
+            <div className="reports-search-bar">
+              <IconSearch size={18} />
+              <input
+                type="search"
+                className="reports-search-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ナンバー・会社名などで検索"
+                aria-label="ナンバー・会社名などで検索"
+                autoFocus
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="reports-search-clear"
+                  onClick={() => setQuery('')}
+                  aria-label="検索文字をクリア"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+        </FeatureHeader>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

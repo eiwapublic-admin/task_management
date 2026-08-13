@@ -7,14 +7,6 @@
   padding: 0 var(--space-5) var(--space-4);
 }
 
-/* 機能ヘッダ右端の最終取得時刻（「今すぐ取得」はハンバーガーメニューへ移動済み）。
-   ボタンではないので、隣のボタンと同じ高さで縦位置だけ揃える */
-.kanban-lastfetch {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  white-space: nowrap;
-}
-
 /* ---------- フィルタバー ---------- */
 .filter-bar {
   display: flex;

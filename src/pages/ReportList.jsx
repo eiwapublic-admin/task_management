@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
-import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import FeatureHeader from '../components/FeatureHeader'
 import {
-  IconDownload,
   IconCar,
   IconClip,
   IconCheckCircle,
@@ -125,7 +123,6 @@ export default function ReportList() {
 
   const today = todayJST()
   const building = INSPECTION_BUILDINGS[0]
-  const pdf = useInspectionPdfExport(month, building)
 
   // 狭い画面では常にリスト型にフォールバックする（state自体は保持し、広い画面に戻れば
   // 選んでいた表示に復帰する）
@@ -630,45 +627,6 @@ export default function ReportList() {
               </button>
             </>
           }
-          actions={
-            <>
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => navigate('/reports/parking')}
-                title="違反車両一覧"
-              >
-                <IconCar size={18} />
-                <span className="btn-plain-label">違反車両</span>
-              </button>
-              {/* 残留塩素等検査（2026-08-10）。入力も帳票PDFの出力も専用画面で行う */}
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => navigate('/reports/chlorine')}
-                title="残留塩素等検査"
-              >
-                <IconDroplet size={18} />
-                <span className="btn-plain-label">残留塩素</span>
-              </button>
-              {/* 自主検査表の一覧画面（/reports/inspections）への遷移ボタンは廃止し、代わりに
-                  その場でPDFをダウンロード（アプリ内プレビュー表示）するボタンにした
-                  （2026-08-07）。一覧画面への遷移手段はこれで無くなるが、画面自体は当面残す。
-                  アイコンはInspections.jsxのPDFボタンと同じIconDownloadを使う。
-                  ツールバーの右端に配置する（2026-08-10。他のPDFボタンより先に押されやすい
-                  位置だったため、末尾に移動してほしいとの依頼） */}
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={pdf.download}
-                disabled={pdf.busy}
-                title="紙の様式でPDFに出力する（半月ごとに1ページ）"
-              >
-                <IconDownload size={18} />
-                <span className="btn-plain-label">{pdf.busy ? '作成中…' : '自主検査'}</span>
-              </button>
-            </>
-          }
         >
           {searchOpen && (
             <div className="reports-search-bar">
@@ -702,12 +660,6 @@ export default function ReportList() {
           </p>
         )}
 
-        {pdf.error && (
-          <p className="dashboard-error dashboard-banner" role="alert">
-            {pdf.error}
-          </p>
-        )}
-
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
         ) : searching ? (
@@ -731,10 +683,6 @@ export default function ReportList() {
           }}
         />
       )}
-
-      {pdf.sheetsPortal}
-      {pdf.previewModal}
-      {pdf.busyOverlay}
     </div>
   )
 }
