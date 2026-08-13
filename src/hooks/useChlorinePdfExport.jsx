@@ -9,19 +9,22 @@ import { fetchChlorineTests, getReportPdfPreviewUrl } from '../lib/reports'
 // 作りは自主検査表の useInspectionPdfExport と同じで、画面外に組んだ紙様式のシートを
 // html2canvas で撮り、1枚＝1ページのPDFにしてアプリ内でプレビュー表示する。
 //
-// 呼び出し元が持っているデータには依存させず、download() が呼ばれた時点で対象年・
-// 対象施設の記録を取得する（一覧の絞り込み状態と帳票の出力対象を独立させるため）。
-// 戻り値の sheetsPortal / previewModal は呼び出し元のJSXにそのまま差し込む。
-export default function useChlorinePdfExport(year, building) {
+// 対象年・対象施設は download(year, building) の呼び出し時に渡す（2026-08-13。
+// 以前はフックの呼び出し時に固定していたが、一覧の年別絞り込みを廃止し、年月グループの
+// 見出しごとに「↓」を置いて対象年を暗黙に決める構成に変えたため、呼び出し側の状態に
+// 依存しない形にした）。戻り値の sheetsPortal / previewModal は呼び出し元のJSXにそのまま差し込む。
+export default function useChlorinePdfExport() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // アプリ内プレビュー表示中のPDF（{ filename, url, blob }）。null なら非表示
   const [preview, setPreview] = useState(null)
   // ダウンロード実行中だけ埋める、紙様式シートの描画に必要なページ配列
   const [pages, setPages] = useState(null)
+  // ダウンロード実行中の対象年・対象施設（シートの描画に必要）
+  const [reportMeta, setReportMeta] = useState(null)
   const sheetsRef = useRef(null)
 
-  async function download() {
+  async function download(year, building) {
     setBusy(true)
     setError('')
     try {
@@ -30,6 +33,7 @@ export default function useChlorinePdfExport(year, building) {
         setError(`${year}年の${building}の測定記録がありません。`)
         return
       }
+      setReportMeta({ year, building })
       // 帳票は古い順（実施した順）に並べる。一覧APIは新しい順で返すため入れ替える
       const sorted = [...tests].sort((a, b) => new Date(a.tested_at) - new Date(b.tested_at))
       const sliced = []
@@ -108,23 +112,24 @@ export default function useChlorinePdfExport(year, building) {
 
   // PDF用の紙様式シート。通常は何も無く、ダウンロード実行中だけ画面外に描画される。
   // 親のレイアウト（flex/overflow）の影響を受けないよう body 直下に出す。
-  const sheetsPortal = pages
-    ? createPortal(
-        <div ref={sheetsRef}>
-          {pages.map((rows, i) => (
-            <ChlorineSheet
-              key={i}
-              building={building}
-              year={year}
-              rows={rows}
-              pageIndex={i}
-              pageCount={pages.length}
-            />
-          ))}
-        </div>,
-        document.body,
-      )
-    : null
+  const sheetsPortal =
+    pages && reportMeta
+      ? createPortal(
+          <div ref={sheetsRef}>
+            {pages.map((rows, i) => (
+              <ChlorineSheet
+                key={i}
+                building={reportMeta.building}
+                year={reportMeta.year}
+                rows={rows}
+                pageIndex={i}
+                pageCount={pages.length}
+              />
+            ))}
+          </div>,
+          document.body,
+        )
+      : null
 
   const previewModal = preview ? (
     <AttachmentPreview

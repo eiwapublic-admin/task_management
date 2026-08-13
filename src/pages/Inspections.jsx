@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
-import { IconHome, IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
+import { IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
@@ -30,7 +29,6 @@ import '../components/KanbanBoard.css'
 // 紙の記入ルール「不備が有る場合は項目に×とし、良好の場合は確認箇所一斉に○とすること」に
 // 合わせ、通常は「すべて良好」1タップで済み、不備のある項目だけ×/◎に落とす。
 export default function Inspections() {
-  const navigate = useNavigate()
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
 
@@ -91,6 +89,30 @@ export default function Inspections() {
 
   const today = todayJST()
 
+  // 機能ヘッダの「＋」。表示中の月がずれていると byDate（表示中の月のデータしか
+  // 持たない）が当日の既存記録を拾えず、開いたフォームが誤って空欄になる
+  // （＝保存すると既存記録を上書きしてしまう）ため、その場合は当月のデータを
+  // 取り直してから開く。表示中の月が既に当月ならそのまま開く（多くはこちら）
+  async function handleQuickAdd() {
+    const cur = currentMonthJST()
+    if (month === cur) {
+      setEditing(today)
+      return
+    }
+    setMonth(cur)
+    try {
+      const [inspections, closed] = await Promise.all([
+        fetchInspections({ month: cur }),
+        fetchClosedDays({ month: cur }),
+      ])
+      setRows(inspections)
+      setClosedDays(new Set(closed))
+    } catch (err) {
+      setError(err.message)
+    }
+    setEditing(today)
+  }
+
   function handleSaved(result) {
     if (result.closed) {
       setClosedDays((prev) => new Set(prev).add(result.inspected_on))
@@ -126,54 +148,55 @@ export default function Inspections() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-wide">
-        {/* 機能ヘッダ（2026-08-12）。左＝年月の移動、右＝PDF出力。
-            日報のサブ画面なので、現在地が分かるよう title を置く */}
+        {/* 機能ヘッダ（2026-08-13）。ホームボタンは廃止（機能間の移動はダッシュボード経由に
+            一本化済み）。年月・＋（当日を記録）・↓（PDF出力）をこの順で1行に収めるため、
+            すべて filters（左側）に入れる（actions を使うと狭幅で2行目に分かれてしまうため） */}
         <FeatureHeader
-          leading={
-            <button
-              type="button"
-              className="icon-btn-home"
-              onClick={() => navigate('/reports')}
-              aria-label="日報一覧に戻る"
-              title="日報一覧に戻る"
-            >
-              <IconHome size={32} />
-            </button>
-          }
           filters={
-            <div className="inspection-month">
+            <>
+              <div className="inspection-month">
+                <button
+                  type="button"
+                  className="icon-btn-nav"
+                  onClick={() => setMonth(shiftMonth(month, -1))}
+                  aria-label="前月"
+                  title="前月"
+                >
+                  <IconChevronLeft size={28} />
+                </button>
+                <span className="inspection-month-label">{month.replace('-', '年')}月</span>
+                <button
+                  type="button"
+                  className="icon-btn-nav"
+                  onClick={() => setMonth(shiftMonth(month, 1))}
+                  aria-label="翌月"
+                  title="翌月"
+                >
+                  <IconChevronRight size={28} />
+                </button>
+              </div>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-btn-add"
+                  onClick={handleQuickAdd}
+                  aria-label="本日の自主検査を記録"
+                  title="本日の自主検査を記録"
+                >
+                  ＋
+                </button>
+              )}
               <button
                 type="button"
-                className="icon-btn-nav"
-                onClick={() => setMonth(shiftMonth(month, -1))}
-                aria-label="前月"
-                title="前月"
+                className="icon-btn-download"
+                onClick={pdf.download}
+                disabled={pdf.busy || loading}
+                aria-label="紙の様式でPDFに出力する（半月ごとに1ページ）"
+                title={pdf.busy ? '作成中…' : '紙の様式でPDFに出力する（半月ごとに1ページ）'}
               >
-                <IconChevronLeft size={28} />
+                <IconDownload size={20} />
               </button>
-              <span className="inspection-month-label">{month.replace('-', '年')}月</span>
-              <button
-                type="button"
-                className="icon-btn-nav"
-                onClick={() => setMonth(shiftMonth(month, 1))}
-                aria-label="翌月"
-                title="翌月"
-              >
-                <IconChevronRight size={28} />
-              </button>
-            </div>
-          }
-          actions={
-            <button
-              type="button"
-              className="btn-plain inspection-pdf-btn"
-              onClick={pdf.download}
-              disabled={pdf.busy || loading}
-              title="紙の様式でPDFに出力する（半月ごとに1ページ）"
-            >
-              <IconDownload size={18} />
-              <span className="btn-plain-label">{pdf.busy ? '作成中…' : 'PDF'}</span>
-            </button>
+            </>
           }
         />
 

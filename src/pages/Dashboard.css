@@ -1869,9 +1869,6 @@
 .inspection-note { display: block; color: var(--text-muted); }
 .inspection-legend { margin-top: var(--space-3); }
 
-/* PDF出力ボタンはツールバーの右端に寄せる（2026-08-06） */
-.inspection-pdf-btn { margin-left: auto; }
-
 /* 入力モーダル */
 /* 入力モーダルの骨格（オーバーレイ・枠・ヘッダ・本文・フッタ）は共通部品
    .ui-overlay / .ui-modal（ui.css）へ統合済み（2026-08-11）。
@@ -1988,54 +1985,58 @@
 /* ============================================================
    残留塩素等検査（Phase 5。2026-08-10）。
    現行アプリ（FileMaker）の「残留塩素濃度_TOP／検査一覧／帳票」に相当する画面。
-   一覧は測定日ごとにまとめ、行をタップすると入力モーダルが開く。
+   2026-08-13: 表示対象年・測定施設の絞り込みを廃止し、一覧は常に全件を年月で
+   グループ化して表示する（トグルで開閉。今月・前月は既定で開く）。行をタップすると
+   入力モーダルが開く。帳票PDFの出力は各グループ見出しの「↓」から起動する。
    ============================================================ */
 
-/* 対象年（一覧の絞り込み・帳票の対象年を兼ねる）・帳票の出力対象施設・PDF出力ボタンを
-   機能ヘッダの左側（表示条件のグループ）に置く（2026-08-12。以前は専用の
-   .chlorine-controls 行だったが、機能ヘッダに統合した）。select は現行アプリの
-   選択肢が少ない（年4桁／施設2択）ため、汎用の .report-field select の
-   min-width: 130px をこのコンテキストだけ狭めて詰める */
-.chlorine-year-field select,
-.chlorine-building-filter-field select {
-  min-width: 104px;
-}
-
-/* 一覧（測定日ごとの見出し＋その日の測定行） */
+/* 一覧（年月ごとの見出し＋その月の測定行） */
 .chlorine-list { display: flex; flex-direction: column; gap: var(--space-3); }
 
-.chlorine-day {
+.chlorine-month {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-/* 測定日ごとの集計見出し。どこで日が切り替わるかを一目で分からせるため、
-   一覧の本文より一段大きく・太くする（2026-08-12。備品名と同じ扱い） */
-.chlorine-day-head {
-  margin: 0;
+/* 年月の見出し（トグルの開閉ボタンを兼ねる）。備品一覧のグループ見出しと同じ
+   淡いグリーン（カンバンの「完了」列と同じ式）にして、月の切り替わりが一目で
+   分かるようにする（2026-08-13） */
+.chlorine-month-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
+  cursor: pointer;
+}
+
+.chlorine-month-toggle-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+.chlorine-month-toggle-icon.is-open { transform: rotate(90deg); }
+
+.chlorine-month-label {
+  flex: 1 1 auto;
   font-size: var(--fs-xl);
   font-weight: 700;
   line-height: var(--leading-tight);
   color: var(--text-strong);
 }
 
-/* 曜日・祝日の色分けは自主検査表・日報一覧と揃える（土曜=青、日曜・祝日=赤） */
-.chlorine-day-head.is-saturday { color: var(--color-primary-hover); }
-.chlorine-day-head.is-holiday { color: var(--color-danger); }
+.chlorine-month-pdf-btn { flex-shrink: 0; }
 
 .chlorine-rows { list-style: none; margin: 0; padding: 0; }
 
 .chlorine-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
-  flex-wrap: wrap;
 }
 
 .chlorine-row.is-clickable { cursor: pointer; }
@@ -2045,10 +2046,13 @@
   outline-offset: -2px;
 }
 
-.chlorine-row-building { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); min-width: 92px; }
-.chlorine-row-time { font-size: var(--fs-base); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* 一覧明細は 日付・施設・塩素濃度 の3項目のみ（2026-08-13。時刻・場所・検査員・
+   官能検査NGは一覧から外した。入力モーダルでは引き続き記録・編集できる） */
+.chlorine-row-date { flex-shrink: 0; font-size: var(--fs-base); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.chlorine-row-building { flex: 1 1 auto; min-width: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
 
 .chlorine-row-value {
+  flex-shrink: 0;
   font-size: 18px;
   font-weight: 700;
   color: var(--text-strong);
@@ -2059,17 +2063,6 @@
 
 /* 水道水質基準（0.1mg/L）を下回った測定値は赤で目立たせる */
 .chlorine-row-value.is-below { color: var(--color-danger); }
-
-.chlorine-row-location, .chlorine-row-inspector { font-size: var(--fs-base); color: var(--text-base); }
-
-.chlorine-row-ng {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-}
 
 .chlorine-legend { margin-top: var(--space-3); }
 
@@ -2189,12 +2182,6 @@
 
 .chlorine-photo-add { display: flex; flex-direction: column; gap: 6px; }
 .chlorine-photo-add .btn-plain { width: 100%; }
-
-@media (max-width: 640px) {
-  .chlorine-row-building { min-width: 0; }
-  .chlorine-year-field > span,
-  .chlorine-building-filter-field > span { font-size: var(--fs-xs); }
-}
 
 /* ============================================================
    PDF作成中のブロッキングオーバーレイ（2026-08-10）。

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
-import { IconHome } from '../components/Icons'
 import FeatureHeader from '../components/FeatureHeader'
 import { getCurrentUser } from '../lib/auth'
 import {
@@ -136,20 +135,9 @@ export default function ParkingViolations() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-narrow reports-container">
-        {/* 機能ヘッダ（2026-08-12）。左＝検索・並び順、右＝記録の追加。
-            日報のサブ画面なので、現在地が分かるよう title を置く */}
+        {/* 機能ヘッダ（2026-08-13。ホームボタンは廃止。機能間の移動はダッシュボード経由に
+            一本化済み）。左＝検索・並び順、右＝記録の追加 */}
         <FeatureHeader
-          leading={
-            <button
-              type="button"
-              className="icon-btn-home"
-              onClick={() => navigate('/reports')}
-              aria-label="日報一覧に戻る"
-              title="日報一覧に戻る"
-            >
-              <IconHome size={32} />
-            </button>
-          }
           filters={
             <>
               <input
