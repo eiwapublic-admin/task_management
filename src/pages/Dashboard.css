@@ -1709,6 +1709,12 @@
 
 .parking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
+/* PC表示（タブレット横以上）は1列だと明細の余白が目立ちすぎるため、3列表示にする
+   （2026-08-14。スマートフォン幅は従来どおり1列のまま） */
+@media (min-width: 768px) {
+  .parking-list { display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; gap: var(--space-3); }
+}
+
 /* 明細の表示フォーマットは残留塩素一覧（.chlorine-row）に合わせる（2026-08-11）。
    日付・車種・テナント名を太字で目立たせ、クリックで詳細（写真・項目の編集）を開ける */
 .parking-list-row {
@@ -1717,6 +1723,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
+  height: 100%;
 }
 
 .parking-list-row.is-clickable { cursor: pointer; }
@@ -1742,23 +1749,33 @@
   border-radius: var(--radius-pill);
 }
 
+/* 「yyyy/mm/dd の日報を見る」の文字リンクをアイコン1つに変更（2026-08-14） */
 .parking-list-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 6px 0 0 auto;
-  width: fit-content;
-  font-size: var(--fs-xs);
+  width: 32px;
+  height: 32px;
   color: var(--color-primary);
   background: transparent;
   border: none;
+  border-radius: var(--radius-control);
   cursor: pointer;
-  text-decoration: underline;
   padding: 0;
 }
+.parking-list-link:hover,
+.parking-list-link:focus-visible {
+  background: var(--color-primary-soft);
+}
 
-.parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-base); margin-top: 4px; }
+.parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-base); margin-top: 4px; flex-wrap: wrap; }
 
-/* 車種・テナント名も太字で目立たせる（2026-08-11） */
-.parking-list-vehicle, .parking-list-owner { font-weight: 700; color: var(--text-strong); }
+/* 2行目の表示順・文字色はテナント名（所有会社）→メーカー→車種で固定（2026-08-14）。
+   テナント名だけ青太字で目立たせる（ユーザー要望による、行自体がクリック可能なことの
+   強調も兼ねる）。メーカー・車種は黒（本文色）のまま */
+.parking-list-owner { font-weight: 700; color: var(--color-primary); }
+.parking-list-maker, .parking-list-model { font-weight: 400; color: var(--text-strong); }
 
 .parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 

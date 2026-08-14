@@ -51,8 +51,9 @@ export default function Chlorine() {
   const [newBuilding, setNewBuilding] = useState(CHLORINE_BUILDINGS[0])
   // ペア記録の続きを開いた時だけ出す案内文（通常の「＋」では空のまま）
   const [pairNotice, setPairNotice] = useState('')
-  // PDFダウンロードダイアログ。開いている間は対象年（グループの「↓」から渡される）を持つ
-  const [pdfDialogYear, setPdfDialogYear] = useState(null)
+  // PDFダウンロードダイアログ。開いている間は対象年月（グループの「↓」から渡される。
+  // 帳票自体は年単位で出力するが、ヘッダの年月表示に使う。2026-08-14）を持つ
+  const [pdfDialog, setPdfDialog] = useState(null) // { year, month } | null
   const [pdfBuilding, setPdfBuilding] = useState(CHLORINE_BUILDINGS[0])
   // 年月グループの開閉状態。ユーザーが手で切り替えた分だけ既定値からの例外として持つ
   const [collapseOverrides, setCollapseOverrides] = useState({})
@@ -158,9 +159,9 @@ export default function Chlorine() {
   }
 
   function handleConfirmPdf() {
-    const year = pdfDialogYear
-    setPdfDialogYear(null)
-    pdf.download(year, pdfBuilding)
+    const { year, month } = pdfDialog
+    setPdfDialog(null)
+    pdf.download(year, pdfBuilding, month)
   }
 
   return (
@@ -234,7 +235,10 @@ export default function Chlorine() {
                       className="icon-btn-download chlorine-month-pdf-btn"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setPdfDialogYear(Number(g.yearMonth.slice(0, 4)))
+                        setPdfDialog({
+                          year: Number(g.yearMonth.slice(0, 4)),
+                          month: Number(g.yearMonth.slice(5, 7)),
+                        })
                       }}
                       onKeyDown={(e) => e.stopPropagation()}
                       aria-label={`${g.yearMonth.slice(0, 4)}年の残留塩素等検査実施記録表をPDF出力`}
@@ -310,12 +314,12 @@ export default function Chlorine() {
 
       {/* 帳票の出力対象施設を選ぶダイアログ（2026-08-13。以前は機能ヘッダの常設ドロップダウンで
           選ばせていたが、その絞り込み欄自体を廃止したため、「↓」を押した時だけその場で選ぶ形にした） */}
-      {pdfDialogYear !== null && (
+      {pdfDialog !== null && (
         <div
           className="ui-overlay is-nested"
           role="dialog"
           aria-modal="true"
-          onClick={() => setPdfDialogYear(null)}
+          onClick={() => setPdfDialog(null)}
         >
           <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
             <div className="ui-modal-head">
@@ -323,7 +327,7 @@ export default function Chlorine() {
               <button
                 type="button"
                 className="icon-btn-close"
-                onClick={() => setPdfDialogYear(null)}
+                onClick={() => setPdfDialog(null)}
                 aria-label="閉じる"
               >
                 ×
@@ -347,7 +351,7 @@ export default function Chlorine() {
             <div className="ui-modal-foot">
               <div className="ui-modal-foot-start" />
               <div className="ui-modal-foot-end">
-                <button type="button" className="btn-plain" onClick={() => setPdfDialogYear(null)}>
+                <button type="button" className="btn-plain" onClick={() => setPdfDialog(null)}>
                   キャンセル
                 </button>
                 <button type="button" className="btn-primary" onClick={handleConfirmPdf} disabled={pdf.busy}>

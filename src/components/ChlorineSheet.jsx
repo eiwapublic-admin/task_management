@@ -34,21 +34,28 @@ function judgementMark(value) {
   return ''
 }
 
-export default function ChlorineSheet({ building, year, rows, pageIndex, pageCount }) {
+// {year}年{month}月（monthが無ければ年のみ。旧表示との後方互換用）
+function formatHeaderYearMonth(year, month) {
+  return month ? `${year}年${month}月` : `${year}年`
+}
+
+export default function ChlorineSheet({ building, year, month, rows, pageIndex, pageCount }) {
   return (
     <div className="chl-sheet">
       <h1 className="chl-sheet-heading">残留塩素等検査実施記録表</h1>
 
+      {/* ヘッダ部：左端に特定建築物名・年月、右端に週1回検査／水道水質基準の注記を
+          グレー文字で表示する（2026-08-14。以前は左右が逆だった） */}
       <div className="chl-sheet-subhead">
-        <div className="chl-sheet-terms">
-          <p>週1回検査</p>
-          <p>水道水質基準：遊離残留塩素濃度として {CHLORINE_STANDARD_MIN.toFixed(1)}mg/L以上</p>
-        </div>
         <div className="chl-sheet-meta">
           <p className="chl-sheet-building">
             特定建築物名【 <strong>{building}</strong> 】
           </p>
-          <p>{year} 年</p>
+          <p>{formatHeaderYearMonth(year, month)}</p>
+        </div>
+        <div className="chl-sheet-terms">
+          <p>週1回検査</p>
+          <p>水道水質基準：遊離残留塩素濃度として {CHLORINE_STANDARD_MIN.toFixed(1)}mg/L以上</p>
         </div>
       </div>
 

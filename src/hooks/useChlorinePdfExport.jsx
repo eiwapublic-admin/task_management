@@ -24,7 +24,8 @@ export default function useChlorinePdfExport() {
   const [reportMeta, setReportMeta] = useState(null)
   const sheetsRef = useRef(null)
 
-  async function download(year, building) {
+  // month はヘッダの年月表示専用（対象データは従来どおり年単位で取得する。2026-08-14）
+  async function download(year, building, month) {
     setBusy(true)
     setError('')
     try {
@@ -33,7 +34,7 @@ export default function useChlorinePdfExport() {
         setError(`${year}年の${building}の測定記録がありません。`)
         return
       }
-      setReportMeta({ year, building })
+      setReportMeta({ year, building, month })
       // 帳票は古い順（実施した順）に並べる。一覧APIは新しい順で返すため入れ替える
       const sorted = [...tests].sort((a, b) => new Date(a.tested_at) - new Date(b.tested_at))
       const sliced = []
@@ -121,6 +122,7 @@ export default function useChlorinePdfExport() {
                 key={i}
                 building={reportMeta.building}
                 year={reportMeta.year}
+                month={reportMeta.month}
                 rows={rows}
                 pageIndex={i}
                 pageCount={pages.length}

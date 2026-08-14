@@ -4,7 +4,7 @@ import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import FeatureHeader from '../components/FeatureHeader'
-import { IconSearch } from '../components/Icons'
+import { IconClipboard, IconSearch } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchParkingViolations,
@@ -242,7 +242,6 @@ export default function ParkingViolations() {
             {filtered.map((v) => {
               const key = plateKey(v)
               const count = key ? countByPlate.get(key) || 0 : 0
-              const vehicle = [v.maker, v.model].filter(Boolean).join(' ')
               return (
                 <li key={v.id}>
                   <div
@@ -272,10 +271,13 @@ export default function ParkingViolations() {
                       </span>
                       {count > 1 && <span className="parking-list-count">累計{count}回</span>}
                     </div>
-                    {(vehicle || v.owner_company) && (
+                    {(v.owner_company || v.maker || v.model) && (
+                      // 表示順・色は所有会社（テナント名。青太字）→メーカー（黒）→車種（黒）
+                      // の順に固定する（2026-08-14。ユーザー要望による2行目の並び）
                       <div className="parking-list-sub">
-                        {vehicle && <span className="parking-list-vehicle">{vehicle}</span>}
                         {v.owner_company && <span className="parking-list-owner">{v.owner_company}</span>}
+                        {v.maker && <span className="parking-list-maker">{v.maker}</span>}
+                        {v.model && <span className="parking-list-model">{v.model}</span>}
                       </div>
                     )}
                     {v.violations.length > 0 && (
@@ -289,6 +291,7 @@ export default function ParkingViolations() {
                     )}
                     {v.note && <p className="parking-list-note">{v.note}</p>}
                     {v.report_date && (
+                      // 「yyyy/mm/dd の日報を見る」の文字リンクをアイコン1つに変更（2026-08-14）
                       <button
                         type="button"
                         className="parking-list-link"
@@ -296,8 +299,10 @@ export default function ParkingViolations() {
                           e.stopPropagation()
                           navigate(`/reports/${v.report_date}`)
                         }}
+                        aria-label={`${formatReportDate(v.report_date)}の日報を見る`}
+                        title={`${formatReportDate(v.report_date)}の日報を見る`}
                       >
-                        {formatReportDate(v.report_date)}の日報を見る
+                        <IconClipboard size={18} />
                       </button>
                     )}
                   </div>

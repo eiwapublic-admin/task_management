@@ -47,17 +47,21 @@ body.pdf-capture-mode .chl-sheet {
   margin-bottom: 3mm;
 }
 
+/* 週1回検査／水道水質基準の注記は右端にグレー文字で（2026-08-14。以前は左端・黒文字） */
 .chl-sheet-terms {
+  text-align: right;
   font-size: 8.5pt;
   line-height: 1.5;
+  color: #666;
 }
 
 .chl-sheet-terms p {
   margin: 0;
 }
 
+/* 特定建築物名・年月は左端に（2026-08-14。以前は右端） */
 .chl-sheet-meta {
-  text-align: right;
+  text-align: left;
   font-size: 10pt;
   line-height: 1.6;
 }

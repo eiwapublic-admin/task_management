@@ -17,14 +17,18 @@ import { getCurrentUser } from '../lib/auth'
 import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
 import {
+  CHLORINE_STANDARD_MIN,
   currentMonthJST,
   currentYearJST,
+  daysInMonth,
   fetchChlorineTests,
+  fetchClosedDays,
   fetchInspections,
   fetchParkingViolations,
   fetchReports,
   formatReportDate,
   jstDateOnly,
+  shiftDate,
   todayJST,
 } from '../lib/reports'
 import { dueStatus } from '../lib/format'
@@ -62,6 +66,20 @@ function greeting() {
   return 'おつかれさまです'
 }
 
+// 当月1日〜昨日のうち、休館日を除いて記録が無い日数を数える
+// （日報・自主検査の「未起票日数」カードで共通に使う）
+function countUnfiledDays(month, filedDates, closedDays, today) {
+  const count = daysInMonth(month)
+  let missing = 0
+  for (let d = 1; d <= count; d += 1) {
+    const date = `${month}-${String(d).padStart(2, '0')}`
+    if (date >= today) break
+    if (closedDays.has(date)) continue
+    if (!filedDates.has(date)) missing += 1
+  }
+  return missing
+}
+
 export default function Portal() {
   const navigate = useNavigate()
   const user = getCurrentUser()
@@ -82,18 +100,20 @@ export default function Portal() {
         fetchReports(),
         fetchEquipmentItems(),
         fetchParkingViolations(),
-        fetchChlorineTests({ year }),
+        // 残留塩素は「過去10日間」の判定に年をまたぐ可能性があるため、年で絞らず全期間取得する
+        fetchChlorineTests(),
         fetchInspections({ month }),
+        fetchClosedDays({ month }),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, inspections] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, inspections, closedDays] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, inspections, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, inspections, closedDays, month, year })
       setLoading(false)
     }
 
@@ -105,8 +125,8 @@ export default function Portal() {
 
   const cards = useMemo(() => {
     const month = stats?.month ?? currentMonthJST()
-    const year = stats?.year ?? currentYearJST()
     const today = todayJST()
+    const closedDays = new Set(stats?.closedDays || [])
 
     // --- タスク（カンバン）---
     const tasks = stats?.tasks
@@ -116,31 +136,43 @@ export default function Portal() {
       (t) => t.status !== STATUS_DONE && dueStatus(t.due_date)?.level === 'overdue',
     ).length
 
-    // --- 日報 ---
+    // --- 日報：昨日までの未起票日数（休館日を除く。2026-08-14） ---
     const reports = stats?.reports
     const monthReports = reports?.filter((r) => (r.report_date || '').startsWith(month))
-    const hasToday = reports?.some((r) => r.report_date === today)
+    const unfiledReportDays = reports
+      ? countUnfiledDays(month, new Set(monthReports.map((r) => r.report_date)), closedDays, today)
+      : undefined
 
-    // --- 備品 ---
+    // --- 備品：在庫数が最も少ない機種の在庫数（警告本数以下のときだけ赤字。2026-08-14） ---
     const items = stats?.items
-    const lowStock = items?.filter(
-      (i) => i.track_stock && i.warn_qty != null && i.stock_qty != null && i.stock_qty <= i.warn_qty,
-    ).length
+    const trackedItems = items?.filter((i) => i.track_stock && i.stock_qty != null)
+    const lowestItem =
+      trackedItems && trackedItems.length > 0
+        ? trackedItems.reduce((min, i) => (i.stock_qty < min.stock_qty ? i : min))
+        : null
+    const lowestBelowWarn =
+      lowestItem != null && lowestItem.warn_qty != null && lowestItem.stock_qty <= lowestItem.warn_qty
 
-    // --- 違反車両 ---
+    // --- 自主検査：昨日までの未起票日数（休館日を除く。2026-08-14） ---
+    const inspections = stats?.inspections
+    const unfiledInspectionDays = inspections
+      ? countUnfiledDays(month, new Set(inspections.map((i) => i.inspected_on)), closedDays, today)
+      : undefined
+
+    // --- 違反車両：過去30日間（当日含む）の件数（2026-08-14） ---
     const parking = stats?.parking
-    const monthParking = parking?.filter((p) => jstDateOnly(p.checked_at).startsWith(month)).length
+    const parkingSince = shiftDate(today, -29)
+    const recentParking = parking?.filter((p) => jstDateOnly(p.checked_at) >= parkingSince).length
 
-    // --- 残留塩素等検査 ---
+    // --- 残留塩素等検査：過去10日間（当日含む）で規定値未満（0.1未満）の検出件数（2026-08-14） ---
     const chlorine = stats?.chlorine
     // API は新しい順で返すので先頭が最終測定
     const lastChlorine = chlorine?.[0]?.tested_at
-
-    // --- 自主検査表 ---
-    const inspections = stats?.inspections
-    const inspectedDays = inspections
-      ? new Set(inspections.map((i) => i.inspected_on)).size
-      : undefined
+    const chlorineSince = shiftDate(today, -9)
+    const belowStandardCount = chlorine?.filter((t) => {
+      if (jstDateOnly(t.tested_at) < chlorineSince) return false
+      return t.concentration !== null && t.concentration !== undefined && Number(t.concentration) < CHLORINE_STANDARD_MIN
+    }).length
 
     const monthLabel = `${Number(month.slice(5, 7))}月`
 
@@ -165,41 +197,42 @@ export default function Portal() {
         label: '日報',
         icon: <IconClipboard size={24} />,
         path: '/reports',
-        value: monthReports?.length,
+        value: unfiledReportDays,
         unit: '日',
-        caption: `${monthLabel}の記録`,
-        sub: reports == null ? '取得できませんでした' : hasToday ? '本日分は記録済み' : '本日分は未入力',
-        alert: reports != null && !hasToday,
+        caption: '未起票（昨日まで）',
+        sub: reports == null ? '取得できませんでした' : `${monthLabel}の記録 ${monthReports.length} 日`,
+        alert: unfiledReportDays > 0,
       },
       {
         key: 'equipment',
         label: '備品',
         icon: <IconBox size={24} />,
         path: '/equipment',
-        value: lowStock,
-        unit: '件',
-        caption: '在庫わずか',
-        sub: items == null ? '取得できませんでした' : `登録 ${items.length} 品目`,
-        alert: lowStock > 0,
+        value: lowestItem?.stock_qty,
+        unit: '点',
+        caption: '在庫最少',
+        sub: items == null ? '取得できませんでした' : lowestItem ? lowestItem.name : '在庫管理の対象がありません',
+        alert: lowestBelowWarn,
       },
       {
         key: 'inspections',
         label: '自主検査',
         icon: <IconCheckCircle size={24} />,
         path: '/reports/inspections',
-        value: inspectedDays,
+        value: unfiledInspectionDays,
         unit: '日',
-        caption: `${monthLabel}の実施`,
+        caption: '未起票（昨日まで）',
         sub: inspections == null ? '取得できませんでした' : '日常の防火・避難点検',
+        alert: unfiledInspectionDays > 0,
       },
       {
         key: 'parking',
         label: '違反車両',
         icon: <IconCar size={24} />,
         path: '/reports/parking',
-        value: monthParking,
+        value: recentParking,
         unit: '件',
-        caption: `${monthLabel}の記録`,
+        caption: '過去30日',
         sub: parking == null ? '取得できませんでした' : `累計 ${parking.length} 件`,
       },
       {
@@ -207,15 +240,16 @@ export default function Portal() {
         label: '残留塩素',
         icon: <IconDroplet size={24} />,
         path: '/reports/chlorine',
-        value: chlorine?.length,
+        value: belowStandardCount,
         unit: '件',
-        caption: `${year}年の測定`,
+        caption: '規定値未満（10日間）',
         sub:
           chlorine == null
             ? '取得できませんでした'
             : lastChlorine
               ? `最終測定 ${formatReportDate(jstDateOnly(lastChlorine))}`
               : 'まだ記録がありません',
+        alert: belowStandardCount > 0,
       },
     ]
 
