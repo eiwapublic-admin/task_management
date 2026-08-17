@@ -378,12 +378,24 @@
   color: var(--color-brand-ink);
 }
 
-/* アーカイブ。機能ヘッダの絞り込みと同じ行（filters側）に置くことが多いため、
-   自身をその行の右端に寄せる margin-left: auto を既定で持たせる（2026-08-13。
-   カンバン画面の唯一の呼び出し元に合わせた。他画面で使う場合は打ち消せばよい） */
-.icon-btn-archive {
-  margin-left: auto;
+/* アーカイブ。狭幅ではアイコンのみ、PC幅（769px以上）では文字ラベルも表示する
+   （2026-08-14。「アーカイブ」の文字を付けてほしいとの依頼）。ラベルの表示切替だけの
+   ためアイコンボタンの共通骨格（幅=高さ固定）とは別に、このボタンだけ幅を可変にする */
+.icon-btn-archive-label { display: none; }
+
+@media (min-width: 769px) {
+  .icon-btn-archive {
+    width: auto;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
+  .icon-btn-archive-label {
+    display: inline;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+  }
 }
+
 .icon-btn-archive:hover:not(:disabled) { color: var(--color-primary); }
 
 /* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
