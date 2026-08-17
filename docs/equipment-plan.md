@@ -719,16 +719,42 @@ Header: X-API-Key: <EQUIPMENT_API_KEY>
 6. 呼び出しは `activity_logs` に1行残す（呼び出し頻度は月数回想定なので溢れない）
 7. キーの生成・ローテーション手順を HANDOFF に記載する（GitHub Secrets → Deploy 実行）
 
-FileMaker 側の呼び出し例（`Insert from URL`、cURL オプション）:
+**動作確認（curl。FileMaker設定の前にターミナルで疎通確認するのを推奨）**:
 
+```bash
+curl -X GET \
+  "https://task-management.eiwa-public.workers.dev/api/equipment/installations?month=2026-08&scope=tenant" \
+  --header "X-API-Key: <EQUIPMENT_API_KEY の値>" \
+  --header "Accept: application/json"
 ```
-"-X GET
---header " & Quote("X-API-Key: ***") & "
---header " & Quote("Accept: application/json")
+
+**FileMaker 側の設定（`Insert from URL`）**:
+
+指定URL（計算式）:
 ```
+"https://task-management.eiwa-public.workers.dev/api/equipment/installations?month=" & Let(
+  [ $y = Year ( Get ( 現在の日付 ) ) ; $m = Month ( Get ( 現在の日付 ) ) ] ;
+  $y & "-" & Right ( "0" & $m ; 2 )
+) & "&scope=tenant"
+```
+（対象月をレイアウト上のフィールド等から渡したい場合は、上記の`Let`部分をそのフィールド参照に差し替える）
+
+cURLオプション（計算式）:
+```
+"-X GET " &
+"--header " & Quote ( "X-API-Key: " & $$EQUIPMENT_API_KEY ) & " " &
+"--header " & Quote ( "Accept: application/json" )
+```
+（`$$EQUIPMENT_API_KEY`はFileMaker側のグローバル変数等にキー本体を1箇所だけ保持し、そこを
+参照する想定。スクリプト内に直書きすると、後でキーをローテーションする際に修正箇所が散らばる）
 
 > **なぜ JWT ではなく API キーか**: JWT は人のログインに紐づく30日期限のトークンで、
 > 機械間連携に使うと期限切れで静かに止まる。用途を分けたほうが運用が破綻しない。
+
+> **本番デプロイについての注意**: 上記URLは`main`ブランチがCloudflare Workersへデプロイされて
+> 初めて有効になる。開発ブランチにコミットしただけの段階では、既存の（このAPIを持たない）
+> 旧バージョンが本番で動き続けているため`{"error":"Not Found"}`が返る。`main`へのマージ・
+> デプロイ完了後に改めて確認すること。
 
 ### 6-3. FileMaker からのテナント同期受信（APIキー認証・書き込み専用）← 【2026-08-12 新設／08-12 全件洗い替え方式に確定。2026-08-17 実装済み。`handleEquipmentTenantSync`】
 
@@ -768,14 +794,29 @@ Body: [
    有効なテナントを誤って一括で論理削除してしまう事故になりうる。ここが唯一のリスクなので、
    件数チェックだけは省略しない
 
-FileMaker 側の呼び出し例（`Insert from URL`）:
+**動作確認（curl）**:
 
+```bash
+curl -X POST \
+  "https://task-management.eiwa-public.workers.dev/api/equipment/tenants/sync" \
+  --header "X-API-Key: <EQUIPMENT_TENANT_SYNC_API_KEY の値>" \
+  --header "Content-Type: application/json" \
+  --data '[{"billing_code":"73070011","name":"大昭和紙工産業（株）","short_name":"大昭和","floor":"2","note":null}]'
 ```
-"-X POST
---header " & Quote("X-API-Key: ***") & "
---header " & Quote("Content-Type: application/json") & "
---data " & Quote(JSON配列)
+
+**FileMaker 側の設定（`Insert from URL`）**:
+
+指定URL: `https://task-management.eiwa-public.workers.dev/api/equipment/tenants/sync`（固定。パラメータ無し）
+
+cURLオプション（計算式）:
 ```
+"-X POST " &
+"--header " & Quote ( "X-API-Key: " & $$EQUIPMENT_TENANT_SYNC_API_KEY ) & " " &
+"--header " & Quote ( "Content-Type: application/json" ) & " " &
+"--data " & Quote ( JSON配列 )
+```
+（`JSON配列`は「現在有効なテナント全件」を検索して`JSONSetElement`等で組み立てた、
+`[{"billing_code":"...","name":"...","short_name":"...","floor":"...","note":"..."}, ...]`形式の文字列）
 
 ---
 
