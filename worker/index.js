@@ -54,8 +54,11 @@ import {
   handleEquipmentTransactionDelete,
   handleEquipmentSuggest,
   handleEquipmentTenantList,
+  handleEquipmentTenantUpdate,
   handleEquipmentSignatureUpload,
   handleEquipmentSignatureGet,
+  handleEquipmentInstallations,
+  handleEquipmentTenantSync,
 } from './lib/equipment.js'
 
 // Cloudflare Worker 本体。
@@ -1003,12 +1006,21 @@ async function route(req, env) {
     return req.method === 'GET' ? handleEquipmentSuggest(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/equipment/tenants') {
-    return req.method === 'GET' ? handleEquipmentTenantList(req) : json({ error: 'Method Not Allowed' }, 405)
+    if (req.method === 'GET') return handleEquipmentTenantList(req)
+    if (req.method === 'PATCH') return handleEquipmentTenantUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/equipment/signature') {
     if (req.method === 'GET') return handleEquipmentSignatureGet(req)
     if (req.method === 'POST') return handleEquipmentSignatureUpload(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // --- FileMaker 連携（APIキー認証。JWT不要。docs/equipment-plan.md 6-2・6-3。2026-08-17〜） ---
+  if (pathname === '/api/equipment/installations') {
+    return req.method === 'GET' ? handleEquipmentInstallations(req, env) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/equipment/tenants/sync') {
+    return req.method === 'POST' ? handleEquipmentTenantSync(req, env) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

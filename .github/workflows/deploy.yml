@@ -4,10 +4,15 @@
 #   CLOUDFLARE_ACCOUNT_ID  … Cloudflare ダッシュボード右下の Account ID
 #   SUPABASE_URL / SUPABASE_SERVICE_KEY / SESSION_SECRET / ANTHROPIC_API_KEY /
 #   GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN /
-#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
+#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT /
+#   EQUIPMENT_API_KEY / EQUIPMENT_TENANT_SYNC_API_KEY / EQUIPMENT_API_ALLOW_IPS
 #     … Worker のシークレットとしてデプロイ時に自動同期される
 #   VAPID_* が未設定の間は新規タスク登録時のWeb Push通知機能が無効のまま
 #   （デプロイ自体は失敗しない。worker/lib/push.js が空チェックしてスキップする）。
+#   EQUIPMENT_API_KEY / EQUIPMENT_TENANT_SYNC_API_KEY はFileMaker連携の公開API用キー
+#   （docs/equipment-plan.md 6-2・6-3）。未設定の間は該当エンドポイントが常に401を返す
+#   （fail closed。worker/lib/equipment.js の verifyEquipmentApiKey 参照）。
+#   EQUIPMENT_API_ALLOW_IPS は任意（送信元IP許可リスト。カンマ区切り。未設定ならIP制限なし）。
 # フロントエンドはデータ面を anon キーで直接読み書きしないため、
 # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY のビルド時注入は不要（廃止済み）。
 name: Deploy to Cloudflare Workers
@@ -80,6 +85,9 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          EQUIPMENT_API_KEY: ${{ secrets.EQUIPMENT_API_KEY }}
+          EQUIPMENT_TENANT_SYNC_API_KEY: ${{ secrets.EQUIPMENT_TENANT_SYNC_API_KEY }}
+          EQUIPMENT_API_ALLOW_IPS: ${{ secrets.EQUIPMENT_API_ALLOW_IPS }}
         run: |
           SECRETS_FILE="$RUNNER_TEMP/worker-secrets.json"
           umask 077
@@ -94,6 +102,9 @@ jobs:
             --arg VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY" \
             --arg VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY" \
             --arg VAPID_SUBJECT "$VAPID_SUBJECT" \
+            --arg EQUIPMENT_API_KEY "$EQUIPMENT_API_KEY" \
+            --arg EQUIPMENT_TENANT_SYNC_API_KEY "$EQUIPMENT_TENANT_SYNC_API_KEY" \
+            --arg EQUIPMENT_API_ALLOW_IPS "$EQUIPMENT_API_ALLOW_IPS" \
             '{
               SUPABASE_URL: $SUPABASE_URL,
               SUPABASE_SERVICE_KEY: $SUPABASE_SERVICE_KEY,
@@ -104,7 +115,10 @@ jobs:
               GMAIL_REFRESH_TOKEN: $GMAIL_REFRESH_TOKEN,
               VAPID_PUBLIC_KEY: $VAPID_PUBLIC_KEY,
               VAPID_PRIVATE_KEY: $VAPID_PRIVATE_KEY,
-              VAPID_SUBJECT: $VAPID_SUBJECT
+              VAPID_SUBJECT: $VAPID_SUBJECT,
+              EQUIPMENT_API_KEY: $EQUIPMENT_API_KEY,
+              EQUIPMENT_TENANT_SYNC_API_KEY: $EQUIPMENT_TENANT_SYNC_API_KEY,
+              EQUIPMENT_API_ALLOW_IPS: $EQUIPMENT_API_ALLOW_IPS
             }' > "$SECRETS_FILE"
           # --message="..." (= 形式) にする: コミット本文が "- " 等ハイフンで始まる箇条書きだと、
           # "--message value" の空白区切りでは wrangler(yargs) が value を新しいオプションの
