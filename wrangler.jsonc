@@ -33,6 +33,9 @@
   }
   // シークレット（SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET,
   // ANTHROPIC_API_KEY, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN,
-  // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT）は
+  // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT,
+  // EQUIPMENT_API_KEY, EQUIPMENT_TENANT_SYNC_API_KEY, EQUIPMENT_API_ALLOW_IPS）は
   // `npx wrangler secret put <NAME>` または CI（deploy.yml）経由で設定する
+  // （EQUIPMENT_* はFileMaker連携の公開API用。docs/equipment-plan.md 6-2・6-3参照。
+  // 未設定の間は該当エンドポイントが常に401を返すだけで、他機能には影響しない）
 }

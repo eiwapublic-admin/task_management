@@ -588,6 +588,44 @@
   color: var(--text-muted);
 }
 
+/* 日ごとのグループ見出し行（トグルの開閉ボタンを兼ねる）。日の区切り線の代わりに
+   この行自体で日の境界が分かるようにした（2026-08-17。以前は logs-day-boundary の
+   太線区切りで日を分けていたが、グルーピング＋トグルを導入したため不要になった） */
+.logs-table tbody tr.logs-day-head {
+  cursor: pointer;
+  background: var(--bg-subtle);
+}
+.logs-table tbody tr.logs-day-head td {
+  padding: var(--space-2) var(--space-3);
+}
+.logs-table tbody tr.logs-day-head:hover td {
+  background: var(--bg-muted);
+}
+
+.logs-day-head-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.logs-day-toggle-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+.logs-day-toggle-icon.is-open { transform: rotate(90deg); }
+
+.logs-day-label {
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.logs-day-count {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
 /* ---------- アーカイブ画面 ---------- */
 /* 絞り込みは機能ヘッダの左側（.ui-feature-head-main）に入る。
    ラベルを上に積んだ入力が並ぶので、この中だけは下端揃えにする */
@@ -720,15 +758,6 @@
   background: var(--bg-surface);
   color: var(--text-base);
   cursor: pointer;
-}
-
-/* 日付が切り替わる行に太い区切り線を入れて日の境界を目立たせる */
-.logs-table tbody tr.logs-day-boundary td {
-  border-top: 3px solid var(--text-strong);
-}
-
-.logs-table tbody tr.logs-day-boundary:first-child td {
-  border-top: none;
 }
 
 @media (max-width: 768px) {

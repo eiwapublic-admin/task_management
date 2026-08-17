@@ -75,6 +75,20 @@ CSSで非表示化（Mac Safariでの挙動不安定の指摘）。③受領サ�
 **次のアクションは実機での最終確認（バナー色を含む）、その後帳票・Web Push・FileMaker連携
 （Phase 2以降の残り）への着手判断**）
 
+**2026-08-17 追記: 入出庫データを全件移行し、FileMaker連携API（6-2・6-3）を実装した。**
+ユーザーから移行元CSV（`入出庫データ_20260812修正.csv`。830行）をチャットへ直接受領し、
+8-4の既知例外（id726除外・id474のin/adjust正規化）に加え、検証で新たに見つかった例外
+（`受領タイムスタンプ`が`?`という壊れ値の行が14件、`共用部設置`なのに請求先コードが入って
+いる行が4件——いずれも過去データのゆらぎとして、分類はそのまま尊重しつつ安全側で取り込み）
+にも対応した取込スクリプト`scripts/import-equipment-csv.mjs`を作成し、**829件を取り込んだ**
+（830件からid726の1件を除外。カテゴリ・備品・**テナントマスタは調査の結果、既に全件投入済み
+だったと判明**）。CSV自身の最終残高（`c_入出庫後在庫`）と自前の積み上げ計算が全13品目で
+完全一致することを確認済み（8-2の合否基準を満たした）。あわせて`GET /api/equipment/installations`
+（設置実績・請求連携用の月次集計）と`POST /api/equipment/tenants/sync`（テナント全件洗い替え
+受信）をAPIキー認証で実装し、社内向け`PATCH /api/equipment/tenants`も追加した。**新シークレット
+（`EQUIPMENT_API_KEY`・`EQUIPMENT_TENANT_SYNC_API_KEY`）はランダム生成済みだが、GitHub Secretsへの
+登録・FileMaker側の同期スクリプト設定はまだ**（残タスクはHANDOFF.md 6章・経緯131番を参照）。
+
 対象: 現行 FileMaker アプリ **「備品管理」**（オンプレ FileMaker Server `eiwaserver.eiwa-up.com` 稼働）の
 Web（Cloudflare Workers + Supabase）への移行。既存のタスク管理・日報と**同じアプリ内**に
 第3のセクションとして統合する。
@@ -647,7 +661,7 @@ CSS に生値を書かない。
 > 6-3 参照。当初は「画面の同期ボタンで手動実行」という JWT 経路も検討していたが、
 > 7-1 の Push 化（2026-08-12）に伴い、テナント同期は FileMaker 側が起点の一本化にした。
 
-### 6-2. FileMaker 向けの公開 API（APIキー認証）
+### 6-2. FileMaker 向けの公開 API（APIキー認証）【2026-08-17 実装済み。`worker/lib/equipment.js` の `handleEquipmentInstallations`】
 
 **要件「FileMaker のアプリから、テナントに設置したランプ情報を年月指定で取得」への回答。**
 
@@ -705,18 +719,44 @@ Header: X-API-Key: <EQUIPMENT_API_KEY>
 6. 呼び出しは `activity_logs` に1行残す（呼び出し頻度は月数回想定なので溢れない）
 7. キーの生成・ローテーション手順を HANDOFF に記載する（GitHub Secrets → Deploy 実行）
 
-FileMaker 側の呼び出し例（`Insert from URL`、cURL オプション）:
+**動作確認（curl。FileMaker設定の前にターミナルで疎通確認するのを推奨）**:
 
+```bash
+curl -X GET \
+  "https://task-management.eiwa-public.workers.dev/api/equipment/installations?month=2026-08&scope=tenant" \
+  --header "X-API-Key: <EQUIPMENT_API_KEY の値>" \
+  --header "Accept: application/json"
 ```
-"-X GET
---header " & Quote("X-API-Key: ***") & "
---header " & Quote("Accept: application/json")
+
+**FileMaker 側の設定（`Insert from URL`）**:
+
+指定URL（計算式）:
 ```
+"https://task-management.eiwa-public.workers.dev/api/equipment/installations?month=" & Let(
+  [ $y = Year ( Get ( 現在の日付 ) ) ; $m = Month ( Get ( 現在の日付 ) ) ] ;
+  $y & "-" & Right ( "0" & $m ; 2 )
+) & "&scope=tenant"
+```
+（対象月をレイアウト上のフィールド等から渡したい場合は、上記の`Let`部分をそのフィールド参照に差し替える）
+
+cURLオプション（計算式）:
+```
+"-X GET " &
+"--header " & Quote ( "X-API-Key: " & $$EQUIPMENT_API_KEY ) & " " &
+"--header " & Quote ( "Accept: application/json" )
+```
+（`$$EQUIPMENT_API_KEY`はFileMaker側のグローバル変数等にキー本体を1箇所だけ保持し、そこを
+参照する想定。スクリプト内に直書きすると、後でキーをローテーションする際に修正箇所が散らばる）
 
 > **なぜ JWT ではなく API キーか**: JWT は人のログインに紐づく30日期限のトークンで、
 > 機械間連携に使うと期限切れで静かに止まる。用途を分けたほうが運用が破綻しない。
 
-### 6-3. FileMaker からのテナント同期受信（APIキー認証・書き込み専用）← 【2026-08-12 新設／08-12 全件洗い替え方式に確定】
+> **本番デプロイについての注意**: 上記URLは`main`ブランチがCloudflare Workersへデプロイされて
+> 初めて有効になる。開発ブランチにコミットしただけの段階では、既存の（このAPIを持たない）
+> 旧バージョンが本番で動き続けているため`{"error":"Not Found"}`が返る。`main`へのマージ・
+> デプロイ完了後に改めて確認すること。
+
+### 6-3. FileMaker からのテナント同期受信（APIキー認証・書き込み専用）← 【2026-08-12 新設／08-12 全件洗い替え方式に確定。2026-08-17 実装済み。`handleEquipmentTenantSync`】
 
 7-1 が Push 方式になったことに伴う受け口。**6-2 とは別キー**（`EQUIPMENT_TENANT_SYNC_API_KEY`）で、
 6-2 の「読み取り専用」原則を崩さないよう完全に切り離す。
@@ -754,14 +794,29 @@ Body: [
    有効なテナントを誤って一括で論理削除してしまう事故になりうる。ここが唯一のリスクなので、
    件数チェックだけは省略しない
 
-FileMaker 側の呼び出し例（`Insert from URL`）:
+**動作確認（curl）**:
 
+```bash
+curl -X POST \
+  "https://task-management.eiwa-public.workers.dev/api/equipment/tenants/sync" \
+  --header "X-API-Key: <EQUIPMENT_TENANT_SYNC_API_KEY の値>" \
+  --header "Content-Type: application/json" \
+  --data '[{"billing_code":"73070011","name":"大昭和紙工産業（株）","short_name":"大昭和","floor":"2","note":null}]'
 ```
-"-X POST
---header " & Quote("X-API-Key: ***") & "
---header " & Quote("Content-Type: application/json") & "
---data " & Quote(JSON配列)
+
+**FileMaker 側の設定（`Insert from URL`）**:
+
+指定URL: `https://task-management.eiwa-public.workers.dev/api/equipment/tenants/sync`（固定。パラメータ無し）
+
+cURLオプション（計算式）:
 ```
+"-X POST " &
+"--header " & Quote ( "X-API-Key: " & $$EQUIPMENT_TENANT_SYNC_API_KEY ) & " " &
+"--header " & Quote ( "Content-Type: application/json" ) & " " &
+"--data " & Quote ( JSON配列 )
+```
+（`JSON配列`は「現在有効なテナント全件」を検索して`JSONSetElement`等で組み立てた、
+`[{"billing_code":"...","name":"...","short_name":"...","floor":"...","note":"..."}, ...]`形式の文字列）
 
 ---
 
@@ -874,7 +929,7 @@ FileMaker Server を公開する必要もない。**7-1 も同じ Push 方式に
 - **過去の署名画像は移行しない**（CSV に載らない。現行 FileMaker を参照用に残す）。**2026-08-11 に「移行なしでよい」と確定**（確認事項⑤）
 - 入出庫データは**全期間の再書き出しを受領済み**（2026-08-11。確認事項⑰）。830件で確定
 
-### 8-2. 取込スクリプト
+### 8-2. 取込スクリプト 【2026-08-17 実装・実行済み。829件を取込完了】
 
 `scripts/import-equipment-csv.mjs`（ローカル実行。CI には載せない）
 
@@ -1010,6 +1065,27 @@ FileMaker Server を公開する必要もない。**7-1 も同じ Push 方式に
 
 - **移行**: **取り込まない**（在庫影響ゼロのため除外しても実績としての欠落は生じない）。
   必要であれば作業記録として備考欄付きで別途参照できるよう、取込ログに1行残すだけにする
+
+#### (8) `受領タイムスタンプ`が壊れた値（`?`）の行が14件ある ←【2026-08-17 全件移行時の取込検証で新規発見】
+
+テナント設置（262件）のうち14件で`受領タイムスタンプ`列が`?`という、日時として解釈できない
+値になっていた（原因不明。空欄でもなく明確な壊れ値）。3件は単純に空欄。
+
+- **移行**: `'YYYY/MM/DD H:MM[:SS]'`形式に一致しない値は`signed_at`を**空のまま取り込む**
+  （実害は無い。署名画像自体はもともと移行しない方針のため、これらの記録も他のテナント設置と
+  同じ「未署名」扱いになるだけ。取込スクリプトはこの検証を正規表現で行い、該当行は取込ログに残す）
+
+#### (9) `共用部設置`（common）なのに請求先コードが入っている行が4件ある ←【2026-08-17 全件移行時の取込検証で新規発見】
+
+(1)(2)（新規入替への請求先混入）と同種の、過去の入力時の分類ゆらぎと見られる例（入出荷ID
+215・235・419・754）。うち754番は備考に「本日ご依頼の２本は請求対象外」と明記されており、
+共用部設置という分類自体は正しい（テナント名は参考情報として記載されていただけ）と読める。
+
+- **移行**: **当時の`reason`（区分）はそのまま尊重し、書き換えない**（実際に請求されたかどうかの
+  歴史的事実を変えないため）。請求先コードが読み取れる行はテナント参照情報（`tenant_id`/
+  `tenant_code`/`tenant_name`/`tenant_short_name`）として併せて取り込む（`floor`/`location`は
+  他の共用部設置と同じくCSVの文字列をそのまま使う）。6-2 の設置実績提供APIは`reason`で絞り込む
+  設計のため、この4件が`common`である限り請求データには混ざらない（3-4のルールに影響しない）
 
 ---
 

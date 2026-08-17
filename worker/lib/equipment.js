@@ -734,6 +734,330 @@ export async function handleEquipmentTenantList(req) {
   }
 }
 
+// PATCH /api/equipment/tenants — default_item_id（当システム独自項目。FileMaker同期の対象外）の
+// 設定、および billing_code 空欄テナントの手動修正（8-4(3)）用（2026-08-17）
+export async function handleEquipmentTenantUpdate(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = typeof payload?.id === 'string' ? payload.id : ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const patch = {}
+    if ('default_item_id' in payload) patch.default_item_id = payload.default_item_id || null
+    if ('billing_code' in payload) patch.billing_code = trimOrNull(payload.billing_code, 20)
+    if ('note' in payload) patch.note = trimOrNull(payload.note, 500)
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('equipment_tenants')
+      .update(patch)
+      .eq('id', id)
+      .select(TENANT_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('equipment-tenant-update:', err.message)
+      const msg = err.code === '23505' ? '請求先コードが重複しています' : 'テナントの更新に失敗しました'
+      return json({ error: msg }, err.code === '23505' ? 409 : 500)
+    }
+    if (!data) return json({ error: 'テナントが見つかりません' }, 404)
+    return json({ tenant: data })
+  } catch (err) {
+    console.error('equipment-tenant-update 失敗:', err)
+    return json({ error: 'テナントの更新に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// FileMaker 連携（APIキー認証。JWTではなく機械間連携専用のキー。2026-08-17。
+// docs/equipment-plan.md 6-2・6-3 参照）
+// ============================================================
+
+// タイミング攻撃を避けるため、長さの不一致でも早期returnせず全バイトをXORし続けて比較する
+function timingSafeEqualString(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const len = Math.max(a.length, b.length)
+  let diff = a.length ^ b.length
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
+  }
+  return diff === 0
+}
+
+// X-API-Key ヘッダを Worker シークレットと照合する。IP許可リスト（EQUIPMENT_API_ALLOW_IPS。
+// カンマ区切り）が設定されていれば併せて検証する。シークレット自体が未設定なら常に拒否する
+// （fail closed。未発行の段階でエンドポイントが無防備に開くことを避ける）
+function verifyEquipmentApiKey(req, secretEnvName) {
+  const expected = process.env[secretEnvName]
+  if (!expected) return false
+  const provided = req.headers.get('x-api-key') || ''
+  if (!timingSafeEqualString(provided, expected)) return false
+
+  const allowList = (process.env.EQUIPMENT_API_ALLOW_IPS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (allowList.length > 0) {
+    const ip = req.headers.get('cf-connecting-ip') || ''
+    if (!allowList.includes(ip)) return false
+  }
+  return true
+}
+
+// KV でのレート制限（ログイン試行回数と同じ LOGIN_ATTEMPTS を流用）。
+// binding が無い環境（ローカル開発等）では制限をスキップする
+async function checkEquipmentApiRateLimit(env, key, limit, windowSeconds) {
+  const kv = env?.LOGIN_ATTEMPTS || null
+  if (!kv) return true
+  const count = Number(await kv.get(key)) || 0
+  if (count >= limit) return false
+  await kv.put(key, String(count + 1), { expirationTtl: windowSeconds })
+  return true
+}
+
+const EQUIPMENT_API_RATE_LIMIT = 60 // 同一IPからの1時間あたり上限（6-2/6-3共通）
+
+// 呼び出しを processing ログへ記録する（活動ログ画面から辿れるように。既存の log_type
+// 制約 fetch/status_change はそのままに、status_change として actor で識別する）
+async function logEquipmentApiCall(supabase, message) {
+  try {
+    await supabase
+      .from('activity_logs')
+      .insert({ log_type: 'status_change', actor: 'FileMaker連携', message })
+  } catch (err) {
+    console.error('logEquipmentApiCall 失敗:', err)
+  }
+}
+
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+
+// JST の指定月（'YYYY-MM'）の月初・翌月初を UTC の Date で返す
+function jstMonthRangeUtc(month) {
+  const [y, m] = month.split('-').map(Number)
+  const JST_OFFSET_MS = 9 * 3600 * 1000
+  return {
+    start: new Date(Date.UTC(y, m - 1, 1) - JST_OFFSET_MS),
+    end: new Date(Date.UTC(y, m, 1) - JST_OFFSET_MS),
+  }
+}
+
+// GET /api/equipment/installations?month=YYYY-MM&scope=tenant|common|all&tenant_code=…
+// FileMaker 向けの公開API（6-2。APIキー認証）。「テナントに設置したランプ情報を年月指定で取得」への回答。
+// 請求の元データになるため、reason は scope で明示的に絞り、replace（新規入替）・discard（不良品処分）は
+// どの scope でも返さない（3-4。新規入替は請求対象外であり、混ぜると誤請求のもとになる）。
+export async function handleEquipmentInstallations(req, env) {
+  if (!verifyEquipmentApiKey(req, 'EQUIPMENT_API_KEY')) {
+    return json({ error: '認証に失敗しました' }, 401)
+  }
+  const ip = req.headers.get('cf-connecting-ip') || 'unknown'
+  if (!(await checkEquipmentApiRateLimit(env, `eq-installations:${ip}`, EQUIPMENT_API_RATE_LIMIT, 3600))) {
+    return json({ error: 'リクエストが多すぎます。しばらくしてから再度お試しください' }, 429)
+  }
+  try {
+    const params = new URL(req.url).searchParams
+    const month = params.get('month') || ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM 形式で指定してください' }, 400)
+    const scope = params.get('scope') || 'tenant'
+    if (!['tenant', 'common', 'all'].includes(scope)) return json({ error: 'scope が不正です' }, 400)
+    const tenantCode = trimOrNull(params.get('tenant_code'), 20)
+    const reasons = scope === 'all' ? ['tenant', 'common'] : [scope]
+    const { start, end } = jstMonthRangeUtc(month)
+
+    const supabase = getAdminClient()
+    let query = supabase
+      .from('equipment_transactions')
+      .select('txn_no, occurred_at, tenant_code, tenant_name, floor, quantity, staff_name, signed_at, note, item_id, reason')
+      .eq('kind', 'out')
+      .in('reason', reasons)
+      .gte('occurred_at', start.toISOString())
+      .lt('occurred_at', end.toISOString())
+      .order('occurred_at', { ascending: true })
+    if (tenantCode) query = query.eq('tenant_code', tenantCode)
+    const { data: rows, error: txnErr } = await query
+    if (txnErr) {
+      console.error('equipment-installations:', txnErr.message)
+      return json({ error: '取得に失敗しました' }, 500)
+    }
+
+    const { data: items, error: itemsErr } = await supabase.from('equipment_items').select('id, item_no, name, product_code')
+    if (itemsErr) {
+      console.error('equipment-installations(items):', itemsErr.message)
+      return json({ error: '取得に失敗しました' }, 500)
+    }
+    const itemMap = new Map((items || []).map((i) => [i.id, i]))
+
+    const installations = (rows || []).map((r) => {
+      const item = itemMap.get(r.item_id)
+      return {
+        txn_no: r.txn_no,
+        installed_at: r.occurred_at,
+        tenant_code: r.tenant_code,
+        tenant_name: r.tenant_name,
+        floor: r.floor,
+        item_no: item?.item_no ?? null,
+        item_name: item?.name ?? null,
+        product_code: item?.product_code ?? null,
+        quantity: r.quantity,
+        staff_name: r.staff_name,
+        signed: Boolean(r.signed_at),
+        note: r.note,
+      }
+    })
+
+    // 請求連携用の月次集計（8-5-2。「修理データ」と同じ中身。請求対象＝テナント設置のみなので
+    // scope に関わらずテナント設置分だけを集計する。呼び出し側が「実績月＝翌月請求」の変換を行う前提）
+    const billingMap = new Map()
+    for (const r of rows || []) {
+      if (r.reason !== 'tenant') continue
+      const item = itemMap.get(r.item_id)
+      const key = `${r.tenant_code}:${item?.item_no}`
+      if (!billingMap.has(key)) {
+        billingMap.set(key, {
+          tenant_code: r.tenant_code,
+          tenant_name: r.tenant_name,
+          item_no: item?.item_no ?? null,
+          item_name: item?.name ?? null,
+          quantity: 0,
+          dates: [],
+        })
+      }
+      const b = billingMap.get(key)
+      b.quantity += r.quantity
+      b.dates.push(r.occurred_at)
+    }
+    const billing = [...billingMap.values()].map((b) => ({ ...b, dates: b.dates.sort() }))
+
+    await logEquipmentApiCall(supabase, `設置実績取得: month=${month} scope=${scope} 件数=${installations.length}`)
+
+    return json({
+      month,
+      generated_at: new Date().toISOString(),
+      count: installations.length,
+      installations,
+      billing,
+    })
+  } catch (err) {
+    console.error('equipment-installations 失敗:', err)
+    return json({ error: '取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/equipment/tenants/sync — FileMaker からのテナント全件洗い替え（6-3。APIキー認証・書き込み専用）。
+// 送られてきた「現在有効なテナント全件」で Update/Insert し、含まれなかった既存の filemaker 由来行は
+// 論理削除（moved_out=true）する。空配列・極端な件数減少は事故防止のため拒否する（6-3の5）
+export async function handleEquipmentTenantSync(req, env) {
+  if (!verifyEquipmentApiKey(req, 'EQUIPMENT_TENANT_SYNC_API_KEY')) {
+    return json({ error: '認証に失敗しました' }, 401)
+  }
+  const ip = req.headers.get('cf-connecting-ip') || 'unknown'
+  if (!(await checkEquipmentApiRateLimit(env, `eq-tenant-sync:${ip}`, EQUIPMENT_API_RATE_LIMIT, 3600))) {
+    return json({ error: 'リクエストが多すぎます。しばらくしてから再度お試しください' }, 429)
+  }
+  try {
+    const payload = await req.json().catch(() => null)
+    if (!Array.isArray(payload)) return json({ error: '配列で指定してください' }, 400)
+    if (payload.length > 1000) return json({ error: 'テナント件数が多すぎます' }, 400)
+
+    const rows = []
+    for (const r of payload) {
+      const billingCode = trimOrNull(r?.billing_code, 20)
+      const name = trimOrNull(r?.name, 200)
+      if (!billingCode || !name) return json({ error: 'billing_code と name はすべての要素で必須です' }, 400)
+      rows.push({
+        billing_code: billingCode,
+        name,
+        short_name: trimOrNull(r?.short_name, 100),
+        floor: trimOrNull(r?.floor, 20),
+        note: trimOrNull(r?.note, 500),
+      })
+    }
+
+    // 安全ガード（6-3の5）その1: 空配列は問答無用で拒否する（全件が退去済み扱いになる事故を防ぐため）
+    if (rows.length === 0) {
+      return json({ error: '空の配列は受け付けられません（全件が退去済み扱いになる事故を防ぐため）' }, 400)
+    }
+
+    const supabase = getAdminClient()
+
+    // 安全ガード（6-3の5）その2: 現在の有効件数から大きく減っていれば拒否する。
+    // 全件洗い替え方式は「送られなかった＝退去」とみなす設計のため、不完全な配列を通すと
+    // 有効なテナントを誤って一括で論理削除してしまう事故になりうる
+    const { count: currentActive, error: countErr } = await supabase
+      .from('equipment_tenants')
+      .select('id', { count: 'exact', head: true })
+      .eq('source', 'filemaker')
+      .eq('moved_out', false)
+    if (countErr) {
+      console.error('equipment-tenant-sync(count):', countErr.message)
+      return json({ error: '同期に失敗しました' }, 500)
+    }
+    if ((currentActive || 0) > 0 && rows.length < (currentActive || 0) * 0.5) {
+      return json(
+        {
+          error: `件数が前回の有効件数（${currentActive}件）から大きく減っています（今回${rows.length}件）。念のため処理を中止しました`,
+        },
+        400
+      )
+    }
+
+    const { data: existing, error: existErr } = await supabase
+      .from('equipment_tenants')
+      .select('id, billing_code')
+      .eq('source', 'filemaker')
+    if (existErr) {
+      console.error('equipment-tenant-sync(load):', existErr.message)
+      return json({ error: '同期に失敗しました' }, 500)
+    }
+    const existingCodes = new Set((existing || []).map((t) => t.billing_code))
+    const incomingCodes = new Set(rows.map((r) => r.billing_code))
+
+    const now = new Date().toISOString()
+    const toUpsert = rows.map((r) => ({
+      billing_code: r.billing_code,
+      name: r.name,
+      short_name: r.short_name,
+      floor: r.floor,
+      note: r.note,
+      moved_out: false,
+      source: 'filemaker',
+      synced_at: now,
+    }))
+    // default_item_id は当システム独自項目のため、upsert 対象の列に含めない＝上書きされない
+    const { error: upsertErr } = await supabase.from('equipment_tenants').upsert(toUpsert, { onConflict: 'billing_code' })
+    if (upsertErr) {
+      console.error('equipment-tenant-sync(upsert):', upsertErr.message)
+      return json({ error: '同期に失敗しました' }, 500)
+    }
+
+    const toRetire = [...existingCodes].filter((code) => code && !incomingCodes.has(code))
+    if (toRetire.length > 0) {
+      const { error: retireErr } = await supabase
+        .from('equipment_tenants')
+        .update({ moved_out: true })
+        .in('billing_code', toRetire)
+      if (retireErr) {
+        console.error('equipment-tenant-sync(retire):', retireErr.message)
+        return json({ error: '同期に失敗しました' }, 500)
+      }
+    }
+
+    const inserted = rows.filter((r) => !existingCodes.has(r.billing_code)).length
+    const updated = rows.length - inserted
+
+    await logEquipmentApiCall(
+      supabase,
+      `テナント同期受信: 受信${rows.length}件（新規${inserted}・更新${updated}・退去${toRetire.length}）`
+    )
+
+    return json({ ok: true, received: rows.length, inserted, updated, retired: toRetire.length })
+  } catch (err) {
+    console.error('equipment-tenant-sync 失敗:', err)
+    return json({ error: '同期に失敗しました' }, 500)
+  }
+}
+
 // ============================================================
 // 署名（テナント設置のみ。5-5。記録の保存と同時、または後から足すのどちらも
 // このエンドポイントで扱う＝「先に記録だけ保存→後日、署名だけ足す」運用の受け口を兼ねる）
