@@ -318,8 +318,24 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 既にDBにあるスレッドはスキップ（通常メール用のスレッド単位の重複判定）。
   // FAXは同一件名・同一送信元でGmailに束ねられるため、スレッドではなく
   // メッセージ単位で重複判定する。そのため gmail_message_id も取得しておく。
-  const { data: existingRows } = await supabase.from('tasks').select('gmail_thread_id, gmail_message_id')
-  const existingThreads = new Set((existingRows || []).map((r) => r.gmail_thread_id))
+  //
+  // 2026-08-17: スレッド単位の判定は「進行中（未処理/返信済み）」のタスクがあるスレッドに
+  // 限定した。件名の使い回し（例: 毎月同じ件名で送る設備点検の案内、同じ件名で複数の
+  // 別宛先に送る一斉連絡）でGmailが本来無関係な複数の用件を1スレッドに束ねることがあり、
+  // 従来はスレッドに1件でもタスクがあれば（完了済みでも）後続メールを無条件でスキップして
+  // いたため、既に完了したタスクの陰に別の新しい用件が隠れて取りこぼされる事例が実際に
+  // 3件発生した（T-134/T-137/T-138。手動復旧して発覚）。完了/アーカイブ済みタスクしか
+  // 無いスレッドは「進行中の会話」ではないとみなし、後続メールを独立した用件として
+  // 分類し直せるようにする。**進行中のタスクがあるスレッドは従来どおりスキップする**
+  // （同じ相手との普通の往復メールが件名一致の返信検知をすり抜けた場合の保険として、
+  // スレッド単位の抑止は残す。安易にメッセージ単位のみに倒すと、返信検知が拾えなかった
+  // 通常の返信メールが毎回スプリアスな新規タスクを作ってしまう恐れがあるため）
+  const { data: existingRows } = await supabase.from('tasks').select('gmail_thread_id, gmail_message_id, status')
+  const existingThreads = new Set(
+    (existingRows || [])
+      .filter((r) => r.status === '未処理' || r.status === '返信済み')
+      .map((r) => r.gmail_thread_id)
+  )
   const existingMessages = new Set((existingRows || []).map((r) => r.gmail_message_id))
   const processedThreads = new Set()
   const processedMessages = new Set()
@@ -556,14 +572,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         }
       }
 
-      // 重複判定。FAXは同一件名・同一送信元でGmailが別々のFAXを1スレッドに束ねるため、
-      // スレッド単位だと2通目以降を取りこぼす。FAXはメッセージ単位（このメッセージから
-      // 既にタスクを作っていない限り処理）で判定し、通常メールは従来通りスレッド単位で判定する。
-      // ※FAXは送信元が自社ドメイン外のため、上の件名/フォーム返信検知には掛からない。
-      if (isFaxGatewayEmail(email)) {
-        if (existingMessages.has(email.id) || processedMessages.has(email.id)) continue
-        processedMessages.add(email.id)
-      } else {
+      // 重複判定。このメッセージ自体が既にタスク化済みなら、タスクの状態を問わず常に
+      // スキップする（メッセージ単位。全チャネル共通の一次判定）。
+      // FAXは同一件名・同一送信元でGmailが別々のFAXを1スレッドに束ねるため、スレッド単位の
+      // 判定は行わずここで終える（送信元が自社ドメイン外のため上の件名/フォーム返信検知にも
+      // 掛からない）。通常メールはさらにスレッド単位でも判定するが、対象は existingThreads
+      // （＝進行中＝未処理/返信済みのタスクを持つスレッドのみ。完了/アーカイブ済みタスクしか
+      // 無いスレッドは対象外）に限定しており、完了済みタスクの陰に別件が隠れて取りこぼされる
+      // のを防ぐ（2026-08-17。上記 existingThreads の構築箇所のコメント参照）。
+      if (existingMessages.has(email.id) || processedMessages.has(email.id)) continue
+      processedMessages.add(email.id)
+      if (!isFaxGatewayEmail(email)) {
         if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
         processedThreads.add(email.threadId)
       }
@@ -908,7 +927,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         const events = await listTodayEvents(accessToken, calendarId)
         for (const ev of events) {
           const key = `cal:${ev.id}`
-          if (existingThreads.has(key)) continue
+          // カレンダーイベントの重複判定はタスクの状態を問わない（メッセージ単位のexistingMessagesを
+          // 使う。2026-08-17: existingThreads は「進行中の会話があるスレッドか」用に意味を変えたため、
+          // ここでの流用をやめた。完了済みのカレンダータスクでも同じイベントを再登録しないようにする）
+          if (existingMessages.has(ev.id)) continue
           const desc = compactBody(stripHtml(ev.description))
           // 詳細に「担当：〜」があれば担当者に採用。無ければ「（担当未設定）」
           const assignee = extractCalendarAssignee(desc) || UNASSIGNED
@@ -935,7 +957,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
             }
           } else {
             summary.calendarCreated += 1
-            existingThreads.add(key)
+            existingMessages.add(ev.id)
             try {
               await notifyNewTask({ title: ev.title || '（無題の予定）' })
             } catch (err) {
