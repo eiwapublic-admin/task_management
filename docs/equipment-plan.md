@@ -694,16 +694,37 @@ Header: X-API-Key: <EQUIPMENT_API_KEY>
       "tenant_name": "静岡県大阪事務所",
       "floor": "1",
       "item_no": 2,
-      "item_name": "FLR40SW (白色)",
+      "item_name": "FLR40SW",
       "product_code": "FLR40SW/M/36",
       "quantity": 2,
       "staff_name": "西川",
       "signed": true,
       "note": null
     }
+  ],
+  "billing": [
+    {
+      "tenant_code": "73050011",
+      "tenant_name": "静岡県大阪事務所",
+      "item_no": 2,
+      "item_name": "FLR40SW",
+      "quantity": 2,
+      "dates": ["2026-08-10T10:22:00+09:00"],
+      "installation_summary": "8/10 FLR40SW"
+    }
   ]
 }
 ```
+
+> **`item_name` は略称（`equipment_items.short_name`）を返す**（2026-08-17。以前は「FLR40SW (白色)」の
+> ような括弧書き付きの表記だったが、FileMaker側での扱いやすさを優先して略称に変更した。略称は
+> 備品マスタに追加した`short_name`列で、未設定の備品は備品名から自動生成される——末尾の
+> 「(補足)」を除いた表記。備品マスタ画面から個別に上書きもできる）。
+>
+> **`billing[].installation_summary`（2026-08-17追加）は「設置日付の列挙＋製品略称」の1行表記**
+> （8-5-2の「c_設置日付列挙_短縮」列と同じ形式。JSTの`M/D`をカンマ区切りで列挙し、末尾に
+> 略称を続ける。例: 単発「2/4 FLR20SS-EX」、複数「2/4, 2/12, 2/19 FLR40SW」）。`dates`（ISO日時の
+> 配列）自体もそのまま残しているので、独自に加工したい場合はそちらを使う。
 
 セキュリティ設計（**これは JWT の外側に開く唯一の口なので厚めに**）:
 

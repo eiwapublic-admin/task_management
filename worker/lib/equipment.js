@@ -9,7 +9,7 @@ import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 
 const ITEM_COLUMNS =
-  'id, item_no, category_code, name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
+  'id, item_no, category_code, name, short_name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
 const CATEGORY_COLUMNS = 'code, name, sort_order, note, created_at, updated_at'
 const TENANT_COLUMNS = 'id, billing_code, name, short_name, floor, moved_out, default_item_id, note, synced_at'
 const TXN_COLUMNS =
@@ -28,6 +28,13 @@ function trimOrNull(value, max = 500) {
   if (typeof value !== 'string') return null
   const t = value.trim()
   return t ? t.slice(0, max) : null
+}
+
+// 備品名から略称を自動生成する（末尾の「 (補足)」を除いた表記。例: "FLR40SW (白色)" → "FLR40SW"）。
+// 括弧が無い名前はそのまま返す。2026-08-17追加
+function deriveShortName(name) {
+  const stripped = (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+  return stripped || name
 }
 
 // 認証と書き込み権限をまとめて確認する（reports.js と同じ形）
@@ -200,6 +207,7 @@ export async function handleEquipmentItemCreate(req) {
       item_no: itemNo,
       category_code: trimOrNull(payload?.category_code, 20),
       name,
+      short_name: trimOrNull(payload?.short_name, 100) || deriveShortName(name),
       product_code: trimOrNull(payload?.product_code, 100),
       sort_order: Number.isFinite(Number(payload?.sort_order)) ? Number(payload.sort_order) : 99,
       warn_qty: payload?.warn_qty === '' || payload?.warn_qty == null ? null : Number(payload.warn_qty),
@@ -236,6 +244,7 @@ export async function handleEquipmentItemUpdate(req) {
       patch.name = name
     }
     if ('category_code' in payload) patch.category_code = trimOrNull(payload.category_code, 20)
+    if ('short_name' in payload) patch.short_name = trimOrNull(payload.short_name, 100)
     if ('product_code' in payload) patch.product_code = trimOrNull(payload.product_code, 100)
     if ('sort_order' in payload) patch.sort_order = Number(payload.sort_order) || 99
     if ('warn_qty' in payload) {
@@ -843,6 +852,18 @@ function jstMonthRangeUtc(month) {
   }
 }
 
+// ISO日時をJSTの「M/D」表記にする（ゼロ埋めなし。例: 2026-02-04 → "2/4"）
+function jstMonthDay(iso) {
+  return new Date(iso).toLocaleString('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+}
+
+// 請求連携用の「設置日付列挙＋製品略称」表記を組み立てる（8-5-2。現行FileMakerの
+// 「c_設置日付列挙_短縮」列と同じ形式）。例: 単発「2/4 FLR20SS-EX」、複数「2/4, 2/12, 2/19 FLR40SW」
+function formatInstallationSummary(dates, shortName) {
+  const mdList = dates.map(jstMonthDay)
+  return `${mdList.join(', ')} ${shortName || ''}`.trim()
+}
+
 // GET /api/equipment/installations?month=YYYY-MM&scope=tenant|common|all&tenant_code=…
 // FileMaker 向けの公開API（6-2。APIキー認証）。「テナントに設置したランプ情報を年月指定で取得」への回答。
 // 請求の元データになるため、reason は scope で明示的に絞り、replace（新規入替）・discard（不良品処分）は
@@ -881,12 +902,16 @@ export async function handleEquipmentInstallations(req, env) {
       return json({ error: '取得に失敗しました' }, 500)
     }
 
-    const { data: items, error: itemsErr } = await supabase.from('equipment_items').select('id, item_no, name, product_code')
+    const { data: items, error: itemsErr } = await supabase
+      .from('equipment_items')
+      .select('id, item_no, name, short_name, product_code')
     if (itemsErr) {
       console.error('equipment-installations(items):', itemsErr.message)
       return json({ error: '取得に失敗しました' }, 500)
     }
     const itemMap = new Map((items || []).map((i) => [i.id, i]))
+    // 製品名は略称（short_name）を使う。未設定の備品は備品名にフォールバックする
+    const itemLabel = (item) => item?.short_name || item?.name || null
 
     const installations = (rows || []).map((r) => {
       const item = itemMap.get(r.item_id)
@@ -897,7 +922,7 @@ export async function handleEquipmentInstallations(req, env) {
         tenant_name: r.tenant_name,
         floor: r.floor,
         item_no: item?.item_no ?? null,
-        item_name: item?.name ?? null,
+        item_name: itemLabel(item),
         product_code: item?.product_code ?? null,
         quantity: r.quantity,
         staff_name: r.staff_name,
@@ -918,7 +943,7 @@ export async function handleEquipmentInstallations(req, env) {
           tenant_code: r.tenant_code,
           tenant_name: r.tenant_name,
           item_no: item?.item_no ?? null,
-          item_name: item?.name ?? null,
+          item_name: itemLabel(item),
           quantity: 0,
           dates: [],
         })
@@ -927,7 +952,10 @@ export async function handleEquipmentInstallations(req, env) {
       b.quantity += r.quantity
       b.dates.push(r.occurred_at)
     }
-    const billing = [...billingMap.values()].map((b) => ({ ...b, dates: b.dates.sort() }))
+    const billing = [...billingMap.values()].map((b) => {
+      const dates = b.dates.sort()
+      return { ...b, dates, installation_summary: formatInstallationSummary(dates, b.item_name) }
+    })
 
     await logEquipmentApiCall(supabase, `設置実績取得: month=${month} scope=${scope} 件数=${installations.length}`)
 
