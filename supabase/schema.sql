@@ -472,6 +472,9 @@ create table if not exists equipment_items (
   item_no       int  not null unique,
   category_code text references equipment_categories(code),
   name          text not null,                 -- FLR40SW (白色)
+  -- 略称（括弧書きの補足を除いた表記。例: FLR40SW）。FileMaker連携APIの設置実績提供（6-2）で
+  -- 品目表記として使う。2026-08-17追加。未指定なら備品名から自動生成する（equipment.js参照）
+  short_name    text,
   product_code  text,                          -- FLR40SW/M/36（発注用情報）
   sort_order    int  not null default 99,
   warn_qty      int,                           -- 警告数量。在庫がこの値以下で「発注依頼してください」

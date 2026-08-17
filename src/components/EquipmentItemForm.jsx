@@ -10,6 +10,7 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
   const [itemNo, setItemNo] = useState(existing?.item_no ? String(existing.item_no) : '')
   const [categoryCode, setCategoryCode] = useState(existing?.category_code || categories[0]?.code || '')
   const [name, setName] = useState(existing?.name || '')
+  const [shortName, setShortName] = useState(existing?.short_name || '')
   const [productCode, setProductCode] = useState(existing?.product_code || '')
   const [sortOrder, setSortOrder] = useState(existing?.sort_order != null ? String(existing.sort_order) : '99')
   const [warnQty, setWarnQty] = useState(existing?.warn_qty != null ? String(existing.warn_qty) : '')
@@ -28,6 +29,7 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
       const payload = {
         category_code: categoryCode || null,
         name: name.trim(),
+        short_name: shortName.trim() || null,
         product_code: productCode || null,
         sort_order: Number(sortOrder) || 99,
         warn_qty: warnQty === '' ? null : Number(warnQty),
@@ -105,6 +107,17 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
           <label className="ui-field">
             <span>備品名</span>
             <input type="text" className="ui-input" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+
+          <label className="ui-field">
+            <span>略称</span>
+            <input
+              type="text"
+              className="ui-input"
+              placeholder="未入力なら備品名から自動生成（括弧書きの補足を除いた表記）"
+              value={shortName}
+              onChange={(e) => setShortName(e.target.value)}
+            />
           </label>
 
           <label className="ui-field">
