@@ -20,13 +20,17 @@ function tenantLabel(t) {
 }
 
 // 出庫・設置モーダル（5-4）。docs/equipment-plan.md 5-4・5-5・11章。
-// existing を渡すと編集モード（履歴画面・在庫一覧の明細タップから開く）になる
-export default function EquipmentOutForm({ items, existing, onClose, onSaved, onDelete }) {
+// existing を渡すと編集モード（履歴画面・在庫一覧の明細タップから開く）になる。
+// defaultItemId を渡すと、その備品をあらかじめ選んだ状態で開く（在庫一覧の行の「出」ボタン等。
+// 2026-08-18）。どちらも無ければ備品は空欄から選ばせる（ヘッダの「出庫」ボタンから開いた場合）
+export default function EquipmentOutForm({ items, existing, defaultItemId, onClose, onSaved, onDelete }) {
   useBodyScrollLock()
 
   const trackedItems = useMemo(() => items.filter((i) => !i.disabled || i.id === existing?.item_id), [items, existing])
-  const [itemId, setItemId] = useState(existing?.item_id || trackedItems[0]?.id || '')
-  const itemTouchedRef = useRef(Boolean(existing)) // 既存編集時は自動デフォルト備品で上書きしない
+  const [itemId, setItemId] = useState(existing?.item_id || defaultItemId || '')
+  // 既存編集時・在庫一覧の行から備品を指定して開いた時は、テナント選択による
+  // 自動デフォルト備品で上書きしない（2026-08-18。defaultItemId分を追加）
+  const itemTouchedRef = useRef(Boolean(existing) || Boolean(defaultItemId))
   const [reason, setReason] = useState(existing?.reason || 'common')
   const [occurredAt, setOccurredAt] = useState(() => toDateTimeLocal(existing?.occurred_at))
   const [location, setLocation] = useState(existing?.location || '')
@@ -201,6 +205,11 @@ export default function EquipmentOutForm({ items, existing, onClose, onSaved, on
                 setItemId(e.target.value)
               }}
             >
+              {!itemId && (
+                <option value="" disabled>
+                  選択してください
+                </option>
+              )}
               {groups.map((g) => (
                 <optgroup key={g.name} label={g.name}>
                   {g.rows.map((item) => (

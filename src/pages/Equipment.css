@@ -79,12 +79,30 @@
   color: var(--text-strong);
 }
 
-.equipment-stock-code {
+/* 在庫数の左の「出」「入」ボタン。この備品を選んだ状態で出庫・入庫フォームを開く
+   （2026-08-18）。iPhone幅で1行に収めるため、キャプションは1文字に短縮している */
+.equipment-stock-row-actions {
   flex: 0 0 auto;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
+
+.equipment-stock-action-btn {
+  flex-shrink: 0;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.equipment-stock-action-btn:hover { background: var(--color-primary-hover); }
 
 .equipment-stock-qty {
   flex: 0 0 auto;
