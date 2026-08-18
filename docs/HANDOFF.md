@@ -330,6 +330,8 @@
     - 上記に伴い、`TaskDetail`の`onStatusChange` propは未使用になったため削除し、`KanbanBoard.jsx`のローカルラッパー`handleStatusChange`と`<TaskDetail onStatusChange={...}>`の受け渡し、`Archive.jsx`の同名ラッパーと受け渡しも合わせて削除した（カンバンのドラッグ&ドロップは`KanbanBoard.jsx`本体の`onStatusChange`propを直接使っており影響なし）。使われなくなったCSS（`.task-detail-spam-btn`系、`.task-detail-footer-label`、`.task-detail-status`、`.status-btn`系）も削除した
     - 検証はPlaywrightでPhone幅（390×844）・PC幅（1280×900）のスクリーンショットに加え、①ステータスをリストで変更しても直後にPATCHが飛ばずモーダルも閉じないこと、②スパムを選んでも確認UIが出ないこと、③「保存」を押すと担当者・期限・留意事項とステータス変更が1回のPATCH（`{..., status: "対応中"}`）にまとまること、④スパムを選んで保存すると`{is_spam: true}`のPATCHが送られモーダルが閉じること、を確認した
 
+136. **カンバンの担当者フィルターを「すべて」＋単一選択から、担当者ごとの独立トグルへ変更（2026-08-18）**: 「橋口」「西川」「岡田」の3チップ＋「すべて」ボタンだった構成を、「橋口」「西川」「岡田」「未割当」の4チップに変更し「すべて」は廃止した。既定は4チップとも「オン」（＝従来の「すべて」と同じ全件表示）で、チップを押すとその担当者のタスクだけ表示から外れる（`KanbanBoard.jsx`の`hiddenAssignees`というSetにトグルで出し入れし、`!hiddenAssignees.has(t.assignee || UNASSIGNED)`でフィルタ）。これにより、橋口・西川・岡田の3つをオフにすれば「未割当」だけを表示する、という組み合わせが新たにできるようになった（従来は「未割当だけを見る」手段が無かった）。`FilterBar.jsx`のprops（`selectedAssignee`/`onChange`の単一選択）を`hiddenAssignees`/`onToggle`に変更。検証はPlaywrightで、既定で4チップ・4カードとも表示、1チップずつオフにして対象カードが消えること、3チップをオフにして「未割当」だけが残ること、再度オンにすると戻ることを確認した
+
 ---
 
 ## 2. 日常運用
