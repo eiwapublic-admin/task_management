@@ -5,7 +5,7 @@ import FilterBar from './FilterBar'
 import TaskDetail from './TaskDetail'
 import TaskForm from './TaskForm'
 import { IconArchive, IconSearch } from './Icons'
-import { STATUS_LIST } from '../lib/status'
+import { STATUS_LIST, UNASSIGNED } from '../lib/status'
 import './KanbanBoard.css'
 
 // タスクID「T-123」/「t-123」/「123」のいずれでも task_no の完全一致として拾えるようにする
@@ -23,7 +23,9 @@ export default function KanbanBoard({
   onAddToReport,
   sharedGmail,
 }) {
-  const [selectedAssignee, setSelectedAssignee] = useState(null)
+  // 担当者ごとの独立トグル（2026-08-18。旧「すべて」＋単一選択から変更）。
+  // Setに入っている担当者は表示から外す。既定は空＝全員表示（従来の「すべて」と同じ状態）
+  const [hiddenAssignees, setHiddenAssignees] = useState(() => new Set())
   const [selectedTask, setSelectedTask] = useState(null)
   const [showForm, setShowForm] = useState(false)
   // フリーワードでの表示タスク絞り込み（2026-08-14）。カンバンは既にタスク全件を
@@ -42,7 +44,7 @@ export default function KanbanBoard({
   }
 
   const filteredTasks = useMemo(() => {
-    let list = selectedAssignee ? tasks.filter((t) => t.assignee === selectedAssignee) : tasks
+    let list = tasks.filter((t) => !hiddenAssignees.has(t.assignee || UNASSIGNED))
     const q = searchQuery.trim().toLowerCase()
     if (q) {
       const taskNo = TASK_NO_PATTERN.exec(q)?.[1]
@@ -54,7 +56,16 @@ export default function KanbanBoard({
       })
     }
     return list
-  }, [tasks, selectedAssignee, searchQuery])
+  }, [tasks, hiddenAssignees, searchQuery])
+
+  function toggleAssignee(name) {
+    setHiddenAssignees((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   function handleDragStart(e, task) {
     e.dataTransfer.setData('text/plain', task.id)
@@ -95,8 +106,8 @@ export default function KanbanBoard({
           <>
             <FilterBar
               assignees={assignees}
-              selectedAssignee={selectedAssignee}
-              onChange={setSelectedAssignee}
+              hiddenAssignees={hiddenAssignees}
+              onToggle={toggleAssignee}
             />
             {/* 検索・アーカイブをまとめて行の右端に寄せる（担当者チップの数によらず
                 この2つは常に隣接させたいため、個々のボタンではなくラップ側に
