@@ -362,59 +362,6 @@
   margin-top: var(--space-1);
 }
 
-/* スパム判定（タスク詳細の保存ボタン左）。主要操作ではないので通常時は控えめにし、
-   確認中だけ赤系を出して「アーカイブへ消える操作」であることを伝える（2026-07-31にカードから移設）。 */
-.task-detail-spam-btn {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-.task-detail-spam-btn:hover {
-  color: var(--due-overdue);
-  border-color: var(--due-overdue);
-  background: var(--color-danger-surface);
-}
-
-.task-detail-spam-confirm {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  font-size: var(--fs-xs);
-}
-
-.task-detail-spam-message {
-  color: var(--due-overdue);
-  font-weight: 600;
-}
-
-.task-detail-spam-go,
-.task-detail-spam-cancel {
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.task-detail-spam-go {
-  color: var(--ink-on-fill);
-  background: var(--due-overdue);
-  border: 1px solid var(--due-overdue);
-}
-
-.task-detail-spam-cancel {
-  color: var(--text-base);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-}
-
 .task-card-remarks {
   margin-top: var(--space-2);
   font-size: var(--fs-xs);
@@ -510,8 +457,8 @@
   color: var(--text-strong);
 }
 
-/* 1行目: 担当者・受信日時・期限を横並びにする行 */
-/* 1行目（担当者・受信日時・期限・スパム・保存）。要素が多いので横の余白は控えめにし、
+/* 1行目: 担当者・受信日時・期限・ステータスを横並びにする行 */
+/* 1行目（担当者・受信日時・期限・ステータス）。要素が多いので横の余白は控えめにし、
    PC幅では1行に収まるようにする（2026-07-31。従来 gap は var(--space-5)=24px）。
    モバイル等で入り切らない場合だけ折り返す。 */
 .task-detail-toprow {
@@ -538,7 +485,8 @@
   white-space: nowrap;
 }
 
-/* 「保存」ボタン（＋保存結果メッセージ）。1行目（期限の行）の右端に寄せる */
+/* ステータス選択（末尾にスパムの選択肢を含む場合がある）。1行目の右端に寄せる。
+   選んだだけでは保存されず、フッタの「保存」でまとめて反映する（2026-08-18） */
 .task-detail-save-group {
   display: flex;
   align-items: center;
@@ -574,6 +522,13 @@
   overflow-wrap: anywhere;
 }
 
+/* 「メール参照」を本文プレビューの右肩に置く（2026-08-18。フッタから移設） */
+.task-detail-body-head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
 .task-detail-body {
   white-space: pre-wrap;
   line-height: 1.6;
@@ -587,7 +542,7 @@
   font-style: italic;
 }
 
-/* フッタ（ステータス変更 + メール操作）は下部に固定し、本文だけがスクロールする */
+/* フッタ（返信・日報追加・保存）は下部に固定し、本文だけがスクロールする（2026-08-18） */
 .task-detail-footer {
   position: sticky;
   bottom: 0;
@@ -600,19 +555,6 @@
   margin-top: var(--space-4);
   padding: var(--space-3) 0 var(--space-4);
   border-top: 1px solid var(--border);
-}
-
-.task-detail-footer-label {
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.task-detail-status {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 .task-detail-actions {
@@ -660,28 +602,6 @@
 
 .task-action-btn.task-action-dark:hover {
   filter: brightness(1.2);
-}
-
-.status-btn {
-  border: 1px solid var(--border-strong);
-  background: var(--bg-surface);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--fs-md);
-  color: var(--text-base);
-  cursor: pointer;
-  transition: background var(--transition), border-color var(--transition), color var(--transition);
-}
-
-.status-btn:hover {
-  border-color: var(--color-primary);
-}
-
-/* 現在のステータスは緑で示す（ヘッダーの配色に合わせる） */
-.status-btn.active {
-  background: var(--color-brand);
-  color: var(--ink-on-fill);
-  border-color: var(--color-brand);
 }
 
 /* ---------- 詳細画面の編集フォーム（担当者・期限・留意事項） ---------- */
@@ -1189,17 +1109,7 @@ select.task-detail-input.is-unassigned {
     margin-top: 0;
   }
 
-  /* タッチ操作しやすいようステータス/操作ボタンを大きめに */
-  .task-detail-status {
-    width: 100%;
-  }
-
-  .status-btn {
-    flex: 1 1 auto;
-    text-align: center;
-    padding: var(--space-2) var(--space-2);
-  }
-
+  /* タッチ操作しやすいよう操作ボタンを大きめに */
   .task-detail-actions {
     margin-left: 0;
     width: 100%;
