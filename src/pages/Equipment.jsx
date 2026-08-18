@@ -36,6 +36,9 @@ export default function Equipment() {
   const [error, setError] = useState('')
   const [showDisabled, setShowDisabled] = useState(false)
   const [mode, setMode] = useState(null) // null | 'in' | 'out'
+  // 出庫/入庫フォームをどの備品を選んだ状態で開くか。在庫一覧の行の「出」「入」ボタンから
+  // 開いた場合はその備品のid、ヘッダの「出庫」「入庫」ボタンから開いた場合は空欄（2026-08-18）
+  const [presetItemId, setPresetItemId] = useState('')
   const [editing, setEditing] = useState(null) // 編集対象の入出庫レコード
 
   const load = useCallback(async () => {
@@ -69,8 +72,20 @@ export default function Equipment() {
     return [...map.values()]
   }, [items])
 
-  function handleModalSaved() {
+  // ヘッダの「出庫」「入庫」ボタン（備品は空欄）と、在庫一覧の行の「出」「入」ボタン
+  // （備品はその行のものをあらかじめ選択）の両方から使う（2026-08-18）
+  function openTransactionForm(kind, itemId = '') {
+    setPresetItemId(itemId)
+    setMode(kind)
+  }
+
+  function closeTransactionForm() {
     setMode(null)
+    setPresetItemId('')
+  }
+
+  function handleModalSaved() {
+    closeTransactionForm()
     setEditing(null)
     load()
   }
@@ -124,10 +139,18 @@ export default function Equipment() {
                       表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
                       専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
                       iPhone幅で「入庫」だけ2行目に折り返していた） */}
-                  <button type="button" className="btn-primary equipment-header-btn" onClick={() => setMode('out')}>
+                  <button
+                    type="button"
+                    className="btn-primary equipment-header-btn"
+                    onClick={() => openTransactionForm('out')}
+                  >
                     出庫
                   </button>
-                  <button type="button" className="btn-primary equipment-header-btn" onClick={() => setMode('in')}>
+                  <button
+                    type="button"
+                    className="btn-primary equipment-header-btn"
+                    onClick={() => openTransactionForm('in')}
+                  >
                     入庫
                   </button>
                 </>
@@ -163,10 +186,33 @@ export default function Equipment() {
                       <li key={item.id} className="equipment-stock-item">
                         <div className="equipment-stock-row is-static">
                           <span className="equipment-stock-name">
-                            {item.name}
+                            {item.short_name || item.name}
                             {item.disabled && <span className="ui-badge">無効</span>}
                           </span>
-                          <span className="equipment-stock-code">{item.product_code || ''}</span>
+                          {/* 在庫数の左の「出」「入」。この備品をあらかじめ選んだ状態で
+                              出庫・入庫フォームを開く（2026-08-18。ヘッダのボタンは備品が空欄のまま） */}
+                          {!readOnly && (
+                            <span className="equipment-stock-row-actions">
+                              <button
+                                type="button"
+                                className="equipment-stock-action-btn"
+                                onClick={() => openTransactionForm('out', item.id)}
+                                aria-label={`${item.short_name || item.name}を出庫`}
+                                title="出庫"
+                              >
+                                出
+                              </button>
+                              <button
+                                type="button"
+                                className="equipment-stock-action-btn"
+                                onClick={() => openTransactionForm('in', item.id)}
+                                aria-label={`${item.short_name || item.name}を入庫`}
+                                title="入庫"
+                              >
+                                入
+                              </button>
+                            </span>
+                          )}
                           {item.track_stock ? (
                             <span className={`equipment-stock-qty${warn ? ' is-danger' : ''}`}>
                               {item.stock_qty}
@@ -229,8 +275,22 @@ export default function Equipment() {
 
       </div>
 
-      {mode === 'in' && <EquipmentInForm items={items} onClose={() => setMode(null)} onSaved={handleModalSaved} />}
-      {mode === 'out' && <EquipmentOutForm items={items} onClose={() => setMode(null)} onSaved={handleModalSaved} />}
+      {mode === 'in' && (
+        <EquipmentInForm
+          items={items}
+          defaultItemId={presetItemId}
+          onClose={closeTransactionForm}
+          onSaved={handleModalSaved}
+        />
+      )}
+      {mode === 'out' && (
+        <EquipmentOutForm
+          items={items}
+          defaultItemId={presetItemId}
+          onClose={closeTransactionForm}
+          onSaved={handleModalSaved}
+        />
+      )}
 
       {editing &&
         !readOnly &&

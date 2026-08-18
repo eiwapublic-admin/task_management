@@ -11,12 +11,14 @@ import {
 } from '../lib/equipment'
 
 // 入庫モーダル（5-3）。現行の「入庫登録」に相当。
-// existing を渡すと編集モード（履歴画面の行タップから開く）になる
-export default function EquipmentInForm({ items, existing, onClose, onSaved, onDelete }) {
+// existing を渡すと編集モード（履歴画面の行タップから開く）になる。
+// defaultItemId を渡すと、その備品をあらかじめ選んだ状態で開く（在庫一覧の行の「入」ボタン等。
+// 2026-08-18）。どちらも無ければ備品は空欄から選ばせる（ヘッダの「入庫」ボタンから開いた場合）
+export default function EquipmentInForm({ items, existing, defaultItemId, onClose, onSaved, onDelete }) {
   useBodyScrollLock()
 
   const trackedItems = useMemo(() => items.filter((i) => !i.disabled || i.id === existing?.item_id), [items, existing])
-  const [itemId, setItemId] = useState(existing?.item_id || trackedItems[0]?.id || '')
+  const [itemId, setItemId] = useState(existing?.item_id || defaultItemId || '')
   const [reason, setReason] = useState(existing?.reason || 'procure')
   const [occurredAt, setOccurredAt] = useState(() => toDateTimeLocal(existing?.occurred_at))
   const [supplier, setSupplier] = useState(existing?.supplier || '')
@@ -134,6 +136,11 @@ export default function EquipmentInForm({ items, existing, onClose, onSaved, onD
               disabled={Boolean(existing)}
               onChange={(e) => setItemId(e.target.value)}
             >
+              {!itemId && (
+                <option value="" disabled>
+                  選択してください
+                </option>
+              )}
               {groups.map((g) => (
                 <optgroup key={g.name} label={g.name}>
                   {g.rows.map((item) => (

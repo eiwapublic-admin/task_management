@@ -339,6 +339,13 @@
     - **休館日との組み合わせについての既知の制約**: `POST /api/report/closed-days`は「その日に既に日報が登録されていれば400で拒否」する仕様のため、チェックマーク経由（＝必ず日報が存在する日）で開いた`InspectionForm`の「休館日」スイッチをオンにして保存しようとすると、サーバー側の400エラーがフォーム内にそのまま表示される（想定内の組み合わせではないため、UI側で選択肢自体を隠す対応はしていない）
     - 検証はPlaywrightで、①リスト型のチェックマークから開いて保存できること・保存後にフォームが閉じること、②カレンダー型のチェックマークから開いてもマスの日報詳細への遷移が起きないこと、③日報詳細ヘッダのボタンからも同じフォームが開くこと・PC幅でキャプションが見えモバイル幅ではアイコンのみになること、を確認した
 
+138. **備品一覧画面: 略称表示・製品番号の非表示、在庫数の左に「出」「入」ボタンを追加。備品マスタ画面のホームボタンを廃止（2026-08-18）**: 「グルーピングしている備品名を略称にして製品番号は非表示に、在庫数の左にも出庫・入庫ボタンを置いて押した備品があらかじめ選ばれた状態でフォームを開けるようにしたい」との依頼。
+    - **表示の変更（`Equipment.jsx`）**: 各行の見出し（`.equipment-stock-name`）を`item.name`から`item.short_name || item.name`に変更（略称が無い旧データへのフォールバック込み）。製品番号を表示していた`.equipment-stock-code`（`<span>{item.product_code}</span>`）は削除した
+    - **行の「出」「入」ボタン**: 在庫数の左に、owner（読み取り専用ロール）以外だけ小さな2つのボタン（`.equipment-stock-action-btn`。キャプションは「出」「入」の1文字。iPhone幅で1行に収めるための省略で、フル表記の「出庫」「入庫」はヘッダの主要ボタンのまま）を追加した。押すとその備品を選んだ状態で`EquipmentOutForm`/`EquipmentInForm`を開く（`Equipment.jsx`の`openTransactionForm(kind, itemId)`→`presetItemId` state→`<EquipmentInForm defaultItemId={presetItemId}>`/`<EquipmentOutForm defaultItemId={...}>`という新しい`defaultItemId` propで渡す）
+    - **両フォームの初期選択ロジックを修正**: 従来、新規記録時は`existing?.item_id || trackedItems[0]?.id || ''`で**常に一覧の先頭の備品が無言でデフォルト選択されていた**（ヘッダの「出庫」「入庫」ボタンから開いても備品欄が空欄に見えなかった）。今回`trackedItems[0]?.id`のフォールバックを廃止し`existing?.item_id || defaultItemId || ''`に変更したため、**ヘッダのボタン（`defaultItemId`を渡さない）から開くと備品欄が本当に空欄から始まる**ようになった（依頼文の「ヘッダの出庫・入庫ボタンを押した場合は備品はブランクとします」に対応。同時に選択肢の先頭へ`<option value="" disabled>選択してください</option>`を追加）。`EquipmentOutForm`側は、テナント選択時に紐づく備品（`default_item_id`）へ自動的に上書きする仕組みがあるため、`defaultItemId`で開いた場合もその上書きが起きないよう`itemTouchedRef`の初期値に`Boolean(defaultItemId)`を追加した
+    - **備品マスタ画面（`EquipmentItems.jsx`）のホームボタンを削除**: 「ホームボタンは不要」との依頼どおり、機能ヘッダの`leading`（`.icon-btn-home`→`/equipment`）を丸ごと削除した。`FeatureHeader`は`leading`/`title`/`filters`のいずれも無いと左側のブロック自体を描画しない作りのため、右側の`actions`（カテゴリ・備品を追加）は`margin-left: auto`だけで従来どおり右寄せのまま表示される（CSS変更不要）
+    - 検証はPlaywrightで、①一覧の見出しが略称のみ（括弧書き無し）で製品番号が表示されないこと、②行の「出」ボタンを押すとその備品が選択された状態でフォームが開くこと、③ヘッダの「出庫」ボタンでは備品欄が空欄のまま開くこと、④備品マスタ画面にホームボタンが無いこと、を確認した
+
 ---
 
 ## 2. 日常運用

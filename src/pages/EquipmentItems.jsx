@@ -1,17 +1,14 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import EquipmentItemForm from '../components/EquipmentItemForm'
 import EquipmentCategoryForm from '../components/EquipmentCategoryForm'
-import { IconHome } from '../components/Icons'
 import { fetchEquipmentItems, fetchEquipmentCategories } from '../lib/equipment'
 import './Dashboard.css'
 import './Equipment.css'
 
 // 備品マスタ（5-6）。カテゴリマスタはこの画面のツールバーから開くモーダルで扱う。
 export default function EquipmentItems() {
-  const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -70,17 +67,6 @@ export default function EquipmentItems() {
       <AppHeader />
       <div className="ui-container is-narrow">
         <FeatureHeader
-          leading={
-            <button
-              type="button"
-              className="icon-btn-home"
-              onClick={() => navigate('/equipment')}
-              aria-label="在庫一覧に戻る"
-              title="在庫一覧に戻る"
-            >
-              <IconHome size={32} />
-            </button>
-          }
           actions={
             <>
               <button type="button" className="btn-plain" onClick={() => setEditingCategories(true)}>
