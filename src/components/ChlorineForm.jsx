@@ -179,7 +179,7 @@ export default function ChlorineForm({
           )}
 
           <div className="chlorine-building-field">
-            <span>測定施設</span>
+            <span className="chlorine-field-label">測定施設</span>
             <div className="chlorine-building-toggle" role="group" aria-label="測定施設">
               {CHLORINE_BUILDINGS.map((b) => (
                 <button
@@ -195,9 +195,9 @@ export default function ChlorineForm({
             </div>
           </div>
 
-          <div className="report-fields">
+          <div className="report-fields chlorine-loc-inspector-row">
             <label className="report-field">
-              <span>測定場所</span>
+              <span className="chlorine-field-label">測定場所</span>
               <input
                 type="text"
                 value={location}
@@ -205,16 +205,16 @@ export default function ChlorineForm({
                   setLocationTouched(true)
                   setLocation(e.target.value)
                 }}
-                placeholder="1F給湯室"
+                placeholder="測定場所"
               />
             </label>
             <label className="report-field">
-              <span>検査者</span>
+              <span className="chlorine-field-label">検査者</span>
               <input
                 type="text"
                 value={inspector}
                 onChange={(e) => setInspector(e.target.value)}
-                placeholder="検査者名"
+                placeholder="検査者"
               />
             </label>
           </div>
@@ -238,36 +238,15 @@ export default function ChlorineForm({
             </label>
             <label className="report-field">
               <span>残留塩素濃度（mg/L）</span>
-              <div className="chlorine-concentration-row">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  max="99.99"
-                  value={concentration}
-                  onChange={(e) => setConcentration(e.target.value)}
-                  placeholder="0.10"
-                />
-                {/* よく使う値をドロップダウンから選べるようにする（自由入力と併用可。2026-08-10） */}
-                <select
-                  className="chlorine-concentration-select"
-                  value=""
-                  aria-label="よく使う濃度から選ぶ"
-                  onChange={(e) => {
-                    const v = e.target.value
-                    e.target.value = ''
-                    if (v) setConcentration(v)
-                  }}
-                >
-                  <option value="">選択…</option>
-                  {CHLORINE_CONCENTRATION_OPTIONS.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* リスト選択のみ（2026-08-18。自由入力欄は廃止。入力ミスを防ぐため） */}
+              <select value={concentration} onChange={(e) => setConcentration(e.target.value)}>
+                <option value="">選択…</option>
+                {CHLORINE_CONCENTRATION_OPTIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
