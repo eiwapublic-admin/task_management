@@ -63,14 +63,14 @@
   border-color: var(--color-brand-hover);
 }
 
+/* 2026-08-18: 担当者ごとの固定色（橋口=黒/西川=ブルー/岡田=グリーン/未設定=グレー）を
+   常に見せたいため、旧「activeなら白で塗りつぶす」上書きは廃止。薄い白リングだけ付けて
+   activeの濃い緑地でも輪郭が沈まないようにする */
 .filter-chip-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-}
-
-.filter-chip.active .filter-chip-dot {
-  background: var(--bg-surface) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 /* ---------- カンバン列 ---------- */
