@@ -2122,11 +2122,6 @@
 /* datetime-local は iOS で幅が詰まりやすいので明示しておく */
 .chlorine-datetime { min-width: 210px; }
 
-/* 残留塩素濃度。自由入力の数値欄＋よく使う値のドロップダウンを横に並べる（2026-08-10） */
-.chlorine-concentration-row { display: flex; gap: 6px; }
-.chlorine-concentration-row input { flex: 1; min-width: 0; }
-.chlorine-concentration-select { flex-shrink: 0; width: 76px; }
-
 .chlorine-warning {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -2225,6 +2220,54 @@
 
 .chlorine-photo-add { display: flex; flex-direction: column; gap: 6px; }
 .chlorine-photo-add .btn-plain { width: 100%; }
+
+/* --- 測定写真：Phone幅のコンパクト表示（2026-08-18） ---
+   写真1枚（無ければ空欄）＋右側にカメラ・フォルダ・ゴミ箱を横並びアイコンで配置し、
+   その下に撮影日を表示する1行構成。ChlorinePhotos.jsx が isMobile のときだけ描画する
+   （PC/タブレット幅は上の .chlorine-photo-grid のまま） */
+.chlorine-photo-mobile-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.chlorine-photo-mobile-row { display: flex; align-items: flex-start; gap: var(--space-3); }
+
+.chlorine-photo-mobile-thumb {
+  flex-shrink: 0;
+  width: 96px;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chlorine-photo-mobile-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.chlorine-photo-mobile-actions { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+.chlorine-photo-mobile-icons { display: flex; gap: var(--space-2); }
+.chlorine-photo-mobile-date { font-size: var(--fs-2xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   残留塩素等検査：Phone幅での入力効率化（2026-08-18）。
+   スクロールせず素早く記録できるよう、見出しの省略・横並び・OK/NGの2行2列化を行う。
+   PC/タブレット幅（641px以上）は既存レイアウトのまま変更しない
+   ============================================================ */
+@media (max-width: 640px) {
+  /* 測定施設・測定場所・検査者の見出しラベルは省略し、場所/検査者は入力欄内の
+     プレースホルダー（薄いグレー表示）だけで用途を示す */
+  .chlorine-field-label { display: none; }
+
+  /* 測定場所・検査者を1行に横並びにする */
+  .chlorine-loc-inspector-row { flex-wrap: nowrap; }
+  .chlorine-loc-inspector-row .report-field { flex: 1 1 0; min-width: 0; }
+
+  /* 色・濁り・臭気・味のOK/NGボタンを狭めて2行2列で表示する */
+  .chlorine-judgements { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2) var(--space-3); }
+  .chlorine-judgement-row { gap: var(--space-2); }
+  .chlorine-judgement-label { width: auto; }
+  .chlorine-judgement-buttons { gap: 4px; }
+  .chlorine-judgement-btn { min-width: 44px; height: 36px; font-size: var(--fs-sm); padding: 0 6px; }
+}
 
 /* ============================================================
    PDF作成中のブロッキングオーバーレイ（2026-08-10）。

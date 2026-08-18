@@ -3,6 +3,7 @@ import { fetchChlorinePhotos, uploadPhoto, deletePhoto, fetchPhotoObjectUrl } fr
 import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import { IconCamera, IconFolder } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -175,6 +176,35 @@ export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending
     })),
   ]
 
+  // カメラ・ファイル選択の隠しinput（モバイル・デスクトップ両方のボタンから共用する）
+  const hiddenInputs = (
+    <>
+      {/* capture 指定でスマホのカメラを直接起動する（現場では撮影が主な導線） */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          handleFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          handleFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+    </>
+  )
+
   return (
     <div className="chlorine-photos">
       <span className="chlorine-photos-label">測定写真</span>
@@ -185,76 +215,98 @@ export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending
         </p>
       )}
 
-      <ul className="photo-grid chlorine-photo-grid">
-        {tiles.map((t) => (
-          <li className="photo-item" key={t.key}>
-            <div className="chlorine-photo-row">
-              <div className="photo-thumb chlorine-photo-thumb">
-                {t.url ? <img src={t.url} alt="測定写真" /> : <span className="photo-loading">読み込み中…</span>}
+      {hiddenInputs}
+
+      {isMobile ? (
+        // Phone幅: 写真1枚（無ければ空欄）＋右側にカメラ・フォルダ・ゴミ箱を横並びのアイコンで
+        // 配置し、その下に撮影日を表示する。スクロールせず素早く撮影・記録できるように
+        // 1行に収める（2026-08-18）
+        <ul className="chlorine-photo-mobile-list">
+          {(tiles.length > 0 ? tiles : readOnly ? [] : [null]).map((t) => (
+            <li className="chlorine-photo-mobile-row" key={t ? t.key : 'empty'}>
+              <div className="chlorine-photo-mobile-thumb">
+                {t &&
+                  (t.url ? <img src={t.url} alt="測定写真" /> : <span className="photo-loading">読み込み中…</span>)}
               </div>
-              {!readOnly && (
-                <div className="chlorine-photo-actions">
-                  <ConfirmDeleteButton onConfirm={t.onDelete} label="この写真を削除" size={22} />
+              <div className="chlorine-photo-mobile-actions">
+                {!readOnly && (
+                  <div className="chlorine-photo-mobile-icons">
+                    <button
+                      type="button"
+                      className="icon-btn-camera"
+                      onClick={() => cameraRef.current?.click()}
+                      disabled={busy}
+                      aria-label={busy ? '処理中…' : '撮影'}
+                      title="撮影"
+                    >
+                      <IconCamera size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn-folder"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={busy}
+                      aria-label="ファイルから選ぶ"
+                      title="ファイルから選ぶ"
+                    >
+                      <IconFolder size={20} />
+                    </button>
+                    {t && <ConfirmDeleteButton onConfirm={t.onDelete} label="この写真を削除" size={20} />}
+                  </div>
+                )}
+                {t?.takenAt && <span className="chlorine-photo-mobile-date">{formatDateTime(t.takenAt)}</span>}
+                {t?.isPending && <span className="chlorine-photo-pending">保存時に登録</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="photo-grid chlorine-photo-grid">
+          {tiles.map((t) => (
+            <li className="photo-item" key={t.key}>
+              <div className="chlorine-photo-row">
+                <div className="photo-thumb chlorine-photo-thumb">
+                  {t.url ? <img src={t.url} alt="測定写真" /> : <span className="photo-loading">読み込み中…</span>}
                 </div>
-              )}
-            </div>
-            <div className="photo-meta">
-              {t.size > 0 && <span>{formatMB(t.size)}</span>}
-              {t.takenAt && <span>{formatDateTime(t.takenAt)}</span>}
-              {t.isPending && <span className="chlorine-photo-pending">保存時に登録</span>}
-            </div>
-          </li>
-        ))}
-        {!readOnly && (
-          <li className="photo-item photo-add-item">
-            {/* capture 指定でスマホのカメラを直接起動する（現場では撮影が主な導線） */}
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              hidden
-              onChange={(e) => {
-                handleFiles(e.target.files)
-                e.target.value = ''
-              }}
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                handleFiles(e.target.files)
-                e.target.value = ''
-              }}
-            />
-            <div className="chlorine-photo-add">
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => cameraRef.current?.click()}
-                disabled={busy}
-              >
-                {busy ? '処理中…' : '撮影'}
-              </button>
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => fileRef.current?.click()}
-                disabled={busy}
-              >
-                ファイルから選ぶ
-              </button>
-            </div>
-          </li>
-        )}
-      </ul>
-      {!readOnly && tiles.length === 0 && (
-        <p className="settings-hint">
-          {isMobile ? '「撮影」で検査薬の色を撮影して記録できます。' : 'アップロード時に自動で縮小されます。'}
-        </p>
+                {!readOnly && (
+                  <div className="chlorine-photo-actions">
+                    <ConfirmDeleteButton onConfirm={t.onDelete} label="この写真を削除" size={22} />
+                  </div>
+                )}
+              </div>
+              <div className="photo-meta">
+                {t.size > 0 && <span>{formatMB(t.size)}</span>}
+                {t.takenAt && <span>{formatDateTime(t.takenAt)}</span>}
+                {t.isPending && <span className="chlorine-photo-pending">保存時に登録</span>}
+              </div>
+            </li>
+          ))}
+          {!readOnly && (
+            <li className="photo-item photo-add-item">
+              <div className="chlorine-photo-add">
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => cameraRef.current?.click()}
+                  disabled={busy}
+                >
+                  {busy ? '処理中…' : '撮影'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={busy}
+                >
+                  ファイルから選ぶ
+                </button>
+              </div>
+            </li>
+          )}
+        </ul>
+      )}
+      {!readOnly && tiles.length === 0 && !isMobile && (
+        <p className="settings-hint">アップロード時に自動で縮小されます。</p>
       )}
     </div>
   )

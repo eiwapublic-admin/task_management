@@ -200,3 +200,22 @@ export function IconSearch(props) {
     </Icon>
   )
 }
+
+// 残留塩素等検査：撮影ボタン（2026-08-18。Phone幅の測定写真アイコン化）
+export function IconCamera(props) {
+  return (
+    <Icon {...props}>
+      <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </Icon>
+  )
+}
+
+// 残留塩素等検査：ファイルから選ぶボタン（2026-08-18。Phone幅の測定写真アイコン化）
+export function IconFolder(props) {
+  return (
+    <Icon {...props}>
+      <path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" />
+    </Icon>
+  )
+}
