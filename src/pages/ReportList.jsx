@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
 import FeatureHeader from '../components/FeatureHeader'
+import InspectionForm from '../components/InspectionForm'
 import {
   IconCar,
   IconClip,
@@ -26,6 +27,7 @@ import {
   markClosedDay,
   unmarkClosedDay,
   fetchInspections,
+  deleteInspection,
   INSPECTION_BUILDINGS,
   weekdayInfo,
   currentMonthJST,
@@ -90,12 +92,16 @@ export default function ReportList() {
   const [month, setMonth] = useState(currentMonthJST())
   const [reports, setReports] = useState([])
   const [closedDays, setClosedDays] = useState(new Set())
-  const [inspectedDates, setInspectedDates] = useState(new Set())
+  // 自主点検の実施記録（表示中の月分）。日付だけでなく既存レコードそのものを保持し、
+  // チェックマークアイコンから開く入力ウインドウの「既存記録の編集」に使う（2026-08-18）
+  const [inspections, setInspections] = useState([])
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // 未入力の行タップで新規作成中（多重タップ防止）
   const [creating, setCreating] = useState(false)
+  // チェックマークアイコンから開く自主点検の入力ウインドウ。開いている日付（'YYYY-MM-DD'）を保持
+  const [editingInspection, setEditingInspection] = useState(null)
   // 'list' | 'calendar'
   const [view, setView] = useState(() =>
     typeof window !== 'undefined' && sessionStorage.getItem(VIEW_STORAGE_KEY) === 'calendar'
@@ -139,20 +145,28 @@ export default function ReportList() {
     setLoading(true)
     setError('')
     try {
-      const [list, closed, inspections] = await Promise.all([
+      const [list, closed, inspectionList] = await Promise.all([
         fetchReports(),
         fetchClosedDays({ month }),
         fetchInspections({ month }),
       ])
       setReports(list)
       setClosedDays(new Set(closed))
-      setInspectedDates(new Set(inspections.filter((i) => i.building === building).map((i) => i.inspected_on)))
+      setInspections(inspectionList)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [month, building])
+  }, [month])
+
+  // 表示中の月の自主点検レコードを日付で引けるようにする（チェックマークの状態判定・
+  // 入力ウインドウへ渡す既存レコードの両方で使う）
+  const inspectionsByDate = useMemo(() => {
+    const map = new Map()
+    for (const i of inspections) if (i.building === building) map.set(i.inspected_on, i)
+    return map
+  }, [inspections, building])
 
   useEffect(() => {
     load()
@@ -225,6 +239,34 @@ export default function ReportList() {
     }
   }
 
+  // 一覧・カレンダーのチェックマークアイコンから自主点検の入力ウインドウを開く（2026-08-18）
+  function handleInspectionSaved(result) {
+    if (result.closed) {
+      setClosedDays((prev) => new Set(prev).add(result.inspected_on))
+      setInspections((prev) => prev.filter((i) => i.inspected_on !== result.inspected_on))
+    } else {
+      setClosedDays((prev) => {
+        if (!prev.has(result.inspected_on)) return prev
+        const next = new Set(prev)
+        next.delete(result.inspected_on)
+        return next
+      })
+      setInspections((prev) => [...prev.filter((i) => i.id !== result.id), result])
+    }
+    setEditingInspection(null)
+  }
+
+  async function handleInspectionDelete(id) {
+    setInspections((prev) => prev.filter((i) => i.id !== id))
+    try {
+      await deleteInspection(id)
+    } catch (err) {
+      setError(err.message)
+      load()
+    }
+    setEditingInspection(null)
+  }
+
   // 1日分の状態をまとめて求める。リスト型・カレンダー型で同じ判定を使う
   function dayState(date) {
     const r = reportsByDate.get(date)
@@ -247,20 +289,35 @@ export default function ReportList() {
   // 上段＝添付画像・自主点検、下段＝違反車両・残留塩素。該当しないものは場所だけ残して
   // 非表示にする（2026-08-05〜）。自主点検は当日以前で未実施のときだけ黄色い丸で目立たせる。
   // リスト型・カレンダー型・検索結果で共通して使う。
+  // 自主点検アイコンは押すとその日の入力ウインドウを開く（2026-08-18）。行・マス自体も
+  // タップ領域を持つため、伝播を止めて行のクリック（詳細を開く）と衝突しないようにする。
+  // 表示専用のowner（読み取り専用ロール）には従来どおりの非活性な丸のまま出す。
   function renderIconsRow1(date, { report, isFuture }, size) {
+    const done = inspectionsByDate.has(date)
+    const badgeClass = `report-row-icon report-inspection-icon${done ? ' is-done' : !isFuture ? ' is-pending' : ''}`
     return (
       <div className="report-row-icons">
         <span className={`report-row-icon${report?.has_photos ? '' : ' is-hidden'}`} title="添付画像あり">
           <IconClip size={size} />
         </span>
-        <span
-          className={`report-row-icon report-inspection-icon${
-            inspectedDates.has(date) ? ' is-done' : !isFuture ? ' is-pending' : ''
-          }`}
-          title={inspectedDates.has(date) ? '自主点検実施済み' : '自主点検未実施'}
-        >
-          <IconCheckCircle size={size - 2} />
-        </span>
+        {isOwner ? (
+          <span className={badgeClass} title={done ? '自主点検実施済み' : '自主点検未実施'}>
+            <IconCheckCircle size={size - 2} />
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={badgeClass}
+            title={done ? '自主点検実施済み（タップで確認・修正）' : '自主点検未実施（タップで記録）'}
+            aria-label={done ? '自主点検を確認・修正する' : '自主点検を記録する'}
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditingInspection(date)
+            }}
+          >
+            <IconCheckCircle size={size - 2} />
+          </button>
+        )}
       </div>
     )
   }
@@ -318,12 +375,23 @@ export default function ReportList() {
           const { report: r, closed, isToday, weekday: wd, entries } = st
 
           if (r) {
+            // チェックマークアイコン（自主点検入力への入口）を行内に持たせるため、
+            // 行自体は<button>ではなくrole="button"の<div>にする（2026-08-18。
+            // <button>の中に<button>は入れられないため）
             return (
               <li key={date}>
-                <button
-                  type="button"
+                <div
                   className={`report-row${isToday ? ' is-today' : ''}`}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => navigate(`/reports/${date}`)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/reports/${date}`)
+                    }
+                  }}
                 >
                   <div className="report-row-main">
                     <div className="report-row-date">
@@ -350,7 +418,7 @@ export default function ReportList() {
                     {renderIconsRow1(date, st, 20)}
                     {renderIconsRow2(date, st, 20)}
                   </div>
-                </button>
+                </div>
               </li>
             )
           }
@@ -522,10 +590,18 @@ export default function ReportList() {
           const wd = weekdayInfo(r.report_date, holidays)
           return (
             <li key={r.report_date}>
-              <button
-                type="button"
+              <div
                 className="report-row"
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/reports/${r.report_date}`)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/reports/${r.report_date}`)
+                  }
+                }}
               >
                 <div className="report-row-main">
                   <div className="report-row-date">
@@ -547,7 +623,7 @@ export default function ReportList() {
                   {renderIconsRow1(r.report_date, dayState(r.report_date), 20)}
                   {renderIconsRow2(r.report_date, dayState(r.report_date), 20)}
                 </div>
-              </button>
+              </div>
             </li>
           )
         })}
@@ -681,6 +757,20 @@ export default function ReportList() {
             navigate('/reports')
             load()
           }}
+        />
+      )}
+
+      {/* 一覧・カレンダーのチェックマークアイコンから開く自主点検の入力ウインドウ（2026-08-18） */}
+      {editingInspection && (
+        <InspectionForm
+          date={editingInspection}
+          building={building}
+          existing={inspectionsByDate.get(editingInspection) || null}
+          initialClosed={closedDays.has(editingInspection)}
+          defaultInspector={user?.display_name || ''}
+          onClose={() => setEditingInspection(null)}
+          onSaved={handleInspectionSaved}
+          onDelete={handleInspectionDelete}
         />
       )}
     </div>

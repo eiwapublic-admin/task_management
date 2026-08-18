@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReportPhotos from '../components/ReportPhotos'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
+import InspectionForm from '../components/InspectionForm'
+import { IconCheckCircle } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
@@ -15,7 +17,11 @@ import {
   fetchTemplates,
   fetchPhotos,
   fetchParkingViolations,
+  fetchInspections,
+  fetchClosedDays,
+  deleteInspection,
   markClosedDay,
+  INSPECTION_BUILDINGS,
   todayJST,
   formatReportDate,
   toHHMM,
@@ -33,6 +39,9 @@ const AUTOSAVE_MS = 800
 // ホームボタンと前日/翌日の移動ボタンは廃止し、右上の「×」だけで閉じる。
 // 呼び出しは ReportList.jsx（URL /reports/:date に :date があるときに描画する）。
 // onClose: 閉じたあとの後始末（一覧へ戻る＋一覧の再読み込み）は呼び出し側が行う。
+// BKBのみ運用のため固定にする（Inspections.jsx/ReportList.jsxと同じ）
+const INSPECTION_BUILDING = INSPECTION_BUILDINGS[0]
+
 export default function ReportDetail({ date, onClose }) {
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
@@ -43,6 +52,11 @@ export default function ReportDetail({ date, onClose }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savedAt, setSavedAt] = useState(null)
+  // ヘッダの「自主点検」ボタン用（2026-08-18）。この日の既存記録・休館日状態を
+  // 先読みしておき、入力ウインドウを開くときに渡す
+  const [inspectionStatus, setInspectionStatus] = useState({ existing: null, closed: false })
+  const [loadingInspectionStatus, setLoadingInspectionStatus] = useState(true)
+  const [editingInspection, setEditingInspection] = useState(false)
 
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
@@ -65,6 +79,25 @@ export default function ReportDetail({ date, onClose }) {
     }
   }, [date])
 
+  const loadInspectionStatus = useCallback(async () => {
+    setLoadingInspectionStatus(true)
+    try {
+      const [inspections, closedDays] = await Promise.all([
+        fetchInspections({ date }),
+        fetchClosedDays({ month: date.slice(0, 7) }),
+      ])
+      setInspectionStatus({
+        existing: inspections.find((i) => i.building === INSPECTION_BUILDING) || null,
+        closed: closedDays.includes(date),
+      })
+    } catch {
+      // 状態が取れなくてもボタン自体は出す（開けば新規記録として入力できる）
+      setInspectionStatus({ existing: null, closed: false })
+    } finally {
+      setLoadingInspectionStatus(false)
+    }
+  }, [date])
+
   // 開いている間は裏の一覧を固定する。これが無いと、モーダル内のスクロールが
   // 裏の一覧へ伝わり、iPhoneで見出しが画面上端の外へ隠れることがあった（2026-08-10）
   useBodyScrollLock()
@@ -72,6 +105,10 @@ export default function ReportDetail({ date, onClose }) {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!isOwner) loadInspectionStatus()
+  }, [loadInspectionStatus, isOwner])
 
   useEffect(() => {
     fetchTemplates()
@@ -228,6 +265,7 @@ export default function ReportDetail({ date, onClose }) {
   closeRef.current = handleClose
 
   return (
+    <>
       <div className="ui-overlay is-top" role="dialog" aria-modal="true" onClick={handleClose}>
         <div className="ui-modal report-detail-modal" onClick={(e) => e.stopPropagation()}>
           <div className="ui-modal-head report-detail-head">
@@ -237,8 +275,22 @@ export default function ReportDetail({ date, onClose }) {
             </h2>
             <div className="report-head-right">
               {savedAt && <span className="report-saved">保存しました</span>}
-              {/* 自主点検・残留塩素の入力ショートカットは廃止（2026-08-13。各専用画面の
-                  「＋」・行タップから記録する動線に一本化）。ゴミ箱・×は日付と同じ行に置く */}
+              {/* 自主点検の入力ショートカット（2026-08-18。日報一覧・カレンダーの
+                  チェックマークアイコンと同じ入力ウインドウをここからも開けるようにした。
+                  残留塩素は専用画面の「＋」・行タップから記録する動線のまま変更していない */}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-btn-inspection"
+                  onClick={() => setEditingInspection(true)}
+                  disabled={loadingInspectionStatus}
+                  aria-label="自主点検を記録"
+                  title="自主点検を記録"
+                >
+                  <IconCheckCircle size={20} />
+                  <span className="icon-btn-inspection-label">自主点検</span>
+                </button>
+              )}
               {!readOnly && report && (
                 <span className="report-head-delete">
                   <ConfirmDeleteButton onConfirm={handleDeleteReport} label="この日の日報を削除" size={22} />
@@ -396,6 +448,33 @@ export default function ReportDetail({ date, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* ヘッダの「自主点検」ボタンから開く入力ウインドウ（2026-08-18） */}
+      {editingInspection && (
+        <InspectionForm
+          date={date}
+          building={INSPECTION_BUILDING}
+          existing={inspectionStatus.existing}
+          initialClosed={inspectionStatus.closed}
+          defaultInspector={user?.display_name || ''}
+          onClose={() => setEditingInspection(false)}
+          onSaved={() => {
+            setEditingInspection(false)
+            loadInspectionStatus()
+          }}
+          onDelete={async (id) => {
+            try {
+              await deleteInspection(id)
+            } catch (err) {
+              setError(err.message)
+            } finally {
+              setEditingInspection(false)
+              loadInspectionStatus()
+            }
+          }}
+        />
+      )}
+    </>
   )
 }
 
