@@ -931,6 +931,20 @@
 
 .report-row-icon.is-hidden { visibility: hidden; }
 
+/* 自主点検アイコンはタップで入力ウインドウを開ける<button>にしている（2026-08-18。
+   owner＝読み取り専用ロールだけ従来どおり非活性な<span>のまま）。ボタンの既定の見た目を
+   打ち消し、.report-row-icon の丸バッジとしての見た目を保つ */
+button.report-row-icon {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.report-row-icon:hover { filter: brightness(1.15); }
+
 /* 自主点検の実施有無。実施済みは落ち着いた緑、当日以前で未実施のときだけ
    黄色い丸背景で目立たせる（日報系ヘッダーバーと同じ配色を流用） */
 .report-inspection-icon.is-done { color: var(--color-brand); }

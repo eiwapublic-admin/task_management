@@ -300,7 +300,8 @@
 .icon-btn-delete,
 .icon-btn-download,
 .icon-btn-search,
-.icon-btn-archive {
+.icon-btn-archive,
+.icon-btn-inspection {
   flex-shrink: 0;
   width: var(--icon-btn);
   height: var(--icon-btn);
@@ -427,6 +428,26 @@
 }
 
 .icon-btn-archive:hover:not(:disabled) { color: var(--color-primary); }
+
+/* 自主点検（日報詳細ヘッダ。2026-08-18）。狭幅ではアイコンのみ、PC幅では
+   「自主点検」の文字ラベルも表示する。アーカイブボタンと全く同じ骨格を使う */
+.icon-btn-inspection-label { display: none; }
+
+@media (min-width: 769px) {
+  .icon-btn-inspection {
+    width: auto;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
+  .icon-btn-inspection-label {
+    display: inline;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+  }
+}
+
+.icon-btn-inspection:hover:not(:disabled) { color: var(--color-primary); }
+.icon-btn-inspection:disabled { opacity: 0.45; cursor: default; }
 
 /* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
 .icon-btn-delete:hover:not(:disabled) {
