@@ -68,11 +68,6 @@ export default function KanbanBoard({
     }
   }
 
-  function handleStatusChange(task, status) {
-    onStatusChange(task, status)
-    setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, status } : prev))
-  }
-
   // 詳細画面の「スパム」。実行するとサーバー側でアーカイブへ移るため、モーダルを閉じる。
   async function handleSpam(task) {
     setSelectedTask(null)
@@ -175,7 +170,6 @@ export default function KanbanBoard({
       <TaskDetail
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
-        onStatusChange={handleStatusChange}
         sharedGmail={sharedGmail}
         assignees={assignees}
         onUpdateTask={onUpdateTask ? handleUpdateTask : undefined}

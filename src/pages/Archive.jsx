@@ -73,23 +73,6 @@ export default function Archive() {
     load({ assignee, channel, q: appliedQ })
   }
 
-  // 詳細画面でステータスを変更したら一覧を更新。完了以外に戻すと
-  // アーカイブから外れる（サーバー側で archived_at がクリアされる）ため、
-  // 一覧から消えるのに合わせてモーダルも閉じる。
-  async function handleStatusChange(task, status) {
-    try {
-      await updateTaskStatus(task.id, status)
-      if (status === '完了') {
-        setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, status } : prev))
-      } else {
-        setSelectedTask(null)
-      }
-      reload()
-    } catch (err) {
-      setError(err.message)
-    }
-  }
-
   // スパム判定だけを外す。アーカイブ済みであることは変えない（誤判定の訂正が目的で、
   // カンバンへ戻すかどうかは別途「復帰」で選べるようにするため）。
   async function handleUnspam(task) {
@@ -295,7 +278,6 @@ export default function Archive() {
       <TaskDetail
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
-        onStatusChange={handleStatusChange}
         sharedGmail={sharedGmail}
         assignees={assignees}
         onUpdateTask={handleUpdateTask}

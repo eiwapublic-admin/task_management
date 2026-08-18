@@ -21,7 +21,10 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam, onAddToReport }) {
+// ステータス選択リストの末尾に加える「スパム」を表す値（STATUS_LIST の実値とは重複しない）
+const SPAM_OPTION = '__spam__'
+
+export default function TaskDetail({ task, onClose, sharedGmail, assignees = [], onUpdateTask, onUnspam, onSpam, onAddToReport }) {
   // 開いている間は裏のカンバンを固定する（共通フックへ集約。2026-08-10）
   useBodyScrollLock(Boolean(task))
 
@@ -38,11 +41,12 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   const [assignee, setAssignee] = useState(UNASSIGNED)
   const [dueDate, setDueDate] = useState('')
   const [remarks, setRemarks] = useState('')
+  // ステータス（スパムを選んだ場合は SPAM_OPTION）。リスト選択のみで即時反映はせず、
+  // 他の編集項目と同じく「保存」を押すまでは画面に留まる（2026-08-18）
+  const [statusSelection, setStatusSelection] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState(false)
-  // スパム判定の確認表示（押し間違いでタスクがアーカイブへ消えるのを防ぐ）
-  const [confirmingSpam, setConfirmingSpam] = useState(false)
   // 「日報に追加」の処理中表示・エラー
   const [addingToReport, setAddingToReport] = useState(false)
   const [addReportError, setAddReportError] = useState('')
@@ -65,9 +69,9 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setAssignee(task.assignee || UNASSIGNED)
     setDueDate(task.due_date || '')
     setRemarks(task.remarks || '')
+    setStatusSelection(task.status)
     setSaveError('')
     setSaved(false)
-    setConfirmingSpam(false)
     setAddReportError('')
   }, [task])
 
@@ -163,10 +167,17 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
   // 担当者の選択肢（既存の担当者一覧 + 未設定 + 現在値の取りこぼし防止）
   const assigneeOptions = Array.from(new Set([UNASSIGNED, ...assignees, task.assignee].filter(Boolean)))
 
-  const dirty =
+  // スパム判定はステータス選択リストの選択肢として出す。誤操作でタスクが視界から消えるのを
+  // 防ぐため、アーカイブ済み・スパム済みのタスクには出さない（解除はタイトル横のバッジから）
+  const canMarkSpam = Boolean(onSpam) && !task.is_spam && !task.archived_at
+  const markingSpam = statusSelection === SPAM_OPTION
+
+  const baseDirty =
     assignee !== (task.assignee || UNASSIGNED) ||
     dueDate !== (task.due_date || '') ||
     remarks !== (task.remarks || '')
+  const statusDirty = statusSelection !== task.status
+  const dirty = baseDirty || statusDirty
 
   async function handleSave() {
     if (!onUpdateTask || !dirty) return
@@ -174,11 +185,19 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
     setSaveError('')
     setSaved(false)
     try {
-      await onUpdateTask(task.id, {
-        assignee,
-        due_date: dueDate || null,
-        remarks: remarks.trim() || null,
-      })
+      // ステータス変更・スパム判定は、他の編集項目とまとめて「保存」で反映する。
+      // スパムはサーバー側で自動的にステータスも変えるため、status は送らず onSpam に任せる
+      if (baseDirty || (statusDirty && !markingSpam)) {
+        await onUpdateTask(task.id, {
+          assignee,
+          due_date: dueDate || null,
+          remarks: remarks.trim() || null,
+          ...(statusDirty && !markingSpam ? { status: statusSelection } : {}),
+        })
+      }
+      if (markingSpam && onSpam) {
+        await onSpam(task)
+      }
       setSaved(true)
       // 保存できたら詳細画面を閉じる（2026-08-05）
       onClose()
@@ -319,7 +338,7 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             ×
           </button>
         </div>
-        {/* 1行目: 担当者・期限・受信日時を横並び（ステータスはフッタにあるため省略） */}
+        {/* 1行目: 担当者・期限・受信日時・ステータスを横並び */}
         <div className="task-detail-toprow">
           <div className="task-detail-topitem">
             <span className="task-detail-topitem-label">担当者</span>
@@ -346,58 +365,32 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             />
           </div>
           {/* 受信日時は「2026/07/29 08:20 受信」と後置きにして、1行目（担当者・期限・
-              スパム・保存）に収まる幅にする（2026-07-31。従来は「受信日時 ○○」の前置き） */}
+              ステータス）に収まる幅にする（2026-07-31。従来は「受信日時 ○○」の前置き） */}
           <div className="task-detail-topitem">
             <span>{formatDateTime(task.received_at) ?? '不明'}</span>
             <span className="task-detail-topitem-label">受信</span>
           </div>
           <div className="task-detail-save-group">
-            {saveError && <span className="task-detail-save-error">{saveError}</span>}
-            {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
-            {/* スパム判定は保存ボタンの左。誤操作でタスクが視界から消えるため確認を挟む。
-                アーカイブ済み・スパム済みのタスクには出さない（解除はタイトル横のバッジから）。 */}
-            {onSpam && !task.is_spam && !task.archived_at && (
-              confirmingSpam ? (
-                <span className="task-detail-spam-confirm" role="group" aria-label="スパム判定の確認">
-                  <span className="task-detail-spam-message">
-                    スパムと判定してすぐにアーカイブへ移動します。
-                  </span>
-                  <button
-                    type="button"
-                    className="task-detail-spam-go"
-                    onClick={() => {
-                      setConfirmingSpam(false)
-                      onSpam(task)
-                    }}
-                  >
-                    移動
-                  </button>
-                  <button
-                    type="button"
-                    className="task-detail-spam-cancel"
-                    onClick={() => setConfirmingSpam(false)}
-                  >
-                    キャンセル
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="task-detail-spam-btn"
-                  onClick={() => setConfirmingSpam(true)}
-                >
-                  スパム
-                </button>
-              )
-            )}
-            <button
-              type="button"
-              className="task-action-btn task-action-reply"
-              onClick={handleSave}
-              disabled={saving || !dirty}
+            {/* ステータスはリスト選択のみ。見出しは省略し、選んだだけでは保存されない
+                （フッタの「保存」でまとめて反映する）。末尾にスパムの選択肢を出す場合がある */}
+            <select
+              className="task-detail-input"
+              value={statusSelection}
+              onChange={(e) => setStatusSelection(e.target.value)}
+              aria-label="ステータス"
             >
-              {saving ? '保存中…' : '保存'}
-            </button>
+              {STATUS_LIST.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+              {canMarkSpam && (
+                <>
+                  <option disabled>──────────</option>
+                  <option value={SPAM_OPTION}>スパム</option>
+                </>
+              )}
+            </select>
           </div>
         </div>
 
@@ -470,7 +463,16 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
             />
           </dd>
           <dt>本文プレビュー</dt>
-          <dd className="task-detail-body">{task.body_preview}</dd>
+          <dd>
+            {mailUrl && (
+              <div className="task-detail-body-head">
+                <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
+                  メール参照
+                </a>
+              </div>
+            )}
+            <div className="task-detail-body">{task.body_preview}</div>
+          </dd>
           {task.classification_note && (
             <>
               <dt>AI判定の理由</dt>
@@ -480,25 +482,15 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
         </dl>
 
         <div className="task-detail-footer">
-          <span className="task-detail-footer-label">ステータス</span>
-          <div className="task-detail-status" role="group" aria-label="ステータスを変更">
-            {STATUS_LIST.map((status) => (
-              <button
-                key={status}
-                className={status === task.status ? 'status-btn active' : 'status-btn'}
-                aria-pressed={status === task.status}
-                onClick={() => {
-                  onStatusChange(task, status)
-                  // ステータス変更後は詳細画面を閉じる（2026-08-05）
-                  onClose()
-                }}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
           <div className="task-detail-actions">
+            {saveError && <span className="task-detail-save-error">{saveError}</span>}
+            {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
             {addReportError && <span className="task-detail-save-error">{addReportError}</span>}
+            {replyHref && (
+              <a className="task-action-btn task-action-dark" href={replyHref}>
+                返信
+              </a>
+            )}
             {onAddToReport && (
               <button
                 type="button"
@@ -509,16 +501,14 @@ export default function TaskDetail({ task, onClose, onStatusChange, sharedGmail,
                 {addingToReport ? '追加中…' : '日報に追加'}
               </button>
             )}
-            {mailUrl && (
-              <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
-                メール参照
-              </a>
-            )}
-            {replyHref && (
-              <a className="task-action-btn task-action-dark" href={replyHref}>
-                返信
-              </a>
-            )}
+            <button
+              type="button"
+              className="task-action-btn task-action-reply"
+              onClick={handleSave}
+              disabled={saving || !dirty}
+            >
+              {saving ? '保存中…' : '保存'}
+            </button>
           </div>
         </div>
       </div>
