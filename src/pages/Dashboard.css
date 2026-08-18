@@ -2261,10 +2261,13 @@
   .chlorine-loc-inspector-row { flex-wrap: nowrap; }
   .chlorine-loc-inspector-row .report-field { flex: 1 1 0; min-width: 0; }
 
-  /* 色・濁り・臭気・味のOK/NGボタンを狭めて2行2列で表示する */
+  /* 色・濁り・臭気・味のOK/NGボタンを狭めて2行2列で表示する。ラベルの文字数が
+     項目によって異なる（色/味=1文字、濁り/臭気=2文字）ため、幅を固定して
+     OK/NGボタンのX位置を列ごとにそろえる（2026-08-18。実機フィードバックで
+     ボタン位置がガタつくとの指摘を受けて width: auto から固定幅に変更） */
   .chlorine-judgements { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2) var(--space-3); }
   .chlorine-judgement-row { gap: var(--space-2); }
-  .chlorine-judgement-label { width: auto; }
+  .chlorine-judgement-label { width: 34px; flex-shrink: 0; }
   .chlorine-judgement-buttons { gap: 4px; }
   .chlorine-judgement-btn { min-width: 44px; height: 36px; font-size: var(--fs-sm); padding: 0 6px; }
 }
