@@ -3,6 +3,7 @@ import ReportPhotos from '../components/ReportPhotos'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
+import TimeInput from '../components/TimeInput'
 import { IconCheckCircle } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
@@ -347,20 +348,18 @@ export default function ReportDetail({ date, onClose }) {
                 </label>
                 <label className="report-field">
                   <span>開始</span>
-                  <input
-                    type="time"
+                  <TimeInput
                     value={toHHMM(report.work_start)}
                     disabled={readOnly}
-                    onChange={(e) => patchHeader({ work_start: e.target.value })}
+                    onChange={(v) => patchHeader({ work_start: v })}
                   />
                 </label>
                 <label className="report-field">
                   <span>終了</span>
-                  <input
-                    type="time"
+                  <TimeInput
                     value={toHHMM(report.work_end)}
                     disabled={readOnly}
-                    onChange={(e) => patchHeader({ work_end: e.target.value })}
+                    onChange={(v) => patchHeader({ work_end: v })}
                   />
                 </label>
               </div>
@@ -377,12 +376,11 @@ export default function ReportDetail({ date, onClose }) {
               <ul className="entry-list">
                 {sortedEntries.map((e) => (
                   <li className="entry-row" key={e.id}>
-                    <input
+                    <TimeInput
                       className="entry-time"
-                      type="time"
                       value={toHHMM(e.entry_time)}
                       disabled={readOnly}
-                      onChange={(ev) => handleEntryChange(e.id, { entry_time: ev.target.value })}
+                      onChange={(v) => handleEntryChange(e.id, { entry_time: v })}
                       aria-label="時刻"
                     />
                     <textarea

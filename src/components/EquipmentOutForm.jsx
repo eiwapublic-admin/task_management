@@ -257,18 +257,25 @@ export default function EquipmentOutForm({ items, existing, defaultItemId, onClo
             </div>
           )}
 
-          <label className="ui-field">
-            <span>出庫数量</span>
-            <input
-              type="number"
-              className="ui-input"
-              inputMode="numeric"
-              min="1"
-              value={quantity}
-              disabled={isSigned}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-          </label>
+          <div className="ui-field-row">
+            <label className="ui-field">
+              <span>出庫数量</span>
+              <input
+                type="number"
+                className="ui-input"
+                inputMode="numeric"
+                min="1"
+                value={quantity}
+                disabled={isSigned}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </label>
+
+            <div className="ui-field">
+              <span>担当者</span>
+              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={isSigned} />
+            </div>
+          </div>
 
           {!existing && beforeQty !== null && (
             <p className={`ui-note${afterQty !== null && afterQty < 0 ? ' is-danger' : ''}`}>
@@ -277,16 +284,11 @@ export default function EquipmentOutForm({ items, existing, defaultItemId, onClo
             </p>
           )}
 
-          <div className="ui-field">
-            <span>担当者</span>
-            <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={isSigned} />
-          </div>
-
           <label className="ui-field">
             <span>備考</span>
             <textarea
-              className="ui-textarea"
-              rows={3}
+              className="ui-textarea is-compact"
+              rows={1}
               value={note}
               disabled={isSigned}
               onChange={(e) => setNote(e.target.value)}
