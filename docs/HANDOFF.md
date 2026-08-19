@@ -372,6 +372,20 @@
     - **備品出庫・入庫フォームの日時はみ出し（再修正。`EquipmentOutForm.jsx`/`EquipmentInForm.jsx`）**: 140番で行った`<input type="datetime-local">`へのCSS調整（`max-width`/`font-size`）は実機（Safari/WebKit）で改善が無いとの報告を受けた。この環境のPlaywright（Chromium）では該当のネイティブ部品の内部セグメントのレンダリング崩れを再現できずCSSの検証ができないため、CSSでの調整を諦め、新規`src/components/DateTimeInput.jsx`で`<input type="date">`と既存の`TimeInput`を横並びにした自作の複合部品に置き換えた。value/onChangeは既存の`occurredAt`（`toDateTimeLocal()`が返す`'YYYY-MM-DDTHH:MM'`文字列）と同じ形式のまま据え置いたため、フォーム側の保存処理は変更していない。横並びの幅配分は`.ui-field-row`（140番で追加済み）を流用し、素の`<input>`同士でも縮むよう`.ui-field-row > input { flex:1 1 0; min-width:0 }`を追加した。**iPhone実機での最終確認はまだ**（ネイティブ部品自体を使わない構成に変えたため理論上ははみ出さないはずだが、Chromium環境では実機のSafari特有の不具合を直接再現できていたわけではないため要注意）。残留塩素フォーム（`ChlorineForm.jsx`）の`datetime-local`は今回対象外（不具合報告が無いため据え置き）
     - 検証: `npm run lint`・`npm run build`が通ることを確認。日時入力については、実際のDOM幅計算（`.ui-field-row`内で`<input type="date">`と時刻入力が均等に縮み、340px幅のコンテナ内でも右端がコンテナ幅を超えないこと）をPlaywrightで直接計測して確認した。日報の開始・終了の1行化、違反車両「＋」の空欄化は既存のCSSクラス・実装パターンの再利用のためコードレビューでの確認に留めた
 
+142. **ヘッダー上部のモヤ修正、詳細画面全般の背景をグレーに、違反車両（新規登録・一覧・更新）の画面調整、作業定型文のホームボタン廃止（2026-08-19）**: 実機フィードバック（スクリーンショット添付）を受けた6件の修正。
+    - **アプリヘッダー上部のモヤ（`index.html`）**: 添付のiPhoneスクリーンショットで、ステータスバー付近（時刻・電波・バッテリー表示の帯）にモヤ（ブラー）が掛かり、ロゴ・タイトルの上端がぼやけて見えていた。自前のCSSにはblur/backdrop-filterが一切無いため、原因は`apple-mobile-web-app-status-bar-style="black-translucent"`（ホーム画面PWAの背景色をノッチの裏側まで拡張するため2026-08-04頃から設定済み）によるiOS標準の半透明ブラー処理と判断し、`black`に変更した。`black`はステータスバー分の領域を確保する代わりにブラーが掛からない（`env(safe-area-inset-top)`は0になるが、`.app-header`の`calc(var(--space-2) + env(safe-area-inset-top))`はそのままで実害は無い）。**この不具合はこのPlaywright/Chromium環境では再現できていない**（iOS標準のネイティブ描画のため）ため、実機での最終確認が必要
+    - **詳細画面全般の背景をグレーに**: 残留塩素画面の色/濁り欄・タスク詳細の本文プレビューは読みやすいとの評価だったフォントサイズとは別に、モーダル・カードの地色が入力欄と同じ白（`--bg-surface`）で、入力欄がどこにあるか分かりにくいとの指摘。`.ui-modal`（`ui.css`。備品出庫入庫・違反車両詳細・自主点検・残留塩素等のモーダル全般）、`.task-detail-modal`とその固定ヘッダー・フッター（`KanbanBoard.css`。タスク詳細）、`.report-card`（`Dashboard.css`。日報詳細・違反車両カード・作業定型文等）の背景を`var(--bg-muted)`（薄いグレー）に変更した。入力欄（`.ui-input`等）は引き続き白のため、地色との対比で際立つ
+    - **違反車両の新規登録画面（`ReportParkingViolations.jsx`/`ParkingViolations.jsx`）**: 「撮影して追加」ボタンを`btn-plain`（枠のみ）から`btn-primary`（ブルー）に変更して目立たせた。クイック登録モーダルの見出しは「違反車両を記録（本日 yyyy/mm/dd）」から日付のみに省略した（本文側に黄色枠の「違反車両」見出しが別途あるため重複を避けた）
+    - **違反車両の一覧画面の明細（`ParkingViolations.jsx`）**: 分類タグ（無断駐車等）を1行目の右側（日付・ナンバーの右上）へ移動し、日報へのジャンプボタン（アイコンのみ）を削除した。結果、通常は「1行目=日付・ナンバー＋分類タグ」「2行目=所有会社・メーカー・車種」の2行構成になる（補足欄がある記録はそのぶん行が増える）。ジャンプボタン削除に伴い`navigate`・`IconClipboard`の未使用importも削除した
+    - **違反車両の更新画面（`ParkingViolationDetail.jsx`）**: 
+      - タイトルの日付表示（読み取り専用）を廃し、本文に編集可能な「日付」欄（`<input type="date">`）を追加した。保存時に`checked_at`として送信するようworkerの`handleParkingUpdate`（`worker/lib/reports.js`）に受け口を追加（不正な日付は無視して既存値を保つ）。日付が空のままの保存はブロックする
+      - 地域・ナンバー・メーカー・車種・所有会社の見出し（`<span>`）を削除し、既存のplaceholder表示（薄い色の案内文字）だけで示すようにした。ナンバー欄は見出しが無くなる代わりに`aria-label`を付けた（Comboboxは元々見出しを持たない他画面の使い方に揃え、追加のprops拡張はしていない）
+      - 所有会社欄の「※必須。不明な場合は「（不明）」」の注釈文言を削除（見出しごと削除したため自然に消えた。必須である旨は保存時のエラーメッセージに残るオレンジ枠と保存エラー文言で引き続き伝わる）
+      - 違反区分のチェックボックス・文字を拡大。共通クラス`.parking-violation-chip`は日報詳細のカード側でも使うため直接は変えず、この画面専用の修飾クラス`.parking-violation-chip.is-lg`（`Dashboard.css`。文字は見出しと同じ`--fs-md`、チェックボックスは18×18pxに拡大）を新設して適用した
+      - 補足欄の高さを`rows={3}`→`rows={1}`にして1行分に縮めた（`.chlorine-note-field textarea`には元々rows以上の高さを強制するCSSが無いため、rows変更のみで縮んだ）
+    - **作業定型文の画面（`ReportTemplates.jsx`）**: 依頼どおりホームボタン（`FeatureHeader`の`leading`）を削除。未使用になった`useNavigate`・`IconHome`のimportも削除した
+    - 検証: `npm run lint`・`npm run build`が通ることを確認。実際のビルド後CSSを読み込んだ静的HTMLをPlaywrightでスクリーンショットし、①違反車両一覧の明細が2行構成で分類タグが右上にあること、②モーダルの地がグレーで白い入力欄・日付欄が際立つこと、③違反区分チェックボックスが拡大されていること、④「撮影して追加」ボタンがブルーになっていること、を目視確認した。**ステータスバーのモヤ修正は実機（iOS Safari/ホーム画面PWA）でのみ最終確認できる**点に注意
+
 ---
 
 ## 2. 日常運用

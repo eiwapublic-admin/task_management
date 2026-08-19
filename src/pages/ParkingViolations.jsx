@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import FeatureHeader from '../components/FeatureHeader'
-import { IconClipboard, IconSearch } from '../components/Icons'
+import { IconSearch } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchParkingViolations,
@@ -29,7 +28,6 @@ function plateKey(v) {
 
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
-  const navigate = useNavigate()
   const user = getCurrentUser()
   const isOwner = user?.role === 'owner'
   const [violations, setViolations] = useState([])
@@ -265,15 +263,28 @@ export default function ParkingViolations() {
                     }
                   >
                     <div className="parking-list-main">
-                      {/* 残留塩素一覧の日付見出しと同じ「日付だけ・太字」の見せ方に揃える
-                          （2026-08-11。以前は時刻まで表示していた） */}
-                      <span className="parking-list-date">{formatReportDate(jstDateOnly(v.checked_at))}</span>
-                      <span className="parking-list-plate">
-                        {v.plate_region || v.plate_number
-                          ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim()
-                          : '（ナンバー未入力）'}
-                      </span>
-                      {count > 1 && <span className="parking-list-count">累計{count}回</span>}
+                      <div className="parking-list-main-left">
+                        {/* 残留塩素一覧の日付見出しと同じ「日付だけ・太字」の見せ方に揃える
+                            （2026-08-11。以前は時刻まで表示していた） */}
+                        <span className="parking-list-date">{formatReportDate(jstDateOnly(v.checked_at))}</span>
+                        <span className="parking-list-plate">
+                          {v.plate_region || v.plate_number
+                            ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim()
+                            : '（ナンバー未入力）'}
+                        </span>
+                        {count > 1 && <span className="parking-list-count">累計{count}回</span>}
+                      </div>
+                      {/* 分類（無断駐車等）は右上に置く（2026-08-19。以前は3行目だったが、
+                          日報へのジャンプボタン廃止に伴い1行目の右側へ寄せて2行構成にした） */}
+                      {v.violations.length > 0 && (
+                        <div className="parking-list-tags">
+                          {v.violations.map((t) => (
+                            <span key={t} className="parking-list-tag">
+                              {VIOLATION_LABELS[t] || t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {(v.owner_company || v.maker || v.model) && (
                       // 表示順・色は所有会社（テナント名。青太字）→メーカー（黒）→車種（黒）
@@ -284,31 +295,7 @@ export default function ParkingViolations() {
                         {v.model && <span className="parking-list-model">{v.model}</span>}
                       </div>
                     )}
-                    {v.violations.length > 0 && (
-                      <div className="parking-list-tags">
-                        {v.violations.map((t) => (
-                          <span key={t} className="parking-list-tag">
-                            {VIOLATION_LABELS[t] || t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                     {v.note && <p className="parking-list-note">{v.note}</p>}
-                    {v.report_date && (
-                      // 「yyyy/mm/dd の日報を見る」の文字リンクをアイコン1つに変更（2026-08-14）
-                      <button
-                        type="button"
-                        className="parking-list-link"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/reports/${v.report_date}`)
-                        }}
-                        aria-label={`${formatReportDate(v.report_date)}の日報を見る`}
-                        title={`${formatReportDate(v.report_date)}の日報を見る`}
-                      >
-                        <IconClipboard size={18} />
-                      </button>
-                    )}
                   </div>
                 </li>
               )
@@ -323,7 +310,8 @@ export default function ParkingViolations() {
         <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={handleCloseQuickAdd}>
           <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
             <div className="ui-modal-head">
-              <h3 className="ui-modal-title">違反車両を記録（本日 {formatReportDate(todayJST())}）</h3>
+              {/* 下に黄色枠の「違反車両」見出しがあるため、ここでは日付だけにする（2026-08-19） */}
+              <h3 className="ui-modal-title">{formatReportDate(todayJST())}</h3>
               <button type="button" className="icon-btn-close" onClick={handleCloseQuickAdd} aria-label="閉じる">
                 ×
               </button>

@@ -10,7 +10,13 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#33604d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- 2026-08-19: black-translucent はステータスバー領域にiOSが独自のブラー(モヤ)を
+         被せてしまい、ロゴ・タイトルの上端がぼやけて見える不具合の原因だったため black に
+         変更した。black-translucent はアプリの背景色をノッチの裏側まで拡張できる代わりに
+         このブラーが常に掛かる仕様で、CSS側では回避できない。black はステータスバー分の
+         領域を確保する代わりにブラーが掛からない（env(safe-area-inset-top) は 0 になるが、
+         .app-header の calc(var(--space-2) + env(safe-area-inset-top)) はそのままで害はない） -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="タスク管理" />
     <link rel="apple-touch-icon" href="/logo.svg" />
     <title>タスク管理システム</title>

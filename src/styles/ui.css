@@ -984,7 +984,10 @@ input.ui-input[type="datetime-local"] {
      見出しが画面上端の外へ追い出される（＝下にスワイプしないと出てこない）。
      100% なら常に枠と一致するので、その状態が起こり得ない（2026-08-10） */
   max-height: 100%;
-  background: var(--bg-surface);
+  /* 2026-08-19: 白一色だと入力欄(.ui-input等。同じ--bg-surface)と地が同化して
+     見づらいとの指摘を受け、モーダル全体の地を薄いグレーにして白い入力欄を
+     際立たせるようにした */
+  background: var(--bg-muted);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-overlay);
 }

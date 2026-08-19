@@ -1208,6 +1208,11 @@ export async function handleParkingUpdate(req) {
     if (typeof id !== 'string' || !id) return json({ error: 'id は必須です' }, 400)
 
     const patch = {}
+    // 日付の訂正（2026-08-19。一覧の明細モーダルで日付を直接編集できるようにした）。
+    // 不正な値は無視し、既存の checked_at を保つ（保存自体は失敗させない）
+    if ('checked_at' in payload && !Number.isNaN(Date.parse(payload.checked_at))) {
+      patch.checked_at = payload.checked_at
+    }
     if ('plate_region' in payload) patch.plate_region = trimOrNull(payload.plate_region, 20)
     if ('plate_number' in payload) patch.plate_number = sanitizePlateNumber(payload.plate_number)
     if ('maker' in payload) patch.maker = trimOrNull(payload.maker, 50)
