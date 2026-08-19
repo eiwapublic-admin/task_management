@@ -612,10 +612,20 @@
   min-width: 0;
 }
 
+/* .ui-field を2つ横並びにする（数量+担当者 等。2026-08-19）。狭幅でも
+   最低限の幅は確保しつつ、はみ出す場合だけ折り返す */
+.ui-field-row {
+  display: flex;
+  gap: var(--space-3);
+}
+.ui-field-row > .ui-field { flex: 1 1 0; min-width: 0; }
+
 .ui-field > span,
 .ui-field > label,
 .ui-label {
-  font-size: var(--fs-sm);
+  /* 2026-08-19: 詳細画面全般の読みやすさ向上のため fs-sm(13px) → fs-md(15px) に拡大。
+     Chlorineの色/濁り等ラベル・TaskDetailの本文プレビューと同じ体感の大きさに揃える */
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -643,12 +653,31 @@
   resize: vertical;
 }
 
+/* 1行分で十分な備考欄向け（2026-08-19。備品の出庫・入庫フォーム）。
+   既定の .ui-textarea は rows 指定によらず min-height を2行分確保しているため、
+   1行に抑えたい場合はこの修飾クラスで明示的に上書きする */
+.ui-textarea.is-compact { min-height: var(--control-h); }
+
+/* 日時入力（datetime-local）。iOS Safari等では内部の年月日時分の表示がwidth指定を
+   無視してボックスの右端からはみ出すことがある（2026-08-19、実機報告）。
+   最大幅を明示し、文字サイズも少し詰めてはみ出しにくくする */
+input.ui-input[type="datetime-local"] {
+  max-width: 100%;
+  font-size: var(--fs-base);
+}
+
 .ui-input:focus,
 .ui-select:focus,
 .ui-textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-weak);
+}
+
+/* TimeInput（テンキーで4桁入力する時刻欄）の不正入力表示（2026-08-19） */
+.is-invalid {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger);
 }
 
 .ui-input:disabled,

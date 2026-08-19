@@ -15,6 +15,7 @@ import {
 import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import Combobox from './Combobox'
 import { IconDownload } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
@@ -278,6 +279,7 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
                 violation={v}
                 photos={photosByViolation[v.id] || []}
                 urls={urls}
+                options={options}
                 readOnly={readOnly}
                 isMobile={isMobile}
                 onPatch={(patch) => patchViolation(v.id, patch)}
@@ -337,34 +339,6 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
             )}
           </ul>
 
-          {/* 地域・ナンバー・メーカー・車種・テナント名は既存レコードからも選べるようにする（2026-08-05）。
-              画面内で一度だけ定義し、各カードの input はこの id を list 属性で参照する
-              （カードごとに定義すると id が重複してしまうため）。 */}
-          <datalist id="parking-region-options">
-            {options.region.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-          <datalist id="parking-plate-options">
-            {options.plate.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-          <datalist id="parking-maker-options">
-            {options.maker.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-          <datalist id="parking-model-options">
-            {options.model.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-          <datalist id="parking-owner-options">
-            {options.owner.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
         </>
       )}
 
@@ -398,6 +372,7 @@ function ParkingCard({
   violation: v,
   photos,
   urls,
+  options,
   readOnly,
   isMobile,
   onPatch,
@@ -474,14 +449,12 @@ function ParkingCard({
       </div>
       <div className="parking-card-fields">
         <div className="parking-card-row">
-          <input
-            type="text"
-            placeholder="地域"
-            list="parking-region-options"
+          <Combobox
             value={v.plate_region || ''}
+            onChange={(text) => onPatch({ plate_region: text })}
+            options={options.region}
+            placeholder="地域"
             disabled={readOnly}
-            onChange={(e) => onPatch({ plate_region: e.target.value })}
-            aria-label="ナンバーの地域"
           />
           <input
             type="text"
@@ -493,35 +466,38 @@ function ParkingCard({
             onChange={(e) => onPatch({ plate_number: sanitizePlateNumber(e.target.value) })}
             aria-label="ナンバー"
           />
+          <datalist id="parking-plate-options">
+            {options.plate.map((o) => (
+              <option key={o} value={o} />
+            ))}
+          </datalist>
         </div>
         <div className="parking-card-row">
-          <input
-            type="text"
-            placeholder="メーカー"
-            list="parking-maker-options"
+          <Combobox
             value={v.maker || ''}
+            onChange={(text) => onPatch({ maker: text })}
+            options={options.maker}
+            placeholder="メーカー"
             disabled={readOnly}
-            onChange={(e) => onPatch({ maker: e.target.value })}
-            aria-label="メーカー"
           />
-          <input
-            type="text"
-            placeholder="車種"
-            list="parking-model-options"
+          <Combobox
             value={v.model || ''}
+            onChange={(text) => onPatch({ model: text })}
+            options={options.model}
+            placeholder="車種"
             disabled={readOnly}
-            onChange={(e) => onPatch({ model: e.target.value })}
-            aria-label="車種"
           />
         </div>
-        <input
-          type="text"
-          placeholder="所有会社・訪問先（テナント名）"
-          list="parking-owner-options"
+        {/* 所有会社・訪問先は必須項目。不明な場合は「（不明）」と入力する運用のため、
+            未入力のときはプレースホルダとオレンジの枠でその旨を示す（2026-08-19）。
+            自動保存のカードのため保存自体はブロックしない（入力を促す表示のみ） */}
+        <Combobox
           value={v.owner_company || ''}
+          onChange={(text) => onPatch({ owner_company: text })}
+          options={options.owner}
+          placeholder="所有会社・訪問先（必須。不明な場合は「（不明）」）"
           disabled={readOnly}
-          onChange={(e) => onPatch({ owner_company: e.target.value })}
-          aria-label="所有会社・訪問先"
+          className={v.owner_company ? '' : 'is-required-empty'}
         />
         <div className="parking-card-violations">
           {Object.entries(VIOLATION_LABELS).map(([key, label]) => (

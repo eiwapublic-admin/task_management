@@ -1336,8 +1336,14 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 .report-fields { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
 
+/* 2項目を確実に1行で均等幅に並べる（違反車両詳細の地域+ナンバー、メーカー+車種。
+   2026-08-19）。既定の .report-fields は中身の内容量で幅が決まるため、素の<input>より
+   広い Combobox（.ui-combobox）を入れても2つ目が折り返さないよう明示的に指定する */
+.report-fields.is-halves > .report-field { flex: 1 1 0; min-width: 0; }
+
 .report-field { display: flex; flex-direction: column; gap: 4px; }
-.report-field > span { font-size: var(--fs-sm); color: var(--text-muted); }
+/* 2026-08-19: 詳細画面全般の読みやすさ向上のため fs-sm(13px) → fs-md(15px) に拡大 */
+.report-field > span { font-size: var(--fs-md); color: var(--text-muted); }
 
 .report-field select, .report-field input {
   padding: 7px 10px;
@@ -1371,10 +1377,16 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   gap: var(--space-2);
 }
 
+/* 作業記録1件ごとの区切りを明確にする（2026-08-19）。同画面の違反車両カード
+   （.parking-card）と同じ書式（濃いめのグレー背景＋枠線）で揃える */
 .entry-row {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-muted);
 }
 
 .entry-time {
@@ -1702,17 +1714,29 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 .parking-card-fields { display: flex; flex-direction: column; gap: 6px; }
 
+/* 地域+ナンバー、メーカー+車種は必ず1行2項目で並べる（2026-08-19）。中身が素の
+   <input> でも Combobox（.ui-combobox）でも、直接の子要素を均等幅にするだけでよい */
 .parking-card-row { display: flex; gap: 6px; }
+.parking-card-row > * { flex: 1; min-width: 0; }
 
-.parking-card-row input, .parking-card-fields > input {
-  flex: 1;
-  min-width: 0;
+/* リスト選択にしていない項目（ナンバー等）はこの見た目のまま。Combobox化した項目
+   （.ui-combobox）は共通の .ui-input（fs-md）をそのまま使うため、ここでは指定しない。
+   2026-08-19: 読みやすさのため fs-sm(13px) → fs-md(15px) に拡大 */
+.parking-card-row > input,
+.parking-card-fields > input {
   padding: 5px 8px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
+}
+
+/* 所有会社・訪問先は必須項目。未入力の間はオレンジの枠で入力を促す（2026-08-19）。
+   自動保存のカード（ReportParkingViolations）では保存自体はブロックしないが、
+   明示的な保存ボタンを持つ詳細モーダル（ParkingViolationDetail）では保存時にも弾く */
+.is-required-empty .ui-input {
+  border-color: var(--due-soon);
 }
 
 .parking-card-violations { display: flex; flex-wrap: wrap; gap: 4px 10px; }
@@ -1721,14 +1745,16 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: var(--fs-xs);
+  /* 2026-08-19: 読みやすさのため fs-xs(12px) → fs-sm(13px) に拡大 */
+  font-size: var(--fs-sm);
   color: var(--text-base);
 }
 
 .parking-card-note {
   width: 100%;
   padding: 5px 8px;
-  font-size: var(--fs-sm);
+  /* 2026-08-19: 読みやすさのため fs-sm(13px) → fs-md(15px) に拡大 */
+  font-size: var(--fs-md);
   line-height: 1.5;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);

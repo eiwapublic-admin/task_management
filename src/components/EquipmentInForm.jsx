@@ -158,16 +158,23 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
             <Combobox value={supplier} onChange={setSupplier} options={supplierOptions} />
           </div>
 
-          <label className="ui-field">
-            <span>入庫数量</span>
-            <input
-              type="number"
-              className="ui-input"
-              inputMode="numeric"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-          </label>
+          <div className="ui-field-row">
+            <label className="ui-field">
+              <span>入庫数量</span>
+              <input
+                type="number"
+                className="ui-input"
+                inputMode="numeric"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </label>
+
+            <div className="ui-field">
+              <span>担当者</span>
+              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} />
+            </div>
+          </div>
 
           {!existing && beforeQty !== null && (
             <p className="ui-note">
@@ -175,16 +182,11 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
             </p>
           )}
 
-          <div className="ui-field">
-            <span>担当者</span>
-            <Combobox value={staffName} onChange={setStaffName} options={staffOptions} />
-          </div>
-
           <label className="ui-field">
             <span>備考</span>
             <textarea
-              className="ui-textarea"
-              rows={3}
+              className="ui-textarea is-compact"
+              rows={1}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="在庫調整理由など"

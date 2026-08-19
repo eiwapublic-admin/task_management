@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   updateParkingViolation,
+  fetchParkingViolations,
   fetchPhotos,
   uploadPhoto,
   deletePhoto,
@@ -14,7 +15,12 @@ import { ParkingPhotoPreview } from './ReportParkingViolations'
 import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import Combobox from './Combobox'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
+
+function uniqueSorted(list) {
+  return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
+}
 
 // モバイル判定の分岐点。ReportParkingViolations.jsx と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -44,6 +50,9 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   const [error, setError] = useState('')
   const [preview, setPreview] = useState(null)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
+  // 地域・メーカー・車種・所有会社をリスト選択できるよう、全期間の履歴を一度だけ取得する
+  // （ReportParkingViolations.jsx と同じ方式。2026-08-19）
+  const [historical, setHistorical] = useState([])
   const cameraRef = useRef(null)
   const fileRef = useRef(null)
   const createdUrls = useRef(new Set())
@@ -54,6 +63,22 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
     mql.addEventListener('change', onChange)
     return () => mql.removeEventListener('change', onChange)
   }, [])
+
+  useEffect(() => {
+    fetchParkingViolations()
+      .then(setHistorical)
+      .catch(() => setHistorical([]))
+  }, [])
+
+  const options = useMemo(
+    () => ({
+      region: uniqueSorted(historical.map((v) => v.plate_region)),
+      maker: uniqueSorted(historical.map((v) => v.maker)),
+      model: uniqueSorted(historical.map((v) => v.model)),
+      owner: uniqueSorted(historical.map((v) => v.owner_company)),
+    }),
+    [historical]
+  )
 
   // 違反車両の写真は日報単位で保存されているため、当該日報の parking カテゴリ全体を
   // 取得してこのレコードの分だけ絞り込む（ReportParkingViolations.jsx と同じ方式）
@@ -169,6 +194,12 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   }
 
   async function handleSave() {
+    // 所有会社・訪問先は必須。不明な場合は「（不明）」と入力する運用のため、
+    // 空欄のままでは保存させない（2026-08-19）
+    if (!ownerCompany.trim()) {
+      setError('所有会社・訪問先を入力してください（不明な場合は「（不明）」と入力）')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -271,17 +302,17 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             )}
           </div>
 
-          <div className="report-fields">
-            <label className="report-field">
+          <div className="report-fields is-halves">
+            <div className="report-field">
               <span>地域</span>
-              <input
-                type="text"
+              <Combobox
                 value={plateRegion}
-                disabled={readOnly}
-                onChange={(e) => setPlateRegion(e.target.value)}
+                onChange={setPlateRegion}
+                options={options.region}
                 placeholder="地域"
+                disabled={readOnly}
               />
-            </label>
+            </div>
             <label className="report-field">
               <span>ナンバー</span>
               <input
@@ -295,39 +326,40 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             </label>
           </div>
 
-          <div className="report-fields">
-            <label className="report-field">
+          <div className="report-fields is-halves">
+            <div className="report-field">
               <span>メーカー</span>
-              <input
-                type="text"
+              <Combobox
                 value={maker}
-                disabled={readOnly}
-                onChange={(e) => setMaker(e.target.value)}
+                onChange={setMaker}
+                options={options.maker}
                 placeholder="メーカー"
-              />
-            </label>
-            <label className="report-field">
-              <span>車種</span>
-              <input
-                type="text"
-                value={model}
                 disabled={readOnly}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="車種"
               />
-            </label>
+            </div>
+            <div className="report-field">
+              <span>車種</span>
+              <Combobox
+                value={model}
+                onChange={setModel}
+                options={options.model}
+                placeholder="車種"
+                disabled={readOnly}
+              />
+            </div>
           </div>
 
-          <label className="report-field">
-            <span>所有会社・訪問先（テナント名）</span>
-            <input
-              type="text"
+          <div className="report-field">
+            <span>所有会社・訪問先（テナント名）※必須。不明な場合は「（不明）」</span>
+            <Combobox
               value={ownerCompany}
-              disabled={readOnly}
-              onChange={(e) => setOwnerCompany(e.target.value)}
+              onChange={setOwnerCompany}
+              options={options.owner}
               placeholder="所有会社・訪問先"
+              disabled={readOnly}
+              className={ownerCompany ? '' : 'is-required-empty'}
             />
-          </label>
+          </div>
 
           <div className="parking-card-violations">
             {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
