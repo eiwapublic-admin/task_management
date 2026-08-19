@@ -9,7 +9,7 @@ import {
   recognizeParkingPhoto,
   sanitizePlateNumber,
   VIOLATION_LABELS,
-  formatReportDate,
+  jstDateOnly,
 } from '../lib/reports'
 import { ParkingPhotoPreview } from './ReportParkingViolations'
 import { prepareImage, formatMB } from '../lib/imageResize'
@@ -35,6 +35,8 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   // 開いている間は裏の一覧を固定する（共通フック）
   useBodyScrollLock()
 
+  // タイトルにあった日付をここへ移し、訂正できるようにする（2026-08-19）
+  const [checkedDate, setCheckedDate] = useState(jstDateOnly(violation.checked_at))
   const [plateRegion, setPlateRegion] = useState(violation.plate_region || '')
   const [plateNumber, setPlateNumber] = useState(violation.plate_number || '')
   const [maker, setMaker] = useState(violation.maker || '')
@@ -194,6 +196,10 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   }
 
   async function handleSave() {
+    if (!checkedDate) {
+      setError('日付を入力してください')
+      return
+    }
     // 所有会社・訪問先は必須。不明な場合は「（不明）」と入力する運用のため、
     // 空欄のままでは保存させない（2026-08-19）
     if (!ownerCompany.trim()) {
@@ -204,6 +210,7 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
     setError('')
     try {
       const updated = await updateParkingViolation(violation.id, {
+        checked_at: `${checkedDate}T00:00:00+09:00`,
         plate_region: plateRegion,
         plate_number: plateNumber,
         maker,
@@ -227,7 +234,9 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
       <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={onClose}>
         <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
-          <h3 className="ui-modal-title">違反車両（{formatReportDate(violation.report_date)}）</h3>
+          {/* 日付は本文の編集可能な入力欄へ移した（下記）ため、タイトルは項目名だけにする
+              （2026-08-19。すぐ下に黄色枠の「違反車両」見出しがあるため省略しても分かる） */}
+          <h3 className="ui-modal-title">違反車両</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
@@ -239,6 +248,16 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
               {error}
             </p>
           )}
+
+          <label className="report-field">
+            <span>日付</span>
+            <input
+              type="date"
+              value={checkedDate}
+              disabled={readOnly}
+              onChange={(e) => setCheckedDate(e.target.value)}
+            />
+          </label>
 
           <div className="parking-card-photos">
             {photos.map((photo) => (
@@ -302,9 +321,9 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             )}
           </div>
 
+          {/* 見出しは省略し、未入力時はプレースホルダーで示す（2026-08-19） */}
           <div className="report-fields is-halves">
             <div className="report-field">
-              <span>地域</span>
               <Combobox
                 value={plateRegion}
                 onChange={setPlateRegion}
@@ -314,7 +333,6 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
               />
             </div>
             <label className="report-field">
-              <span>ナンバー</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -322,13 +340,13 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
                 disabled={readOnly}
                 onChange={(e) => setPlateNumber(sanitizePlateNumber(e.target.value))}
                 placeholder="ナンバー"
+                aria-label="ナンバー"
               />
             </label>
           </div>
 
           <div className="report-fields is-halves">
             <div className="report-field">
-              <span>メーカー</span>
               <Combobox
                 value={maker}
                 onChange={setMaker}
@@ -338,7 +356,6 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
               />
             </div>
             <div className="report-field">
-              <span>車種</span>
               <Combobox
                 value={model}
                 onChange={setModel}
@@ -350,7 +367,6 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
           </div>
 
           <div className="report-field">
-            <span>所有会社・訪問先（テナント名）※必須。不明な場合は「（不明）」</span>
             <Combobox
               value={ownerCompany}
               onChange={setOwnerCompany}
@@ -363,7 +379,7 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
 
           <div className="parking-card-violations">
             {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
-              <label key={key} className="parking-violation-chip">
+              <label key={key} className="parking-violation-chip is-lg">
                 <input
                   type="checkbox"
                   checked={violationTypes.includes(key)}
@@ -379,7 +395,7 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             <span>補足</span>
             <textarea
               value={note}
-              rows={3}
+              rows={1}
               disabled={readOnly}
               onChange={(e) => setNote(e.target.value)}
               placeholder="補足"

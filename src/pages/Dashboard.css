@@ -1306,7 +1306,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .report-saved { font-size: var(--fs-xs); color: var(--color-brand); font-weight: 700; }
 
 .report-card {
-  background: var(--bg-surface);
+  /* 2026-08-19: 白一色だと入力欄と地が同化するため、モーダルと同じく薄いグレーに
+     変更（.ui-modal 参照） */
+  background: var(--bg-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
@@ -1750,6 +1752,18 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   color: var(--text-base);
 }
 
+/* 違反車両の更新画面（ParkingViolationDetail.jsx）だけ、見出しと同程度の大きさに
+   拡大する（2026-08-19。日報詳細のカード側 .parking-violation-chip は対象外のため
+   共通クラスは変えず修飾クラスを分けた） */
+.parking-violation-chip.is-lg {
+  gap: 6px;
+  font-size: var(--fs-md);
+}
+.parking-violation-chip.is-lg input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
 .parking-card-note {
   width: 100%;
   padding: 5px 8px;
@@ -1802,7 +1816,10 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   outline-offset: -2px;
 }
 
-.parking-list-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+/* 1行目: 左に日付・ナンバー、右上に分類タグ（2026-08-19。以前は3行に分かれていたが
+   日報へのジャンプボタンを廃止したのに合わせ、分類を1行目の右側へ寄せて2行構成にした） */
+.parking-list-main { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.parking-list-main-left { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 
 /* 日付・ナンバーは残留塩素一覧の測定日見出し・building 表示と同じ太字・大きめサイズにする。
    時刻は表示しない（2026-08-11。以前は checked_at をそのまま formatDateTime していた） */
@@ -1818,26 +1835,6 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   border-radius: var(--radius-pill);
 }
 
-/* 「yyyy/mm/dd の日報を見る」の文字リンクをアイコン1つに変更（2026-08-14） */
-.parking-list-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 6px 0 0 auto;
-  width: 32px;
-  height: 32px;
-  color: var(--color-primary);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  padding: 0;
-}
-.parking-list-link:hover,
-.parking-list-link:focus-visible {
-  background: var(--color-primary-soft);
-}
-
 .parking-list-sub { display: flex; gap: var(--space-3); font-size: var(--fs-base); margin-top: 4px; flex-wrap: wrap; }
 
 /* 2行目の表示順・文字色はテナント名（所有会社）→メーカー→車種で固定（2026-08-14）。
@@ -1846,7 +1843,7 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .parking-list-owner { font-weight: 700; color: var(--color-primary); }
 .parking-list-maker, .parking-list-model { font-weight: 400; color: var(--text-strong); }
 
-.parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 
 .parking-list-tag {
   padding: 2px 8px;

@@ -336,7 +336,7 @@ export default function ReportParkingViolations({ reportId, readOnly, filterIds,
                 />
                 <button
                   type="button"
-                  className="btn-plain photo-add-btn"
+                  className="btn-primary photo-add-btn"
                   disabled={uploading}
                   onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
                 >
