@@ -231,7 +231,7 @@ export default function Equipment() {
                                 <thead>
                                   <tr>
                                     <th>日付</th>
-                                    <th>設置先</th>
+                                    <th className="equipment-txn-loc">設置先</th>
                                     <th className="is-numeric">出庫</th>
                                     <th className="is-numeric">入庫</th>
                                     <th className="is-numeric">残</th>
@@ -247,7 +247,9 @@ export default function Equipment() {
                                       onClick={readOnly ? undefined : () => setEditing(t)}
                                     >
                                       <td>{formatEquipmentDate(t.occurred_at)}</td>
-                                      <td>{t.tenant_short_name || t.location || ''}</td>
+                                      <td className="equipment-txn-loc" title={t.tenant_short_name || t.location || ''}>
+                                        {t.tenant_short_name || t.location || ''}
+                                      </td>
                                       <td className="is-numeric equipment-history-out">
                                         {t.kind === 'out' ? t.quantity : ''}
                                       </td>

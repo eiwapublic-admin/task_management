@@ -211,6 +211,9 @@ export default function ReportList() {
       navigate(`/reports/${date}`)
     } catch (err) {
       setError(err.message)
+    } finally {
+      // 成功時も戻す（2026-08-19。従来は失敗時にしか戻しておらず、1回でも成功すると
+      // creatingがtrueのまま固まり、以後どの日の行/マスをタップしても新規作成できなくなっていた）
       setCreating(false)
     }
   }
@@ -292,9 +295,11 @@ export default function ReportList() {
   // 自主点検アイコンは押すとその日の入力ウインドウを開く（2026-08-18）。行・マス自体も
   // タップ領域を持つため、伝播を止めて行のクリック（詳細を開く）と衝突しないようにする。
   // 表示専用のowner（読み取り専用ロール）には従来どおりの非活性な丸のまま出す。
-  function renderIconsRow1(date, { report, isFuture }, size) {
+  function renderIconsRow1(date, { report, isFuture, closed }, size) {
     const done = inspectionsByDate.has(date)
-    const badgeClass = `report-row-icon report-inspection-icon${done ? ' is-done' : !isFuture ? ' is-pending' : ''}`
+    const badgeClass = `report-row-icon report-inspection-icon${
+      done ? ' is-done' : !isFuture && !closed ? ' is-pending' : ''
+    }`
     return (
       <div className="report-row-icons">
         <span className={`report-row-icon${report?.has_photos ? '' : ' is-hidden'}`} title="添付画像あり">
@@ -519,7 +524,9 @@ export default function ReportList() {
                     <span className={`report-calendar-day ${wd.className}`}>{Number(date.slice(-2))}</span>
                     {isToday && <span className="report-today-badge">本日</span>}
                     {closed && <span className="report-calendar-closed-label">休館日</span>}
-                    {r && renderIconsRow1(date, st, 18)}
+                    {/* 自主点検アイコンは日報の有無に関わらず表示する（2026-08-19。自主点検の
+                        実施記録は日報とは独立したデータのため、日報が無い日でも記録・確認できる） */}
+                    {renderIconsRow1(date, st, 18)}
                   </div>
 
                   {r ? (
