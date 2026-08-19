@@ -79,20 +79,21 @@
   color: var(--text-strong);
 }
 
-/* 在庫数の左の「出」「入」ボタン。この備品を選んだ状態で出庫・入庫フォームを開く
-   （2026-08-18）。iPhone幅で1行に収めるため、キャプションは1文字に短縮している */
+/* 在庫数の左の「出庫」「入庫」ボタン。この備品を選んだ状態で出庫・入庫フォームを開く
+   （2026-08-18）。当初はiPhone幅で1行に収めるため「出」「入」の1文字に短縮していたが、
+   実機フィードバックで「幅に余裕があるのでフル表記の方が押しやすい」とのことでキャプションを
+   戻し、タップ領域も少し広げた */
 .equipment-stock-row-actions {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .equipment-stock-action-btn {
   flex-shrink: 0;
-  min-width: 30px;
-  height: 28px;
-  padding: 0 var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-3);
   border: none;
   border-radius: var(--radius-control);
   background: var(--color-primary);
