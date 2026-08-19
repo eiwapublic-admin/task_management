@@ -272,6 +272,16 @@
 .equipment-txn-table td {
   white-space: nowrap;
 }
+
+/* 設置先（テナント名・共用部の場所名）は長いと出庫/入庫/残の列を画面外へ押し出して
+   しまうため、この列だけ幅の上限を決めてカットする（2026-08-19。全文は title 属性で
+   長押し・ホバーすると見える）。他の列（出庫/入庫/残/理由/担当）は短い固定値のため
+   従来どおり nowrap のまま実幅で表示する */
+.equipment-txn-loc {
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .equipment-txn-table th:first-child,
 .equipment-txn-table td:first-child {
   position: sticky;
