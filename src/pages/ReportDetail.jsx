@@ -346,6 +346,10 @@ export default function ReportDetail({ date, onClose }) {
                     onChange={(v) => patchHeader({ worker_pm: v })}
                   />
                 </label>
+              </div>
+              {/* 開始・終了は必ず1行横並びにする（2026-08-19。作業者の枠と混ざって折り返すと
+                  ペアが崩れるため別の report-fields に分け、is-halves で幅を2等分する） */}
+              <div className="report-fields is-halves">
                 <label className="report-field">
                   <span>開始</span>
                   <TimeInput

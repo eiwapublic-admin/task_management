@@ -619,6 +619,9 @@
   gap: var(--space-3);
 }
 .ui-field-row > .ui-field { flex: 1 1 0; min-width: 0; }
+/* DateTimeInput（日付+時刻の直の <input> 2つ）のように .ui-field で包まない場合にも
+   横並びで縮むようにする（2026-08-19） */
+.ui-field-row > input { flex: 1 1 0; min-width: 0; }
 
 .ui-field > span,
 .ui-field > label,

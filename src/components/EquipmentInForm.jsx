@@ -3,6 +3,7 @@ import ConfirmDeleteButton from './ConfirmDeleteButton'
 import Combobox from './Combobox'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
+import DateTimeInput from './DateTimeInput'
 import {
   EQUIPMENT_IN_REASONS,
   createEquipmentTransaction,
@@ -120,12 +121,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
 
           <label className="ui-field">
             <span>入庫日時</span>
-            <input
-              type="datetime-local"
-              className="ui-input"
-              value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
+            <DateTimeInput value={occurredAt} onChange={setOccurredAt} />
           </label>
 
           <label className="ui-field">

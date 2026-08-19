@@ -44,6 +44,9 @@ export default function ParkingViolations() {
   // 準備中（日報の取得/作成中）は null のまま、準備できたらモーダルを開く
   const [quickAddReportId, setQuickAddReportId] = useState(null)
   const [preparingQuickAdd, setPreparingQuickAdd] = useState(false)
+  // 「＋」を押すたびに空の新規入力にするため、その回に新規作成した記録の id だけを保持し、
+  // モーダル内には常にこの id 一覧に含まれる分だけを表示する（当日の既存記録は出さない。2026-08-19）
+  const [quickAddIds, setQuickAddIds] = useState([])
   // 明細クリックで開く詳細（写真・項目の閲覧/編集）モーダル。選んだレコードを保持する（2026-08-11）
   const [selected, setSelected] = useState(null)
 
@@ -66,6 +69,7 @@ export default function ParkingViolations() {
     if (preparingQuickAdd || isOwner) return
     setPreparingQuickAdd(true)
     setError('')
+    setQuickAddIds([])
     try {
       const report = await createReport(todayJST())
       setQuickAddReportId(report.id)
@@ -325,7 +329,12 @@ export default function ParkingViolations() {
               </button>
             </div>
             <div className="ui-modal-body is-stacked">
-              <ReportParkingViolations reportId={quickAddReportId} readOnly={false} />
+              <ReportParkingViolations
+                reportId={quickAddReportId}
+                readOnly={false}
+                filterIds={quickAddIds}
+                onCreated={(id) => setQuickAddIds((prev) => [...prev, id])}
+              />
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import Combobox from './Combobox'
 import SignaturePad from './SignaturePad'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
+import DateTimeInput from './DateTimeInput'
 import {
   EQUIPMENT_OUT_REASONS,
   createEquipmentTransaction,
@@ -185,13 +186,7 @@ export default function EquipmentOutForm({ items, existing, defaultItemId, onClo
 
           <label className="ui-field">
             <span>出庫日時</span>
-            <input
-              type="datetime-local"
-              className="ui-input"
-              value={occurredAt}
-              disabled={isSigned}
-              onChange={(e) => setOccurredAt(e.target.value)}
-            />
+            <DateTimeInput value={occurredAt} disabled={isSigned} onChange={setOccurredAt} />
           </label>
 
           <label className="ui-field">
