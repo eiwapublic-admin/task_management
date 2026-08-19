@@ -189,8 +189,10 @@ export default function Equipment() {
                             {item.short_name || item.name}
                             {item.disabled && <span className="ui-badge">無効</span>}
                           </span>
-                          {/* 在庫数の左の「出」「入」。この備品をあらかじめ選んだ状態で
-                              出庫・入庫フォームを開く（2026-08-18。ヘッダのボタンは備品が空欄のまま） */}
+                          {/* 在庫数の左の「出庫」「入庫」。この備品をあらかじめ選んだ状態で
+                              出庫・入庫フォームを開く（2026-08-18。ヘッダのボタンは備品が空欄のまま。
+                              当初「出」「入」の1文字に省略していたが、iPhoneでも幅に余裕があり
+                              押しやすさを優先してフル表記に戻した） */}
                           {!readOnly && (
                             <span className="equipment-stock-row-actions">
                               <button
@@ -198,18 +200,16 @@ export default function Equipment() {
                                 className="equipment-stock-action-btn"
                                 onClick={() => openTransactionForm('out', item.id)}
                                 aria-label={`${item.short_name || item.name}を出庫`}
-                                title="出庫"
                               >
-                                出
+                                出庫
                               </button>
                               <button
                                 type="button"
                                 className="equipment-stock-action-btn"
                                 onClick={() => openTransactionForm('in', item.id)}
                                 aria-label={`${item.short_name || item.name}を入庫`}
-                                title="入庫"
                               >
-                                入
+                                入庫
                               </button>
                             </span>
                           )}
