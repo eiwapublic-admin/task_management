@@ -105,6 +105,18 @@ export function jstDateOnly(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
+// timestamptz（ISO文字列）→ JST の 'HH:MM'。jstDateOnly の時刻版（2026-08-19。
+// 違反車両の更新画面で日付だけでなく時刻も訂正できるようにするため追加）
+export function jstTimeOnly(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 // 作業記録を時刻順に並べる（保存順＝sort_order とは独立）。時刻が同じ／未入力のものは
 // 追加順を保つため sort_order をタイブレークに使う。日報詳細と一覧（リスト型・カレンダー型）
 // で並び順が食い違わないよう、両方からこの関数を使う（2026-08-07）。

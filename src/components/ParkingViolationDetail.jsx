@@ -10,12 +10,14 @@ import {
   sanitizePlateNumber,
   VIOLATION_LABELS,
   jstDateOnly,
+  jstTimeOnly,
 } from '../lib/reports'
 import { ParkingPhotoPreview } from './ReportParkingViolations'
 import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import Combobox from './Combobox'
+import TimeInput from './TimeInput'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 
 function uniqueSorted(list) {
@@ -35,8 +37,10 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   // 開いている間は裏の一覧を固定する（共通フック）
   useBodyScrollLock()
 
-  // タイトルにあった日付をここへ移し、訂正できるようにする（2026-08-19）
+  // タイトルにあった日付をここへ移し、訂正できるようにする（2026-08-19）。時刻も
+  // 日付とは独立してテンキー（TimeInput）で訂正できるようにした
   const [checkedDate, setCheckedDate] = useState(jstDateOnly(violation.checked_at))
+  const [checkedTime, setCheckedTime] = useState(jstTimeOnly(violation.checked_at))
   const [plateRegion, setPlateRegion] = useState(violation.plate_region || '')
   const [plateNumber, setPlateNumber] = useState(violation.plate_number || '')
   const [maker, setMaker] = useState(violation.maker || '')
@@ -210,7 +214,7 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
     setError('')
     try {
       const updated = await updateParkingViolation(violation.id, {
-        checked_at: `${checkedDate}T00:00:00+09:00`,
+        checked_at: `${checkedDate}T${checkedTime || '00:00'}:00+09:00`,
         plate_region: plateRegion,
         plate_number: plateNumber,
         maker,
@@ -249,15 +253,21 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             </p>
           )}
 
-          <label className="report-field">
-            <span>日付</span>
-            <input
-              type="date"
-              value={checkedDate}
-              disabled={readOnly}
-              onChange={(e) => setCheckedDate(e.target.value)}
-            />
-          </label>
+          <div className="report-fields is-halves">
+            <label className="report-field">
+              <span>日付</span>
+              <input
+                type="date"
+                value={checkedDate}
+                disabled={readOnly}
+                onChange={(e) => setCheckedDate(e.target.value)}
+              />
+            </label>
+            <label className="report-field">
+              <span>時刻</span>
+              <TimeInput value={checkedTime} disabled={readOnly} onChange={setCheckedTime} />
+            </label>
+          </div>
 
           <div className="parking-card-photos">
             {photos.map((photo) => (

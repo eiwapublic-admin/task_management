@@ -386,6 +386,11 @@
     - **作業定型文の画面（`ReportTemplates.jsx`）**: 依頼どおりホームボタン（`FeatureHeader`の`leading`）を削除。未使用になった`useNavigate`・`IconHome`のimportも削除した
     - 検証: `npm run lint`・`npm run build`が通ることを確認。実際のビルド後CSSを読み込んだ静的HTMLをPlaywrightでスクリーンショットし、①違反車両一覧の明細が2行構成で分類タグが右上にあること、②モーダルの地がグレーで白い入力欄・日付欄が際立つこと、③違反区分チェックボックスが拡大されていること、④「撮影して追加」ボタンがブルーになっていること、を目視確認した。**ステータスバーのモヤ修正は実機（iOS Safari/ホーム画面PWA）でのみ最終確認できる**点に注意
 
+143. **違反車両の更新画面に時刻の訂正欄を追加（2026-08-19）**: 142番で日付を訂正できるようにしたが、時刻もテンキーで独立して訂正したいとの追加依頼。
+    - `src/lib/reports.js`に`jstTimeOnly(iso)`を追加（`jstDateOnly`の時刻版。ISO文字列→JSTの`'HH:MM'`）。`ParkingViolationDetail.jsx`に`checkedTime` state（初期値は`jstTimeOnly(violation.checked_at)`）を追加し、時刻専用のテンキー入力部品`TimeInput.jsx`（140番で追加済み。日報の開始・終了と同じ「4桁入力→"HH:MM"解釈」方式）を「日付」欄の隣に`report-fields is-halves`で横並び配置した
+    - 保存時は`checked_at`を`` `${checkedDate}T${checkedTime || '00:00'}:00+09:00` ``として送る（時刻が空のままなら0:00として扱う）。workerの`handleParkingUpdate`は142番で`checked_at`を受け付けるようすでに対応済みのため、worker側の変更は不要だった
+    - 検証: `npm run lint`・`npm run build`が通ることを確認。ビルド後CSSを読み込んだ静的HTMLで日付欄と時刻欄が横並びでモーダル幅に収まることをPlaywrightで確認した
+
 ---
 
 ## 2. 日常運用
