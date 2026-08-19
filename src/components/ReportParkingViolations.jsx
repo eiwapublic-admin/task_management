@@ -32,7 +32,11 @@ function uniqueSorted(list) {
 // 違反車両の登録。写真セクションと同じ「空枠にドラッグ＆ドロップ/撮影」の流れで、
 // 1件につき写真2枚まで登録し、その場でナンバー等の項目を入力できるようにする。
 // 一覧は日を跨って見られるよう別画面（/reports/parking）に分けている（このセクションは当日分のみ）。
-export default function ReportParkingViolations({ reportId, readOnly }) {
+// filterIds: 指定すると、この id 一覧に含まれる記録だけを表示する（一覧画面のヘッダー「＋」
+// からの新規登録用。当日の日報に既存の記録があっても、その回に新規作成した分だけを見せたい
+// ため。日報詳細から開く通常表示では未指定＝全件表示のまま。2026-08-19）
+// onCreated: 新規記録が作成されたときにその id を通知する（filterIds を更新する側が使う）
+export default function ReportParkingViolations({ reportId, readOnly, filterIds, onCreated }) {
   const [violations, setViolations] = useState([])
   const [photosByViolation, setPhotosByViolation] = useState({}) // violation.id -> photo[]
   const [historical, setHistorical] = useState([]) // 全期間（リスト選択の候補作成用）
@@ -152,6 +156,7 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
         setViolations((prev) => [violation, ...prev])
         targetId = violation.id
         createdNew = true
+        onCreated?.(violation.id)
       }
       const file = files[0]
       const prepared = await prepareImage(file, 'parking')
@@ -253,11 +258,13 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
     return patch
   }
 
+  const visibleViolations = filterIds ? violations.filter((v) => filterIds.includes(v.id)) : violations
+
   return (
     <section className="report-card">
       <h3 className="report-card-title">
         違反車両
-        <span className="report-count">{violations.length} 件</span>
+        <span className="report-count">{visibleViolations.length} 件</span>
       </h3>
 
       {error && (
@@ -270,10 +277,10 @@ export default function ReportParkingViolations({ reportId, readOnly }) {
         <p className="dashboard-loading">読み込み中…</p>
       ) : (
         <>
-          {violations.length === 0 && !uploading && <p className="settings-hint">まだ記録がありません。</p>}
+          {visibleViolations.length === 0 && !uploading && <p className="settings-hint">まだ記録がありません。</p>}
 
           <ul className="parking-grid">
-            {violations.map((v) => (
+            {visibleViolations.map((v) => (
               <ParkingCard
                 key={v.id}
                 violation={v}
