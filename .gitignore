@@ -35,5 +35,8 @@ dist-ssr
 .wrangler
 .dev.vars
 
+# Claude Code: 個人用ローカル設定（コミットしない）
+.claude/settings.local.json
+
 # PWA: ビルド時に scripts/generate-sw.mjs が生成する
 /public/sw.js
