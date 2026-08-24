@@ -79,6 +79,41 @@
   color: var(--text-on-dark);
 }
 
+/* PC幅だけのショートカットメニュー（2026-08-24）。タイトル（.app-header-left）と
+   ユーザー名・ハンバーガー（.app-header-right）の間に置く。.app-header が
+   justify-content: space-between の3分割になるため、左右の幅が違っても
+   おおよそ中央寄りに来る。モバイルでは非表示（下記メディアクエリ参照。
+   ハンバーガーメニューからの遷移のみ） */
+.app-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.app-header-nav-btn {
+  border: none;
+  background: transparent;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-on-dark);
+  opacity: 0.85;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.app-header-nav-btn:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.3); }
+
+.app-header-nav-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+
+.app-header-nav-btn.is-active {
+  opacity: 1;
+  color: var(--ink-on-fill);
+  background: rgba(255, 255, 255, 0.18);
+}
+
 /* ハンバーガー左のログインユーザー名。狭幅では場所を取るので隠し、
    代わりにドロップダウンの先頭（.app-menu-user）で確認できるようにする */
 .app-header-user {
@@ -768,6 +803,12 @@
      モバイルで見えなくなっていたとの指摘（2026-08-13）を受け、狭幅でも隠さない
      （ハンバーガーメニューの左側に表示され続ける） */
   .app-header-user {
+    display: none;
+  }
+
+  /* ショートカットメニューはPC幅のみ（依頼どおり）。モバイルは従来どおり
+     ハンバーガーメニューからの遷移だけにする */
+  .app-header-nav {
     display: none;
   }
 
