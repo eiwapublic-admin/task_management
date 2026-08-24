@@ -298,7 +298,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const accessToken = await getAccessToken()
 
   // 1) 新着メールの取得クエリを組み立てる
-  let query = 'in:inbox'
+  // 迷惑メール（Gmailの自動スパム判定）も対象に含める（2026-08-24）。
+  // あおば薬局からの返信がGmail側でスパム判定され、業務外判定（AI）以前の問題として
+  // 自動取得の対象から漏れていた事例を受けての対応。誤って迷惑メールに振り分けられた
+  // 本物の業務メールも同じ「業務外」AI分類を通るため、実際の迷惑メールがそのままタスク化
+  // される心配は無い（分類コストは増えるが、現状の件数であれば許容範囲とユーザー確認済み）
+  let query = '{in:inbox in:spam}'
   if (lastFetchAt) {
     query += ` after:${Math.floor(lastFetchAt.getTime() / 1000)}`
   } else {
