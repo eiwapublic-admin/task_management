@@ -44,6 +44,23 @@ const FEATURE_TITLES = [
   { path: '/', title: 'タスク' },
 ]
 
+// PC幅だけ表示するショートカットメニュー（2026-08-24）。タイトルの中央あたりに置き、
+// 各機能へ直接ジャンプできるようにする（モバイルはハンバーガーメニューのみのまま）。
+// タスク（カンバン）は owner（小泉産業様）には見せない（RequireStaffガードで
+// 結局 /reports へ送り返されるだけのため。App.jsx参照）
+const NAV_ITEMS = [
+  { path: '/', label: 'タスク', exact: true, staffOnly: true },
+  { path: '/reports', label: '日報', exact: true },
+  { path: '/equipment', label: '備品' },
+  { path: '/reports/inspections', label: '自主検査' },
+  { path: '/reports/parking', label: '違反車両' },
+  { path: '/reports/chlorine', label: '残留塩素' },
+]
+
+function isNavItemActive(item, pathname) {
+  return item.exact ? pathname === item.path : pathname === item.path || pathname.startsWith(`${item.path}/`)
+}
+
 function featureTitleFor(pathname) {
   const hit = FEATURE_TITLES.find(({ path, exact }) =>
     exact ? pathname === path : pathname === path || pathname.startsWith(`${path}/`),
@@ -186,6 +203,19 @@ export default function AppHeader({ lastFetchAt } = {}) {
           </button>
           {featureTitle && <h1 className="app-header-title">{featureTitle}</h1>}
         </div>
+        <nav className="app-header-nav" aria-label="機能メニュー">
+          {NAV_ITEMS.filter((item) => !item.staffOnly || !isOwner).map((item) => (
+            <button
+              key={item.path}
+              type="button"
+              className={`app-header-nav-btn${isNavItemActive(item, location.pathname) ? ' is-active' : ''}`}
+              aria-current={isNavItemActive(item, location.pathname) ? 'page' : undefined}
+              onClick={() => navigate(item.path)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
         <div className="app-header-right">
           {/* 最終取得はユーザー名の左側に置く（2026-08-13。以前はユーザー名とメニューの
               間だったが「ユーザー名の左側に」との依頼で並び順を変更）。モバイルでも常に
