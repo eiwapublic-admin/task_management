@@ -8,15 +8,16 @@
   margin-top: var(--space-4);
 }
 
-/* カテゴリ名。備品名（集計見出し）より一段控えめにして、
-   「カテゴリ → 備品 → 明細」の階層が読み取れるようにする */
+/* カテゴリ名。以前は備品名より一段控えめ(fs-md・text-muted)にしていたが、
+   実機フィードバックで見づらいとの指摘を受け、備品名（.equipment-stock-name）と
+   同じ大きさ・濃さに揃えた（2026-08-19） */
 .equipment-stock-group-head {
   margin: 0 0 var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--border);
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--text-strong);
 }
 
 .equipment-stock-rows {

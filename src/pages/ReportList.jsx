@@ -16,6 +16,7 @@ import {
   IconDroplet,
 } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
+import { assigneeColor, assigneeInitial } from '../lib/format'
 import {
   fetchReports,
   createReport,
@@ -50,6 +51,24 @@ import '../components/KanbanBoard.css'
 const WIDE_SCREEN_QUERY = '(min-width: 768px)'
 
 const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土']
+
+// カレンダー型の担当者表示（2026-08-19）。カンバンのタスクカードと同じ丸いマーク
+// （assigneeInitial・assigneeColor）に揃える。午前・午後が同じ人なら1つだけ出す
+function renderCalendarWorkers(r) {
+  const names = r.worker_am && r.worker_am === r.worker_pm ? [r.worker_am] : [r.worker_am, r.worker_pm].filter(Boolean)
+  if (names.length === 0) return null
+  return names.map((name, i) => (
+    <span
+      key={i}
+      className="avatar report-calendar-avatar"
+      style={{ background: assigneeColor(name) }}
+      title={name}
+      aria-label={name}
+    >
+      {assigneeInitial(name)}
+    </span>
+  ))
+}
 
 // リスト/カレンダーの選択を覚えておくキー（2026-08-07）。違反車両一覧・自主検査表など
 // 他画面のホームボタンで /reports に戻ると ReportList は作り直されて view state が
@@ -102,11 +121,12 @@ export default function ReportList() {
   const [creating, setCreating] = useState(false)
   // チェックマークアイコンから開く自主点検の入力ウインドウ。開いている日付（'YYYY-MM-DD'）を保持
   const [editingInspection, setEditingInspection] = useState(null)
-  // 'list' | 'calendar'
+  // 'list' | 'calendar'。既定は「カレンダー」（2026-08-19）。sessionStorageに
+  // 明示的に'list'が保存されているときだけリスト型に戻す
   const [view, setView] = useState(() =>
-    typeof window !== 'undefined' && sessionStorage.getItem(VIEW_STORAGE_KEY) === 'calendar'
-      ? 'calendar'
-      : 'list',
+    typeof window !== 'undefined' && sessionStorage.getItem(VIEW_STORAGE_KEY) === 'list'
+      ? 'list'
+      : 'calendar',
   )
   // 作業記録の検索（2026-08-08）。虫眼鏡タップで検索欄を開閉し、入力文字が
   // 1文字でもあれば通常のリスト/カレンダー表示に代えて検索結果を出す。
@@ -532,9 +552,7 @@ export default function ReportList() {
                   {r ? (
                     <>
                       <div className="report-calendar-workers-row">
-                        <span className="report-calendar-workers">
-                          {r.worker_am || '—'} | {r.worker_pm || '—'}
-                        </span>
+                        <span className="report-calendar-workers">{renderCalendarWorkers(r)}</span>
                         {renderIconsRow2(date, st, 18)}
                       </div>
                       <div className="report-calendar-body">

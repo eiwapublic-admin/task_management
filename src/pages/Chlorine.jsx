@@ -75,24 +75,32 @@ export default function Chlorine() {
     load()
   }, [load])
 
-  // 年月ごとにまとめる（新しい月が上）。行には測定日（YYYY-MM-DD）を持たせておく
+  // 年月ごとにまとめる（新しい月が上）。さらに同じ月の中で測定日ごとにまとめ、
+  // 1日分の記録（BKB・小泉本社）を1行に横並びのカードで表示する（2026-08-19。
+  // 以前は施設ごとに別の行だったが、同じ日の2施設を1行で見渡せるようにした）
   const groups = useMemo(() => {
     const map = new Map()
     for (const t of tests) {
       // 測定日はJSTの日付で見る（tested_at はタイムゾーン付きで持っている）
       const date = new Date(t.tested_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
       const yearMonth = date.slice(0, 7)
-      if (!map.has(yearMonth)) map.set(yearMonth, [])
-      map.get(yearMonth).push({ ...t, date })
+      if (!map.has(yearMonth)) map.set(yearMonth, new Map())
+      const dateMap = map.get(yearMonth)
+      if (!dateMap.has(date)) dateMap.set(date, [])
+      dateMap.get(date).push({ ...t, date })
     }
     return [...map.entries()]
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([yearMonth, rows]) => ({
+      .map(([yearMonth, dateMap]) => ({
         yearMonth,
-        rows: rows.sort((a, b) => {
-          if (a.date !== b.date) return a.date < b.date ? -1 : 1
-          return new Date(a.tested_at) - new Date(b.tested_at)
-        }),
+        dates: [...dateMap.entries()]
+          .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+          .map(([date, list]) => ({
+            date,
+            tests: list.sort(
+              (a, b) => CHLORINE_BUILDINGS.indexOf(a.building) - CHLORINE_BUILDINGS.indexOf(b.building)
+            ),
+          })),
       }))
   }, [tests])
 
@@ -249,38 +257,35 @@ export default function Chlorine() {
                   </div>
                   {open && (
                     <ul className="chlorine-rows">
-                      {g.rows.map((t) => {
-                        const below =
-                          t.concentration !== null &&
-                          t.concentration !== undefined &&
-                          Number(t.concentration) < CHLORINE_STANDARD_MIN
-                        return (
-                          <li key={t.id}>
-                            <div
-                              className={`chlorine-row${readOnly ? '' : ' is-clickable'}`}
-                              onClick={readOnly ? undefined : () => setEditing(t)}
-                              role={readOnly ? undefined : 'button'}
-                              tabIndex={readOnly ? undefined : 0}
-                              onKeyDown={
-                                readOnly
-                                  ? undefined
-                                  : (e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault()
-                                        setEditing(t)
-                                      }
-                                    }
-                              }
-                            >
-                              <span className="chlorine-row-date">{formatReportDate(t.date)}</span>
-                              <span className="chlorine-row-building">{t.building}</span>
-                              <span className={`chlorine-row-value${below ? ' is-below' : ''}`}>
-                                {formatConcentration(t.concentration) || '—'}
-                              </span>
+                      {g.dates.map((d) => (
+                        <li key={d.date}>
+                          <div className="chlorine-row">
+                            <span className="chlorine-row-date">{formatReportDate(d.date)}</span>
+                            <div className="chlorine-row-buildings">
+                              {d.tests.map((t) => {
+                                const below =
+                                  t.concentration !== null &&
+                                  t.concentration !== undefined &&
+                                  Number(t.concentration) < CHLORINE_STANDARD_MIN
+                                return (
+                                  <button
+                                    key={t.id}
+                                    type="button"
+                                    className="chlorine-building-card"
+                                    disabled={readOnly}
+                                    onClick={() => setEditing(t)}
+                                  >
+                                    <span className="chlorine-building-card-name">{t.building}</span>
+                                    <span className={`chlorine-building-card-value${below ? ' is-below' : ''}`}>
+                                      {formatConcentration(t.concentration) || '—'}
+                                    </span>
+                                  </button>
+                                )
+                              })}
                             </div>
-                          </li>
-                        )
-                      })}
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </section>
