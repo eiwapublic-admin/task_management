@@ -1213,15 +1213,18 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .report-calendar-workers-row .report-row-icons { gap: 2px; }
 .report-calendar-workers-row .report-row-icon { width: 18px; height: 18px; }
 
+/* 2026-08-19: 文字表示（西川｜岡田）から、カンバンのタスクカードと同じ丸いマーク
+   （.avatar。assigneeInitial・assigneeColorで色も揃える）に変更した */
 .report-calendar-workers {
   flex: 1;
   min-width: 0;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
+
+.report-calendar-avatar { width: 18px; height: 18px; flex-shrink: 0; }
 
 .report-calendar-body {
   display: flex;
@@ -1272,7 +1275,6 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   .report-calendar-cell { padding: 6px; }
   .report-calendar-line { font-size: var(--fs-xs); gap: 4px; }
   .report-calendar-line .report-line-time { width: 34px; }
-  .report-calendar-workers { font-size: var(--fs-2xs); }
 }
 
 /* --- 詳細（2026-08-07に別画面から「一覧の上に重ねるモーダル」へ変更） ---
@@ -1801,8 +1803,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 /* 明細の表示フォーマットは残留塩素一覧（.chlorine-row）に合わせる（2026-08-11）。
    日付・車種・テナント名を太字で目立たせ、クリックで詳細（写真・項目の編集）を開ける */
 .parking-list-row {
-  /* .parking-card と同じく、1件ごとの区切りが分かるようはっきり濃いグレーにする（2026-08-10） */
-  background: var(--bg-muted);
+  /* 2026-08-19: ページの地（--bg-app）と近い色でメリハリが無いとの指摘を受け、
+     白（--bg-surface）に変更した。区切りは枠線（border）で示す */
+  background: var(--bg-surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-3) var(--space-4);
@@ -2098,38 +2101,50 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 .chlorine-rows { list-style: none; margin: 0; padding: 0; }
 
+/* 2026-08-19: 1施設1行だった明細を1日1行に変更し、その日の施設ごとの結果を
+   横並びのカードで見渡せるようにした（BKB・小泉本社をペアで実施する運用のため） */
 .chlorine-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
 }
 
-.chlorine-row.is-clickable { cursor: pointer; }
-.chlorine-row.is-clickable:hover,
-.chlorine-row.is-clickable:focus-visible {
+.chlorine-row-date { flex-shrink: 0; font-size: var(--fs-base); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.chlorine-row-buildings { flex: 1; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.chlorine-building-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-family: inherit;
+}
+.chlorine-building-card:disabled { cursor: default; }
+.chlorine-building-card:not(:disabled):hover,
+.chlorine-building-card:not(:disabled):focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
 
-/* 一覧明細は 日付・施設・塩素濃度 の3項目のみ（2026-08-13。時刻・場所・検査員・
-   官能検査NGは一覧から外した。入力モーダルでは引き続き記録・編集できる） */
-.chlorine-row-date { flex-shrink: 0; font-size: var(--fs-base); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.chlorine-row-building { flex: 1 1 auto; min-width: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
+.chlorine-building-card-name { font-size: var(--fs-md); font-weight: 700; color: var(--text-strong); }
 
-.chlorine-row-value {
-  flex-shrink: 0;
+.chlorine-building-card-value {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
-  min-width: 56px;
-  text-align: right;
 }
 
 /* 水道水質基準（0.1mg/L）を下回った測定値は赤で目立たせる */
-.chlorine-row-value.is-below { color: var(--color-danger); }
+.chlorine-building-card-value.is-below { color: var(--color-danger); }
 
 .chlorine-legend { margin-top: var(--space-3); }
 
