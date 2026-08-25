@@ -473,6 +473,7 @@
     - **サーバー側（`worker/lib/equipment.js`）**: 入出庫の登録（`handleEquipmentTransactionCreate`）・修正（`handleEquipmentTransactionUpdate`）だけ、`write:true`の一律ゲートを外し、`kind`・対象レコードが判明してから個別に許可判定するよう書き換えた。`canWrite`（staff/admin）に加えて、`isEquipmentOutStaff`は「登録時は`kind==='out'`のときだけ」「修正時は対象が`kind==='out'`かつ`occurred_at`がJSTの当日のときだけ」許可する（`isTodayJst`ヘルパーを新設）。過去日付の偽装を防ぐため、このロールでは①新規登録時に送信された`occurred_at`を無視して必ず現在時刻にする、②修正時に`occurred_at`を当日以外へ変更しようとした場合は400エラーで拒否する、の2点を追加した。削除（`handleEquipmentTransactionDelete`）は従来どおり`canWrite`必須のままで、このロールには許可していない。
     - **フロント側**: `src/lib/auth.js`に`isLimitedRole(user)`（`owner`・`equipment_out_staff`のどちらかを判定）を追加し、日報・自主検査・違反車両・残留塩素の各画面（`ReportList.jsx`・`ReportDetail.jsx`・`Inspections.jsx`・`ParkingViolations.jsx`・`Chlorine.jsx`）の`readOnly`/`isOwner`判定と、`App.jsx`の`RequireStaff`ガード、`Portal.jsx`・`AppHeader.jsx`のタスク管理／備品マスタ／設定などスタッフ専用メニューの非表示判定をこの関数に統一した（＝`equipment_out_staff`は`owner`と同じ範囲でこれらの画面・メニューが閲覧専用・非表示になる）。`Equipment.jsx`・`EquipmentItemHistory.jsx`だけは、`readOnly`（`owner`のみ）とは別に`isEquipmentOutStaff`・`canFullWrite`・`canEditTxn(t)`を用意し、「出庫」ボタンは`owner`以外に表示、「入庫」ボタンと当日以外／入庫レコードの修正はフル権限だけに表示、`equipment_out_staff`は当日の出庫レコードの行だけがクリック可能（編集モーダルが開く）ようにした。`EquipmentOutForm.jsx`には`dateLocked`（出庫日時欄を編集不可にする）・`canDelete`（削除ボタンを出すか）の2props を追加し、`equipment_out_staff`が開く新規登録・修正モーダルではどちらも制限をかけている（サーバー側の検証が正であり、これはUXの補助）。
     - 検証: `npm run lint`・`npm run build`が通ることを確認。`worker/lib/http.js`の`isOwner`/`isEquipmentOutStaff`/`canWrite`/`canUseTaskSection`をNodeで直接importし、`staff`/`admin`/`owner`/`equipment_out_staff`/未設定/未認証の6パターンで意図した真偽値になることを確認した。JST同日判定（`isTodayJst`と同じ式）もNodeで日付境界のケース（UTC日をまたぐ深夜のケースなど）を試し、JSTの暦日で比較できていることを確認した。既存の`koizumi`（`role='owner'`）アカウントの挙動には影響がないことをコードレビューで確認済み（`isOwner`単体の判定は変えていない）。
+    - デプロイ後、依頼元から「アカウント：staff、名称：スタッフ」としてこのロールのアカウントを作ってほしいとの指示を受けた。`users.role`にはDB側にも許可値のCHECK制約（`users_role_check`）があり、`equipment_out_staff`を追加していなかったため`INSERT`が制約違反で失敗した。マイグレーション`add_equipment_out_staff_role`で制約を`staff`/`owner`/`admin`/`equipment_out_staff`の4値に拡張してから、`username='staff'` / `display_name='スタッフ'` / `role='equipment_out_staff'`で1件`INSERT`した（パスワードはbcryptjsでハッシュ化し、生成した初期パスワードはチャット上で直接通知）。
 
 ---
 
@@ -482,7 +483,7 @@
 - 基本は放置でよい。メールは稼働時間帯（既定 8〜18時 JST）に設定した頻度（既定30分）で自動取得される
 - 振り分け精度の調整: 設定画面の「業務背景・振り分けルール（org_context）」を編集して保存（**再デプロイ不要**、次回取得から反映）。各タスク詳細の「AI判定の理由」が調整の参考になる
 - ユーザー追加: Supabase の `users` テーブルに `username / password_hash(bcrypt) / display_name` を INSERT
-- 登録済みユーザー: `nishikawa`（西川）/ `okada`（岡田）/ `kaz`（橋口）/ `hyoka`（評価ユーザー）/ `koizumi`（小泉本社。`role='owner'`＝日報・備品・自主検査・違反車両・残留塩素の閲覧のみで書き込み不可。2026-08-25追加）
+- 登録済みユーザー: `nishikawa`（西川）/ `okada`（岡田）/ `kaz`（橋口）/ `hyoka`（評価ユーザー）/ `koizumi`（小泉本社。`role='owner'`＝日報・備品・自主検査・違反車両・残留塩素の閲覧のみで書き込み不可。2026-08-25追加）/ `staff`（表示名「スタッフ」。`role='equipment_out_staff'`＝上記5画面の閲覧に加え、備品の「出庫」新規登録・当日入力分の「出庫」修正のみ書き込み可。2026-08-25追加）
 - 自社ドメインの変更: settings の `company_domains`（カンマ区切り、既定 `eiwa-up.jp`）。このドメイン発のメールは「自社からの返信」として返信検知に使われる
 - 操作の確認: メイン画面「ログ」→ 操作ログ画面（取得結果・ステータス変更を実行者付きで表示）
 
