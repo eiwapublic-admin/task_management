@@ -33,9 +33,11 @@ import '../components/KanbanBoard.css'
 // 施設別」の紙様式（`ChlorineSheet.jsx`）なので、どの月の「↓」を押しても、その月が属する
 // "年"の年間分をまとめて出力する（対象施設だけをその場のダイアログで選ぶ）。
 //
-// 2026-08-13: BKB・小泉本社は1日にペアで実施する運用のため、新規保存の直後に同じ日の
-// もう片方がまだ未記録なら、閉じずにそのままもう片方の入力へ続ける（handleSaved参照）。
+// 2026-08-13: 対象施設は1日にまとめて実施する運用のため、新規保存の直後に同じ日の
+// 他施設がまだ未記録なら、閉じずにそのまま次の施設の入力へ続ける（handleSaved参照）。
 // 「＋」を押した時点でも、その日まだ記録の無い施設を自動で選んでおく（pickBuildingFor）。
+// 2026-08-25: 対象施設をBKB・小泉本社の2つからスイングビルを加えた3つに変更したが、
+// このロジック自体はCHLORINE_BUILDINGSの並び順に従って汎用的に動くため変更不要だった。
 export default function Chlorine() {
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
@@ -138,15 +140,16 @@ export default function Chlorine() {
     // 測定日を変更した場合など、一覧の並び・グループが変わりうるので取り直す
     load()
 
-    // 新規保存の直後は、同じ日にもう片方の施設がまだ未記録なら続けて開く
-    // （BKB・小泉本社はペアで実施するため。2026-08-13。既存レコードの編集時は対象外）
+    // 新規保存の直後は、同じ日にまだ未記録の施設があれば続けて開く（CHLORINE_BUILDINGSの
+    // 並び順で次に見つかった1件。3施設に増えた後も、全施設分記録し終えるまで順に案内する。
+    // 2026-08-13導入・2026-08-25にスイングビル追加へ対応。既存レコードの編集時は対象外）
     if (wasNew) {
       const savedDate = new Date(saved.tested_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-      const pairBuilding = CHLORINE_BUILDINGS.find((b) => b !== saved.building)
       const recorded = buildingsRecordedOn(savedDate, nextTests)
-      if (pairBuilding && !recorded.has(pairBuilding)) {
-        setNewBuilding(pairBuilding)
-        setPairNotice(`${saved.building}を記録しました。続けて${pairBuilding}も記録してください。`)
+      const nextBuilding = CHLORINE_BUILDINGS.find((b) => !recorded.has(b))
+      if (nextBuilding) {
+        setNewBuilding(nextBuilding)
+        setPairNotice(`${saved.building}を記録しました。続けて${nextBuilding}も記録してください。`)
         setEditing('new')
         return
       }

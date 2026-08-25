@@ -1337,10 +1337,10 @@ export async function handleParkingRecognize(req) {
 const CHLORINE_COLUMNS =
   'id, report_id, building, location, tested_at, concentration, color_ok, turbidity_ok, odor_ok, taste_ok, inspector, note, created_at, updated_at'
 
-// 測定施設。BKB＝備後町コイズミビルの略称。
-// 現行アプリ（FileMaker）のTOP画面には「スイングビル」もあったが、実際に測定するのは
-// この2施設のみとの確認により対象外にした（2026-08-10）。
-const VALID_CHLORINE_BUILDINGS = new Set(['BKB', '小泉本社'])
+// 測定施設。BKB＝備後町コイズミビルの略称。src/lib/reports.js の CHLORINE_BUILDINGS と
+// 揃える（2026-08-10時点では2施設のみだったが、実際にはスイングビルの測定も継続して
+// いたことがFileMakerからの移行時（2026-08-25）に判明し、3施設目として追加した）
+const VALID_CHLORINE_BUILDINGS = new Set(['BKB', '小泉本社', 'スイングビル'])
 
 // 濃度は 0〜99.99 mg/L の範囲で小数第2位まで（DBは numeric(4,2)）。
 // 未測定（記録だけ先に作る場合）は null を許す。
