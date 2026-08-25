@@ -465,6 +465,9 @@
     - **②残留塩素の測定施設「スイングビル」を「旧本社」に呼称変更**: 施設の実際の呼び名が変わったとの連絡を受け、表示名を全面的に置き換えた。`src/lib/reports.js`の`CHLORINE_BUILDINGS`と`worker/lib/reports.js`の`VALID_CHLORINE_BUILDINGS`（サーバー側のbuilding値バリデーション）をどちらも`'スイングビル'`→`'旧本社'`に変更。**既存データも呼称を追わないと表示と一致しなくなる**ため、Supabase上の`chlorine_tests`テーブルの`building = 'スイングビル'`な既存154件を`UPDATE`で`'旧本社'`に一括変更した（`BKB`184件・`小泉本社`184件は対象外）。施設名はコード中で固定リストとしてはBKB専用画面（自主検査表`INSPECTION_BUILDINGS`）とは独立しており、そちらに影響はない。グラフ・一覧・トグルボタンなどの表示はすべて`t.building`の値をそのままラベルとして描画する作りのため、この2箇所（フロント定数・サーバー側バリデーション）とDBの3点を揃えるだけで全画面に反映される。
     - 検証: `npm run lint`・`npm run build`が通ることを確認。①はビルド後CSSを使った静的HTMLをPlaywrightでスクリーンショットし、「残 99」「残 2」（発注注意時は赤字）が崩れず右揃えで収まることを確認した。②はSupabaseに対して変更前後で`building`ごとの件数を`SELECT`し、`スイングビル`154件が消え`旧本社`154件が現れたこと（他施設の件数は不変）を確認した。
 
+159. **小泉本社担当者用アカウント`koizumi`を追加（2026-08-25）**: 「日報・備品・自主検査・違反車両・残留塩素の各画面を閲覧のみで使わせたい」との依頼。コード上に既に`role='owner'`という読み取り専用ロールが存在し（`worker/lib/http.js`の`isOwner`/`canWrite`/`canUseTaskSection`、フロントの`App.jsx`の`RequireStaff`ガード）、ちょうどこの5画面（`/reports`・`/equipment`系・`/reports/inspections`・`/reports/parking`・`/reports/chlorine`）だけに`RequireAuth`でアクセスでき、書き込みAPIとタスク管理（カンバン）画面はサーバー側で拒否される作りになっていた（コードコメント上は「小泉産業様向け」と想定されていたが、これまで実際にこのロールのアカウントは1件も作られていなかった）。この既存の仕組みをそのまま使うのが依頼内容と完全に一致するため、新規ロールは追加せずSupabaseの`users`テーブルへ`username='koizumi'` / `display_name='小泉本社'` / `role='owner'`で1件`INSERT`した（パスワードは`bcryptjs`でハッシュ化してから`password_hash`列へ。生成した初期パスワードはユーザーへチャット上で直接通知し、必要なら本人がログイン後に変更できるよう伝える運用とした）。
+    - 検証: 追加後`SELECT username, role from users`で該当行が`role='owner'`で作成されたことを確認。挙動の正しさは既存コード（`isOwner`/`canWrite`等）に依っており、今回はコードの追加変更は無し。
+
 ---
 
 ## 2. 日常運用
@@ -473,7 +476,7 @@
 - 基本は放置でよい。メールは稼働時間帯（既定 8〜18時 JST）に設定した頻度（既定30分）で自動取得される
 - 振り分け精度の調整: 設定画面の「業務背景・振り分けルール（org_context）」を編集して保存（**再デプロイ不要**、次回取得から反映）。各タスク詳細の「AI判定の理由」が調整の参考になる
 - ユーザー追加: Supabase の `users` テーブルに `username / password_hash(bcrypt) / display_name` を INSERT
-- 登録済みユーザー: `nishikawa`（西川）/ `okada`（岡田）/ `kaz`（橋口）/ `hyoka`（評価ユーザー）
+- 登録済みユーザー: `nishikawa`（西川）/ `okada`（岡田）/ `kaz`（橋口）/ `hyoka`（評価ユーザー）/ `koizumi`（小泉本社。`role='owner'`＝日報・備品・自主検査・違反車両・残留塩素の閲覧のみで書き込み不可。2026-08-25追加）
 - 自社ドメインの変更: settings の `company_domains`（カンマ区切り、既定 `eiwa-up.jp`）。このドメイン発のメールは「自社からの返信」として返信検知に使われる
 - 操作の確認: メイン画面「ログ」→ 操作ログ画面（取得結果・ステータス変更を実行者付きで表示）
 
