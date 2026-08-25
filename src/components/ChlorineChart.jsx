@@ -38,14 +38,24 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
   })
 
   const showStandard = standardValue != null && standardValue <= yMax
+  const isStandardValue = (v) => showStandard && Math.abs(v - standardValue) < 1e-9
 
   // Y軸のグリッド線（0.1刻み）。基準線（0.1mg/L）と同じ位置に重なる線は基準線側に
   // 譲って引かない（2026-08-25）
   const yGridSteps = []
   for (let v = Y_GRID_STEP; v < yMax - 1e-9; v += Y_GRID_STEP) {
     const rounded = Math.round(v * 10) / 10
-    if (showStandard && Math.abs(rounded - standardValue) < 1e-9) continue
+    if (isStandardValue(rounded)) continue
     yGridSteps.push(rounded)
+  }
+
+  // Y軸の目盛りラベル（0・0.1刻み・yMax。線ごとに数値を表示してほしいとの依頼。
+  // 2026-08-25）。基準線（0.1mg/L）の位置は「基準0.1」の専用ラベル側に任せる
+  const yLabelSteps = []
+  for (let v = 0; v <= yMax + 1e-9; v += Y_GRID_STEP) {
+    const rounded = Math.round(v * 10) / 10
+    if (isStandardValue(rounded)) continue
+    yLabelSteps.push(rounded)
   }
 
   // X軸は毎年1月・6月にラベルと縦線を出す（2026-08-25。以前は詰まらないよう
@@ -114,12 +124,17 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
             </text>
           </>
         )}
-        <text className="chlorine-trend-axis-label" x={PAD_X} y={PLOT_TOP - 4} textAnchor="start">
-          {yMax.toFixed(1)}
-        </text>
-        <text className="chlorine-trend-axis-label" x={PAD_X} y={PLOT_BOTTOM + 12} textAnchor="start">
-          0
-        </text>
+        {yLabelSteps.map((v) => (
+          <text
+            key={v}
+            className="chlorine-trend-axis-label"
+            x={PAD_X}
+            y={v === 0 ? PLOT_BOTTOM + 12 : y(v) - 4}
+            textAnchor="start"
+          >
+            {v.toFixed(1)}
+          </text>
+        ))}
         {xTickIndexes.map((i) => (
           <text key={months[i].key} className="chlorine-trend-month-text" x={x(i)} y={MONTH_LABEL_Y} textAnchor="middle">
             {months[i].shortLabel}
