@@ -14,7 +14,7 @@ import Chlorine from './pages/Chlorine'
 import Equipment from './pages/Equipment'
 import EquipmentItemHistory from './pages/EquipmentItemHistory'
 import EquipmentItems from './pages/EquipmentItems'
-import { isAuthenticated, getCurrentUser } from './lib/auth'
+import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
 function RequireAuth({ children }) {
@@ -22,11 +22,12 @@ function RequireAuth({ children }) {
 }
 
 // タスク管理セクション用のガード（2026-08-04）。
-// owner（小泉産業様）は日報のみを見られるので、タスク管理の各画面へ来たら日報へ送る。
+// owner（小泉産業様）・備品出庫限定ロール（2026-08-25追加）は日報・備品等の閲覧＋
+// 備品出庫の登録・修正までしかできないので、タスク管理の各画面へ来たら日報へ送る。
 // ※これは画面上の誘導であり、権限の正はサーバー側（Worker の verifyRequestAuth）にある。
 function RequireStaff({ children }) {
   if (!isAuthenticated()) return <Navigate to="/login" replace />
-  if (getCurrentUser()?.role === 'owner') return <Navigate to="/reports" replace />
+  if (isLimitedRole(getCurrentUser())) return <Navigate to="/reports" replace />
   return children
 }
 

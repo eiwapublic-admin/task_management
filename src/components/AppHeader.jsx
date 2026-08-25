@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AboutModal from './AboutModal'
-import { getCurrentUser, logout } from '../lib/auth'
+import { getCurrentUser, logout, isLimitedRole } from '../lib/auth'
 import { reloadApp } from '../pwa/reloadApp'
 import { formatBuildTime } from '../lib/version'
 import { formatDateTime } from '../lib/format'
@@ -46,8 +46,8 @@ const FEATURE_TITLES = [
 
 // PC幅だけ表示するショートカットメニュー（2026-08-24）。タイトルの中央あたりに置き、
 // 各機能へ直接ジャンプできるようにする（モバイルはハンバーガーメニューのみのまま）。
-// タスク（カンバン）は owner（小泉産業様）には見せない（RequireStaffガードで
-// 結局 /reports へ送り返されるだけのため。App.jsx参照）
+// タスク（カンバン）は owner（小泉産業様）・備品出庫限定ロールには見せない
+// （RequireStaffガードで結局 /reports へ送り返されるだけのため。App.jsx参照）
 const NAV_ITEMS = [
   { path: '/', label: 'タスク', exact: true, staffOnly: true },
   { path: '/reports', label: '日報', exact: true },
@@ -173,8 +173,9 @@ export default function AppHeader({ lastFetchAt } = {}) {
   const inPortal = section === 'portal'
   const inReports = section === 'reports'
   const inEquipment = section === 'equipment'
-  // owner（小泉産業様）は日報・備品（閲覧のみ）。タスク管理のメニューは出さない
-  const isOwner = user?.role === 'owner'
+  // owner（小泉産業様）・備品出庫限定ロール（2026-08-25追加）は日報・備品等の閲覧のみ
+  // （備品出庫限定ロールは備品の出庫だけ書き込み可）。どちらもタスク管理のメニューは出さない
+  const isOwner = isLimitedRole(user)
   // ヘッダーに大きく出す機能名（2026-08-12。従来のセクション切替の置き換え）
   const featureTitle = featureTitleFor(location.pathname)
 

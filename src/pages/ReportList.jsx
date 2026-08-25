@@ -15,7 +15,7 @@ import {
   IconSearch,
   IconDroplet,
 } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { assigneeColor, assigneeInitial } from '../lib/format'
 import {
   fetchReports,
@@ -106,7 +106,8 @@ export default function ReportList() {
   // 閉じたときに元の見え方へ戻る。
   const { date: openDate } = useParams()
   const user = getCurrentUser()
-  const isOwner = user?.role === 'owner'
+  // 日報の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
+  const isOwner = isLimitedRole(user)
 
   const [month, setMonth] = useState(currentMonthJST())
   const [reports, setReports] = useState([])

@@ -23,8 +23,20 @@ function tenantLabel(t) {
 // 出庫・設置モーダル（5-4）。docs/equipment-plan.md 5-4・5-5・11章。
 // existing を渡すと編集モード（履歴画面・在庫一覧の明細タップから開く）になる。
 // defaultItemId を渡すと、その備品をあらかじめ選んだ状態で開く（在庫一覧の行の「出」ボタン等。
-// 2026-08-18）。どちらも無ければ備品は空欄から選ばせる（ヘッダの「出庫」ボタンから開いた場合）
-export default function EquipmentOutForm({ items, existing, defaultItemId, onClose, onSaved, onDelete }) {
+// 2026-08-18）。どちらも無ければ備品は空欄から選ばせる（ヘッダの「出庫」ボタンから開いた場合）。
+// dateLocked・canDelete は備品出庫限定ロール用（2026-08-25追加）。当日入力分の出庫の修正のみを
+// 許可するロールのため、出庫日時は動かせないようにし（過去日付への付け替えを防ぐ）、
+// 削除は許可されていないため削除ボタン自体を出さない
+export default function EquipmentOutForm({
+  items,
+  existing,
+  defaultItemId,
+  dateLocked = false,
+  canDelete = true,
+  onClose,
+  onSaved,
+  onDelete,
+}) {
   useBodyScrollLock()
 
   const trackedItems = useMemo(() => items.filter((i) => !i.disabled || i.id === existing?.item_id), [items, existing])
@@ -186,7 +198,7 @@ export default function EquipmentOutForm({ items, existing, defaultItemId, onClo
 
           <label className="ui-field">
             <span>出庫日時</span>
-            <DateTimeInput value={occurredAt} disabled={isSigned} onChange={setOccurredAt} />
+            <DateTimeInput value={occurredAt} disabled={isSigned || dateLocked} onChange={setOccurredAt} />
           </label>
 
           <label className="ui-field">
@@ -316,7 +328,7 @@ export default function EquipmentOutForm({ items, existing, defaultItemId, onClo
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
-            {existing && !isSigned && (
+            {existing && !isSigned && canDelete && (
               <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
             )}
           </div>

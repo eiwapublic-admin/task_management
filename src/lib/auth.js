@@ -51,6 +51,15 @@ function tokenExpiry(token) {
   }
 }
 
+// 権限が限定されたロールか（owner=閲覧のみ、equipment_out_staff=備品の出庫のみ書き込み可）。
+// タスク管理・備品マスタ・設定などスタッフ専用の機能はどちらのロールにも見せない
+// （2026-08-25追加。備品画面での書き込みの可否はこの関数では判定しないので、
+// Equipment.jsx/EquipmentItemHistory.jsxではロールごとに個別に見る）
+export function isLimitedRole(user) {
+  const role = user?.role
+  return role === 'owner' || role === 'equipment_out_staff'
+}
+
 export function isAuthenticated() {
   const token = getToken()
   if (!token) return false
