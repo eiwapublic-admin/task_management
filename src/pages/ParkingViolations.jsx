@@ -79,12 +79,13 @@ function monthLabelOf(key) {
   return `${y}年${Number(m)}月`
 }
 
-// 直近12か月分の年月キー（今月を含む・古い→新しい順）。UTCの年月演算だけで
-// 求めているため実行環境のタイムゾーンに依存しない（todayJST() で起点をJSTに揃える）
-function last12MonthKeys() {
+// 直近nか月分の年月キー（今月を含む・古い→新しい順）。UTCの年月演算だけで
+// 求めているため実行環境のタイムゾーンに依存しない（todayJST() で起点をJSTに揃える）。
+// 月別台数推移の「過去1年」「過去3年」切替（2026-08-25）はこの関数にn=12/36を渡して使う
+function lastNMonthKeys(n) {
   const [y, m] = todayJST().split('-').map(Number)
   const out = []
-  for (let i = 11; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date(Date.UTC(y, m - 1 - i, 1))
     out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
   }
@@ -150,6 +151,9 @@ export default function ParkingViolations() {
   // ダッシュボードのランキング切替（2026-08-25。総累計 / 過去1年）
   const [tenantRankMode, setTenantRankMode] = useState('year')
   const [vehicleRankMode, setVehicleRankMode] = useState('year')
+  // 月別台数推移の表示期間切替（2026-08-25追加。過去1年 / 過去3年）。ランキングの
+  // 「過去1年」絞り込みや年月グループの既定開閉とは無関係の、グラフ専用の状態
+  const [trendRangeMonths, setTrendRangeMonths] = useState(12)
   // 年月グループの開閉状態。ユーザーが手で切り替えた分だけ既定値からの例外として持つ
   // （処理ログ・残留塩素等検査の年月グループと同じやり方）
   const [collapseOverrides, setCollapseOverrides] = useState({})
@@ -254,22 +258,33 @@ export default function ParkingViolations() {
 
   // 車とテナントの紐付け（2026-08-25）。ダッシュボードの集計はこの解決結果を使う
   const resolvedTenants = useMemo(() => resolveTenantsByPlate(violations), [violations])
-  const monthKeys = useMemo(() => last12MonthKeys(), [])
+  // ランキングの「過去1年」絞り込み・年月グループの既定開閉は常に直近1年基準（月別台数
+  // 推移の表示期間切替とは独立させる。2026-08-25）
+  const monthKeys = useMemo(() => lastNMonthKeys(12), [])
   const cutoffMonthKey = monthKeys[0]
 
+  // 月別台数推移だけは表示期間（過去1年/過去3年）を切り替えられる（2026-08-25）。
+  // 3年（36か月）表示では月名だけだと年をまたいで同じ表記が繰り返され紛らわしいため、
+  // 「YY/M」形式にする（グラフ側は詰まった月をまばらにしか表示しないが、ラベル自体は
+  // どの時点でも一意に決まるようにしておく）
+  const trendMonthKeys = useMemo(() => lastNMonthKeys(trendRangeMonths), [trendRangeMonths])
+
   const monthlyTrend = useMemo(() => {
-    const counts = new Map(monthKeys.map((k) => [k, 0]))
+    const counts = new Map(trendMonthKeys.map((k) => [k, 0]))
     for (const v of violations) {
       const k = monthKeyOf(v.checked_at)
       if (counts.has(k)) counts.set(k, counts.get(k) + 1)
     }
-    return monthKeys.map((k) => ({
-      key: k,
-      shortLabel: `${Number(k.slice(5))}月`,
-      fullLabel: monthLabelOf(k),
-      count: counts.get(k),
-    }))
-  }, [violations, monthKeys])
+    return trendMonthKeys.map((k) => {
+      const [y, m] = k.split('-')
+      return {
+        key: k,
+        shortLabel: trendRangeMonths <= 12 ? `${Number(m)}月` : `${y.slice(2)}/${Number(m)}`,
+        fullLabel: monthLabelOf(k),
+        count: counts.get(k),
+      }
+    })
+  }, [violations, trendMonthKeys, trendRangeMonths])
 
   const tenantRanking = useMemo(
     () => buildRanking(violations, resolvedTenants, 'tenant', tenantRankMode, cutoffMonthKey),
@@ -458,7 +473,27 @@ export default function ParkingViolations() {
         {!loading && violations.length > 0 && (
           <div className="parking-dashboard">
             <div className="ui-card parking-chart-card">
-              <div className="ui-card-title">月別台数推移（過去1年）</div>
+              <div className="ui-card-title">
+                月別台数推移
+                <div className="ui-segmented parking-chart-toggle ui-card-title-action" role="group" aria-label="表示期間">
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${trendRangeMonths === 12 ? ' is-active' : ''}`}
+                    aria-pressed={trendRangeMonths === 12}
+                    onClick={() => setTrendRangeMonths(12)}
+                  >
+                    過去1年
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${trendRangeMonths === 36 ? ' is-active' : ''}`}
+                    aria-pressed={trendRangeMonths === 36}
+                    onClick={() => setTrendRangeMonths(36)}
+                  >
+                    過去3年
+                  </button>
+                </div>
+              </div>
               <MonthlyTrendChart data={monthlyTrend} />
             </div>
             <div className="ui-card parking-chart-card">

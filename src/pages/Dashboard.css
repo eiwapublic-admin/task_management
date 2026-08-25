@@ -2111,11 +2111,14 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   vertical-align: middle;
 }
 
+/* 見出しが薄くて目立たないとの指摘（2026-08-25）を受け、備品の備品名バナー
+   （.equipment-stock-row.is-static）と同じグリーン系（カンバン「完了」列相当の
+   色。Equipment.css参照）に揃え、文字も一段大きくした */
 .inspection-table thead th {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  font-weight: 600;
-  background: var(--bg-subtle);
+  font-size: var(--fs-md);
+  color: var(--text-strong);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
   white-space: nowrap;
 }
 
@@ -2363,6 +2366,53 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .chlorine-building-card-value.is-below { color: var(--color-danger); }
 
 .chlorine-legend { margin-top: var(--space-3); }
+
+/* ---------- 残留塩素濃度の推移グラフ（過去3年・3施設。2026-08-25新規） ----------
+   dataviz方針: 3系列のため凡例を必ず表示し、系列色は固定順の識別色（カテゴリパレット）
+   を使う。折れ線は違反車両ダッシュボードの.parking-trend-*と同じ組み方（SVG・
+   width:100%/height:autoで拡大縮小） */
+.chlorine-trend-card { margin-bottom: var(--space-4); }
+
+.chlorine-trend-wrap { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.chlorine-trend-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.chlorine-trend-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
+}
+
+.chlorine-trend-legend-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+}
+
+.chlorine-trend-chart { display: block; width: 100%; height: auto; }
+
+.chlorine-trend-baseline { stroke: var(--border); stroke-width: 1; }
+
+/* 水道水質基準（0.1mg/L）の目安線。系列色と紛れないよう、施設カード等で「基準未満」
+   を示すのと同じ危険色を使い、破線で「測定値の系列ではない」ことを示す */
+.chlorine-trend-standard-line { stroke: var(--color-danger); stroke-width: 1; stroke-dasharray: 4 3; }
+.chlorine-trend-standard-label { font-family: inherit; font-size: var(--fs-2xs); fill: var(--color-danger); }
+
+.chlorine-trend-axis-label { font-family: inherit; font-size: var(--fs-2xs); fill: var(--text-muted); }
+.chlorine-trend-month-text { font-family: inherit; font-size: var(--fs-2xs); fill: var(--text-muted); }
+
+.chlorine-trend-line { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chlorine-trend-dot { stroke: var(--bg-surface); stroke-width: 1.5; }
 
 /* --- 入力モーダル（自主検査表のモーダル .inspection-* を土台に使う） --- */
 

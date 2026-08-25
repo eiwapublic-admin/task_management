@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ChlorineForm from '../components/ChlorineForm'
+import { ChlorineTrendChart } from '../components/ChlorineChart'
 import useChlorinePdfExport from '../hooks/useChlorinePdfExport'
 import { IconChevronRight, IconDownload } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
@@ -14,6 +15,7 @@ import {
   formatReportDate,
   currentMonthJST,
   shiftMonth,
+  jstDateOnly,
   todayJST,
 } from '../lib/reports'
 import './Dashboard.css'
@@ -38,6 +40,15 @@ import '../components/KanbanBoard.css'
 // 「＋」を押した時点でも、その日まだ記録の無い施設を自動で選んでおく（pickBuildingFor）。
 // 2026-08-25: 対象施設をBKB・小泉本社の2つからスイングビルを加えた3つに変更したが、
 // このロジック自体はCHLORINE_BUILDINGSの並び順に従って汎用的に動くため変更不要だった。
+
+// 画面上部の推移グラフ（過去3年・3施設。2026-08-25新規）用の設定。
+// 系列色はdataviz方針に沿い、カテゴリ順に固定の識別色を割り当てる（CHLORINE_BUILDINGS
+// の並び順=BKB・小泉本社・スイングビルに対応）。既存の単系列グラフで使っている
+// --color-primaryを1つ目に据え、2・3つ目はスキルのカテゴリパレット（オレンジ・アクア）
+// から採用し、validate_palette.jsで3色ともALL PASS（CVD隣接ΔE9.2・通常視ΔE27.6）を確認済み
+const CHLORINE_TREND_MONTHS = 36
+const CHLORINE_TREND_COLORS = ['var(--color-primary)', '#eb6834', '#1baf7a']
+
 export default function Chlorine() {
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
@@ -76,6 +87,41 @@ export default function Chlorine() {
   useEffect(() => {
     load()
   }, [load])
+
+  // 画面上部の推移グラフ用データ（過去3年・3施設。2026-08-25新規）。月ごとの平均濃度を
+  // 施設別に算出する。その月に測定が無い施設はnull（グラフ側でその区間だけ線を切る）
+  const chlorineTrendMonths = useMemo(() => {
+    const cur = currentMonthJST()
+    const out = []
+    for (let i = CHLORINE_TREND_MONTHS - 1; i >= 0; i--) {
+      const key = shiftMonth(cur, -i)
+      const [y, m] = key.split('-')
+      out.push({ key, shortLabel: `${y.slice(2)}/${Number(m)}`, fullLabel: `${y}年${Number(m)}月` })
+    }
+    return out
+  }, [])
+
+  const chlorineTrendSeries = useMemo(() => {
+    const sums = new Map() // building -> Map(monthKey -> { sum, count })
+    for (const t of tests) {
+      if (t.concentration == null) continue
+      const monthKey = jstDateOnly(t.tested_at).slice(0, 7)
+      if (!sums.has(t.building)) sums.set(t.building, new Map())
+      const byMonth = sums.get(t.building)
+      const cur = byMonth.get(monthKey) || { sum: 0, count: 0 }
+      cur.sum += Number(t.concentration)
+      cur.count += 1
+      byMonth.set(monthKey, cur)
+    }
+    return CHLORINE_BUILDINGS.map((building, i) => {
+      const byMonth = sums.get(building) || new Map()
+      const values = chlorineTrendMonths.map((mo) => {
+        const rec = byMonth.get(mo.key)
+        return rec ? rec.sum / rec.count : null
+      })
+      return { key: building, label: building, color: CHLORINE_TREND_COLORS[i], values }
+    })
+  }, [tests, chlorineTrendMonths])
 
   // 年月ごとにまとめる（新しい月が上）。さらに同じ月の中で測定日ごとにまとめ、
   // 1日分の記録（BKB・小泉本社）を1行に横並びのカードで表示する（2026-08-19。
@@ -211,6 +257,19 @@ export default function Chlorine() {
           <p className="dashboard-error dashboard-banner" role="alert">
             {pdf.error}
           </p>
+        )}
+
+        {/* 画面上部の推移グラフ（過去3年・3施設。2026-08-25新規）。記録が無いうちは
+            出しても意味がないため、1件以上あるときだけ表示する */}
+        {!loading && tests.length > 0 && (
+          <div className="ui-card chlorine-trend-card">
+            <div className="ui-card-title">残留塩素濃度の推移（過去3年）</div>
+            <ChlorineTrendChart
+              months={chlorineTrendMonths}
+              series={chlorineTrendSeries}
+              standardValue={CHLORINE_STANDARD_MIN}
+            />
+          </div>
         )}
 
         {loading ? (
