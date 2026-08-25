@@ -5,7 +5,7 @@ import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import FeatureHeader from '../components/FeatureHeader'
 import { MonthlyTrendChart, RankingBarList } from '../components/ParkingCharts'
 import { IconSearch, IconChevronRight } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
   fetchParkingViolations,
   deleteParkingViolation,
@@ -130,7 +130,8 @@ function buildRanking(violations, resolvedTenants, by, mode, cutoffMonthKey) {
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
   const user = getCurrentUser()
-  const isOwner = user?.role === 'owner'
+  // 違反車両の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
+  const isOwner = isLimitedRole(user)
   const [violations, setViolations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

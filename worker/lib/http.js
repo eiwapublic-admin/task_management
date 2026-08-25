@@ -94,21 +94,37 @@ export async function verifyRequestAuth(req) {
 }
 
 // ロール判定（2026-08-04。日報機能の追加に伴う権限分離）
-//  staff  : 従来どおり全機能
-//  owner  : 日報の閲覧のみ。書き込みとタスク管理系APIは不可（小泉産業様向け）
-//  admin  : staff と同等（将来の分離用）
+//  staff             : 従来どおり全機能
+//  owner             : 日報・備品・自主検査・違反車両・残留塩素の閲覧のみ。書き込みと
+//                       タスク管理系APIは不可（小泉産業様向け）
+//  equipment_out_staff: owner と同じ閲覧範囲に加え、備品の「出庫」新規登録・当日入力分の
+//                       「出庫」修正だけを許可する（2026-08-25。備品交換を主に行うスタッフ向け。
+//                       過去データの誤修正を避けるため、それ以外の書き込み―入庫・当日以外の
+//                       出庫修正・削除・備品マスタ編集等―は一律不可。equipment.js 側で
+//                       個別に許可する）
+//  admin             : staff と同等（将来の分離用）
 // role が未設定・不明な値のときは staff 扱いにはせず、最も制限の強い扱いにはしない。
 // 既存ユーザーは全員 role='staff' が入るため、この分岐で挙動が変わることはない。
 export function isOwner(auth) {
   return (auth?.role || 'staff') === 'owner'
 }
 
-// 書き込みを許可してよいか（owner は読み取り専用）
-export function canWrite(auth) {
-  return Boolean(auth) && !isOwner(auth)
+export function isEquipmentOutStaff(auth) {
+  return (auth?.role || 'staff') === 'equipment_out_staff'
 }
 
-// タスク管理セクションを使ってよいか（owner は日報のみ）
+// 一般の書き込みAPIでは「閲覧のみ」として扱うべきか。owner に加え、備品出庫限定ロールも
+// ここでは同様に扱う（備品の出庫だけは equipment.js 側の個別チェックで別途許可する）
+function isReadOnlyRole(auth) {
+  return isOwner(auth) || isEquipmentOutStaff(auth)
+}
+
+// 書き込みを許可してよいか（owner・備品出庫限定ロールは読み取り専用）
+export function canWrite(auth) {
+  return Boolean(auth) && !isReadOnlyRole(auth)
+}
+
+// タスク管理セクションを使ってよいか（owner・備品出庫限定ロールは日報等の閲覧のみ）
 export function canUseTaskSection(auth) {
-  return Boolean(auth) && !isOwner(auth)
+  return Boolean(auth) && !isReadOnlyRole(auth)
 }

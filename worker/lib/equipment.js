@@ -4,7 +4,7 @@
 // テナント設置（reason='tenant'）・新規入替（reason='replace'）・署名は対応済み（2026-08-12 追加）。
 // テナントは FileMaker からの同期（Phase 4・7-1）が入るまでは手動投入のみ。
 
-import { json, verifyRequestAuth, canWrite } from './http.js'
+import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 
@@ -45,6 +45,13 @@ async function requireAuth(req, { write = false } = {}) {
     return { error: json({ error: 'この操作を行う権限がありません' }, 403) }
   }
   return { auth }
+}
+
+// timestamptz（ISO文字列）がJSTの「今日」かどうか（2026-08-25。備品出庫限定ロールが
+// 修正してよいのは当日入力分の出庫だけ、という制約の判定に使う）
+function isTodayJst(iso) {
+  const jstDate = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+  return jstDate(iso) === jstDate(new Date())
 }
 
 // ============================================================
@@ -441,9 +448,11 @@ function validateTenantFields(reason, payload) {
   return null
 }
 
-// POST /api/equipment/transactions — 入出庫の登録
+// POST /api/equipment/transactions — 入出庫の登録。
+// 通常は canWrite（staff/admin）が必要だが、備品出庫限定ロールにも「出庫」の新規登録だけを
+// 開放する（2026-08-25）。そのため write:true では縛らず、kind が判明してから個別に判定する
 export async function handleEquipmentTransactionCreate(req) {
-  const { auth, error } = await requireAuth(req, { write: true })
+  const { auth, error } = await requireAuth(req)
   if (error) return error
   try {
     const payload = await req.json().catch(() => null)
@@ -453,6 +462,13 @@ export async function handleEquipmentTransactionCreate(req) {
     if (!itemId) return json({ error: 'item_id は必須です' }, 400)
     const kind = payload.kind
     if (!VALID_KINDS.has(kind)) return json({ error: 'kind が不正です' }, 400)
+
+    const fullWrite = canWrite(auth)
+    const limitedOutOnly = isEquipmentOutStaff(auth) && kind === 'out'
+    if (!fullWrite && !limitedOutOnly) {
+      return json({ error: 'この操作を行う権限がありません' }, 403)
+    }
+
     const reason = payload.reason
     if (!REASONS_BY_KIND[kind]?.has(reason)) return json({ error: 'reason が不正です' }, 400)
     if (!SUPPORTED_REASONS.has(reason)) {
@@ -463,8 +479,10 @@ export async function handleEquipmentTransactionCreate(req) {
     if (quantity < 0 && reason !== 'adjust') {
       return json({ error: 'マイナスの数量は在庫調整のときだけ指定できます' }, 400)
     }
+    // 備品出庫限定ロールは、過去日付での新規登録（＝実質的な過去データの偽装）を避けるため、
+    // 送信された occurred_at を無視して必ず現在時刻にする（2026-08-25）
     const occurredAt =
-      payload.occurred_at && !Number.isNaN(Date.parse(payload.occurred_at))
+      fullWrite && payload.occurred_at && !Number.isNaN(Date.parse(payload.occurred_at))
         ? new Date(payload.occurred_at).toISOString()
         : new Date().toISOString()
 
@@ -528,9 +546,12 @@ export async function handleEquipmentTransactionCreate(req) {
   }
 }
 
-// PATCH /api/equipment/transactions — 入出庫の修正
+// PATCH /api/equipment/transactions — 入出庫の修正。
+// 通常は canWrite（staff/admin）が必要だが、備品出庫限定ロールにも「当日入力分の出庫」の
+// 修正だけを開放する（2026-08-25）。対象レコードの kind・occurred_at を見ないと判定できないため、
+// write:true では縛らず、既存レコードを読み込んでから個別に判定する
 export async function handleEquipmentTransactionUpdate(req) {
-  const { auth, error } = await requireAuth(req, { write: true })
+  const { auth, error } = await requireAuth(req)
   if (error) return error
   try {
     const payload = await req.json().catch(() => null)
@@ -540,7 +561,7 @@ export async function handleEquipmentTransactionUpdate(req) {
     const supabase = getAdminClient()
     const { data: existing, error: existErr } = await supabase
       .from('equipment_transactions')
-      .select('id, item_id, kind, reason, signed_at, tenant_id')
+      .select('id, item_id, kind, reason, occurred_at, signed_at, tenant_id')
       .eq('id', id)
       .maybeSingle()
     if (existErr) {
@@ -548,6 +569,19 @@ export async function handleEquipmentTransactionUpdate(req) {
       return json({ error: '入出庫の更新に失敗しました' }, 500)
     }
     if (!existing) return json({ error: '対象が見つかりません' }, 404)
+
+    const fullWrite = canWrite(auth)
+    const limitedOutOnly =
+      isEquipmentOutStaff(auth) && existing.kind === 'out' && isTodayJst(existing.occurred_at)
+    if (!fullWrite && !limitedOutOnly) {
+      return json({ error: 'この操作を行う権限がありません' }, 403)
+    }
+    // 備品出庫限定ロールは、当日以外の日付へ移す変更（＝過去データの偽装や当日制約の
+    // すり抜けになる）を禁止する（2026-08-25）
+    if (limitedOutOnly && 'occurred_at' in payload && !isTodayJst(payload.occurred_at)) {
+      return json({ error: '出庫日時を当日以外に変更することはできません' }, 400)
+    }
+
     // 署名済みの記録は staff は修正不可（9章。将来 Phase 2 で署名が付くと発生する）
     if (existing.signed_at && auth.role !== 'admin') {
       return json({ error: '署名済みの記録は修正できません' }, 403)

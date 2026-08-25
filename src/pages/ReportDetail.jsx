@@ -5,7 +5,7 @@ import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
 import TimeInput from '../components/TimeInput'
 import { IconCheckCircle } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   fetchReport,
@@ -45,7 +45,8 @@ const INSPECTION_BUILDING = INSPECTION_BUILDINGS[0]
 
 export default function ReportDetail({ date, onClose }) {
   const user = getCurrentUser()
-  const isOwner = user?.role === 'owner'
+  // 日報の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
+  const isOwner = isLimitedRole(user)
   const readOnly = isOwner
   const [report, setReport] = useState(null)
   const [entries, setEntries] = useState([])

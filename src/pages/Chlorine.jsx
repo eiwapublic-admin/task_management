@@ -5,7 +5,7 @@ import ChlorineForm from '../components/ChlorineForm'
 import { ChlorineTrendChart } from '../components/ChlorineChart'
 import useChlorinePdfExport from '../hooks/useChlorinePdfExport'
 import { IconChevronRight, IconDownload } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
   CHLORINE_BUILDINGS,
   CHLORINE_STANDARD_MIN,
@@ -52,7 +52,8 @@ const CHLORINE_TREND_COLORS = ['var(--color-primary)', '#eb6834', '#1baf7a']
 
 export default function Chlorine() {
   const user = getCurrentUser()
-  const readOnly = user?.role === 'owner'
+  // 残留塩素の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
+  const readOnly = isLimitedRole(user)
 
   const [tests, setTests] = useState([])
   const [loading, setLoading] = useState(true)

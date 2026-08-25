@@ -4,7 +4,7 @@ import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
 import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import { IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
   INSPECTION_BUILDINGS,
@@ -30,7 +30,8 @@ import '../components/KanbanBoard.css'
 // 合わせ、通常は「すべて良好」1タップで済み、不備のある項目だけ×/◎に落とす。
 export default function Inspections() {
   const user = getCurrentUser()
-  const readOnly = user?.role === 'owner'
+  // 自主検査表の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
+  const readOnly = isLimitedRole(user)
 
   const [month, setMonth] = useState(currentMonthJST())
   // BKBのみ運用のため切替UIは廃止し固定にする（2026-08-05）

@@ -6,6 +6,7 @@ import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
 import { IconHome } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
+import { todayJST, jstDateOnly } from '../lib/reports'
 import {
   EQUIPMENT_REASON_LABELS,
   fetchEquipmentItems,
@@ -28,6 +29,16 @@ export default function EquipmentItemHistory() {
   const navigate = useNavigate()
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
+  // 備品出庫限定ロール（2026-08-25追加）。当日入力分の「出庫」の修正だけ許可する
+  // （Equipment.jsx と同じ判定。詳細はそちらのコメント参照）
+  const isEquipmentOutStaff = user?.role === 'equipment_out_staff'
+  const canFullWrite = !readOnly && !isEquipmentOutStaff
+
+  function canEditTxn(t) {
+    if (canFullWrite) return true
+    if (isEquipmentOutStaff) return t.kind === 'out' && jstDateOnly(t.occurred_at) === todayJST()
+    return false
+  }
 
   const [period, setPeriod] = useState('3m')
   const [item, setItem] = useState(null)
@@ -146,11 +157,13 @@ export default function EquipmentItemHistory() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map((t) => (
+                    {transactions.map((t) => {
+                      const editable = canEditTxn(t)
+                      return (
                       <tr
                         key={t.id}
-                        className={readOnly ? '' : 'equipment-history-row'}
-                        onClick={readOnly ? undefined : () => setEditing(t)}
+                        className={editable ? 'equipment-history-row' : ''}
+                        onClick={editable ? () => setEditing(t) : undefined}
                       >
                         <td>{formatEquipmentDate(t.occurred_at)}</td>
                         <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
@@ -160,7 +173,8 @@ export default function EquipmentItemHistory() {
                         <td>{t.tenant_short_name || t.location || ''}</td>
                         <td>{t.staff_name || ''}</td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -172,7 +186,7 @@ export default function EquipmentItemHistory() {
       </div>
 
       {editing &&
-        !readOnly &&
+        canEditTxn(editing) &&
         (editing.kind === 'in' ? (
           <EquipmentInForm
             items={allItems}
@@ -185,6 +199,8 @@ export default function EquipmentItemHistory() {
           <EquipmentOutForm
             items={allItems}
             existing={editing}
+            dateLocked={isEquipmentOutStaff}
+            canDelete={!isEquipmentOutStaff}
             onClose={() => setEditing(null)}
             onSaved={handleSaved}
             onDelete={handleDelete}

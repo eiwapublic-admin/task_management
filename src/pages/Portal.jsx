@@ -13,7 +13,7 @@ import {
   IconList,
   IconYen,
 } from '../components/Icons'
-import { getCurrentUser } from '../lib/auth'
+import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
 import {
@@ -83,7 +83,8 @@ function countUnfiledDays(month, filedDates, closedDays, today) {
 export default function Portal() {
   const navigate = useNavigate()
   const user = getCurrentUser()
-  const isOwner = user?.role === 'owner'
+  // owner・備品出庫限定ロール（2026-08-25追加）はどちらもタスク管理系のカード・導線を見せない
+  const isOwner = isLimitedRole(user)
 
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)

@@ -4,6 +4,7 @@ import FeatureHeader from '../components/FeatureHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
 import { getCurrentUser } from '../lib/auth'
+import { todayJST, jstDateOnly } from '../lib/reports'
 import {
   EQUIPMENT_REASON_LABELS,
   deleteEquipmentTransaction,
@@ -28,6 +29,21 @@ const PERIODS = [
 export default function Equipment() {
   const user = getCurrentUser()
   const readOnly = user?.role === 'owner'
+  // 備品出庫限定ロール（2026-08-25追加。備品交換を主に行うスタッフ向け）。
+  // 「出庫」の新規登録と、当日入力分の「出庫」の修正だけを許可する（過去データの誤修正を
+  // 避けるため、入庫・当日以外の出庫の修正・削除は不可）。正はサーバー側（equipment.js）
+  const isEquipmentOutStaff = user?.role === 'equipment_out_staff'
+  // 「出庫」ボタンを出してよいか（owner以外は誰でも）
+  const canRegisterOut = !readOnly
+  // 「入庫」ボタン・当日以外／入庫レコードの修正など、フル権限（staff/admin）だけに許すか
+  const canFullWrite = !readOnly && !isEquipmentOutStaff
+
+  // このレコードを今の自分が修正してよいか（行のクリック可否・編集モーダル表示の両方で使う）
+  function canEditTxn(t) {
+    if (canFullWrite) return true
+    if (isEquipmentOutStaff) return t.kind === 'out' && jstDateOnly(t.occurred_at) === todayJST()
+    return false
+  }
 
   const [period, setPeriod] = useState('3m')
   const [items, setItems] = useState([])
@@ -133,27 +149,28 @@ export default function Equipment() {
                 />
                 無効品込み
               </label>
-              {!readOnly && (
-                <>
-                  {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外）。
-                      表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
-                      専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
-                      iPhone幅で「入庫」だけ2行目に折り返していた） */}
-                  <button
-                    type="button"
-                    className="btn-primary equipment-header-btn"
-                    onClick={() => openTransactionForm('out')}
-                  >
-                    出庫
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary equipment-header-btn"
-                    onClick={() => openTransactionForm('in')}
-                  >
-                    入庫
-                  </button>
-                </>
+              {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外）。
+                  表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
+                  専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
+                  iPhone幅で「入庫」だけ2行目に折り返していた）。
+                  備品出庫限定ロール（2026-08-25追加）は「出庫」だけを見せる */}
+              {canRegisterOut && (
+                <button
+                  type="button"
+                  className="btn-primary equipment-header-btn"
+                  onClick={() => openTransactionForm('out')}
+                >
+                  出庫
+                </button>
+              )}
+              {canFullWrite && (
+                <button
+                  type="button"
+                  className="btn-primary equipment-header-btn"
+                  onClick={() => openTransactionForm('in')}
+                >
+                  入庫
+                </button>
               )}
             </>
           }
@@ -193,24 +210,28 @@ export default function Equipment() {
                               出庫・入庫フォームを開く（2026-08-18。ヘッダのボタンは備品が空欄のまま。
                               当初「出」「入」の1文字に省略していたが、iPhoneでも幅に余裕があり
                               押しやすさを優先してフル表記に戻した） */}
-                          {!readOnly && (
+                          {(canRegisterOut || canFullWrite) && (
                             <span className="equipment-stock-row-actions">
-                              <button
-                                type="button"
-                                className="equipment-stock-action-btn"
-                                onClick={() => openTransactionForm('out', item.id)}
-                                aria-label={`${item.short_name || item.name}を出庫`}
-                              >
-                                出庫
-                              </button>
-                              <button
-                                type="button"
-                                className="equipment-stock-action-btn"
-                                onClick={() => openTransactionForm('in', item.id)}
-                                aria-label={`${item.short_name || item.name}を入庫`}
-                              >
-                                入庫
-                              </button>
+                              {canRegisterOut && (
+                                <button
+                                  type="button"
+                                  className="equipment-stock-action-btn"
+                                  onClick={() => openTransactionForm('out', item.id)}
+                                  aria-label={`${item.short_name || item.name}を出庫`}
+                                >
+                                  出庫
+                                </button>
+                              )}
+                              {canFullWrite && (
+                                <button
+                                  type="button"
+                                  className="equipment-stock-action-btn"
+                                  onClick={() => openTransactionForm('in', item.id)}
+                                  aria-label={`${item.short_name || item.name}を入庫`}
+                                >
+                                  入庫
+                                </button>
+                              )}
                             </span>
                           )}
                           {item.track_stock ? (
@@ -240,11 +261,13 @@ export default function Equipment() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {txns.map((t) => (
+                                  {txns.map((t) => {
+                                    const editable = canEditTxn(t)
+                                    return (
                                     <tr
                                       key={t.id}
-                                      className={readOnly ? '' : 'equipment-history-row'}
-                                      onClick={readOnly ? undefined : () => setEditing(t)}
+                                      className={editable ? 'equipment-history-row' : ''}
+                                      onClick={editable ? () => setEditing(t) : undefined}
                                     >
                                       <td>{formatEquipmentDate(t.occurred_at)}</td>
                                       <td className="equipment-txn-loc" title={t.tenant_short_name || t.location || ''}>
@@ -260,7 +283,8 @@ export default function Equipment() {
                                       <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
                                       <td>{t.staff_name || ''}</td>
                                     </tr>
-                                  ))}
+                                    )
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -289,13 +313,14 @@ export default function Equipment() {
         <EquipmentOutForm
           items={items}
           defaultItemId={presetItemId}
+          dateLocked={isEquipmentOutStaff}
           onClose={closeTransactionForm}
           onSaved={handleModalSaved}
         />
       )}
 
       {editing &&
-        !readOnly &&
+        canEditTxn(editing) &&
         (editing.kind === 'in' ? (
           <EquipmentInForm
             items={items}
@@ -308,6 +333,8 @@ export default function Equipment() {
           <EquipmentOutForm
             items={items}
             existing={editing}
+            dateLocked={isEquipmentOutStaff}
+            canDelete={!isEquipmentOutStaff}
             onClose={() => setEditing(null)}
             onSaved={handleModalSaved}
             onDelete={handleDelete}
