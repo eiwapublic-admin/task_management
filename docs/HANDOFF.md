@@ -475,6 +475,13 @@
     - 検証: `npm run lint`・`npm run build`が通ることを確認。`worker/lib/http.js`の`isOwner`/`isEquipmentOutStaff`/`canWrite`/`canUseTaskSection`をNodeで直接importし、`staff`/`admin`/`owner`/`equipment_out_staff`/未設定/未認証の6パターンで意図した真偽値になることを確認した。JST同日判定（`isTodayJst`と同じ式）もNodeで日付境界のケース（UTC日をまたぐ深夜のケースなど）を試し、JSTの暦日で比較できていることを確認した。既存の`koizumi`（`role='owner'`）アカウントの挙動には影響がないことをコードレビューで確認済み（`isOwner`単体の判定は変えていない）。
     - デプロイ後、依頼元から「アカウント：staff、名称：スタッフ」としてこのロールのアカウントを作ってほしいとの指示を受けた。`users.role`にはDB側にも許可値のCHECK制約（`users_role_check`）があり、`equipment_out_staff`を追加していなかったため`INSERT`が制約違反で失敗した。マイグレーション`add_equipment_out_staff_role`で制約を`staff`/`owner`/`admin`/`equipment_out_staff`の4値に拡張してから、`username='staff'` / `display_name='スタッフ'` / `role='equipment_out_staff'`で1件`INSERT`した（パスワードはbcryptjsでハッシュ化し、生成した初期パスワードはチャット上で直接通知）。
 
+161. **【障害】テナント設置の受領サインが保存されない不具合を修正（2026-08-25）**: 「テナント向けに設置登録のテストをして受領サインも入力したが、再度開くとサインが消えている（備品FLR40SW、8/25にテスト入力）」との報告。
+    - **調査**: 該当レコード（`txn_no=1031`）をSupabaseで確認したところ`signature_key`・`signed_at`がともに`null`だった。`mcp__Supabase__query_logs`でCloudflare側からSupabaseへのリクエスト履歴（`edge_logs`）を辿ったところ、該当レコードへの`GET`（読み込み）→`PATCH`（本体の更新）は2回とも記録されていたが、署名登録エンドポイント（`/api/equipment/signature`が呼ぶ`equipment_transactions`の`signed_at`更新や`storage`バケットへの書き込み）へのリクエストは**一度も発生していなかった**。つまりサーバー側は署名登録の試行自体を一切受け取っておらず、フロント側（`SignaturePad.jsx`）が「署名欄に何も描かれていない」と判定し、`EquipmentOutForm.jsx`が署名アップロード処理そのものをスキップしていたことが原因と判明した。
+    - **原因①（本命）**: `SignaturePad.jsx`は`pointermove`が実際に発火して初めて「描かれた」（`hasInk`）と判定する作りだった。マウスでのクリックのみ（ドラッグせず一点をタップしただけ）や、環境によっては`pointerdown`直後に十分な`pointermove`が発生しないケースでは、画面上は押した反応があっても`hasInk`が`false`のままになり、保存時に「署名なし」として静かにスキップされていた（本来「署名は必須ではない」仕様どおりの動作だが、実際には押した＝入力したつもりのケースまで無署名扱いになっていた）。`handlePointerDown`側でも、押した位置に極小の線（実質1点）を描いて`hasInk`を即座に立てるよう変更し、ドラッグなしのタップだけでも署名として認識されるようにした。
+    - **原因②（副次的だが実害のあるバグ）**: `EquipmentOutForm.jsx`の保存処理は、本体（出庫レコード）の登録・更新に成功した後、`reason==='tenant'`であれば続けて署名をアップロードするが、**このアップロードが失敗してもエラーを握りつぶしたまま`onSaved()`を呼んでモーダルを閉じてしまっていた**（`Equipment.jsx`側の`onSaved`はモーダルを即座にアンマウントするため、エラーメッセージを`setError()`で表示してもユーザーが見る前に消えていた）。さらに、この状態で「もう一度保存」を試みると本体レコードがもう一度`create`され、**同じ内容の記録が重複作成される**リスクもあった。`handleSave()`を書き換え、①本体の保存に成功したら`savedTxn`としてローカルに保持し、再保存時は本体を作り直さず署名の再送信だけを行う、②署名アップロードが失敗した場合はエラーを`throw`させて外側の`catch`に合流させ、`onSaved()`を呼ばずモーダルを開いたままエラーを表示する、の2点に修正した。
+    - 検証: `npm run lint`・`npm run build`が通ることを確認。Playwright上で実際のCanvas APIを使い、ドラッグなしの1点タップ（`pointerdown`直後に`pointerup`、`pointermove`なし）を再現するテストページを作成し、修正後は`getBlob`のインク検出ロジック（0.1刻みでない、実装と同じ2pxおきの白判定スキャン）が確実にインクを検出することを確認した。サーバー側（`worker/lib/equipment.js`）は変更していない（フロント側の呼び出しがそもそも発生していなかったことが原因のため）。
+    - 対応が必要な残作業: 今回の`txn_no=1031`（FLR40SWのテスト設置記録）はテスト入力とのことで、無署名のまま残っている。依頼元の確認のうえ、削除するか、修正版アプリで再度サインを入力し直すかを決めていただく必要がある（本セッションでは実データの削除は行っていない）。
+
 ---
 
 ## 2. 日常運用

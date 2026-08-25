@@ -54,6 +54,11 @@ export default function EquipmentOutForm({
   const [note, setNote] = useState(existing?.note || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // 本体（出庫レコード）は保存できたが署名の登録だけ失敗した場合に保持する。
+  // これが入っている間の再保存では、本体を作り直さず署名の登録だけをやり直す
+  // （2026-08-25。以前は失敗時もモーダルが閉じてしまい、エラーに気づけないまま
+  // 再度「記録する」を押すと同じ内容の記録が重複作成されてしまっていた）
+  const [savedTxn, setSavedTxn] = useState(null)
 
   // テナント選択（5-4）
   const [tenants, setTenants] = useState([])
@@ -123,31 +128,35 @@ export default function EquipmentOutForm({
 
     setSaving(true)
     try {
-      const payload = {
-        reason,
-        occurred_at: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
-        location: reason === 'common' ? location || null : null,
-        staff_name: staffName || null,
-        note: note || null,
-        quantity: numericQty,
-        ...(reason === 'tenant' ? { tenant_id: tenantId } : {}),
+      // 本体（出庫レコード）は既に保存済み（署名だけ失敗して再保存した）なら
+      // 作り直さない。二重登録を防ぐため（2026-08-25）
+      let saved = savedTxn
+      if (!saved) {
+        const payload = {
+          reason,
+          occurred_at: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
+          location: reason === 'common' ? location || null : null,
+          staff_name: staffName || null,
+          note: note || null,
+          quantity: numericQty,
+          ...(reason === 'tenant' ? { tenant_id: tenantId } : {}),
+        }
+        saved = existing
+          ? await updateEquipmentTransaction(existing.id, payload)
+          : await createEquipmentTransaction({ item_id: itemId, kind: 'out', ...payload })
+        setSavedTxn(saved)
       }
-      const saved = existing
-        ? await updateEquipmentTransaction(existing.id, payload)
-        : await createEquipmentTransaction({ item_id: itemId, kind: 'out', ...payload })
 
-      // 署名は同じ保存操作の中で続けて登録する（新規保存と同時／未署名の記録への後付け、両方をこの1本でまかなう）
+      // 署名は同じ保存操作の中で続けて登録する（新規保存と同時／未署名の記録への後付け、両方をこの1本でまかなう）。
+      // ここで失敗した場合は本体だけ保存済みの状態でモーダルを開いたままにし、
+      // エラーを表示してユーザーが署名だけ再送信できるようにする（2026-08-25。
+      // 以前はここで捕捉したエラーの直後に必ずonSaved()を呼んでモーダルを閉じてしまい、
+      // エラーメッセージが表示される前にコンポーネントごと消えて気づけなかった）
       let finalSaved = saved
       if (reason === 'tenant' && signatureRef.current && !signatureRef.current.isEmpty()) {
         const blob = await signatureRef.current.getBlob()
         if (blob) {
-          try {
-            finalSaved = await uploadEquipmentSignature(saved.id, blob)
-          } catch (sigErr) {
-            // 記録自体は保存済みなので、署名だけ失敗しても登録は成功として扱う
-            // （履歴一覧の「署名待ち」バッジから後で再度足せる）
-            setError(`記録は保存しましたが、署名の登録に失敗しました: ${sigErr.message}`)
-          }
+          finalSaved = await uploadEquipmentSignature(saved.id, blob)
         }
       }
       onSaved(finalSaved)
