@@ -123,9 +123,15 @@ export async function uploadEquipmentSignature(txnId, blob) {
   return data.transaction
 }
 
-// 署名画像の表示用URL（<img>のsrcにそのまま使う。Blob化はコンポーネント側の必要に応じて）
-export function equipmentSignatureUrl(txnId) {
-  return `/api/equipment/signature?txn_id=${encodeURIComponent(txnId)}`
+// 署名画像を取得してBlob URLにする（2026-08-25修正。このAPIはJWT認証必須のため、
+// 認証ヘッダを送れない<img src>への直指定では常に401になり「サインが壊れて表示される」
+// 不具合になっていた。src/lib/reports.js の fetchPhotoObjectUrl と同じ方式に揃える）
+export async function fetchEquipmentSignatureObjectUrl(txnId) {
+  const res = await fetch(`/api/equipment/signature?txn_id=${encodeURIComponent(txnId)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) throw new Error('署名画像を取得できませんでした')
+  return URL.createObjectURL(await res.blob())
 }
 
 // 入出庫明細の日付表示（年月日＋曜日。時刻は出さない。2026-08-12、iPhone幅の一覧で

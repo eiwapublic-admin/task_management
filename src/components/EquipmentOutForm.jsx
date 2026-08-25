@@ -12,7 +12,7 @@ import {
   fetchEquipmentSuggest,
   fetchEquipmentTenants,
   uploadEquipmentSignature,
-  equipmentSignatureUrl,
+  fetchEquipmentSignatureObjectUrl,
 } from '../lib/equipment'
 
 function tenantLabel(t) {
@@ -66,6 +66,31 @@ export default function EquipmentOutForm({
   const [tenantInput, setTenantInput] = useState(existing?.tenant_short_name || existing?.tenant_name || '')
   const signatureRef = useRef(null)
   const isSigned = Boolean(existing?.signed_at)
+  const [signatureUrl, setSignatureUrl] = useState('')
+  const [signatureLoadError, setSignatureLoadError] = useState(false)
+
+  // 署名済みの記録は画像を取得して表示する。このAPIはJWT認証必須のため、
+  // <img src>に直接APIのURLを指定しても認証ヘッダが送れず読み込めない
+  // （2026-08-25発見。取得してBlob URL化する方式に修正した）
+  useEffect(() => {
+    if (!isSigned || !existing?.id) return
+    let objectUrl = ''
+    let cancelled = false
+    fetchEquipmentSignatureObjectUrl(existing.id)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        objectUrl = url
+        setSignatureUrl(url)
+      })
+      .catch(() => setSignatureLoadError(true))
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [isSigned, existing?.id])
 
   useEffect(() => {
     fetchEquipmentSuggest('location').then(setLocationOptions).catch(() => {})
@@ -316,11 +341,13 @@ export default function EquipmentOutForm({
               <span className="equipment-signature-label">受領サイン</span>
               {isSigned ? (
                 <div className="equipment-signature-status">
-                  <img
-                    className="equipment-signature-thumb"
-                    src={equipmentSignatureUrl(existing.id)}
-                    alt="受領サイン"
-                  />
+                  {signatureUrl ? (
+                    <img className="equipment-signature-thumb" src={signatureUrl} alt="受領サイン" />
+                  ) : signatureLoadError ? (
+                    <span className="ui-note is-danger">署名画像を読み込めませんでした</span>
+                  ) : (
+                    <span className="ui-note">読み込み中…</span>
+                  )}
                   <span className="ui-badge is-current">署名済み</span>
                 </div>
               ) : (
