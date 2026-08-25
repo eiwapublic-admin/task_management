@@ -220,10 +220,14 @@ async function main() {
   const dryRun = args.includes('--dry-run')
   const untilArg = args.find((a) => a.startsWith('--until='))
   const until = untilArg ? untilArg.slice('--until='.length) : '2026-07-31'
+  // --from（省略時は下限なし）: 既に移行済みの期間と重ならない範囲だけを追加移行したい場合に使う
+  // （例: 2026年8月分の事故復旧。--from=2026-08-01 --until=2026-08-31）
+  const fromArg = args.find((a) => a.startsWith('--from='))
+  const from = fromArg ? fromArg.slice('--from='.length) : null
   const xmlPath = args.find((a) => !a.startsWith('--'))
   if (!xmlPath) {
     console.error(
-      '使い方: node scripts/import-daily-reports-xml.mjs <XMLパス> [--dry-run] [--emit-sql=<dir>] [--until=YYYY-MM-DD]'
+      '使い方: node scripts/import-daily-reports-xml.mjs <XMLパス> [--dry-run] [--emit-sql=<dir>] [--from=YYYY-MM-DD] [--until=YYYY-MM-DD]'
     )
     process.exit(1)
   }
@@ -248,15 +252,18 @@ async function main() {
   const { rows } = parseFmpXml(text)
   console.log(`XML読込: ${rows.length}件`)
 
-  // report_date でグルーピングし、until 以前だけを対象にする
+  // report_date でグルーピングし、[from, until] の範囲だけを対象にする
   const byDate = new Map()
   for (const r of rows) {
     const isoDate = toIsoDate(single(r, '日付'))
     if (!isoDate || isoDate > until) continue
+    if (from && isoDate < from) continue
     if (!byDate.has(isoDate)) byDate.set(isoDate, [])
     byDate.get(isoDate).push(r)
   }
-  console.log(`対象日数（${until}まで）: ${byDate.size}日 / 元レコード ${[...byDate.values()].reduce((s, l) => s + l.length, 0)}件`)
+  console.log(
+    `対象日数（${from ? from + '〜' : ''}${until}まで）: ${byDate.size}日 / 元レコード ${[...byDate.values()].reduce((s, l) => s + l.length, 0)}件`
+  )
 
   const comboFallbackDates = []
   const dailyReports = []
@@ -318,10 +325,9 @@ async function main() {
 
   // 安全対策: 移行範囲内に既存の daily_reports が無いことを確認してから実行する
   // （二重実行や本番の並行入力データとの衝突を避けるため）
-  const { data: existing, error: existingErr } = await supabase
-    .from('daily_reports')
-    .select('report_date')
-    .lte('report_date', until)
+  let existingQuery = supabase.from('daily_reports').select('report_date').lte('report_date', until)
+  if (from) existingQuery = existingQuery.gte('report_date', from)
+  const { data: existing, error: existingErr } = await existingQuery
   if (existingErr) throw existingErr
   if (existing.length > 0) {
     console.error(
