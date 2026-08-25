@@ -5,7 +5,10 @@
 
 const W = 700
 const H = 190
-const PAD_X = 14
+// Y軸ラベルがグラフの線・点と重なって読みにくいとの指摘（2026-08-25）を受け、
+// 左側にラベル専用の余白（PAD_LEFT）を確保し、プロット領域はその外側から描く
+const PAD_LEFT = 42
+const PAD_RIGHT = 14
 const PLOT_TOP = 18
 const PLOT_BOTTOM = 150
 const MONTH_LABEL_Y = 172
@@ -14,11 +17,11 @@ const Y_GRID_STEP = 0.1
 
 export function ChlorineTrendChart({ months, series, standardValue }) {
   const n = months.length
-  const step = n > 1 ? (W - PAD_X * 2) / (n - 1) : 0
+  const step = n > 1 ? (W - PAD_LEFT - PAD_RIGHT) / (n - 1) : 0
   const allValues = series.flatMap((s) => s.values.filter((v) => v != null))
   const rawMax = Math.max(0.2, standardValue || 0, ...allValues)
   const yMax = Math.ceil(rawMax * 10) / 10
-  const x = (i) => PAD_X + i * step
+  const x = (i) => PAD_LEFT + i * step
   const y = (v) => PLOT_BOTTOM - (v / yMax) * (PLOT_BOTTOM - PLOT_TOP)
 
   // 欠測（null）で線が途切れるよう、値がある区間だけをsegmentに分ける
@@ -86,9 +89,9 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
           <line
             key={v}
             className="chlorine-trend-ygrid"
-            x1={PAD_X}
+            x1={PAD_LEFT}
             y1={y(v)}
-            x2={W - PAD_X}
+            x2={W - PAD_RIGHT}
             y2={y(v)}
           />
         ))}
@@ -102,23 +105,22 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
             y2={PLOT_BOTTOM}
           />
         ))}
-        <line className="chlorine-trend-baseline" x1={PAD_X} y1={PLOT_BOTTOM} x2={W - PAD_X} y2={PLOT_BOTTOM} />
+        <line className="chlorine-trend-baseline" x1={PAD_LEFT} y1={PLOT_BOTTOM} x2={W - PAD_RIGHT} y2={PLOT_BOTTOM} />
         {showStandard && (
           <>
             <line
               className="chlorine-trend-standard-line"
-              x1={PAD_X}
+              x1={PAD_LEFT}
               y1={y(standardValue)}
-              x2={W - PAD_X}
+              x2={W - PAD_RIGHT}
               y2={y(standardValue)}
             />
-            {/* 右端だと系列の線・点と重なりやすいため、軸の目盛り（0・yMax）と同じ左端に
-                寄せる（2026-08-25） */}
+            {/* グラフの線・点と重ならないよう、プロット領域の外側（左）に出す（2026-08-25） */}
             <text
               className="chlorine-trend-standard-label"
-              x={PAD_X}
+              x={PAD_LEFT - 6}
               y={y(standardValue) - 4}
-              textAnchor="start"
+              textAnchor="end"
             >
               基準{standardValue}
             </text>
@@ -128,9 +130,9 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
           <text
             key={v}
             className="chlorine-trend-axis-label"
-            x={PAD_X}
+            x={PAD_LEFT - 6}
             y={v === 0 ? PLOT_BOTTOM + 12 : y(v) - 4}
-            textAnchor="start"
+            textAnchor="end"
           >
             {v.toFixed(1)}
           </text>
