@@ -1167,11 +1167,13 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   gap: var(--space-2);
 }
 
-/* 曜日の行に日報詳細と同じイエローの背景枠を付ける（2026-08-10）。
-   当初はアプリタイトルと同じ大きさ（fs-2xl）にしていたが、日付マス目に対して
-   目立ちすぎるとの指摘（2026-08-11）を受け、文字を小さく・枠の高さも縮めた */
+/* 曜日の行に日報詳細と同じイエローの背景枠を付けていた（2026-08-10）。
+   2026-08-25、黄色から他画面（自主検査表のヘッダ・備品の備品名バナー）と同じ
+   薄いグリーンに変更し、文字も日付マス目の数字（.report-calendar-day = fs-2xl）
+   と同じ大きさに揃えた（以前は目立ちすぎるとの指摘でfs-mdまで縮めていたが、
+   今回改めて数字と揃えるよう依頼された） */
 .report-calendar-head {
-  background: var(--reports-header-bg);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
   border-radius: var(--radius-lg);
   padding: 3px 0;
 }
@@ -1179,9 +1181,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .report-calendar-head-cell {
   padding: 2px 0;
   text-align: center;
-  font-size: var(--fs-md);
+  font-size: var(--fs-2xl);
   font-weight: 700;
-  color: var(--reports-header-ink);
+  color: var(--text-strong);
 }
 
 /* 曜日見出しも日付と同じ配色にする（土=青・日=赤） */
@@ -2402,6 +2404,15 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .chlorine-trend-chart { display: block; width: 100%; height: auto; }
 
 .chlorine-trend-baseline { stroke: var(--border); stroke-width: 1; }
+
+/* Y軸0.1刻み・X軸1月/6月の目安線（2026-08-25）。データの線・点より控えめに
+   見えるよう、グレーの点線にする（dataviz方針: グリッド線は控えめな1px） */
+.chlorine-trend-ygrid,
+.chlorine-trend-xgrid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
 
 /* 水道水質基準（0.1mg/L）の目安線。系列色と紛れないよう、施設カード等で「基準未満」
    を示すのと同じ危険色を使い、破線で「測定値の系列ではない」ことを示す */

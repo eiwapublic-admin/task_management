@@ -188,13 +188,14 @@ export default function Inspections() {
               )}
               <button
                 type="button"
-                className="icon-btn-download"
+                className="icon-btn-download icon-btn-download-print"
                 onClick={pdf.download}
                 disabled={pdf.busy || loading}
                 aria-label="紙の様式でPDFに出力する（半月ごとに1ページ）"
                 title={pdf.busy ? '作成中…' : '紙の様式でPDFに出力する（半月ごとに1ページ）'}
               >
                 <IconDownload size={20} />
+                <span className="icon-btn-download-print-label">印刷用</span>
               </button>
             </>
           }

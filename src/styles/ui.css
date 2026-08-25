@@ -449,6 +449,35 @@
 .icon-btn-inspection:hover:not(:disabled) { color: var(--color-primary); }
 .icon-btn-inspection:disabled { opacity: 0.45; cursor: default; }
 
+/* 自主検査表のPDFボタン（2026-08-25）。アイコンだけでは何のボタンか分かりにくく、
+   地の色と同化してボタンの形が見えないとの指摘を受け、白系の塗り＋枠線でボタンの
+   輪郭を出し、PC幅では「印刷用」の文字ラベルも表示する（アーカイブ・自主点検の
+   各ボタンと同じ骨格） */
+.icon-btn-download-print {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+.icon-btn-download-print:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.icon-btn-download-print-label { display: none; }
+
+@media (min-width: 769px) {
+  .icon-btn-download-print {
+    width: auto;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
+  .icon-btn-download-print-label {
+    display: inline;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+  }
+}
+
 /* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
 .icon-btn-delete:hover:not(:disabled) {
   color: var(--color-danger);
