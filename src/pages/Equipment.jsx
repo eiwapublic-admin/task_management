@@ -335,6 +335,7 @@ export default function Equipment() {
             existing={editing}
             dateLocked={isEquipmentOutStaff}
             canDelete={!isEquipmentOutStaff}
+            canEditSigned={isEquipmentOutStaff}
             onClose={() => setEditing(null)}
             onSaved={handleModalSaved}
             onDelete={handleDelete}
