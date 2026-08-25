@@ -1,17 +1,11 @@
 import { assigneeColor } from '../lib/format'
 import { UNASSIGNED } from '../lib/status'
 
-// チップの●色は指定の固定色にする（2026-08-18）。設定で追加された未知の担当者名は
-// 従来どおりハッシュ由来の色にフォールバックする
-const FIXED_CHIP_COLORS = {
-  橋口: 'var(--surface-inverse)',
-  西川: 'var(--color-primary)',
-  岡田: 'var(--status-done)',
-  [UNASSIGNED]: 'var(--text-muted)',
-}
-
+// チップの●色は指定の固定色にする（2026-08-18）。固定色そのものは`assigneeColor`に
+// 集約済み（2026-08-25。日報側のマークとも共通化するため）。「未設定」はタスク側だけの
+// 概念のためここで個別に扱う
 function chipColor(name) {
-  return FIXED_CHIP_COLORS[name] || assigneeColor(name)
+  return name === UNASSIGNED ? 'var(--text-muted)' : assigneeColor(name)
 }
 
 // 「未設定」チップはiPhone幅でヘッダが2行になるのを避けるため短い表記にする
