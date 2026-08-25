@@ -108,7 +108,8 @@
 
 .equipment-stock-qty {
   flex: 0 0 auto;
-  min-width: 2.5em;
+  /* 「残 99」形式にしたため("残 "の分だけ幅を広げる。2026-08-25) */
+  min-width: 4em;
   text-align: right;
   font-size: var(--fs-lg);
   font-weight: 600;
