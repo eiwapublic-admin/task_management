@@ -170,7 +170,7 @@ export default function ChlorineForm({
             </p>
           )}
 
-          {/* BKB・小泉本社のペア記録の続き（2026-08-13。Chlorine.jsx の handleSaved 参照）。
+          {/* 同じ日の他施設の記録の続き（2026-08-13。Chlorine.jsx の handleSaved 参照）。
               通常の新規登録・既存編集では渡されない */}
           {noticeMessage && (
             <p className="chlorine-pair-hint" role="status">
