@@ -1,25 +1,57 @@
 // 違反車両ダッシュボードの小さなグラフ部品（2026-08-25新規）。専用のグラフ描画
-// ライブラリは入っていないため、プレーンなdiv+CSSで組む（dataviz方針: 棒は太さ上限
-// 24px・データ側だけ4px角丸・基準線側は直角、隣接する棒は最低2px以上の隙間で
-// 分離、直接ラベルは要点だけに絞る）。1系列のグラフのため凡例は置かず、
-// カード見出し（呼び出し側）が「何のグラフか」を示す。
+// ライブラリは入っていないため、プレーンなSVG/div+CSSで組む（dataviz方針: 折れ線は
+// 2px・端点は角丸結合、マーカーは半径4px以上＋地の色の2pxリングで縁取り、基準線は
+// 1本だけの控えめな1pxグリッド、直接ラベルで値を示す）。1系列のグラフのため凡例は
+// 置かず、カード見出し（呼び出し側）が「何のグラフか」を示す。
 
-// 月別の件数推移（直近12か月・棒グラフ）。ピークの月だけ強調ラベルを付け、
-// それ以外は上に小さく件数を出す（件数が小さい値域のため全件ラベルでも煩雑にならない）
+// 月別の件数推移（直近12か月・折れ線グラフ。2026-08-25、棒グラフから変更）。
+// viewBoxの座標系のまま幅100%・高さautoで拡大縮小させ、線・マーカー・文字を
+// 常に同じ比率で保つ（幅と高さを別々に固定すると歪んで見えるため）
+const TREND_W = 360
+const TREND_H = 140
+const TREND_PAD_X = 18
+const TREND_PLOT_TOP = 22
+const TREND_PLOT_BOTTOM = 104
+const TREND_MONTH_Y = 128
+
 export function MonthlyTrendChart({ data }) {
   const max = Math.max(1, ...data.map((d) => d.count))
+  const n = data.length
+  const step = n > 1 ? (TREND_W - TREND_PAD_X * 2) / (n - 1) : 0
+  const points = data.map((d, i) => ({
+    ...d,
+    x: TREND_PAD_X + i * step,
+    y: TREND_PLOT_BOTTOM - (d.count / max) * (TREND_PLOT_BOTTOM - TREND_PLOT_TOP),
+  }))
+  const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ')
   return (
-    <div className="parking-trend-chart" role="img" aria-label="月別の違反車両台数推移（直近12か月）">
-      {data.map((d) => (
-        <div className="parking-trend-col" key={d.key} title={`${d.fullLabel}: ${d.count}件`}>
-          <span className="parking-trend-value">{d.count}</span>
-          <div className="parking-trend-bar-track">
-            <div className="parking-trend-bar" style={{ height: `${(d.count / max) * 100}%` }} />
-          </div>
-          <span className="parking-trend-month">{d.shortLabel}</span>
-        </div>
+    <svg
+      className="parking-trend-chart"
+      viewBox={`0 0 ${TREND_W} ${TREND_H}`}
+      role="img"
+      aria-label="月別の違反車両台数推移（直近12か月）"
+    >
+      <line
+        className="parking-trend-baseline"
+        x1={TREND_PAD_X}
+        y1={TREND_PLOT_BOTTOM}
+        x2={TREND_W - TREND_PAD_X}
+        y2={TREND_PLOT_BOTTOM}
+      />
+      <polyline className="parking-trend-line" points={linePoints} fill="none" />
+      {points.map((p) => (
+        <g key={p.key}>
+          <title>{`${p.fullLabel}: ${p.count}件`}</title>
+          <circle className="parking-trend-dot" cx={p.x} cy={p.y} r="4" />
+          <text className="parking-trend-value-text" x={p.x} y={p.y - 8} textAnchor="middle">
+            {p.count}
+          </text>
+          <text className="parking-trend-month-text" x={p.x} y={TREND_MONTH_Y} textAnchor="middle">
+            {p.shortLabel}
+          </text>
+        </g>
       ))}
-    </div>
+    </svg>
   )
 }
 
