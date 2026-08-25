@@ -201,6 +201,7 @@ export default function EquipmentItemHistory() {
             existing={editing}
             dateLocked={isEquipmentOutStaff}
             canDelete={!isEquipmentOutStaff}
+            canEditSigned={isEquipmentOutStaff}
             onClose={() => setEditing(null)}
             onSaved={handleSaved}
             onDelete={handleDelete}

@@ -582,8 +582,11 @@ export async function handleEquipmentTransactionUpdate(req) {
       return json({ error: '出庫日時を当日以外に変更することはできません' }, 400)
     }
 
-    // 署名済みの記録は staff は修正不可（9章。将来 Phase 2 で署名が付くと発生する）
-    if (existing.signed_at && auth.role !== 'admin') {
+    // 署名済みの記録は staff は修正不可（9章。将来 Phase 2 で署名が付くと発生する）。
+    // ただし備品出庫限定ロールは「当日入力分の出庫」の訂正猶予として、署名済みでも
+    // 当日中（＝limitedOutOnlyが真）なら例外的に修正できる（2026-08-25。それ以外の
+    // ロール・翌日以降はこれまでどおり修正不可）
+    if (existing.signed_at && auth.role !== 'admin' && !limitedOutOnly) {
       return json({ error: '署名済みの記録は修正できません' }, 403)
     }
 

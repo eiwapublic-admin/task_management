@@ -24,15 +24,19 @@ function tenantLabel(t) {
 // existing を渡すと編集モード（履歴画面・在庫一覧の明細タップから開く）になる。
 // defaultItemId を渡すと、その備品をあらかじめ選んだ状態で開く（在庫一覧の行の「出」ボタン等。
 // 2026-08-18）。どちらも無ければ備品は空欄から選ばせる（ヘッダの「出庫」ボタンから開いた場合）。
-// dateLocked・canDelete は備品出庫限定ロール用（2026-08-25追加）。当日入力分の出庫の修正のみを
-// 許可するロールのため、出庫日時は動かせないようにし（過去日付への付け替えを防ぐ）、
-// 削除は許可されていないため削除ボタン自体を出さない
+// dateLocked・canDelete・canEditSigned は備品出庫限定ロール用（2026-08-25追加）。当日入力分の
+// 出庫の修正のみを許可するロールのため、出庫日時は動かせないようにし（過去日付への付け替えを
+// 防ぐ）、削除は許可されていないため削除ボタン自体を出さない。canEditSigned は「署名済みの
+// 記録でも当日中なら修正させてほしい（入力間違いの訂正のため）」という依頼への対応で、
+// 通常は署名済みの記録は誰も編集できない（`worker/lib/equipment.js`側もadmin以外は拒否）ところを、
+// 呼び出し元（Equipment.jsx等）が当日の出庫レコードであることを確認済みの場合にだけ真にする
 export default function EquipmentOutForm({
   items,
   existing,
   defaultItemId,
   dateLocked = false,
   canDelete = true,
+  canEditSigned = false,
   onClose,
   onSaved,
   onDelete,
@@ -66,6 +70,9 @@ export default function EquipmentOutForm({
   const [tenantInput, setTenantInput] = useState(existing?.tenant_short_name || existing?.tenant_name || '')
   const signatureRef = useRef(null)
   const isSigned = Boolean(existing?.signed_at)
+  // 署名済みでも当日中の出庫（備品出庫限定ロール）は修正させるため、UIの非活性化には
+  // isSignedではなくこちらを使う（署名欄自体は既存のサムネイルのまま・再署名はさせない）
+  const locked = isSigned && !canEditSigned
   const [signatureUrl, setSignatureUrl] = useState('')
   const [signatureLoadError, setSignatureLoadError] = useState(false)
 
@@ -208,7 +215,7 @@ export default function EquipmentOutForm({
             </p>
           )}
 
-          {isSigned && (
+          {locked && (
             <p className="ui-note">署名済みの記録です。修正できません（内容の確認のみできます）。</p>
           )}
 
@@ -221,7 +228,7 @@ export default function EquipmentOutForm({
                   type="button"
                   className={`btn-plain equipment-reason-btn${reason === r.key ? ' is-active' : ''}`}
                   aria-pressed={reason === r.key}
-                  disabled={isSigned}
+                  disabled={locked}
                   onClick={() => setReason(r.key)}
                 >
                   {r.label}
@@ -232,7 +239,7 @@ export default function EquipmentOutForm({
 
           <label className="ui-field">
             <span>出庫日時</span>
-            <DateTimeInput value={occurredAt} disabled={isSigned || dateLocked} onChange={setOccurredAt} />
+            <DateTimeInput value={occurredAt} disabled={locked || dateLocked} onChange={setOccurredAt} />
           </label>
 
           <label className="ui-field">
@@ -240,7 +247,7 @@ export default function EquipmentOutForm({
             <select
               className="ui-select"
               value={itemId}
-              disabled={Boolean(existing) || isSigned}
+              disabled={Boolean(existing) || locked}
               onChange={(e) => {
                 itemTouchedRef.current = true
                 setItemId(e.target.value)
@@ -272,7 +279,7 @@ export default function EquipmentOutForm({
                 onSelect={handleTenantSelect}
                 options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
                 placeholder="テナント名で検索"
-                disabled={isSigned}
+                disabled={locked}
               />
               {selectedTenant ? (
                 <p className="equipment-tenant-summary">
@@ -293,7 +300,7 @@ export default function EquipmentOutForm({
                 onChange={setLocation}
                 options={locationOptions}
                 placeholder="喫煙室 / 通路 / 玄関ホール"
-                disabled={isSigned}
+                disabled={locked}
               />
             </div>
           )}
@@ -307,14 +314,14 @@ export default function EquipmentOutForm({
                 inputMode="numeric"
                 min="1"
                 value={quantity}
-                disabled={isSigned}
+                disabled={locked}
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </label>
 
             <div className="ui-field">
               <span>担当者</span>
-              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={isSigned} />
+              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={locked} />
             </div>
           </div>
 
@@ -331,7 +338,7 @@ export default function EquipmentOutForm({
               className="ui-textarea is-compact"
               rows={1}
               value={note}
-              disabled={isSigned}
+              disabled={locked}
               onChange={(e) => setNote(e.target.value)}
             />
           </label>
@@ -364,15 +371,15 @@ export default function EquipmentOutForm({
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
-            {existing && !isSigned && canDelete && (
+            {existing && !locked && canDelete && (
               <ConfirmDeleteButton onConfirm={() => onDelete(existing.id)} label="この記録を削除" size={22} />
             )}
           </div>
           <div className="ui-modal-foot-end">
             <button type="button" className="btn-plain" onClick={onClose}>
-              {isSigned ? '閉じる' : 'キャンセル'}
+              {locked ? '閉じる' : 'キャンセル'}
             </button>
-            {!isSigned && (
+            {!locked && (
               <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? '保存中…' : '記録する'}
               </button>

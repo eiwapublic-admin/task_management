@@ -488,6 +488,11 @@
     - 検証: `npm run lint`・`npm run build`が通ることを確認。Supabaseで対象レコードの`signature_key`・`signed_at`が正しく設定済みであること（保存自体は161番の修正で正常化している）を確認した。この画面（本番環境）への直接アクセスは本セッションのネットワークポリシー上できないため、実機での見た目確認は依頼元にお願いする形とした。
     - あわせて、「スタッフ（`equipment_out_staff`）は備品の当日中のみ修正可、前日以前は修正不可にしてほしい」との再確認があったが、これは160番で実装済みの制約（`Equipment.jsx`の`canEditTxn`・`worker/lib/equipment.js`の`isTodayJst`によるJST暦日単位の当日判定）とすでに一致しており、今回コードの変更は行っていない。
 
+163. **【障害】署名済みのテナント設置記録は当日中でもスタッフが修正できなかった不具合を修正（2026-08-25）**: 162番の確認中、依頼元から「スタッフ（`equipment_out_staff`）が当日登録・署名済みにした記録を、同じ当日にもう一度開くと修正できなくなっている」との報告。
+    - **原因**: `worker/lib/equipment.js`の`handleEquipmentTransactionUpdate`には元々（Phase 2以前からの既存仕様として）「署名済みの記録は`admin`以外は修正不可」という一律ロックがあり、これは160番で追加した`equipment_out_staff`の「当日入力分の出庫は修正可」という許可判定（`limitedOutOnly`）よりも後の行で評価されるため、`equipment_out_staff`が当日中に操作しても常にこの署名ロックに引っかかって403になっていた。フロント側（`EquipmentOutForm.jsx`）も`isSigned`（署名済みか）だけを見て全フィールドを一律disabledにしており、ロールや日付を考慮していなかった。
+    - **修正**: サーバー側は署名ロックの条件に`&& !limitedOutOnly`を追加し、「`equipment_out_staff`が当日入力分の出庫を操作している」場合は署名済みでも例外的に通すようにした（それ以外のロール・日付が異なる場合は従来どおりadmin以外拒否）。フロント側は`EquipmentOutForm.jsx`に`canEditSigned`propを追加し、`isSigned`単体ではなく`locked = isSigned && !canEditSigned`でフィールドの非活性化・削除ボタン・保存ボタンの表示を判定するよう変更した（署名画像自体の表示・再署名の可否には影響しない。既存の署名サムネイルはそのまま見せ、再署名はさせない設計は維持）。`Equipment.jsx`・`EquipmentItemHistory.jsx`の編集用`EquipmentOutForm`に`canEditSigned={isEquipmentOutStaff}`を渡した（新規登録用インスタンスは`existing`が無く`isSigned`が常にfalseのため対象外）。
+    - 検証: `npm run lint`・`npm run build`が通ることを確認。`handleEquipmentTransactionUpdate`と同じ許可判定ロジックをNodeで再現し、「`equipment_out_staff`・当日・署名済み」→許可、「`equipment_out_staff`・前日・署名済み」→拒否、「`staff`・当日・署名済み」→拒否（署名ロックは維持）、「`admin`・当日・署名済み」→許可、「`owner`・当日・署名済み」→拒否（そもそも書き込み権限なし）の5パターンすべてが意図どおりになることを確認した。
+
 ---
 
 ## 2. 日常運用
