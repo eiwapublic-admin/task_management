@@ -9,9 +9,8 @@ const PAD_X = 14
 const PLOT_TOP = 18
 const PLOT_BOTTOM = 150
 const MONTH_LABEL_Y = 172
-// 3年（36か月）分は全月に目盛りを出すと詰まって読めなくなるため、始点・終点・
-// 6か月ごとだけに絞る（月別台数推移の3年表示と同じ考え方）
-const TICK_EVERY = 6
+// Y軸の横線の間隔（2026-08-25。グレーの点線を0.1刻みで引いてほしいとの依頼）
+const Y_GRID_STEP = 0.1
 
 export function ChlorineTrendChart({ months, series, standardValue }) {
   const n = months.length
@@ -38,8 +37,24 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
     return { ...s, segments }
   })
 
-  const showTick = (i) => i === 0 || i === n - 1 || i % TICK_EVERY === 0
   const showStandard = standardValue != null && standardValue <= yMax
+
+  // Y軸のグリッド線（0.1刻み）。基準線（0.1mg/L）と同じ位置に重なる線は基準線側に
+  // 譲って引かない（2026-08-25）
+  const yGridSteps = []
+  for (let v = Y_GRID_STEP; v < yMax - 1e-9; v += Y_GRID_STEP) {
+    const rounded = Math.round(v * 10) / 10
+    if (showStandard && Math.abs(rounded - standardValue) < 1e-9) continue
+    yGridSteps.push(rounded)
+  }
+
+  // X軸は毎年1月・6月にラベルと縦線を出す（2026-08-25。以前は詰まらないよう
+  // 6か月おきに間引いていたが、年月の節目として分かりやすい1月・6月に固定した）
+  const xTickIndexes = months.reduce((acc, mo, i) => {
+    const m = mo.key.slice(5, 7)
+    if (m === '01' || m === '06') acc.push(i)
+    return acc
+  }, [])
 
   return (
     <div className="chlorine-trend-wrap">
@@ -57,6 +72,26 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
         role="img"
         aria-label="残留塩素濃度の推移（過去3年・3施設）"
       >
+        {yGridSteps.map((v) => (
+          <line
+            key={v}
+            className="chlorine-trend-ygrid"
+            x1={PAD_X}
+            y1={y(v)}
+            x2={W - PAD_X}
+            y2={y(v)}
+          />
+        ))}
+        {xTickIndexes.map((i) => (
+          <line
+            key={months[i].key}
+            className="chlorine-trend-xgrid"
+            x1={x(i)}
+            y1={PLOT_TOP}
+            x2={x(i)}
+            y2={PLOT_BOTTOM}
+          />
+        ))}
         <line className="chlorine-trend-baseline" x1={PAD_X} y1={PLOT_BOTTOM} x2={W - PAD_X} y2={PLOT_BOTTOM} />
         {showStandard && (
           <>
@@ -85,14 +120,11 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
         <text className="chlorine-trend-axis-label" x={PAD_X} y={PLOT_BOTTOM + 12} textAnchor="start">
           0
         </text>
-        {months.map(
-          (mo, i) =>
-            showTick(i) && (
-              <text key={mo.key} className="chlorine-trend-month-text" x={x(i)} y={MONTH_LABEL_Y} textAnchor="middle">
-                {mo.shortLabel}
-              </text>
-            )
-        )}
+        {xTickIndexes.map((i) => (
+          <text key={months[i].key} className="chlorine-trend-month-text" x={x(i)} y={MONTH_LABEL_Y} textAnchor="middle">
+            {months[i].shortLabel}
+          </text>
+        ))}
         {seriesWithSegments.map((s) => (
           <g key={s.key}>
             {s.segments.map((seg, si) => (
