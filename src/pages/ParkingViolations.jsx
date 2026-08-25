@@ -3,7 +3,8 @@ import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
 import FeatureHeader from '../components/FeatureHeader'
-import { IconSearch } from '../components/Icons'
+import { MonthlyTrendChart, RankingBarList } from '../components/ParkingCharts'
+import { IconSearch, IconChevronRight } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import {
   fetchParkingViolations,
@@ -26,6 +27,105 @@ function plateKey(v) {
 // 使うため src/lib/reports.js の jstDateOnly() へ共通化した（2026-08-12）。
 // 日付見出しは日付だけで十分＋時刻は目立たせたい項目の邪魔になるため時刻は出さない（2026-08-11）。
 
+// ===== ダッシュボード（月別推移・テナント別/車別ランキング）＆ 年月グルーピング用
+// ヘルパー（2026-08-25新規）=====
+
+// 「所有会社・訪問先」欄が実質未記入とみなせる値。ここに当たらなければ
+// テナントが判明しているものとして扱う（一度でも紐づいた車の名寄せに使う）
+function isUnclearTenant(name) {
+  if (!name) return true
+  const t = name.trim()
+  if (!t) return true
+  if (t.includes('不明')) return true
+  if (t.includes('外部')) return true
+  if (/^\d+\s*[FfＦ階]$/.test(t)) return true // 「5F」「2階」等、階数だけの記載はテナント名ではない
+  return false
+}
+
+// 車（地域+ナンバー）ごとに、一度でも判明したテナント名があればそれを紐付けとして
+// 保持する（同じ車で「不明」の回とテナント判明済みの回が混在するケースがあるため。
+// 複数のテナント名が記録されている車は、より多く記録されている方＝同点なら直近の
+// ものを採用する）
+function resolveTenantsByPlate(violations) {
+  const byPlate = new Map()
+  for (const v of violations) {
+    const key = plateKey(v)
+    if (!key || isUnclearTenant(v.owner_company)) continue
+    const tenant = v.owner_company.trim()
+    if (!byPlate.has(key)) byPlate.set(key, new Map())
+    const stats = byPlate.get(key)
+    const cur = stats.get(tenant) || { count: 0, lastAt: 0 }
+    cur.count += 1
+    cur.lastAt = Math.max(cur.lastAt, new Date(v.checked_at).getTime())
+    stats.set(tenant, cur)
+  }
+  const resolved = new Map()
+  for (const [key, stats] of byPlate) {
+    let best = null
+    for (const [tenant, s] of stats) {
+      if (!best || s.count > best.s.count || (s.count === best.s.count && s.lastAt > best.s.lastAt)) best = { tenant, s }
+    }
+    if (best) resolved.set(key, best.tenant)
+  }
+  return resolved
+}
+
+function monthKeyOf(iso) {
+  return jstDateOnly(iso).slice(0, 7) // 'YYYY-MM'
+}
+
+function monthLabelOf(key) {
+  const [y, m] = key.split('-')
+  return `${y}年${Number(m)}月`
+}
+
+// 直近12か月分の年月キー（今月を含む・古い→新しい順）。UTCの年月演算だけで
+// 求めているため実行環境のタイムゾーンに依存しない（todayJST() で起点をJSTに揃える）
+function last12MonthKeys() {
+  const [y, m] = todayJST().split('-').map(Number)
+  const out = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1))
+    out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+  }
+  return out
+}
+
+const RANKING_TOP_N = 8
+
+// テナント別／車別ランキングの集計。mode: 'all'（総累計）| 'year'（過去1年）
+function buildRanking(violations, resolvedTenants, by, mode, cutoffMonthKey) {
+  const rows = mode === 'year' ? violations.filter((v) => monthKeyOf(v.checked_at) >= cutoffMonthKey) : violations
+  const map = new Map()
+  if (by === 'tenant') {
+    for (const v of rows) {
+      const key = plateKey(v)
+      const tenant = key ? resolvedTenants.get(key) : null
+      if (!tenant) continue // 一度も紐付いていない車はテナント別ランキングには数えない
+      map.set(tenant, (map.get(tenant) || 0) + 1)
+    }
+    return [...map.entries()]
+      .map(([label, count]) => ({ key: label, label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, RANKING_TOP_N)
+  }
+  for (const v of rows) {
+    const key = plateKey(v)
+    if (!key) continue
+    const cur = map.get(key) || { count: 0, region: v.plate_region, number: v.plate_number }
+    cur.count += 1
+    map.set(key, cur)
+  }
+  return [...map.entries()]
+    .map(([key, v]) => {
+      const tenant = resolvedTenants.get(key)
+      const plate = `${v.region || ''} ${v.number || ''}`.trim() || '（ナンバー未入力）'
+      return { key, label: tenant ? `${plate}（${tenant}）` : plate, count: v.count }
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, RANKING_TOP_N)
+}
+
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
   const user = getCurrentUser()
@@ -47,6 +147,12 @@ export default function ParkingViolations() {
   const [quickAddIds, setQuickAddIds] = useState([])
   // 明細クリックで開く詳細（写真・項目の閲覧/編集）モーダル。選んだレコードを保持する（2026-08-11）
   const [selected, setSelected] = useState(null)
+  // ダッシュボードのランキング切替（2026-08-25。総累計 / 過去1年）
+  const [tenantRankMode, setTenantRankMode] = useState('year')
+  const [vehicleRankMode, setVehicleRankMode] = useState('year')
+  // 年月グループの開閉状態。ユーザーが手で切り替えた分だけ既定値からの例外として持つ
+  // （処理ログ・残留塩素等検査の年月グループと同じやり方）
+  const [collapseOverrides, setCollapseOverrides] = useState({})
 
   const load = useCallback(() => {
     setLoading(true)
@@ -146,6 +252,117 @@ export default function ParkingViolations() {
     return sorted
   }, [violations, query, sort, countByPlate])
 
+  // 車とテナントの紐付け（2026-08-25）。ダッシュボードの集計はこの解決結果を使う
+  const resolvedTenants = useMemo(() => resolveTenantsByPlate(violations), [violations])
+  const monthKeys = useMemo(() => last12MonthKeys(), [])
+  const cutoffMonthKey = monthKeys[0]
+
+  const monthlyTrend = useMemo(() => {
+    const counts = new Map(monthKeys.map((k) => [k, 0]))
+    for (const v of violations) {
+      const k = monthKeyOf(v.checked_at)
+      if (counts.has(k)) counts.set(k, counts.get(k) + 1)
+    }
+    return monthKeys.map((k) => ({
+      key: k,
+      shortLabel: `${Number(k.slice(5))}月`,
+      fullLabel: monthLabelOf(k),
+      count: counts.get(k),
+    }))
+  }, [violations, monthKeys])
+
+  const tenantRanking = useMemo(
+    () => buildRanking(violations, resolvedTenants, 'tenant', tenantRankMode, cutoffMonthKey),
+    [violations, resolvedTenants, tenantRankMode, cutoffMonthKey]
+  )
+  const vehicleRanking = useMemo(
+    () => buildRanking(violations, resolvedTenants, 'vehicle', vehicleRankMode, cutoffMonthKey),
+    [violations, resolvedTenants, vehicleRankMode, cutoffMonthKey]
+  )
+
+  // 年月ごとのグルーピング（2026-08-25）。ランキング順（累計回数順）は日付を跨いだ
+  // 全期間での順位付けのため、年月グルーピングとは相性が悪く対象外とする
+  // （日付順のときだけ年月でグルーピングする）
+  const groupedByMonth = useMemo(() => {
+    if (sort !== 'date') return null
+    const map = new Map()
+    for (const v of filtered) {
+      const k = monthKeyOf(v.checked_at)
+      if (!map.has(k)) map.set(k, [])
+      map.get(k).push(v)
+    }
+    return [...map.entries()]
+  }, [filtered, sort])
+
+  function isMonthOpen(key) {
+    const override = collapseOverrides[key]
+    if (override !== undefined) return override
+    return key >= cutoffMonthKey // 直近1年分は既定で開き、それより古い年月は既定で閉じる
+  }
+  function toggleMonth(key) {
+    setCollapseOverrides((prev) => ({ ...prev, [key]: !isMonthOpen(key) }))
+  }
+
+  // 明細行の描画。日付順（年月グルーピングあり）・累計回数順（フラット表示）の
+  // どちらからも同じ見た目で使えるよう共通化する
+  function renderRow(v) {
+    const key = plateKey(v)
+    const count = key ? countByPlate.get(key) || 0 : 0
+    return (
+      <li key={v.id}>
+        <div
+          className={`parking-list-row${isOwner ? '' : ' is-clickable'}`}
+          onClick={isOwner ? undefined : () => setSelected(v)}
+          role={isOwner ? undefined : 'button'}
+          tabIndex={isOwner ? undefined : 0}
+          onKeyDown={
+            isOwner
+              ? undefined
+              : (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelected(v)
+                  }
+                }
+          }
+        >
+          <div className="parking-list-main">
+            <div className="parking-list-main-left">
+              {/* 残留塩素一覧の日付見出しと同じ「日付だけ・太字」の見せ方に揃える
+                  （2026-08-11。以前は時刻まで表示していた） */}
+              <span className="parking-list-date">{formatReportDate(jstDateOnly(v.checked_at))}</span>
+              <span className="parking-list-plate">
+                {v.plate_region || v.plate_number ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim() : '（ナンバー未入力）'}
+              </span>
+              {count > 1 && <span className="parking-list-count">累計{count}回</span>}
+            </div>
+            {/* 分類（無断駐車等）は右上に置く（2026-08-19。以前は3行目だったが、
+                日報へのジャンプボタン廃止に伴い1行目の右側へ寄せて2行構成にした） */}
+            {v.violations.length > 0 && (
+              <div className="parking-list-tags">
+                {v.violations.map((t) => (
+                  <span key={t} className="parking-list-tag">
+                    {VIOLATION_LABELS[t] || t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          {(v.owner_company || v.maker || v.model) && (
+            // 表示順・色は所有会社（テナント名。青太字）→メーカー（黒）→車種（黒）
+            // の順に固定する（2026-08-14。ユーザー要望による2行目の並び）
+            <div className="parking-list-sub">
+              {v.owner_company && <span className="parking-list-owner">{v.owner_company}</span>}
+              {v.maker && <span className="parking-list-maker">{v.maker}</span>}
+              {v.model && <span className="parking-list-model">{v.model}</span>}
+            </div>
+          )}
+          {v.note && <p className="parking-list-note">{v.note}</p>}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <div className="ui-page">
       <AppHeader />
@@ -233,74 +450,94 @@ export default function ParkingViolations() {
           </p>
         )}
 
+        {/* ダッシュボード（月別推移・テナント別/車別ランキング。2026-08-25新規）。
+            記録が無いうちは出しても意味がないため、1件以上あるときだけ表示する */}
+        {!loading && violations.length > 0 && (
+          <div className="parking-dashboard">
+            <div className="ui-card parking-chart-card">
+              <div className="ui-card-title">月別台数推移（過去1年）</div>
+              <MonthlyTrendChart data={monthlyTrend} />
+            </div>
+            <div className="ui-card parking-chart-card">
+              <div className="ui-card-title">
+                テナント別台数ランキング
+                <div className="ui-segmented parking-chart-toggle ui-card-title-action" role="group" aria-label="集計期間">
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${tenantRankMode === 'all' ? ' is-active' : ''}`}
+                    aria-pressed={tenantRankMode === 'all'}
+                    onClick={() => setTenantRankMode('all')}
+                  >
+                    総累計
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${tenantRankMode === 'year' ? ' is-active' : ''}`}
+                    aria-pressed={tenantRankMode === 'year'}
+                    onClick={() => setTenantRankMode('year')}
+                  >
+                    過去1年
+                  </button>
+                </div>
+              </div>
+              <RankingBarList items={tenantRanking} emptyText="テナントが判明している記録がありません。" />
+            </div>
+            <div className="ui-card parking-chart-card">
+              <div className="ui-card-title">
+                車別台数ランキング
+                <div className="ui-segmented parking-chart-toggle ui-card-title-action" role="group" aria-label="集計期間">
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${vehicleRankMode === 'all' ? ' is-active' : ''}`}
+                    aria-pressed={vehicleRankMode === 'all'}
+                    onClick={() => setVehicleRankMode('all')}
+                  >
+                    総累計
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${vehicleRankMode === 'year' ? ' is-active' : ''}`}
+                    aria-pressed={vehicleRankMode === 'year'}
+                    onClick={() => setVehicleRankMode('year')}
+                  >
+                    過去1年
+                  </button>
+                </div>
+              </div>
+              <RankingBarList items={vehicleRanking} />
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
         ) : filtered.length === 0 ? (
           <p className="settings-hint">
             {violations.length === 0 ? 'まだ違反車両の記録がありません。' : '該当する記録がありません。'}
           </p>
-        ) : (
-          <ul className="parking-list">
-            {filtered.map((v) => {
-              const key = plateKey(v)
-              const count = key ? countByPlate.get(key) || 0 : 0
+        ) : sort === 'date' ? (
+          <div className="parking-groups">
+            {groupedByMonth.map(([mk, rows]) => {
+              const open = isMonthOpen(mk)
               return (
-                <li key={v.id}>
-                  <div
-                    className={`parking-list-row${isOwner ? '' : ' is-clickable'}`}
-                    onClick={isOwner ? undefined : () => setSelected(v)}
-                    role={isOwner ? undefined : 'button'}
-                    tabIndex={isOwner ? undefined : 0}
-                    onKeyDown={
-                      isOwner
-                        ? undefined
-                        : (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              setSelected(v)
-                            }
-                          }
-                    }
+                <div className="parking-month-group" key={mk}>
+                  <button
+                    type="button"
+                    className="parking-month-head"
+                    onClick={() => toggleMonth(mk)}
+                    aria-expanded={open}
                   >
-                    <div className="parking-list-main">
-                      <div className="parking-list-main-left">
-                        {/* 残留塩素一覧の日付見出しと同じ「日付だけ・太字」の見せ方に揃える
-                            （2026-08-11。以前は時刻まで表示していた） */}
-                        <span className="parking-list-date">{formatReportDate(jstDateOnly(v.checked_at))}</span>
-                        <span className="parking-list-plate">
-                          {v.plate_region || v.plate_number
-                            ? `${v.plate_region || ''} ${v.plate_number || ''}`.trim()
-                            : '（ナンバー未入力）'}
-                        </span>
-                        {count > 1 && <span className="parking-list-count">累計{count}回</span>}
-                      </div>
-                      {/* 分類（無断駐車等）は右上に置く（2026-08-19。以前は3行目だったが、
-                          日報へのジャンプボタン廃止に伴い1行目の右側へ寄せて2行構成にした） */}
-                      {v.violations.length > 0 && (
-                        <div className="parking-list-tags">
-                          {v.violations.map((t) => (
-                            <span key={t} className="parking-list-tag">
-                              {VIOLATION_LABELS[t] || t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {(v.owner_company || v.maker || v.model) && (
-                      // 表示順・色は所有会社（テナント名。青太字）→メーカー（黒）→車種（黒）
-                      // の順に固定する（2026-08-14。ユーザー要望による2行目の並び）
-                      <div className="parking-list-sub">
-                        {v.owner_company && <span className="parking-list-owner">{v.owner_company}</span>}
-                        {v.maker && <span className="parking-list-maker">{v.maker}</span>}
-                        {v.model && <span className="parking-list-model">{v.model}</span>}
-                      </div>
-                    )}
-                    {v.note && <p className="parking-list-note">{v.note}</p>}
-                  </div>
-                </li>
+                    <IconChevronRight size={16} className={`parking-month-toggle-icon${open ? ' is-open' : ''}`} />
+                    <span className="parking-month-label">{monthLabelOf(mk)}</span>
+                    <span className="parking-month-count">{rows.length}件</span>
+                  </button>
+                  {open && <ul className="parking-list">{rows.map(renderRow)}</ul>}
+                </div>
               )
             })}
-          </ul>
+          </div>
+        ) : (
+          <ul className="parking-list">{filtered.map(renderRow)}</ul>
         )}
       </div>
 
