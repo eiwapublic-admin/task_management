@@ -215,7 +215,7 @@ export default function Equipment() {
                           )}
                           {item.track_stock ? (
                             <span className={`equipment-stock-qty${warn ? ' is-danger' : ''}`}>
-                              {item.stock_qty}
+                              残 {item.stock_qty}
                             </span>
                           ) : (
                             <span className="equipment-stock-qty is-muted">—</span>

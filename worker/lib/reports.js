@@ -1338,9 +1338,11 @@ const CHLORINE_COLUMNS =
   'id, report_id, building, location, tested_at, concentration, color_ok, turbidity_ok, odor_ok, taste_ok, inspector, note, created_at, updated_at'
 
 // 測定施設。BKB＝備後町コイズミビルの略称。src/lib/reports.js の CHLORINE_BUILDINGS と
-// 揃える（2026-08-10時点では2施設のみだったが、実際にはスイングビルの測定も継続して
-// いたことがFileMakerからの移行時（2026-08-25）に判明し、3施設目として追加した）
-const VALID_CHLORINE_BUILDINGS = new Set(['BKB', '小泉本社', 'スイングビル'])
+// 揃える（2026-08-10時点では2施設のみだったが、実際には3施設目（当時の呼称
+// 「スイングビル」）の測定も継続していたことがFileMakerからの移行時（2026-08-25）に
+// 判明し追加した。その後、施設の呼称が「旧本社」に変更されたため（2026-08-25）、
+// 既存レコードのbuilding値も含めて「旧本社」に統一している）
+const VALID_CHLORINE_BUILDINGS = new Set(['BKB', '小泉本社', '旧本社'])
 
 // 濃度は 0〜99.99 mg/L の範囲で小数第2位まで（DBは numeric(4,2)）。
 // 未測定（記録だけ先に作る場合）は null を許す。
