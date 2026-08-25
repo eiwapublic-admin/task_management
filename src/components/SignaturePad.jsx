@@ -51,6 +51,16 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 180 }, ref) {
     const ctx = canvas.getContext('2d')
     ctx.beginPath()
     ctx.moveTo(x, y)
+    // ドラッグせず一点だけタップされた場合（pointermoveが1回も発火しない）でも
+    // 「押した」こと自体を線として残す。そうしないと押しただけでは何も描かれず
+    // hasInkがfalseのまま保存され、記録上は「未署名」として保存されてしまう
+    // （2026-08-25。テスト入力時にサインが消えたとの報告を受けて調査・修正）
+    ctx.lineTo(x + 0.01, y + 0.01)
+    ctx.stroke()
+    if (!hasInkRef.current) {
+      hasInkRef.current = true
+      setHasInk(true)
+    }
   }
 
   function handlePointerMove(e) {
