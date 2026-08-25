@@ -1924,7 +1924,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   margin-bottom: var(--space-4);
 }
 @media (min-width: 1024px) {
-  .parking-dashboard { grid-template-columns: repeat(3, 1fr); align-items: start; }
+  /* minmax(0, 1fr): ランキングカードの見出し＋切替ボタンのmin-content幅に
+     引っ張られて3列が不均等になる（2026-08-25発覚）のを防ぎ、常に等幅3列にする */
+  .parking-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
 }
 
 .parking-chart-card { display: flex; flex-direction: column; }
@@ -1937,48 +1939,40 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   font-size: var(--fs-2xs);
 }
 
-/* 月別台数推移（棒グラフ）。1系列のため凡例なし。カード見出しが凡例代わり */
-.parking-trend-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-1);
+/* 月別台数推移（折れ線グラフ。2026-08-25、棒グラフから変更）。1系列のため凡例なし。
+   カード見出しが凡例代わり。SVGはwidth:100%・height:autoでviewBoxの縦横比を保った
+   まま拡大縮小させる（高さを別に固定すると線・マーカー・文字が歪むため） */
+.parking-trend-chart { display: block; width: 100%; height: auto; }
+
+.parking-trend-baseline { stroke: var(--border); stroke-width: 1; }
+
+.parking-trend-line {
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.parking-trend-col {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+/* マーカー半径4px（規定の8px以上に相当）＋地の色2pxリングで、線と重なっても
+   潰れずに見えるようにする */
+.parking-trend-dot {
+  fill: var(--color-primary);
+  stroke: var(--bg-surface);
+  stroke-width: 2;
 }
 
-.parking-trend-value {
+.parking-trend-value-text {
+  font-family: inherit;
   font-size: var(--fs-2xs);
   font-weight: 700;
-  color: var(--text-muted);
+  fill: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.parking-trend-bar-track {
-  width: 100%;
-  max-width: 24px;
-  height: 120px;
-  display: flex;
-  align-items: flex-end;
-}
-
-.parking-trend-bar {
-  width: 100%;
-  min-height: 2px;
-  background: var(--color-primary);
-  border-radius: 4px 4px 0 0;
-}
-
-.parking-trend-month {
+.parking-trend-month-text {
+  font-family: inherit;
   font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
+  fill: var(--text-muted);
 }
 
 /* テナント別・車別ランキング（横棒）。両方 RankingBarList を共用 */
@@ -2002,9 +1996,12 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   color: var(--text-muted);
 }
 
+/* ラベル幅はカードの何%、ではなくバー（.parking-ranking-track）側を固定幅にして
+   横幅が増えた分は全てラベルに回す（2026-08-25。画面を横に広げてもテナント名が
+   カード幅に対する割合で隠れたままだったため）。長い名前の保険として省略記号は残す */
 .parking-ranking-label {
-  flex: 0 1 auto;
-  max-width: 42%;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--fs-sm);
   color: var(--text-strong);
   overflow: hidden;
@@ -2013,8 +2010,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 }
 
 .parking-ranking-track {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: 160px;
+  max-width: 40%;
   height: 14px;
   background: var(--bg-subtle);
   border-radius: var(--radius-sm);
@@ -2047,20 +2045,22 @@ button.report-row-icon:hover { filter: brightness(1.15); }
    ＋トグルと同じ見せ方を年月単位で流用する） */
 .parking-groups { display: flex; flex-direction: column; gap: var(--space-3); }
 
+/* 背景色が薄く年月バナーだと分かりにくいとの指摘（2026-08-25）を受け、
+   .parking-card・.entry-row と同じ「濃いめのグレー背景＋枠線」に揃えた */
 .parking-month-head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--bg-subtle);
+  background: var(--bg-muted);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 }
-.parking-month-head:hover { background: var(--bg-muted); }
+.parking-month-head:hover { background: color-mix(in srgb, var(--bg-muted) 70%, var(--border-strong)); }
 
 .parking-month-toggle-icon {
   flex-shrink: 0;
@@ -2069,8 +2069,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 }
 .parking-month-toggle-icon.is-open { transform: rotate(90deg); }
 
-.parking-month-label { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
-.parking-month-count { color: var(--text-muted); font-size: var(--fs-xs); }
+/* カード内の日付（.parking-list-date）と同程度の大きさに揃える（2026-08-25） */
+.parking-month-label { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.parking-month-count { color: var(--text-muted); font-size: var(--fs-sm); }
 
 .parking-month-group .parking-list { margin-top: var(--space-3); }
 
