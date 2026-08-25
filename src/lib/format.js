@@ -19,8 +19,18 @@ export function formatDateTime(value) {
 // 担当者名から決定的にアバター色を割り当てる（同じ名前は常に同じ色）
 const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#db2777', '#059669', '#ea580c']
 
+// 特定の担当者は固定色にする（2026-08-18にタスク側の担当者フィルタで導入。日報側の
+// 担当者マーク（ReportList.jsx）も同じ色に揃えるため、ここに集約して両方から参照する。
+// 2026-08-25）
+const FIXED_ASSIGNEE_COLORS = {
+  橋口: 'var(--surface-inverse)',
+  西川: 'var(--color-primary)',
+  岡田: 'var(--status-done)',
+}
+
 export function assigneeColor(name) {
   if (!name) return 'var(--text-muted)'
+  if (FIXED_ASSIGNEE_COLORS[name]) return FIXED_ASSIGNEE_COLORS[name]
   let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
