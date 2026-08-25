@@ -1,0 +1,118 @@
+// 残留塩素濃度の推移グラフ（3施設×過去3年・複数系列の折れ線グラフ。2026-08-25新規）。
+// 専用のグラフ描画ライブラリは使わずSVGで組む（dataviz方針: 系列ごとに固定順の識別色を
+// 割り当て、2系列以上は必ず凡例を表示する。欠測月（その施設でその月に測定が無い）は
+// その区間だけ線を描かず、値がある点だけ丸マーカーを打つ）
+
+const W = 700
+const H = 190
+const PAD_X = 14
+const PLOT_TOP = 18
+const PLOT_BOTTOM = 150
+const MONTH_LABEL_Y = 172
+// 3年（36か月）分は全月に目盛りを出すと詰まって読めなくなるため、始点・終点・
+// 6か月ごとだけに絞る（月別台数推移の3年表示と同じ考え方）
+const TICK_EVERY = 6
+
+export function ChlorineTrendChart({ months, series, standardValue }) {
+  const n = months.length
+  const step = n > 1 ? (W - PAD_X * 2) / (n - 1) : 0
+  const allValues = series.flatMap((s) => s.values.filter((v) => v != null))
+  const rawMax = Math.max(0.2, standardValue || 0, ...allValues)
+  const yMax = Math.ceil(rawMax * 10) / 10
+  const x = (i) => PAD_X + i * step
+  const y = (v) => PLOT_BOTTOM - (v / yMax) * (PLOT_BOTTOM - PLOT_TOP)
+
+  // 欠測（null）で線が途切れるよう、値がある区間だけをsegmentに分ける
+  const seriesWithSegments = series.map((s) => {
+    const segments = []
+    let current = []
+    s.values.forEach((v, i) => {
+      if (v == null) {
+        if (current.length) segments.push(current)
+        current = []
+      } else {
+        current.push({ i, v })
+      }
+    })
+    if (current.length) segments.push(current)
+    return { ...s, segments }
+  })
+
+  const showTick = (i) => i === 0 || i === n - 1 || i % TICK_EVERY === 0
+  const showStandard = standardValue != null && standardValue <= yMax
+
+  return (
+    <div className="chlorine-trend-wrap">
+      <ul className="chlorine-trend-legend">
+        {series.map((s) => (
+          <li className="chlorine-trend-legend-item" key={s.key}>
+            <span className="chlorine-trend-legend-swatch" style={{ background: s.color }} />
+            {s.label}
+          </li>
+        ))}
+      </ul>
+      <svg
+        className="chlorine-trend-chart"
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="残留塩素濃度の推移（過去3年・3施設）"
+      >
+        <line className="chlorine-trend-baseline" x1={PAD_X} y1={PLOT_BOTTOM} x2={W - PAD_X} y2={PLOT_BOTTOM} />
+        {showStandard && (
+          <>
+            <line
+              className="chlorine-trend-standard-line"
+              x1={PAD_X}
+              y1={y(standardValue)}
+              x2={W - PAD_X}
+              y2={y(standardValue)}
+            />
+            {/* 右端だと系列の線・点と重なりやすいため、軸の目盛り（0・yMax）と同じ左端に
+                寄せる（2026-08-25） */}
+            <text
+              className="chlorine-trend-standard-label"
+              x={PAD_X}
+              y={y(standardValue) - 4}
+              textAnchor="start"
+            >
+              基準{standardValue}
+            </text>
+          </>
+        )}
+        <text className="chlorine-trend-axis-label" x={PAD_X} y={PLOT_TOP - 4} textAnchor="start">
+          {yMax.toFixed(1)}
+        </text>
+        <text className="chlorine-trend-axis-label" x={PAD_X} y={PLOT_BOTTOM + 12} textAnchor="start">
+          0
+        </text>
+        {months.map(
+          (mo, i) =>
+            showTick(i) && (
+              <text key={mo.key} className="chlorine-trend-month-text" x={x(i)} y={MONTH_LABEL_Y} textAnchor="middle">
+                {mo.shortLabel}
+              </text>
+            )
+        )}
+        {seriesWithSegments.map((s) => (
+          <g key={s.key}>
+            {s.segments.map((seg, si) => (
+              <polyline
+                key={si}
+                className="chlorine-trend-line"
+                style={{ stroke: s.color }}
+                fill="none"
+                points={seg.map((p) => `${x(p.i)},${y(p.v)}`).join(' ')}
+              />
+            ))}
+            {s.segments.flat().map((p) => (
+              <g key={p.i}>
+                <title>{`${months[p.i].fullLabel} ${s.label}: ${p.v.toFixed(2)}mg/L`}</title>
+                <circle className="chlorine-trend-dot" style={{ fill: s.color }} cx={x(p.i)} cy={y(p.v)} r="3" />
+              </g>
+            ))}
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+}

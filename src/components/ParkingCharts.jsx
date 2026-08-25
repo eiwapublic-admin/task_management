@@ -4,15 +4,21 @@
 // 1本だけの控えめな1pxグリッド、直接ラベルで値を示す）。1系列のグラフのため凡例は
 // 置かず、カード見出し（呼び出し側）が「何のグラフか」を示す。
 
-// 月別の件数推移（直近12か月・折れ線グラフ。2026-08-25、棒グラフから変更）。
-// viewBoxの座標系のまま幅100%・高さautoで拡大縮小させ、線・マーカー・文字を
-// 常に同じ比率で保つ（幅と高さを別々に固定すると歪んで見えるため）
+// 月別の件数推移（折れ線グラフ。2026-08-25、棒グラフから変更）。過去1年（12件）・
+// 過去3年（36件）の両方を受け取る。viewBoxの座標系のまま幅100%・高さautoで
+// 拡大縮小させ、線・マーカー・文字を常に同じ比率で保つ（幅と高さを別々に固定すると
+// 歪んで見えるため）
 const TREND_W = 360
 const TREND_H = 140
 const TREND_PAD_X = 18
 const TREND_PLOT_TOP = 22
 const TREND_PLOT_BOTTOM = 104
 const TREND_MONTH_Y = 128
+// 過去1年（12件）は全点に値・月ラベルを出すが、過去3年（36件）は詰まって読めなく
+// なるため、目印（始点・終点・6か月ごと）だけにマーカー・ラベルを絞る（dataviz方針:
+// 直接ラベルは要点だけに絞る。個々の月の値は1年表示に切り替えれば確認できる）
+const TREND_DENSE_THRESHOLD = 12
+const TREND_TICK_EVERY = 6
 
 export function MonthlyTrendChart({ data }) {
   const max = Math.max(1, ...data.map((d) => d.count))
@@ -24,12 +30,14 @@ export function MonthlyTrendChart({ data }) {
     y: TREND_PLOT_BOTTOM - (d.count / max) * (TREND_PLOT_BOTTOM - TREND_PLOT_TOP),
   }))
   const linePoints = points.map((p) => `${p.x},${p.y}`).join(' ')
+  const dense = n > TREND_DENSE_THRESHOLD
+  const isMarked = (i) => !dense || i === 0 || i === n - 1 || i % TREND_TICK_EVERY === 0
   return (
     <svg
       className="parking-trend-chart"
       viewBox={`0 0 ${TREND_W} ${TREND_H}`}
       role="img"
-      aria-label="月別の違反車両台数推移（直近12か月）"
+      aria-label={`月別の違反車両台数推移（直近${n}か月）`}
     >
       <line
         className="parking-trend-baseline"
@@ -39,18 +47,23 @@ export function MonthlyTrendChart({ data }) {
         y2={TREND_PLOT_BOTTOM}
       />
       <polyline className="parking-trend-line" points={linePoints} fill="none" />
-      {points.map((p) => (
-        <g key={p.key}>
-          <title>{`${p.fullLabel}: ${p.count}件`}</title>
-          <circle className="parking-trend-dot" cx={p.x} cy={p.y} r="4" />
-          <text className="parking-trend-value-text" x={p.x} y={p.y - 8} textAnchor="middle">
-            {p.count}
-          </text>
-          <text className="parking-trend-month-text" x={p.x} y={TREND_MONTH_Y} textAnchor="middle">
-            {p.shortLabel}
-          </text>
-        </g>
-      ))}
+      {points.map(
+        (p, i) =>
+          isMarked(i) && (
+            <g key={p.key}>
+              <title>{`${p.fullLabel}: ${p.count}件`}</title>
+              <circle className="parking-trend-dot" cx={p.x} cy={p.y} r={dense ? 3 : 4} />
+              {!dense && (
+                <text className="parking-trend-value-text" x={p.x} y={p.y - 8} textAnchor="middle">
+                  {p.count}
+                </text>
+              )}
+              <text className="parking-trend-month-text" x={p.x} y={TREND_MONTH_Y} textAnchor="middle">
+                {p.shortLabel}
+              </text>
+            </g>
+          )
+      )}
     </svg>
   )
 }
