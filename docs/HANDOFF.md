@@ -482,6 +482,12 @@
     - 検証: `npm run lint`・`npm run build`が通ることを確認。Playwright上で実際のCanvas APIを使い、ドラッグなしの1点タップ（`pointerdown`直後に`pointerup`、`pointermove`なし）を再現するテストページを作成し、修正後は`getBlob`のインク検出ロジック（0.1刻みでない、実装と同じ2pxおきの白判定スキャン）が確実にインクを検出することを確認した。サーバー側（`worker/lib/equipment.js`）は変更していない（フロント側の呼び出しがそもそも発生していなかったことが原因のため）。
     - 対応が必要な残作業: 今回の`txn_no=1031`（FLR40SWのテスト設置記録）はテスト入力とのことで、無署名のまま残っている。依頼元の確認のうえ、削除するか、修正版アプリで再度サインを入力し直すかを決めていただく必要がある（本セッションでは実データの削除は行っていない）。
 
+162. **【障害】161番の修正後、署名サムネイルが「？」の壊れた画像になる不具合を修正（2026-08-25）**: 依頼元から161番の修正を試した結果のスクリーンショット2枚が届いた。入力直後は署名（手書き文字）が正しく描画され保存できているが、記録を開き直すと「署名済み」バッジは出るもののサムネイル画像が読み込めず「？」アイコンになっていた。
+    - **調査**: 該当レコードをSupabaseで確認すると`signature_key`・`signed_at`は正しく設定されており（161番の修正で署名の保存自体は成功するようになっていた）、保存側のバグではなく表示側の不具合と判明。`EquipmentOutForm.jsx`は署名サムネイルを`<img src={equipmentSignatureUrl(existing.id)} />`という素の`<img>`タグで表示していたが、`GET /api/equipment/signature`はJWT認証必須（`requireAuth`）のエンドポイントであり、ブラウザの`<img src>`はアプリ独自のBearerトークンを送らないため常に401になり、画像が壊れて見えていた（同じ理由の不具合は過去に日報の写真プレビューでも発生しており、`src/lib/reports.js`の`fetchPhotoObjectUrl`で対処済みだったが、備品の署名画像は同じ対処がされていなかった）。
+    - **修正**: `src/lib/equipment.js`の`equipmentSignatureUrl`（URLをそのまま返すだけの関数）を廃止し、`fetchPhotoObjectUrl`と同じ方式の`fetchEquipmentSignatureObjectUrl(txnId)`（Authorizationヘッダ付きで取得し`URL.createObjectURL`でBlob URL化）に置き換えた。`EquipmentOutForm.jsx`側は`useEffect`でこれを呼び出し、取得できるまでは「読み込み中…」、失敗時は「署名画像を読み込めませんでした」を表示し、アンマウント時に`URL.revokeObjectURL`で解放するようにした。
+    - 検証: `npm run lint`・`npm run build`が通ることを確認。Supabaseで対象レコードの`signature_key`・`signed_at`が正しく設定済みであること（保存自体は161番の修正で正常化している）を確認した。この画面（本番環境）への直接アクセスは本セッションのネットワークポリシー上できないため、実機での見た目確認は依頼元にお願いする形とした。
+    - あわせて、「スタッフ（`equipment_out_staff`）は備品の当日中のみ修正可、前日以前は修正不可にしてほしい」との再確認があったが、これは160番で実装済みの制約（`Equipment.jsx`の`canEditTxn`・`worker/lib/equipment.js`の`isTodayJst`によるJST暦日単位の当日判定）とすでに一致しており、今回コードの変更は行っていない。
+
 ---
 
 ## 2. 日常運用
