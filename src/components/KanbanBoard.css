@@ -1000,8 +1000,20 @@ select.task-detail-input.is-unassigned {
 
 /* ---------- レスポンシブ: 狭い画面は横スクロール ---------- */
 @media (max-width: 768px) {
+  /* アプリシェル導入（2026-08-26）により、.kanban-board は常に定高（.app-scroll の
+     残り高さぴったり）の祖先を持つようになったため、以前のように 100dvh から
+     ヘッダー類の実測値・余白を1つずつ手で引き算する必要が無くなった（この方式は
+     実機ではわずかな誤差が積み重なり、画面下部に余分な空白が残る不具合があった。
+     引き算だけの検証はPlaywrightでは再現できず、実機報告で発覚）。
+     代わりに .kanban-board 自身を height: 100% にし、.kanban-columns を
+     flex: 1 1 auto で残り高さいっぱいに伸ばし、.kanban-column は
+     .kanban-columns（横並びのflexコンテナ）の既定の align-items: stretch に
+     任せて縦方向を自動で埋める。これによりピクセル単位の計算が不要になり、
+     実機の丸め誤差の影響を受けない。 */
   .kanban-board {
     padding: 0 var(--space-3) var(--space-3);
+    height: 100%;
+    min-height: 0;
   }
 
   /* 機能ヘッダを1行に収めるため、狭幅では担当者チップを詰める。
@@ -1021,6 +1033,8 @@ select.task-detail-input.is-unassigned {
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     padding-bottom: var(--space-2);
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   /* overflow-x を指定した要素は、CSSの仕様上 overflow-y も自動的に visible から
@@ -1029,31 +1043,24 @@ select.task-detail-input.is-unassigned {
      コンテナを兼ねてしまい、列見出し（.ui-sticky-head-2）がページ基準ではなく
      この要素基準で固定されて位置がずれる不具合になっていた（2026-08-11）。
      ページ全体ではなく「列ごと」に縦スクロールさせる設計に変えることで、
-     この土台とうまく噛み合わせる：列自身に高さの上限と overflow-y を持たせ、
+     この土台とうまく噛み合わせる：列自身に overflow-y を持たせ、
      列見出しはページではなくその列の中で固定表示する（top: 0）。
-     高さの計算式は、列の開始位置（AppHeader＋機能ヘッダ＋隙間）を実測値
-     （--app-header-h・--sticky2-h）から逆算し、画面の残り高さぶんだけ確保する。
-     引く内訳（2026-08-12に機能ヘッダへ移行した後の構成）:
-       --space-4  … .kanban-board の gap（機能ヘッダと列の間）
-       --space-3 * 2 … .kanban-board の下パディング＋ズレ吸収の余裕
-       --space-2  … .kanban-columns の下パディング
-     ※ 機能ヘッダ自身の上下パディングは --sticky2-h（実測値）に含まれるので
-       ここでは引かない。.kanban-board の上パディングは 0 にしてある */
+     高さは .kanban-columns の align-items: stretch（既定値）で自動的に
+     揃うため、この要素自身では指定しない（上記コメント参照） */
   .kanban-column {
     flex: 0 0 82%;
     scroll-snap-align: start;
     /* 既定の min-height: 400px（カードが少ない列を寂しく見せない用途）が
-       この height を下から突き上げて無効化してしまうため、ここで解除する */
+       stretch による高さより優先されて突き上げてしまわないよう、ここで解除する */
     min-height: 0;
-    height: calc(
-      100dvh - var(--app-header-h) - var(--sticky2-h, 0px) - var(--space-4) -
-        env(safe-area-inset-bottom) - var(--space-3) * 2 - var(--space-2)
-    );
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     /* 上だけ0にし、代わりに列見出し自身に同じ分の余白を持たせる（下の理由）。
-       左右・下はそのまま列のふちの余白として機能する */
+       左右はそのまま列のふちの余白として機能する。下はホームインジケータ
+       （セーフエリア下端）の分を追加し、最後のカードがその真上に隠れず
+       スクロールで見えるようにする */
     padding-top: 0;
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
   }
 
   /* 列の上余白（padding-top）を列自身ではなく列見出しの内側に持たせる。
