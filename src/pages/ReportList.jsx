@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
@@ -192,6 +192,34 @@ export default function ReportList() {
   useEffect(() => {
     load()
   }, [load])
+
+  // 「本日」ボタン（2026-08-26追加）。表示中の月が今日を含まない場合は今月へ切り替えてから
+  // スクロールする必要があるため、切替後の再読み込み（loadingがfalseに戻るタイミング）を
+  // 待ってスクロールする（scrollToTodayRef。同じ月なら即座にスクロールする）
+  const scrollToTodayRef = useRef(false)
+
+  function scrollToToday() {
+    requestAnimationFrame(() => {
+      document.querySelector('.is-today')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  function handleGoToToday() {
+    const todayMonth = currentMonthJST()
+    if (month === todayMonth) {
+      scrollToToday()
+    } else {
+      scrollToTodayRef.current = true
+      setMonth(todayMonth)
+    }
+  }
+
+  useEffect(() => {
+    if (!loading && scrollToTodayRef.current) {
+      scrollToTodayRef.current = false
+      scrollToToday()
+    }
+  }, [loading])
 
   // 土曜=青、日曜・祝日=赤の色分けに使う。取れなくても一覧自体は表示できるようにする
   useEffect(() => {
@@ -423,9 +451,7 @@ export default function ReportList() {
                     <div className="report-row-date">
                       <span className={`report-date ${wd.className}`}>{formatReportDate(date)}</span>
                       {isToday && <span className="report-today-badge">本日</span>}
-                      <span className="report-workers">
-                        {r.worker_am || '—'} | {r.worker_pm || '—'}
-                      </span>
+                      <span className="report-calendar-workers">{renderCalendarWorkers(r)}</span>
                     </div>
                     <div className="report-row-body">
                       {entries.length === 0 ? (
@@ -632,9 +658,7 @@ export default function ReportList() {
                 <div className="report-row-main">
                   <div className="report-row-date">
                     <span className={`report-date ${wd.className}`}>{formatReportDate(r.report_date)}</span>
-                    <span className="report-workers">
-                      {r.worker_am || '—'} | {r.worker_pm || '—'}
-                    </span>
+                    <span className="report-calendar-workers">{renderCalendarWorkers(r)}</span>
                   </div>
                   <div className="report-row-body">
                     {entries.map((e) => (
@@ -691,6 +715,13 @@ export default function ReportList() {
                   <IconChevronRight size={28} />
                 </button>
               </div>
+              {/* 「本日」ボタン（2026-08-26）。押すと今日を含む月へ切り替え、本日の行/マスが
+                  見える位置までスクロールする。検索結果表示中は対象が無いため出さない */}
+              {!searching && (
+                <button type="button" className="btn-plain reports-today-btn" onClick={handleGoToToday}>
+                  本日
+                </button>
+              )}
               {/* 表示切替（リスト型／カレンダー型）。カレンダー型はマス目が狭くなりすぎるため
                   PC/iPad幅でのみ選べるようにし、スマートフォン幅では切替自体を出さない（2026-08-07） */}
               {isWideScreen && (
