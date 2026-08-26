@@ -1736,8 +1736,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 /* 写真は1件につき最大2枚まで横並びで表示する（2026-08-05） */
 /* Grid にする（flexだと iOS Safari で子要素が縮みきらずカードからはみ出すことがあるため。
-   2026-08-05）。作業写真の一覧（.photo-grid のモバイル時）と同じ minmax(120px,1fr) にして
-   写真の幅を揃え、カードに収まらなければ自動で折り返す。 */
+   2026-08-05）。minmax(120px,1fr) で写真の幅を揃え、カードに収まらなければ自動で
+   折り返す（この値は日報カードのサムネイル専用。.photo-grid・.parking-grid とは別物で、
+   2026-08-26の枠サイズ変更の対象外）。 */
 .parking-card-photos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
