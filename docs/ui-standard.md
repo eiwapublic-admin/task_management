@@ -86,17 +86,28 @@ CSS に `14px` `#6b7280` `12px` `z-index: 55` のような**生値を直接書�
 
 ```
 ┌──────────────────────────────────────────────┐
-│ 1. アプリヘッダ（AppHeader・グリーンの帯）        │ ← 固定
+│ 1. アプリヘッダ（AppHeader・グリーンの帯）        │ ← 固定（.app-scroll の外）
 │    左: アプリアイコン ＋ 機能名（大きめのタイトル） │
 │    右: ユーザー名（769px以上）＋ ハンバーガー      │
-├──────────────────────────────────────────────┤
-│ 2. 機能ヘッダ（FeatureHeader）                   │ ← 固定
+├──────────────────────────────────────────────┤ ← ここから内部が .app-scroll
+│ 2. 機能ヘッダ（FeatureHeader）                   │ ← 固定（.app-scroll 内の sticky）
 │    左: 年月・日付選択 / 表示切替 / 絞り込み・検索   │
 │    右: その機能のボタン群                        │
 ├──────────────────────────────────────────────┤
 │ 3. 本体（一覧・明細）                            │ ← ここだけ縦スクロール
 └──────────────────────────────────────────────┘
 ```
+
+> **アプリシェル構造（2026-08-26 導入）**: `<html>`/`<body>` 自体はスクロールしない。
+> `.ui-page`（`.app-shell`と同じ役割）は `position: fixed; inset: 0` でビューポート全体を
+> 占める箱にし、実際のスクロールは中の `.app-scroll`（＝本体を囲む `.ui-container` と
+> 同一要素）だけが担う。**きっかけは iOS の PWA（ホーム画面追加・standalone起動）で、
+> `<body>` がスクロールする構造だとステータスバー下を通過するコンテンツとみなされ、
+> ヘッダーに常時薄いぼかしが乗る不具合**（`apple-mobile-web-app-status-bar-style` 関連。
+> HANDOFF 170〜171番）。この変更により、1段目 AppHeader は `.app-scroll` の**外**（＝
+> スクロールしても常に画面に残る）に置けるようになり、2段目 `FeatureHeader` は
+> `.app-scroll` の先頭に `top: 0` で貼り付くだけでよくなった（AppHeader分の高さを
+> 加算する必要が無くなった）。詳細な経緯は `docs/HANDOFF.md` 170・171・177番を参照。
 
 **画面名はアプリヘッダのタイトルが示す。だから画面側に画面タイトルを置かない。**
 `FeatureHeader` に `title` を渡すのは、画面名ではなく「いま何を見ているか」が
@@ -128,7 +139,7 @@ export default function NewScreen() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow">
+      <div className="ui-container is-narrow app-scroll">
         <FeatureHeader
           {/* title は原則渡さない（画面名はアプリヘッダが出す）。
               対象がデータで決まる画面だけ title={item?.name} のように渡す */}
@@ -155,6 +166,11 @@ export default function NewScreen() {
 （`--sticky2-h`）をまとめて見るので、**画面ごとに `useStickyHeightVar` を
 呼ぶ必要はない。** 3段目（表の列見出し・カレンダーの曜日行）は従来どおり
 `.ui-sticky-head-2` を付ければこの下に積み上がる。
+
+**本体を囲む `.ui-container` には必ず `app-scroll` クラスも付ける**（上記の骨格の
+とおり）。アプリシェル構造（2026-08-26。次項参照）により、実際に縦スクロールする
+のはこの要素であって `<body>` ではないため、付け忘れると本体がスクロールしない
+画面になる。
 
 狭幅（768px以下）では**左＝1行目・右＝2行目の右端**に必ず分かれる。
 折り返し位置を幅任せにすると、文字数や端末のフォント設定で結果が変わり
@@ -380,9 +396,12 @@ iOS では固定表示（`position: fixed`）要素の実寸と一致しない�
 <th className="ui-sticky-head-2">タイトル</th>
 ```
 
-`useStickyHeightVar`（`src/lib/`）が1段目・2段目の実測高さを CSS 変数化し、
-3段目はその下に `top: calc(var(--app-header-h) + var(--sticky2-h, 0px))` で積み上がる。
-**このフックを画面から直接呼ぶ必要はない**（`AppHeader` と `FeatureHeader` が呼ぶ）。
+`useStickyHeightVar`（`src/lib/`）が2段目（機能ヘッダ）の実測高さを CSS 変数化し、
+3段目はその下に `top: var(--sticky2-h, 0px)` で積み上がる。**このフックを画面から
+直接呼ぶ必要はない**（`FeatureHeader` が呼ぶ）。**2026-08-26 のアプリシェル導入前は
+`top: calc(var(--app-header-h) + var(--sticky2-h, 0px))` だったが、1段目 AppHeader が
+`.app-scroll` の外（そもそもスクロール対象外）になったことで、3段目が重ねる相手は
+2段目だけでよくなり、`--app-header-h` の加算が不要になった。**
 
 > **横スクロールできる要素の中では使わない。** `overflow-x: auto` を持つ要素は、
 > CSS の仕様上 `overflow-y` も自動的に `visible` から `auto` に変わる
