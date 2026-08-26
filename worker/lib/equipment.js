@@ -489,6 +489,15 @@ export async function handleEquipmentTransactionCreate(req) {
     const tenantErr = validateTenantFields(reason, payload)
     if (tenantErr) return json({ error: tenantErr }, 400)
 
+    // 担当者は入出庫を問わず必須（2026-08-26。備考以外の全項目を必須化する依頼に対応）
+    const staffName = trimOrNull(payload.staff_name, 200)
+    if (!staffName) return json({ error: '担当者を入力してください' }, 400)
+    // 共用部設置は階・設置場所も必須（同上。テナント設置は選択したテナントの階を自動で使うため対象外）
+    if (reason === 'common') {
+      if (!trimOrNull(payload.location, 200)) return json({ error: '設置場所を入力してください' }, 400)
+      if (!trimOrNull(payload.floor, 20)) return json({ error: '階を入力してください' }, 400)
+    }
+
     const supabase = getAdminClient()
 
     // テナント設置は請求先そのものなので、名称・コードはクライアントの送信値を
@@ -527,7 +536,7 @@ export async function handleEquipmentTransactionCreate(req) {
       ...tenantFields,
       floor: tenantFloor,
       location: reason === 'tenant' ? null : trimOrNull(payload.location, 200),
-      staff_name: trimOrNull(payload.staff_name, 200),
+      staff_name: staffName,
       note: trimOrNull(payload.note, 1000),
       created_by: auth.sub,
       updated_by: auth.sub,
@@ -613,6 +622,21 @@ export async function handleEquipmentTransactionUpdate(req) {
       patch.quantity = quantity
     }
     if ('supplier' in payload) patch.supplier = trimOrNull(payload.supplier, 200)
+
+    // 担当者は入出庫を問わず必須（2026-08-26）。共用部設置は階・設置場所も必須
+    // （テナント設置は選択したテナントの階を自動で使うため対象外。いずれもフロントは
+    // 常に全項目を含めて送るため、値が渡されているのに空という状態だけを弾く）
+    if ('staff_name' in payload && !trimOrNull(payload.staff_name, 200)) {
+      return json({ error: '担当者を入力してください' }, 400)
+    }
+    if (reason === 'common') {
+      if ('location' in payload && !trimOrNull(payload.location, 200)) {
+        return json({ error: '設置場所を入力してください' }, 400)
+      }
+      if ('floor' in payload && !trimOrNull(payload.floor, 20)) {
+        return json({ error: '階を入力してください' }, 400)
+      }
+    }
 
     // テナント設置は、選び直された（tenant_id が渡された）場合のみサーバー側で再解決する。
     // それ以外（reason を tenant のまま維持しただけ）は既存の tenant_id・floor 等を保つ
@@ -732,9 +756,9 @@ async function refreshWarning(supabase, itemId) {
 // 担当者・場所・調達先の候補（過去値からの重複除去）
 // ============================================================
 
-const SUGGEST_FIELDS = { staff: 'staff_name', location: 'location', supplier: 'supplier' }
+const SUGGEST_FIELDS = { staff: 'staff_name', location: 'location', supplier: 'supplier', floor: 'floor' }
 
-// GET /api/equipment/suggest?field=staff|location|supplier — <datalist> 用の候補（使用頻度順）
+// GET /api/equipment/suggest?field=staff|location|supplier|floor — <datalist> 用の候補（使用頻度順）
 export async function handleEquipmentSuggest(req) {
   const { error } = await requireAuth(req)
   if (error) return error
