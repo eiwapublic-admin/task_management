@@ -215,6 +215,10 @@
 html,
 body {
   height: 100%;
+  /* アプリシェル（.ui-page/.app-shell）は position: fixed で自前のスクロールを
+     持たない。body 側にも overflow: hidden を掛けておき、万一シェル未適用の
+     要素がはみ出しても body 自体はスクロールしないようにする（2026-08-26） */
+  overflow: hidden;
 }
 
 body {

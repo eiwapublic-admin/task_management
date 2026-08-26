@@ -88,7 +88,7 @@ export default function EquipmentItemHistory() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow">
+      <div className="ui-container is-narrow app-scroll">
         <FeatureHeader
           title={item?.name || '備品の履歴'}
           leading={

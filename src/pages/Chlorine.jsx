@@ -226,7 +226,7 @@ export default function Chlorine() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow reports-container">
+      <div className="ui-container is-narrow reports-container app-scroll">
         {/* 機能ヘッダ（2026-08-13）。ホームボタン・表示対象年/測定施設の絞り込みは廃止。
             右端に「＋」（測定を記録）だけを置く */}
         <FeatureHeader

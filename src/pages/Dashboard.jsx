@@ -157,50 +157,52 @@ export default function Dashboard() {
     <div className="ui-page">
       <AppHeader lastFetchAt={lastFetchAt} />
 
-      {creditAlert && (
-        <div className="dashboard-banner dashboard-credit-alert" role="alert">
-          <span>
-            ⚠️ APIクレジットが不足し、メールの自動分類が停止しています。チャージ後にハンバーガーメニューの「今すぐ取得」で再開できます。
-          </span>
-          <a
-            className="dashboard-credit-button"
-            href={BILLING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            APIクレジットをチャージ
-          </a>
-        </div>
-      )}
-      {error && (
-        <p className="dashboard-banner dashboard-error" role="alert">
-          {error}
-        </p>
-      )}
-
-      {loading ? (
-        <p className="dashboard-loading">読み込み中…</p>
-      ) : tasks.length === 0 ? (
-        <div className="dashboard-empty">
-          <p>まだタスクがありません。</p>
-          <p className="dashboard-empty-hint">
-            ハンバーガーメニューの「今すぐ取得」を押すと共有メールを取得・分類します。
-            まだ配信が始まったばかりの場合は、メールが届いてから取得してください。
+      <div className="app-scroll">
+        {creditAlert && (
+          <div className="dashboard-banner dashboard-credit-alert" role="alert">
+            <span>
+              ⚠️ APIクレジットが不足し、メールの自動分類が停止しています。チャージ後にハンバーガーメニューの「今すぐ取得」で再開できます。
+            </span>
+            <a
+              className="dashboard-credit-button"
+              href={BILLING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              APIクレジットをチャージ
+            </a>
+          </div>
+        )}
+        {error && (
+          <p className="dashboard-banner dashboard-error" role="alert">
+            {error}
           </p>
-        </div>
-      ) : (
-        <KanbanBoard
-          tasks={tasks}
-          assignees={assignees}
-          onStatusChange={handleStatusChange}
-          onCreateTask={handleCreateTask}
-          onUpdateTask={handleUpdateTask}
-          onOpenArchive={() => navigate('/archive')}
-          onSpamTask={handleSpamTask}
-          onAddToReport={handleAddToReport}
-          sharedGmail={sharedGmail}
-        />
-      )}
+        )}
+
+        {loading ? (
+          <p className="dashboard-loading">読み込み中…</p>
+        ) : tasks.length === 0 ? (
+          <div className="dashboard-empty">
+            <p>まだタスクがありません。</p>
+            <p className="dashboard-empty-hint">
+              ハンバーガーメニューの「今すぐ取得」を押すと共有メールを取得・分類します。
+              まだ配信が始まったばかりの場合は、メールが届いてから取得してください。
+            </p>
+          </div>
+        ) : (
+          <KanbanBoard
+            tasks={tasks}
+            assignees={assignees}
+            onStatusChange={handleStatusChange}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
+            onOpenArchive={() => navigate('/archive')}
+            onSpamTask={handleSpamTask}
+            onAddToReport={handleAddToReport}
+            sharedGmail={sharedGmail}
+          />
+        )}
+      </div>
     </div>
   )
 }

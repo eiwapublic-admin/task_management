@@ -12,22 +12,28 @@ import { useEffect } from 'react'
 // 入れ子のモーダル（日報詳細の上に自主点検・残留塩素）でも正しく動くよう、
 // ロックしている数を数えて、最後の1つが閉じたときにだけ元へ戻す。
 //
-// なお html 側には掛けない。html を overflow:hidden にすると裏のページのスクロール
-// 位置が先頭へ戻ってしまい、閉じたときに一覧の見ていた場所を見失う。
+// アプリシェル導入（2026-08-26）により、実際にスクロールするのは body ではなく
+// 各ページの .app-scroll 要素になった（body 自体は position: fixed で動かない）。
+// そのため固定対象を .app-scroll に変更する。開いた時点で画面にある .app-scroll
+// （＝表示中のページのもの）を覚えておき、閉じるときも同じ要素へ戻す。
 let lockCount = 0
-let prevBodyOverflow = ''
+let lockedEl = null
+let prevOverflow = ''
 
 function lock() {
   lockCount += 1
   if (lockCount > 1) return
-  prevBodyOverflow = document.body.style.overflow
-  document.body.style.overflow = 'hidden'
+  lockedEl = document.querySelector('.app-scroll')
+  if (!lockedEl) return
+  prevOverflow = lockedEl.style.overflow
+  lockedEl.style.overflow = 'hidden'
 }
 
 function unlock() {
   lockCount -= 1
   if (lockCount > 0) return
-  document.body.style.overflow = prevBodyOverflow
+  if (lockedEl) lockedEl.style.overflow = prevOverflow
+  lockedEl = null
 }
 
 export default function useBodyScrollLock(active = true) {

@@ -78,7 +78,7 @@ export default function Logs() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container logs-container">
+      <div className="ui-container logs-container app-scroll">
         {/* 画面名はアプリヘッダが出すので、ここに見出し行は置かない（2026-08-12） */}
         <FeatureHeader
           filters={

@@ -65,7 +65,7 @@ export default function EquipmentItems() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow">
+      <div className="ui-container is-narrow app-scroll">
         <FeatureHeader
           actions={
             <>

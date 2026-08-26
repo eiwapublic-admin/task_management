@@ -385,7 +385,7 @@ export default function ParkingViolations() {
       {/* PCではウインドウ幅を十分に使う（2026-08-25。ダッシュボードのグラフ・ランキングの
           文字が隠れないようにするための依頼）。max-width指定を持たないため、
           Logs.jsx・Archive.jsx・日報カレンダー表示（.is-calendar）と同じ全幅表示になる */}
-      <div className="ui-container reports-container">
+      <div className="ui-container reports-container app-scroll">
         {/* 機能ヘッダ（2026-08-13。ホームボタンは廃止。機能間の移動はダッシュボード経由に
             一本化済み）。1行目は左から ソート順・虫眼鏡・＋ の順で必ず1行に収める
             （`actions` は狭幅で2行目に分かれる仕様のため、＋も含めて全て `filters` に

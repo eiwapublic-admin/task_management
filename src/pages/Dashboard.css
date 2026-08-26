@@ -530,13 +530,18 @@
   flex-shrink: 0;
 }
 
-/* 設定ページの本文コンテナ（横は画面いっぱいに使う。業務背景欄が残りの高さを埋める） */
+/* 設定ページの本文コンテナ（横は画面いっぱいに使う。業務背景欄が残りの高さを埋める）。
+   アプリシェル導入（2026-08-26）により本体は常にこの内部スクロールに統一したため、
+   幅を問わず overflow-y: auto を持たせる（.app-scroll と同じ役割） */
 .settings-container {
   padding: var(--page-pad-y) var(--page-pad-x);
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 設定ページ: タイトル・保存結果メッセージ・保存ボタンを1行に */
@@ -553,20 +558,10 @@
   color: var(--status-done);
 }
 
-@media (max-width: 900px) {
-  /* 1カラムに積む幅では、設定パネル側(SettingsPanel.css)と合わせて
-     ウインドウ高さ固定をやめ、従来どおりページ全体でスクロールさせる */
-  .settings-page {
-    height: auto;
-    overflow: visible;
-  }
-
-  .settings-container {
-    flex: none;
-    min-height: auto;
-    display: block;
-  }
-}
+/* 旧: 1カラムに積む幅ではウインドウ高さ固定をやめてページ全体でスクロール
+   させていたが、アプリシェル導入（2026-08-26）により幅を問わず
+   .settings-container の内部スクロールに統一したため、この上書きは廃止した。
+   SettingsPanel.css 側の1カラム化（グリッド→縦積み）はそのまま有効。 */
 
 /* 処理ログ・アーカイブ画面。表を素直に広げたいので max-width は付けない
    （2026-07-18 に 1100px 制限を撤廃した経緯があるため、幅の制限を戻さないこと）。
