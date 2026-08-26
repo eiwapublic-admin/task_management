@@ -756,9 +756,9 @@ async function refreshWarning(supabase, itemId) {
 // 担当者・場所・調達先の候補（過去値からの重複除去）
 // ============================================================
 
-const SUGGEST_FIELDS = { staff: 'staff_name', location: 'location', supplier: 'supplier', floor: 'floor' }
+const SUGGEST_FIELDS = { staff: 'staff_name', location: 'location', supplier: 'supplier' }
 
-// GET /api/equipment/suggest?field=staff|location|supplier|floor — <datalist> 用の候補（使用頻度順）
+// GET /api/equipment/suggest?field=staff|location|supplier — <datalist> 用の候補（使用頻度順）
 export async function handleEquipmentSuggest(req) {
   const { error } = await requireAuth(req)
   if (error) return error

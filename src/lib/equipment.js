@@ -24,6 +24,9 @@ export const EQUIPMENT_REASON_LABELS = Object.fromEntries(
   [...EQUIPMENT_IN_REASONS, ...EQUIPMENT_OUT_REASONS].map((r) => [r.key, r.label])
 )
 
+// 共用部設置の階（リスト選択。2026-08-26）。B=地下
+export const EQUIPMENT_FLOOR_OPTIONS = ['B', '1', '2', '3', '4', '5', '6', '7']
+
 // ---- カテゴリ ----
 
 export async function fetchEquipmentCategories() {

@@ -7,6 +7,7 @@ import { toDateTimeLocal } from '../lib/reports'
 import DateTimeInput from './DateTimeInput'
 import {
   EQUIPMENT_OUT_REASONS,
+  EQUIPMENT_FLOOR_OPTIONS,
   createEquipmentTransaction,
   updateEquipmentTransaction,
   fetchEquipmentSuggest,
@@ -54,7 +55,6 @@ export default function EquipmentOutForm({
   const [locationOptions, setLocationOptions] = useState([])
   // 共用部設置のときだけ入力する階（テナント設置は選んだテナントの階を自動で使う。2026-08-26追加）
   const [floor, setFloor] = useState(existing?.floor || '')
-  const [floorOptions, setFloorOptions] = useState([])
   const [quantity, setQuantity] = useState(existing ? String(existing.quantity) : '')
   const [staffName, setStaffName] = useState(existing?.staff_name || '')
   const [staffOptions, setStaffOptions] = useState([])
@@ -104,7 +104,6 @@ export default function EquipmentOutForm({
 
   useEffect(() => {
     fetchEquipmentSuggest('location').then(setLocationOptions).catch(() => {})
-    fetchEquipmentSuggest('floor').then(setFloorOptions).catch(() => {})
     fetchEquipmentSuggest('staff').then(setStaffOptions).catch(() => {})
     // 退去済みも含めて取得する（編集中の記録が過去に退去済みテナントへ設置していた場合、
     // 一覧から消えて選択欄の表示が壊れないようにするため。候補としては後で絞り込む）
@@ -224,9 +223,7 @@ export default function EquipmentOutForm({
             </p>
           )}
 
-          {locked && (
-            <p className="ui-note">署名済みの記録です。修正できません（内容の確認のみできます）。</p>
-          )}
+          {locked && <p className="ui-note">署名済みのため修正できません</p>}
 
           <div className="equipment-reason-field">
             <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
@@ -294,11 +291,11 @@ export default function EquipmentOutForm({
                 {selectedTenant?.moved_out && <p className="equipment-tenant-summary is-danger">退去済み</p>}
               </div>
               <div className="ui-field equipment-floor-field">
-                <span>階</span>
                 <input
                   type="text"
                   className="ui-input"
-                  value={selectedTenant?.floor ? `${selectedTenant.floor}F` : '—'}
+                  value={selectedTenant?.floor ? `${selectedTenant.floor}F` : ''}
+                  placeholder="階"
                   disabled
                   readOnly
                 />
@@ -309,16 +306,25 @@ export default function EquipmentOutForm({
           {reason === 'common' && (
             <div className="ui-field-row">
               <div className="ui-field equipment-floor-field">
-                <span>階</span>
-                <Combobox value={floor} onChange={setFloor} options={floorOptions} placeholder="3" disabled={locked} />
+                <select className="ui-select" value={floor} disabled={locked} onChange={(e) => setFloor(e.target.value)}>
+                  {!floor && (
+                    <option value="" disabled>
+                      階
+                    </option>
+                  )}
+                  {EQUIPMENT_FLOOR_OPTIONS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="ui-field">
-                <span>設置場所</span>
                 <Combobox
                   value={location}
                   onChange={setLocation}
                   options={locationOptions}
-                  placeholder="喫煙室 / 通路 / 玄関ホール"
+                  placeholder="設置場所"
                   disabled={locked}
                 />
               </div>
