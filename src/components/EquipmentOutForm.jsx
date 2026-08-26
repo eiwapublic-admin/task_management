@@ -306,18 +306,26 @@ export default function EquipmentOutForm({
           {reason === 'common' && (
             <div className="ui-field-row">
               <div className="ui-field equipment-floor-field">
-                <select className="ui-select" value={floor} disabled={locked} onChange={(e) => setFloor(e.target.value)}>
-                  {!floor && (
-                    <option value="" disabled>
-                      階
-                    </option>
-                  )}
-                  {EQUIPMENT_FLOOR_OPTIONS.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
+                <div className="equipment-floor-inline">
+                  <select
+                    className="ui-select"
+                    value={floor}
+                    disabled={locked}
+                    onChange={(e) => setFloor(e.target.value)}
+                  >
+                    {!floor && (
+                      <option value="" disabled>
+                        階
+                      </option>
+                    )}
+                    {EQUIPMENT_FLOOR_OPTIONS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  {floor && <span className="equipment-floor-suffix">F</span>}
+                </div>
               </div>
               <div className="ui-field">
                 <Combobox
