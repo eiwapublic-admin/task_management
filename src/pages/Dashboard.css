@@ -1374,12 +1374,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 /* 入力欄の小見出し（作業者・時間／作業記録／写真 等）。日報系はイエロー基調で
    タスク一覧のグリーン系ヘッダーと区別する（2026-08-05）。カード上端いっぱいに
-   バーとして敷き、負のマージンで card の padding 分だけ外側へ広げる。
-   上端の食い込みは card の一番上に来るとき（:first-child）だけにする（2026-08-26。
-   作業記録カードで「＋」「定型文から追加」をこの見出しより上に出すようになり、
-   その場合は上端の食い込みを外して見出しの上に通常の余白を残す必要があるため） */
+   バーとして敷き、負のマージンで card の padding 分だけ外側へ広げる。 */
 .report-card-title {
-  margin: 0 calc(var(--space-4) * -1) var(--space-3);
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--reports-header-bg);
   color: var(--reports-header-ink);
@@ -1388,9 +1385,6 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-.report-card-title:first-child {
-  margin-top: calc(var(--space-4) * -1);
 }
 
 /* 「作業者・時間」欄右端の「休館日」ボタン（2026-08-07）。見出しバーの一番右に寄せる */
@@ -1492,13 +1486,23 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   padding: 2px 8px;
 }
 
-/* 記録の追加ボタンと定型文からの追加を横並びにする。作業一覧の左端
-   （データがある場合はその下）に置く（2026-08-05。定型文の選択はこの行に統合） */
+/* 記録の追加ボタンと定型文からの追加を横並びにする（2026-08-05。定型文の選択はこの行に
+   統合）。**「作業記録」見出しバーの右側**に置く（.report-card-title-action。2026-08-26。
+   以前は見出しの下・上と場所を変えたが、依頼により見出しと同じ行の右端に確定した） */
 .entry-add-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+/* 見出しバーの右端に収める場合は、行としての下マージンを消し、見出し文字（狭幅では
+   4文字）とボタン・セレクトが両方収まるよう縮んでよくする（既定の .report-card-title-action
+   は flex-shrink:0 の想定だが、ここは選択肢の文字数次第で幅を取り合うため上書きする） */
+.report-card-title .entry-add-row {
+  margin-bottom: 0;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .entry-add-trigger { flex-shrink: 0; }
@@ -1513,6 +1517,12 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
+}
+
+/* 見出しバーの中では320pxもの幅は取れないため、狭く抑える（2026-08-26） */
+.report-card-title .entry-template-select {
+  min-width: 0;
+  max-width: 170px;
 }
 
 .template-textarea {

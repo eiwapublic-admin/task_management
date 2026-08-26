@@ -371,40 +371,41 @@ export default function ReportDetail({ date, onClose }) {
             </section>
 
             <section className="report-card">
-              {!readOnly && (
-                <div className="entry-add-row">
-                  <button
-                    type="button"
-                    className="icon-btn-add is-compact entry-add-trigger"
-                    onClick={() => handleAddEntry()}
-                    aria-label="記録を追加"
-                    title="記録を追加"
-                  >
-                    ＋
-                  </button>
-                  {templates.length > 0 && (
-                    <select
-                      className="entry-template-select"
-                      value=""
-                      aria-label="定型文から追加"
-                      onChange={(e) => {
-                        const label = e.target.value
-                        e.target.value = ''
-                        if (label) handleAddEntry(label)
-                      }}
+              <h3 className="report-card-title">
+                作業記録
+                {!readOnly && (
+                  <div className="entry-add-row report-card-title-action">
+                    <button
+                      type="button"
+                      className="icon-btn-add is-compact entry-add-trigger"
+                      onClick={() => handleAddEntry()}
+                      aria-label="記録を追加"
+                      title="記録を追加"
                     >
-                      <option value="">定型文から追加…</option>
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.label}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              <h3 className="report-card-title">作業記録</h3>
+                      ＋
+                    </button>
+                    {templates.length > 0 && (
+                      <select
+                        className="entry-template-select"
+                        value=""
+                        aria-label="定型文から追加"
+                        onChange={(e) => {
+                          const label = e.target.value
+                          e.target.value = ''
+                          if (label) handleAddEntry(label)
+                        }}
+                      >
+                        <option value="">定型文から追加…</option>
+                        {templates.map((t) => (
+                          <option key={t.id} value={t.label}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </h3>
 
               {entries.length === 0 && <p className="settings-hint">まだ記録がありません。</p>}
 
