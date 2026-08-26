@@ -165,6 +165,7 @@ export default function EquipmentOutForm({
       let saved = savedTxn
       if (!saved) {
         const payload = {
+          item_id: itemId,
           reason,
           occurred_at: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
           location: reason === 'common' ? location || null : null,
@@ -175,7 +176,7 @@ export default function EquipmentOutForm({
         }
         saved = existing
           ? await updateEquipmentTransaction(existing.id, payload)
-          : await createEquipmentTransaction({ item_id: itemId, kind: 'out', ...payload })
+          : await createEquipmentTransaction({ ...payload, kind: 'out' })
         setSavedTxn(saved)
       }
 
@@ -247,7 +248,7 @@ export default function EquipmentOutForm({
             <select
               className="ui-select"
               value={itemId}
-              disabled={Boolean(existing) || locked}
+              disabled={locked}
               onChange={(e) => {
                 itemTouchedRef.current = true
                 setItemId(e.target.value)
