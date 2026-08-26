@@ -351,6 +351,18 @@
    コンテナより広くし、代わりに横スクロールさせる */
 .equipment-tenant-table { min-width: 640px; }
 
+/* 階ごとの帯（2026-08-26）。他のページの見出し行（自主検査表ヘッダ・日報カレンダー曜日行の
+   グリーン帯・備品在庫一覧の備品名バナー）と同じ色式に揃え、階の文字も同様に大きく太字にする */
+.equipment-tenant-floor-head {
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 明細のテナント名（2026-08-26。太字にしてほしいとの依頼） */
+.equipment-tenant-name-cell { font-weight: 700; }
+
 .equipment-history-in { color: var(--color-brand); font-weight: 600; }
 .equipment-history-out { color: var(--color-primary); font-weight: 600; }
 .equipment-history-row { cursor: pointer; }
