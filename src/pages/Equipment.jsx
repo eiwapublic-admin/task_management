@@ -3,6 +3,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
+import useEquipmentSlipPdfExport from '../hooks/useEquipmentSlipPdfExport'
 import { getCurrentUser } from '../lib/auth'
 import { todayJST, jstDateOnly } from '../lib/reports'
 import {
@@ -20,6 +21,16 @@ const PERIODS = [
   { key: '1y', label: '1年' },
   { key: 'all', label: '全期間' },
 ]
+
+// 年月順表示（2026-08-26）用のヘルパー。違反車両一覧（ParkingViolations.jsx）と
+// 同じ考え方で、JSTの'YYYY-MM'をキーにする
+function monthKeyOfTxn(t) {
+  return jstDateOnly(t.occurred_at).slice(0, 7)
+}
+function monthLabelOfTxn(key) {
+  const [y, m] = key.split('-')
+  return `${y}年${Number(m)}月`
+}
 
 // 在庫一覧（備品セクションのホーム画面）。
 // 各備品の入出庫明細は行をタップしなくてもその場に展開表示する（2026-08-12〜）。
@@ -52,6 +63,10 @@ export default function Equipment() {
   const [error, setError] = useState('')
   const [showDisabled, setShowDisabled] = useState(false)
   const [mode, setMode] = useState(null) // null | 'in' | 'out'
+  // 並べ順（2026-08-26）。'item'＝備品順（既定・従来どおりカテゴリ→備品ごとの明細表）、
+  // 'month'＝年月順（全備品の明細を年月でグルーピングし、直近から日付順に混在表示）
+  const [listView, setListView] = useState('item')
+  const slipExport = useEquipmentSlipPdfExport()
   // 出庫/入庫フォームをどの備品を選んだ状態で開くか。在庫一覧の行の「出」「入」ボタンから
   // 開いた場合はその備品のid、ヘッダの「出庫」「入庫」ボタンから開いた場合は空欄（2026-08-18）
   const [presetItemId, setPresetItemId] = useState('')
@@ -87,6 +102,57 @@ export default function Equipment() {
     }
     return [...map.values()]
   }, [items])
+
+  // 年月順表示（2026-08-26）。表示中の備品（無効品込みトグルに従う）に限定し、
+  // 全備品の明細を1本のリストへ展開してから年月でグルーピングする
+  const itemsById = useMemo(() => new Map(items.map((it) => [it.id, it])), [items])
+
+  const flatTransactions = useMemo(() => {
+    const list = []
+    for (const [itemId, txns] of Object.entries(transactionsByItem)) {
+      const item = itemsById.get(itemId)
+      if (!item) continue // 無効品込みがオフのときは非表示の備品と揃える
+      for (const t of txns) list.push({ ...t, item })
+    }
+    return list
+  }, [transactionsByItem, itemsById])
+
+  const monthGroups = useMemo(() => {
+    const map = new Map()
+    for (const t of flatTransactions) {
+      const k = monthKeyOfTxn(t)
+      if (!map.has(k)) map.set(k, [])
+      map.get(k).push(t)
+    }
+    const entries = [...map.entries()]
+    entries.sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0)) // 新しい年月が先
+    for (const [, rows] of entries) {
+      rows.sort((a, b) => {
+        const diff = new Date(b.occurred_at) - new Date(a.occurred_at)
+        if (diff !== 0) return diff
+        return (b.txn_no || 0) - (a.txn_no || 0) // 同日は登録が新しい順
+      })
+    }
+    return entries
+  }, [flatTransactions])
+
+  // 修理伝票PDF出力（2026-08-26）。年月グループのバナーから、その月のテナント設置分
+  // （reason==='tenant'）だけを抽出して渡す
+  function handleSlipOutput(monthKey, rows) {
+    const tenantRows = rows.filter((t) => t.reason === 'tenant')
+    if (tenantRows.length === 0) return
+    const records = tenantRows.map((t) => ({
+      id: t.id,
+      occurredAt: t.occurred_at,
+      floor: t.floor,
+      tenantName: t.tenant_name,
+      productCode: t.item.product_code || t.item.short_name || t.item.name,
+      quantity: t.quantity,
+      staffName: t.staff_name,
+      hasSignature: Boolean(t.signature_key),
+    }))
+    slipExport.download(records, monthLabelOfTxn(monthKey))
+  }
 
   // ヘッダの「出庫」「入庫」ボタン（備品は空欄）と、在庫一覧の行の「出」「入」ボタン
   // （備品はその行のものをあらかじめ選択）の両方から使う（2026-08-18）
@@ -127,6 +193,26 @@ export default function Equipment() {
         <FeatureHeader
           filters={
             <>
+              {/* 並べ順（2026-08-26）。備品順＝従来の「カテゴリ→備品ごとの明細表」、
+                  年月順＝全備品の明細を年月でグルーピングし直近から日付順に混在表示 */}
+              <div className="ui-segmented" role="group" aria-label="並べ順">
+                <button
+                  type="button"
+                  className={`ui-segmented-btn${listView === 'item' ? ' is-active' : ''}`}
+                  aria-pressed={listView === 'item'}
+                  onClick={() => setListView('item')}
+                >
+                  備品順
+                </button>
+                <button
+                  type="button"
+                  className={`ui-segmented-btn${listView === 'month' ? ' is-active' : ''}`}
+                  aria-pressed={listView === 'month'}
+                  onClick={() => setListView('month')}
+                >
+                  年月順
+                </button>
+              </div>
               <select
                 className="equipment-period-select"
                 value={period}
@@ -182,8 +268,86 @@ export default function Equipment() {
           </p>
         )}
 
+        {slipExport.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {slipExport.error}
+          </p>
+        )}
+
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
+        ) : listView === 'month' ? (
+          monthGroups.length === 0 ? (
+            <p className="ui-empty">この期間の入出庫記録はありません。</p>
+          ) : (
+            <div className="equipment-month-groups">
+              {monthGroups.map(([mk, rows]) => {
+                const tenantCount = rows.filter((t) => t.reason === 'tenant').length
+                return (
+                  <section className="equipment-month-group" key={mk}>
+                    <h3 className="equipment-month-head">
+                      {monthLabelOfTxn(mk)}
+                      <span className="equipment-month-head-count">{rows.length}件</span>
+                      {/* テナント設置分（reason==='tenant'）が無い月は押しても意味が
+                          無いため無効化する（2026-08-26） */}
+                      <button
+                        type="button"
+                        className="btn-plain equipment-slip-btn"
+                        onClick={() => handleSlipOutput(mk, rows)}
+                        disabled={tenantCount === 0 || slipExport.busy}
+                        title={tenantCount === 0 ? 'この月にテナント設置分の記録がありません' : '修理伝票PDFを作成'}
+                      >
+                        伝票出力
+                      </button>
+                    </h3>
+                    <div className="ui-table-wrap">
+                      <table className="ui-table equipment-txn-table">
+                        <thead>
+                          <tr>
+                            <th>日付</th>
+                            <th>備品</th>
+                            <th>階</th>
+                            <th className="equipment-txn-loc">設置先</th>
+                            <th className="is-numeric">出庫</th>
+                            <th className="is-numeric">入庫</th>
+                            <th>理由</th>
+                            <th>担当</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((t) => {
+                            const editable = canEditTxn(t)
+                            return (
+                              <tr
+                                key={t.id}
+                                className={editable ? 'equipment-history-row' : ''}
+                                onClick={editable ? () => setEditing(t) : undefined}
+                              >
+                                <td>{formatEquipmentDate(t.occurred_at)}</td>
+                                <td>{t.item.short_name || t.item.name}</td>
+                                <td>{t.floor ? `${t.floor}F` : ''}</td>
+                                <td className="equipment-txn-loc" title={t.tenant_short_name || t.location || ''}>
+                                  {t.tenant_short_name || t.location || ''}
+                                </td>
+                                <td className="is-numeric equipment-history-out">
+                                  {t.kind === 'out' ? t.quantity : ''}
+                                </td>
+                                <td className="is-numeric equipment-history-in">
+                                  {t.kind === 'in' ? t.quantity : ''}
+                                </td>
+                                <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
+                                <td>{t.staff_name || ''}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          )
         ) : groups.length === 0 ? (
           <p className="ui-empty">備品が登録されていません。</p>
         ) : (
@@ -343,6 +507,12 @@ export default function Equipment() {
             onDelete={handleDelete}
           />
         ))}
+
+      {/* 修理伝票PDF（2026-08-26）。sheetsPortal は画面外の紙様式シート（PDF作成中だけ描画）、
+          previewModal はアプリ内プレビュー、busyOverlay は作成中の全画面ブロック */}
+      {slipExport.sheetsPortal}
+      {slipExport.previewModal}
+      {slipExport.busyOverlay}
     </div>
   )
 }
