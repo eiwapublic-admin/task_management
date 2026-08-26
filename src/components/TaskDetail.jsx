@@ -386,7 +386,7 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
               ))}
               {canMarkSpam && (
                 <>
-                  <option disabled>──────────</option>
+                  <option disabled>────</option>
                   <option value={SPAM_OPTION}>スパム</option>
                 </>
               )}

@@ -1020,8 +1020,6 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .report-date.is-saturday { color: var(--color-primary-hover); }
 .report-date.is-holiday { color: var(--color-danger); }
 
-.report-workers { font-size: var(--fs-sm); color: var(--text-muted); }
-
 .report-today-badge {
   margin-left: 8px;
   padding: 2px 10px;
@@ -1376,9 +1374,12 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 /* 入力欄の小見出し（作業者・時間／作業記録／写真 等）。日報系はイエロー基調で
    タスク一覧のグリーン系ヘッダーと区別する（2026-08-05）。カード上端いっぱいに
-   バーとして敷き、負のマージンで card の padding 分だけ外側へ広げる。 */
+   バーとして敷き、負のマージンで card の padding 分だけ外側へ広げる。
+   上端の食い込みは card の一番上に来るとき（:first-child）だけにする（2026-08-26。
+   作業記録カードで「＋」「定型文から追加」をこの見出しより上に出すようになり、
+   その場合は上端の食い込みを外して見出しの上に通常の余白を残す必要があるため） */
 .report-card-title {
-  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-3);
+  margin: 0 calc(var(--space-4) * -1) var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--reports-header-bg);
   color: var(--reports-header-ink);
@@ -1387,6 +1388,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+.report-card-title:first-child {
+  margin-top: calc(var(--space-4) * -1);
 }
 
 /* 「作業者・時間」欄右端の「休館日」ボタン（2026-08-07）。見出しバーの一番右に寄せる */
@@ -2099,6 +2103,10 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 /* ホーム・年月・タイトルを1行にまとめる（2026-08-05。BKBのみ運用のためビル切替は廃止） */
 .inspection-month { display: flex; align-items: center; gap: var(--space-3); }
+
+/* 「本日」ボタン（2026-08-26。日報一覧の年月移動の右）。押すと今日を含む月へ切り替え、
+   本日の行/マスまでスクロールする。他のボタンと同じ行に収めるため左右パディングを詰める */
+.reports-today-btn { flex-shrink: 0; padding: 0 var(--space-3); }
 /* ページタイトルと同じ大きさに揃える（2026-08-07。日報一覧の月見出しとも共通） */
 .inspection-month-label { font-size: var(--fs-xl); font-weight: 700; color: var(--text-strong); }
 
