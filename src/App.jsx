@@ -14,6 +14,7 @@ import Chlorine from './pages/Chlorine'
 import Equipment from './pages/Equipment'
 import EquipmentItemHistory from './pages/EquipmentItemHistory'
 import EquipmentItems from './pages/EquipmentItems'
+import EquipmentTenants from './pages/EquipmentTenants'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -159,6 +160,15 @@ function App() {
           element={
             <RequireAuth>
               <EquipmentItemHistory />
+            </RequireAuth>
+          }
+        />
+        {/* テナントマスタ（参照専用。2026-08-26）。docs/equipment-plan.md 2-6・7-1参照 */}
+        <Route
+          path="/equipment/tenants"
+          element={
+            <RequireAuth>
+              <EquipmentTenants />
             </RequireAuth>
           }
         />

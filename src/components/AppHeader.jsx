@@ -39,6 +39,7 @@ const FEATURE_TITLES = [
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
   { path: '/equipment/items', title: '備品マスタ', exact: true },
+  { path: '/equipment/tenants', title: 'テナントマスタ', exact: true },
   { path: '/equipment', title: '備品' },
   { path: '/reports', title: '日報' },
   { path: '/', title: 'タスク' },
@@ -250,6 +251,7 @@ export default function AppHeader({ lastFetchAt } = {}) {
                       （マスタ編集は出さない。docs/equipment-plan.md 5-0） */}
                   <button onClick={() => goTo('/equipment')}>在庫一覧</button>
                   {!isOwner && <button onClick={() => goTo('/equipment/items')}>備品マスタ</button>}
+                  {!isOwner && <button onClick={() => goTo('/equipment/tenants')}>テナントマスタ</button>}
                   {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
                 </>
               ) : inReports || isOwner ? (

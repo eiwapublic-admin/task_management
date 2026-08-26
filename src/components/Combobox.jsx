@@ -18,7 +18,10 @@ export default function Combobox({ value, onChange, onSelect, options, placehold
   const filtered = useMemo(() => {
     const q = value.trim().toLowerCase()
     const list = q ? normalized.filter((o) => o.label.toLowerCase().includes(q)) : normalized
-    return list.slice(0, 20)
+    // 上限20件だと備品テナント（現在32件）等、候補が多い一覧で後方（階の大きいテナント等）が
+    // 一切選べなくなっていた（2026-08-26）。候補欄自体が max-height:240px + overflow-y:auto で
+    // スクロールする作りのため、件数を増やしても表示は崩れない。実用上十分な上限として200件にする
+    return list.slice(0, 200)
   }, [value, normalized])
 
   useEffect(() => {
