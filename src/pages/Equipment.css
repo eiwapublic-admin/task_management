@@ -344,6 +344,13 @@
   color: var(--text-muted);
 }
 
+/* テナントマスタ（2026-08-26）。.ui-table は width:100% のため、テナント名等の
+   長い文字列があると横スクロールせずセル内で1文字ずつ折り返ってしまう
+   （.ui-table-wrap 自体は overflow-x:auto を持つが、表がコンテナ幅を超えない限り
+   発動しない）。.logs-table の狭幅対応と同じ考え方で、最小幅を持たせて
+   コンテナより広くし、代わりに横スクロールさせる */
+.equipment-tenant-table { min-width: 640px; }
+
 .equipment-history-in { color: var(--color-brand); font-weight: 600; }
 .equipment-history-out { color: var(--color-primary); font-weight: 600; }
 .equipment-history-row { cursor: pointer; }
