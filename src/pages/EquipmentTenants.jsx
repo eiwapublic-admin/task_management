@@ -80,14 +80,14 @@ export default function EquipmentTenants() {
                 {groups.map((g) => (
                   <Fragment key={g.floor}>
                     <tr>
-                      <td colSpan={5} className="equipment-master-group-head">
+                      <td colSpan={5} className="equipment-tenant-floor-head">
                         {floorGroupLabel(g.floor)}
                       </td>
                     </tr>
                     {g.rows.map((t) => (
                       <tr key={t.id}>
                         <td>{t.billing_code || ''}</td>
-                        <td>{t.name}</td>
+                        <td className="equipment-tenant-name-cell">{t.name}</td>
                         <td>{t.short_name || ''}</td>
                         <td>{t.moved_out && <span className="ui-badge is-danger">退去済み</span>}</td>
                         <td>{t.note || ''}</td>
