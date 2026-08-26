@@ -20,6 +20,40 @@
   color: var(--text-strong);
 }
 
+/* 年月順表示（2026-08-26）。備品順（.equipment-stock-list）と同じ縦積みの間隔にする */
+.equipment-month-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+/* 年月の見出し。.equipment-stock-group-head と同じ見た目に、件数と「伝票出力」
+   ボタンを右側へ添える（.equipment-stock-name と同じ考え方でflex化） */
+.equipment-month-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.equipment-month-head-count {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.equipment-slip-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .equipment-stock-rows {
   list-style: none;
   margin: 0;

@@ -150,3 +150,14 @@ export function formatEquipmentDate(value) {
     weekday: 'short',
   })
 }
+
+// 修理伝票PDF（2026-08-26）専用の和暦表示。「令和8年 7月22日」の形式（紙の様式に合わせ、
+// 月日は0埋めしない）。この機能で扱うデータは全て2019-05-01（令和改元）以降のため、
+// 令和より前の元号は考慮しない。
+export function formatEquipmentDateReiwa(value) {
+  const d = new Date(value)
+  const parts = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).split('-').map(Number)
+  const [y, m, day] = parts
+  const reiwaYear = y - 2018
+  return `令和${reiwaYear}年 ${m}月${day}日`
+}

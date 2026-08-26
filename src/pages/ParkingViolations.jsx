@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
-import FeatureHeader from '../components/FeatureHeader'
 import { MonthlyTrendChart, RankingBarList } from '../components/ParkingCharts'
 import { IconSearch, IconChevronRight } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
@@ -386,83 +385,6 @@ export default function ParkingViolations() {
           文字が隠れないようにするための依頼）。max-width指定を持たないため、
           Logs.jsx・Archive.jsx・日報カレンダー表示（.is-calendar）と同じ全幅表示になる */}
       <div className="ui-container reports-container app-scroll">
-        {/* 機能ヘッダ（2026-08-13。ホームボタンは廃止。機能間の移動はダッシュボード経由に
-            一本化済み）。1行目は左から ソート順・虫眼鏡・＋ の順で必ず1行に収める
-            （`actions` は狭幅で2行目に分かれる仕様のため、＋も含めて全て `filters` に
-            まとめている。以前は＋だけ `actions` に残していたためモバイルで2行目に
-            落ちていた） */}
-        <FeatureHeader
-          filters={
-            <>
-              <div className="ui-segmented" role="group" aria-label="並び順">
-                <button
-                  type="button"
-                  className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
-                  aria-pressed={sort === 'date'}
-                  onClick={() => setSort('date')}
-                >
-                  日付順
-                </button>
-                <button
-                  type="button"
-                  className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
-                  aria-pressed={sort === 'rank'}
-                  onClick={() => setSort('rank')}
-                >
-                  累計回数順
-                </button>
-              </div>
-              <button
-                type="button"
-                className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
-                onClick={handleToggleSearch}
-                aria-label="ナンバー・会社名などで検索"
-                aria-pressed={searchOpen}
-                title="ナンバー・会社名などで検索"
-              >
-                <IconSearch size={20} />
-              </button>
-              {!isOwner && (
-                <button
-                  type="button"
-                  className="icon-btn-add"
-                  onClick={handleOpenQuickAdd}
-                  disabled={preparingQuickAdd}
-                  aria-label="違反車両を記録（本日分）"
-                  title="違反車両を記録（本日分）"
-                >
-                  ＋
-                </button>
-              )}
-            </>
-          }
-        >
-          {searchOpen && (
-            <div className="reports-search-bar">
-              <IconSearch size={18} />
-              <input
-                type="search"
-                className="reports-search-input"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="ナンバー・会社名などで検索"
-                aria-label="ナンバー・会社名などで検索"
-                autoFocus
-              />
-              {query && (
-                <button
-                  type="button"
-                  className="reports-search-clear"
-                  onClick={() => setQuery('')}
-                  aria-label="検索文字をクリア"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
-        </FeatureHeader>
-
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
@@ -545,6 +467,76 @@ export default function ParkingViolations() {
               </div>
               <RankingBarList items={vehicleRanking} />
             </div>
+          </div>
+        )}
+
+        {/* 並び順・検索・＋（2026-08-26。以前は機能ヘッダに置いていたが、グラフ・
+            ランキングの下、一覧表の上に移動してほしいとの依頼を受けて通常の行にした。
+            固定表示（sticky）は不要になったため .ui-toolbar を使う */}
+        <div className="ui-toolbar">
+          <div className="ui-segmented" role="group" aria-label="並び順">
+            <button
+              type="button"
+              className={`ui-segmented-btn${sort === 'date' ? ' is-active' : ''}`}
+              aria-pressed={sort === 'date'}
+              onClick={() => setSort('date')}
+            >
+              日付順
+            </button>
+            <button
+              type="button"
+              className={`ui-segmented-btn${sort === 'rank' ? ' is-active' : ''}`}
+              aria-pressed={sort === 'rank'}
+              onClick={() => setSort('rank')}
+            >
+              累計回数順
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
+            onClick={handleToggleSearch}
+            aria-label="ナンバー・会社名などで検索"
+            aria-pressed={searchOpen}
+            title="ナンバー・会社名などで検索"
+          >
+            <IconSearch size={20} />
+          </button>
+          {!isOwner && (
+            <button
+              type="button"
+              className="icon-btn-add"
+              onClick={handleOpenQuickAdd}
+              disabled={preparingQuickAdd}
+              aria-label="違反車両を記録（本日分）"
+              title="違反車両を記録（本日分）"
+            >
+              ＋
+            </button>
+          )}
+        </div>
+        {searchOpen && (
+          <div className="reports-search-bar">
+            <IconSearch size={18} />
+            <input
+              type="search"
+              className="reports-search-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ナンバー・会社名などで検索"
+              aria-label="ナンバー・会社名などで検索"
+              autoFocus
+            />
+            {query && (
+              <button
+                type="button"
+                className="reports-search-clear"
+                onClick={() => setQuery('')}
+                aria-label="検索文字をクリア"
+              >
+                ×
+              </button>
+            )}
           </div>
         )}
 
