@@ -53,7 +53,7 @@ export default function EquipmentTenants() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow app-scroll">
+      <div className="ui-container is-wide app-scroll">
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
