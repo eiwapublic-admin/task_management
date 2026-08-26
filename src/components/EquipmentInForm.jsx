@@ -64,6 +64,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
     if (!itemId) return setError('備品を選択してください')
     if (!Number.isFinite(numericQty) || numericQty === 0) return setError('入庫数量を入力してください')
     if (numericQty < 0 && reason !== 'adjust') return setError('マイナスの数量は在庫調整のときだけ指定できます')
+    if (!staffName) return setError('担当者を入力してください')
 
     setSaving(true)
     try {
@@ -103,7 +104,6 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
           )}
 
           <div className="equipment-reason-field">
-            <span>入庫理由</span>
             <div className="equipment-reason-toggle" role="group" aria-label="入庫理由">
               {EQUIPMENT_IN_REASONS.map((r) => (
                 <button
@@ -124,8 +124,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
             <DateTimeInput value={occurredAt} onChange={setOccurredAt} />
           </label>
 
-          <label className="ui-field">
-            <span>備品</span>
+          <div className="ui-field">
             <select
               className="ui-select"
               value={itemId}
@@ -134,7 +133,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
             >
               {!itemId && (
                 <option value="" disabled>
-                  選択してください
+                  備品
                 </option>
               )}
               {groups.map((g) => (
@@ -147,29 +146,29 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
                 </optgroup>
               ))}
             </select>
-          </label>
+          </div>
 
           <div className="ui-field">
             <span>調達先</span>
             <Combobox value={supplier} onChange={setSupplier} options={supplierOptions} />
           </div>
 
-          <div className="ui-field-row">
-            <label className="ui-field">
-              <span>入庫数量</span>
-              <input
-                type="number"
-                className="ui-input"
-                inputMode="numeric"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </label>
-
-            <div className="ui-field">
-              <span>担当者</span>
-              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} />
-            </div>
+          <div className="equipment-qty-staff-row">
+            <input
+              type="number"
+              className="ui-input equipment-qty-input"
+              inputMode="numeric"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+            <span className="equipment-qty-unit">本</span>
+            <span className="equipment-staff-prefix">担当</span>
+            <Combobox
+              className="equipment-staff-combobox"
+              value={staffName}
+              onChange={setStaffName}
+              options={staffOptions}
+            />
           </div>
 
           {!existing && beforeQty !== null && (
@@ -178,8 +177,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
             </p>
           )}
 
-          <label className="ui-field">
-            <span>備考</span>
+          <div className="ui-field">
             <textarea
               className="ui-textarea is-compact"
               rows={1}
@@ -187,7 +185,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
               onChange={(e) => setNote(e.target.value)}
               placeholder="在庫調整理由など"
             />
-          </label>
+          </div>
         </div>
 
         <div className="ui-modal-foot">

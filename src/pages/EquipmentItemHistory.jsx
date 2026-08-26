@@ -152,6 +152,7 @@ export default function EquipmentItemHistory() {
                       <th className="is-numeric">入庫</th>
                       <th className="is-numeric">出庫</th>
                       <th className="is-numeric">残</th>
+                      <th>階</th>
                       <th>設置先</th>
                       <th>担当</th>
                     </tr>
@@ -170,6 +171,7 @@ export default function EquipmentItemHistory() {
                         <td className="is-numeric equipment-history-in">{t.kind === 'in' ? t.quantity : ''}</td>
                         <td className="is-numeric equipment-history-out">{t.kind === 'out' ? t.quantity : ''}</td>
                         <td className="is-numeric">{t.balance}</td>
+                        <td>{t.floor ? `${t.floor}F` : ''}</td>
                         <td>{t.tenant_short_name || t.location || ''}</td>
                         <td>{t.staff_name || ''}</td>
                       </tr>

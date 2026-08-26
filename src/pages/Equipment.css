@@ -233,6 +233,35 @@
   color: var(--text-faint);
 }
 
+/* 階（5-4。共用部は入力、テナントは自動表示。2026-08-26追加）。
+   数字1〜2文字程度なので、設置場所・設置先テナントより狭い固定幅にする */
+.equipment-floor-field { flex: 0 0 5em; }
+
+/* 出庫/入庫数量＋担当者を1行にまとめる（2026-08-26。見出しを省き
+   「{数量}本 担当{担当者名}」の形にすることで項目を切り詰める） */
+.equipment-qty-staff-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.equipment-qty-input {
+  /* 出庫・入庫数量は最大2桁想定のため、その幅までしか広げない */
+  flex: 0 0 auto;
+  width: 3.5em;
+  text-align: right;
+}
+.equipment-qty-unit,
+.equipment-staff-prefix {
+  flex: 0 0 auto;
+  font-size: var(--fs-md);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.equipment-staff-combobox {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* テナント検索選択（5-4） */
 .equipment-tenant-summary {
   margin-top: var(--space-1);

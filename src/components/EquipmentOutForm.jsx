@@ -52,6 +52,9 @@ export default function EquipmentOutForm({
   const [occurredAt, setOccurredAt] = useState(() => toDateTimeLocal(existing?.occurred_at))
   const [location, setLocation] = useState(existing?.location || '')
   const [locationOptions, setLocationOptions] = useState([])
+  // 共用部設置のときだけ入力する階（テナント設置は選んだテナントの階を自動で使う。2026-08-26追加）
+  const [floor, setFloor] = useState(existing?.floor || '')
+  const [floorOptions, setFloorOptions] = useState([])
   const [quantity, setQuantity] = useState(existing ? String(existing.quantity) : '')
   const [staffName, setStaffName] = useState(existing?.staff_name || '')
   const [staffOptions, setStaffOptions] = useState([])
@@ -101,6 +104,7 @@ export default function EquipmentOutForm({
 
   useEffect(() => {
     fetchEquipmentSuggest('location').then(setLocationOptions).catch(() => {})
+    fetchEquipmentSuggest('floor').then(setFloorOptions).catch(() => {})
     fetchEquipmentSuggest('staff').then(setStaffOptions).catch(() => {})
     // 退去済みも含めて取得する（編集中の記録が過去に退去済みテナントへ設置していた場合、
     // 一覧から消えて選択欄の表示が壊れないようにするため。候補としては後で絞り込む）
@@ -157,6 +161,9 @@ export default function EquipmentOutForm({
     if (!itemId) return setError('備品を選択してください')
     if (!Number.isFinite(numericQty) || numericQty <= 0) return setError('出庫数量を入力してください')
     if (reason === 'tenant' && !tenantId) return setError('設置先テナントを選択してください')
+    if (reason === 'common' && !location) return setError('設置場所を入力してください')
+    if (reason === 'common' && !floor) return setError('階を入力してください')
+    if (!staffName) return setError('担当者を入力してください')
 
     setSaving(true)
     try {
@@ -169,6 +176,7 @@ export default function EquipmentOutForm({
           reason,
           occurred_at: occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString(),
           location: reason === 'common' ? location || null : null,
+          floor: reason === 'common' ? floor || null : null,
           staff_name: staffName || null,
           note: note || null,
           quantity: numericQty,
@@ -221,7 +229,6 @@ export default function EquipmentOutForm({
           )}
 
           <div className="equipment-reason-field">
-            <span>設置先／出庫理由</span>
             <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
               {EQUIPMENT_OUT_REASONS.map((r) => (
                 <button
@@ -243,8 +250,7 @@ export default function EquipmentOutForm({
             <DateTimeInput value={occurredAt} disabled={locked || dateLocked} onChange={setOccurredAt} />
           </label>
 
-          <label className="ui-field">
-            <span>備品</span>
+          <div className="ui-field">
             <select
               className="ui-select"
               value={itemId}
@@ -256,7 +262,7 @@ export default function EquipmentOutForm({
             >
               {!itemId && (
                 <option value="" disabled>
-                  選択してください
+                  備品
                 </option>
               )}
               {groups.map((g) => (
@@ -269,61 +275,75 @@ export default function EquipmentOutForm({
                 </optgroup>
               ))}
             </select>
-          </label>
+          </div>
 
           {reason === 'tenant' && (
-            <div className="ui-field">
-              <span>設置先テナント</span>
-              <Combobox
-                value={tenantInput}
-                onChange={handleTenantChange}
-                onSelect={handleTenantSelect}
-                options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
-                placeholder="テナント名で検索"
-                disabled={locked}
-              />
-              {selectedTenant ? (
-                <p className="equipment-tenant-summary">
-                  設置階: {selectedTenant.floor ? `${selectedTenant.floor}F` : '—'}
-                  {selectedTenant.moved_out && '（退去済み）'}
-                </p>
-              ) : (
-                tenantInput && <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
-              )}
+            <div className="ui-field-row">
+              <div className="ui-field">
+                <Combobox
+                  value={tenantInput}
+                  onChange={handleTenantChange}
+                  onSelect={handleTenantSelect}
+                  options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
+                  placeholder="設置先テナント"
+                  disabled={locked}
+                />
+                {!selectedTenant && tenantInput && (
+                  <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
+                )}
+                {selectedTenant?.moved_out && <p className="equipment-tenant-summary is-danger">退去済み</p>}
+              </div>
+              <div className="ui-field equipment-floor-field">
+                <span>階</span>
+                <input
+                  type="text"
+                  className="ui-input"
+                  value={selectedTenant?.floor ? `${selectedTenant.floor}F` : '—'}
+                  disabled
+                  readOnly
+                />
+              </div>
             </div>
           )}
 
           {reason === 'common' && (
-            <div className="ui-field">
-              <span>設置場所</span>
-              <Combobox
-                value={location}
-                onChange={setLocation}
-                options={locationOptions}
-                placeholder="喫煙室 / 通路 / 玄関ホール"
-                disabled={locked}
-              />
+            <div className="ui-field-row">
+              <div className="ui-field equipment-floor-field">
+                <span>階</span>
+                <Combobox value={floor} onChange={setFloor} options={floorOptions} placeholder="3" disabled={locked} />
+              </div>
+              <div className="ui-field">
+                <span>設置場所</span>
+                <Combobox
+                  value={location}
+                  onChange={setLocation}
+                  options={locationOptions}
+                  placeholder="喫煙室 / 通路 / 玄関ホール"
+                  disabled={locked}
+                />
+              </div>
             </div>
           )}
 
-          <div className="ui-field-row">
-            <label className="ui-field">
-              <span>出庫数量</span>
-              <input
-                type="number"
-                className="ui-input"
-                inputMode="numeric"
-                min="1"
-                value={quantity}
-                disabled={locked}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </label>
-
-            <div className="ui-field">
-              <span>担当者</span>
-              <Combobox value={staffName} onChange={setStaffName} options={staffOptions} disabled={locked} />
-            </div>
+          <div className="equipment-qty-staff-row">
+            <input
+              type="number"
+              className="ui-input equipment-qty-input"
+              inputMode="numeric"
+              min="1"
+              value={quantity}
+              disabled={locked}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+            <span className="equipment-qty-unit">本</span>
+            <span className="equipment-staff-prefix">担当</span>
+            <Combobox
+              className="equipment-staff-combobox"
+              value={staffName}
+              onChange={setStaffName}
+              options={staffOptions}
+              disabled={locked}
+            />
           </div>
 
           {!existing && beforeQty !== null && (
@@ -333,16 +353,16 @@ export default function EquipmentOutForm({
             </p>
           )}
 
-          <label className="ui-field">
-            <span>備考</span>
+          <div className="ui-field">
             <textarea
               className="ui-textarea is-compact"
               rows={1}
               value={note}
               disabled={locked}
+              placeholder="備考"
               onChange={(e) => setNote(e.target.value)}
             />
-          </label>
+          </div>
 
           {reason === 'tenant' && (
             <div className="ui-field">
