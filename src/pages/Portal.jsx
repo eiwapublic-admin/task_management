@@ -270,7 +270,7 @@ export default function Portal() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide portal-container">
+      <div className="ui-container is-wide portal-container app-scroll">
         <header className="portal-hero">
           <p className="portal-hero-date">{todayLabel()}</p>
           <h1 className="portal-hero-title">

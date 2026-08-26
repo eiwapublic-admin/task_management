@@ -148,7 +148,7 @@ export default function Inspections() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide">
+      <div className="ui-container is-wide app-scroll">
         {/* 機能ヘッダ（2026-08-13）。ホームボタンは廃止（機能間の移動はダッシュボード経由に
             一本化済み）。年月・＋（当日を記録）・↓（PDF出力）をこの順で1行に収めるため、
             すべて filters（左側）に入れる（actions を使うと狭幅で2行目に分かれてしまうため） */}

@@ -119,7 +119,7 @@ export default function Equipment() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow">
+      <div className="ui-container is-narrow app-scroll">
         {/* 機能ヘッダ。機能名「備品」はアプリヘッダのタイトルが示すのでここには置かない。
             表示期間・絞り込み・入出庫の操作を全て filters 側にまとめ、モバイルでも
             1行に収まるようにする（2026-08-13。actions 側は狭幅で2行目に分かれる仕様の

@@ -246,13 +246,26 @@ export default function ReportPhotos({ reportId, readOnly }) {
                     e.target.value = ''
                   }}
                 />
-                <button
-                  type="button"
-                  className="btn-plain photo-add-btn"
-                  onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
-                >
-                  {isMobile ? '撮影して追加' : 'ファイルから選ぶ'}
-                </button>
+                {isMobile ? (
+                  <>
+                    {/* モバイルは撮影・ライブラリ選択の両方を出す（2026-08-26。以前は撮影のみで
+                        写真ライブラリから選べなかった） */}
+                    <button
+                      type="button"
+                      className="btn-plain photo-add-btn"
+                      onClick={() => cameraRef.current?.click()}
+                    >
+                      撮影して追加
+                    </button>
+                    <button type="button" className="btn-plain photo-add-btn" onClick={() => fileRef.current?.click()}>
+                      ライブラリから選ぶ
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="btn-plain photo-add-btn" onClick={() => fileRef.current?.click()}>
+                    ファイルから選ぶ
+                  </button>
+                )}
               </li>
             )}
           </ul>

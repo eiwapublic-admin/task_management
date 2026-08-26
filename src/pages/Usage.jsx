@@ -8,7 +8,7 @@ export default function Usage() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow">
+      <div className="ui-container is-narrow app-scroll">
         {/* 画面名はアプリヘッダが出すので、ここに見出し行は置かない（2026-08-12） */}
         <UsagePanel />
       </div>

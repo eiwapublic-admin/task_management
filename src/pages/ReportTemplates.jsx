@@ -41,7 +41,7 @@ export default function ReportTemplates() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow reports-container">
+      <div className="ui-container is-narrow reports-container app-scroll">
         <FeatureHeader
           actions={
             <>

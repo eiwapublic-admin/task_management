@@ -126,7 +126,7 @@ export default function Archive() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container logs-container">
+      <div className="ui-container logs-container app-scroll">
         {/* 機能ヘッダ（2026-08-12）。タスク管理のサブ画面なので title を置く。
             左＝絞り込み（検索ボタンを含む）、右＝機能ボタン（この画面には無し） */}
         <FeatureHeader

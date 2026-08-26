@@ -23,10 +23,32 @@
    1. ページの骨格
    ========================================================================= */
 
-/* 画面の地。各ページのルート要素に付ける */
-.ui-page {
-  min-height: 100vh;
+/* 画面の地。各ページのルート要素に付ける。
+   iOS の PWA（standalone 起動・viewport-fit=cover）では、<body> 自体が
+   スクロールする構造だとステータスバー下を通過するコンテンツとみなされ、
+   ヘッダーに常時半透明のぼかしが乗ってしまう（2026-08-26）。
+   ヘッダーを完全にスクロール対象外にするため、ページ全体を
+   position: fixed の「アプリシェル」にし、本文だけを .app-scroll で
+   内部スクロールさせる。ヘッダー等の固定要素はこの直下（.app-scroll の外）に置く。 */
+.ui-page,
+.app-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg-app);
+}
+
+/* 本文の内部スクロールコンテナ。.app-shell 直下でヘッダーの次に置く。
+   overscroll-behavior: contain でスクロールの親要素への伝播（chaining）を防ぎ、
+   -webkit-overflow-scrolling: touch で iOS の慣性スクロールを有効にする */
+.app-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 本文の器。幅は画面の性格で3種類から選ぶ（既定＝全幅）。
@@ -93,15 +115,15 @@
 }
 
 /* 縦スクロールしても固定表示し続ける3段目（2026-08-11）。
-   1段目 AppHeader（.app-header）はそれ自身が position: sticky; top: 0、
-   2段目は機能ヘッダ（.ui-feature-head。下記）。どちらも折り返し・safe-area で
-   高さが可変なため、その下に重ねる段は JS で測った実測値
-   （useStickyHeightVar.js）を var(--app-header-h) / var(--sticky2-h) として使う。
+   1段目 AppHeader（.app-header）と2段目 機能ヘッダ（.ui-feature-head。下記）は
+   アプリシェル導入（2026-08-26）により .app-scroll の外＝そもそもスクロール
+   対象外になったため、この段が重ねる相手は2段目だけでよく、オフセットは
+   var(--sticky2-h) のみで足りる（.app-header 分は加算不要）。
    3段目（一覧の列見出し・カレンダーの曜日行など）には .ui-sticky-head-2 を付ける
    だけでよい（3段目自体の高さを測る必要はない＝4段目が無いため ref は不要）。 */
 .ui-sticky-head-2 {
   position: sticky;
-  top: calc(var(--app-header-h) + var(--sticky2-h, 0px));
+  top: var(--sticky2-h, 0px);
   z-index: var(--z-header-2);
 }
 
@@ -116,10 +138,14 @@
    画面名はアプリヘッダのタイトルが示すので、画面側にはタイトルを置かない。
    title を渡すのは対象がデータで決まる場合だけ（備品の履歴画面＝備品名）。
    コンポーネントは src/components/FeatureHeader.jsx（高さの実測もそこで行う）。
+   アプリシェル導入（2026-08-26）により 1段目 AppHeader は .app-scroll の外に
+   出たため、この要素にとっての「スクロールする祖先」は .app-scroll そのもの。
+   その先頭（top: 0）に貼り付ければ AppHeader のすぐ下に重なるので、
+   var(--app-header-h) の加算は不要になった。
    -------------------------------------------------------------------- */
 .ui-feature-head {
   position: sticky;
-  top: var(--app-header-h);
+  top: 0;
   z-index: var(--z-header-2);
   /* 本体がこの下を通り抜けるので、地の色で必ず塗りつぶす（透けさせない） */
   background: var(--bg-app);
