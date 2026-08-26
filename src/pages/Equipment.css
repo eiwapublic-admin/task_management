@@ -234,8 +234,9 @@
 }
 
 /* 階（5-4。共用部は入力、テナントは自動表示。2026-08-26追加）。
-   数字1〜2文字程度なので、設置場所・設置先テナントより狭い固定幅にする */
-.equipment-floor-field { flex: 0 0 5em; }
+   「B」または数字1桁だけなので、設置場所・設置先テナントの幅を優先し
+   階は1桁分の固定幅に縮める（2026-08-26。当初5emだったが依頼により再調整） */
+.equipment-floor-field { flex: 0 0 3.5em; }
 
 /* 出庫/入庫数量＋担当者を1行にまとめる（2026-08-26。見出しを省き
    「{数量}本 担当{担当者名}」の形にすることで項目を切り詰める） */
@@ -309,9 +310,14 @@
    長押し・ホバーすると見える）。他の列（出庫/入庫/残/理由/担当）は短い固定値のため
    従来どおり nowrap のまま実幅で表示する */
 .equipment-txn-loc {
-  max-width: 6em;
+  max-width: 8em;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 設置先の表示をできる限り広くとるため、この列だけ左右の余白を詰める
+     （2026-08-26。他の列と共通の padding: var(--space-2) var(--space-3) だと
+     余白に取られる分だけ表示できる文字数が減っていた） */
+  padding-left: var(--space-1);
+  padding-right: var(--space-1);
 }
 .equipment-txn-table th:first-child,
 .equipment-txn-table td:first-child {
