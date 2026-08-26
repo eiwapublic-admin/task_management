@@ -532,7 +532,8 @@
 
 /* 設定ページの本文コンテナ（横は画面いっぱいに使う。業務背景欄が残りの高さを埋める）。
    アプリシェル導入（2026-08-26）により本体は常にこの内部スクロールに統一したため、
-   幅を問わず overflow-y: auto を持たせる（.app-scroll と同じ役割） */
+   幅を問わず overflow-y: auto を持たせる（.app-scroll と同じ役割。
+   常時表示の細いスクロールバー用の指定も .app-scroll と同様にここへ持たせる） */
 .settings-container {
   padding: var(--page-pad-y) var(--page-pad-x);
   flex: 1;
@@ -542,6 +543,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--border-strong) transparent; /* Firefox */
 }
 
 /* 設定ページ: タイトル・保存結果メッセージ・保存ボタンを1行に */

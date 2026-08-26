@@ -42,27 +42,42 @@
 
 /* 本文の内部スクロールコンテナ。.app-shell 直下でヘッダーの次に置く。
    overscroll-behavior: contain でスクロールの親要素への伝播（chaining）を防ぎ、
-   -webkit-overflow-scrolling: touch で iOS の慣性スクロールを有効にする */
+   -webkit-overflow-scrolling: touch で iOS の慣性スクロールを有効にする。
+   実際にスクロールする要素はこれ（html/bodyではない）なので、常時表示の細い
+   スクロールバー用の指定（元は html にあった。2026-08-26 に移設。理由は
+   index.css の該当コメント参照）もここに持たせる */
 .app-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--border-strong) transparent; /* Firefox */
 }
 
 /* 本文の器。幅は画面の性格で3種類から選ぶ（既定＝全幅）。
-   いずれも中央寄せする（従量課金だけ左寄せ、のような揺れを作らない） */
+   いずれも中央寄せする（従量課金だけ左寄せ、のような揺れを作らない）。
+   中央寄せは margin-inline: auto ではなく左右パディングの拡大で行う
+   （2026-08-26）。この要素は .app-scroll と同一要素として使われており、
+   margin で幅そのものを狭めると、スクロールバーが窓の真の右端ではなく
+   狭めた箱の右端（＝画面中央寄り）に出てしまう。要素自体は常に親いっぱいの
+   幅を保ったまま、内側の余白だけを広げることで見た目の中央寄せを実現し、
+   スクロールバーは常に窓の右端に来るようにする */
 .ui-container {
   padding: var(--page-pad-y) var(--page-pad-x);
-  margin-inline: auto;
   width: 100%;
 }
 
 /* 一覧・フォームが主役の画面 */
-.ui-container.is-narrow { max-width: var(--page-narrow); }
+.ui-container.is-narrow {
+  padding-inline: max(var(--page-pad-x), calc((100% - var(--page-narrow)) / 2));
+}
 /* 表が主役の画面 */
-.ui-container.is-wide { max-width: var(--page-wide); }
+.ui-container.is-wide {
+  padding-inline: max(var(--page-pad-x), calc((100% - var(--page-wide)) / 2));
+}
 
 /* タイトルと操作ボタンを並べる1行。左＝現在地の情報、右＝操作、が原則。
    狭幅では折り返し、操作群は .ui-toolbar-actions で右端に寄せる */

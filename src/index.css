@@ -237,12 +237,14 @@ body {
    表示されるため、ヘッダーに食い込んで見えることがある。常時表示の細いスクロール
    バーをページ側で描画することで、通常のスタッキング順に従わせる。
    ※ macOS Safari はメインページのスクロールバーを OS 統合の NSScroller で描く
-     ため、この CSS は効かない（プラットフォーム挙動。対応保留と判断済み） */
-html {
-  scrollbar-gutter: stable;
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: var(--border-strong) transparent; /* Firefox */
-}
+     ため、この CSS は効かない（プラットフォーム挙動。対応保留と判断済み）。
+   ※ アプリシェル導入（2026-08-26）により実際にスクロールするのは html/body では
+     なく各画面の .app-scroll（.settings-container）になったため、
+     scrollbar-gutter・Firefox向けのscrollbar-width/colorはそちらに付けている
+     （src/styles/ui.css・Dashboard.css）。html に残したままだと、スクロールしない
+     html自身が使われないスクロールバー分の余白だけを窓の右端に確保してしまい、
+     実際のスクロールバー（.app-scrollの右端。中央寄せの画面では窓の内側に来る）
+     と二重にずれて見える不具合になっていた */
 
 ::-webkit-scrollbar {
   width: 10px;
