@@ -235,8 +235,28 @@
 
 /* 階（5-4。共用部は入力、テナントは自動表示。2026-08-26追加）。
    「B」または数字1桁だけなので、設置場所・設置先テナントの幅を優先し
-   階は1桁分の固定幅に縮める（2026-08-26。当初5emだったが依頼により再調整） */
-.equipment-floor-field { flex: 0 0 3.5em; }
+   階は1桁分の固定幅に縮める。**`.ui-field-row > .ui-field { flex: 1 1 0 }`（ui.css）と
+   クラス数が同じ(2個)だと詳細度が並び順に負けて縮まなかった（2026-08-26に実機で発覚）ため、
+   `.ui-field`にも掛かる形にしてクラス3個で確実に上書きする** */
+.ui-field-row > .ui-field.equipment-floor-field { flex: 0 0 4.5em; }
+
+/* 共用部の階セレクトと「F」表記を横並びにする（2026-08-26。依頼により階選択欄の右にF表記を追加） */
+.equipment-floor-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.equipment-floor-inline .ui-select {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: var(--space-1);
+}
+.equipment-floor-suffix {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+}
 
 /* 出庫/入庫数量＋担当者を1行にまとめる（2026-08-26。見出しを省き
    「{数量}本 担当{担当者名}」の形にすることで項目を切り詰める） */
