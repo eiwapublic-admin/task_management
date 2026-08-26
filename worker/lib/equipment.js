@@ -643,6 +643,13 @@ export async function handleEquipmentTransactionUpdate(req) {
     }
     if ('staff_name' in payload) patch.staff_name = trimOrNull(payload.staff_name, 200)
     if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
+    // 備品の選び間違いを訂正できるよう、item_id も修正対象にする（2026-08-26。
+    // 登録時に間違った備品を選んでいた場合、以前は入出庫理由等しか直せなかった）
+    if ('item_id' in payload) {
+      const itemId = typeof payload.item_id === 'string' ? payload.item_id : ''
+      if (!itemId) return json({ error: 'item_id が不正です' }, 400)
+      patch.item_id = itemId
+    }
 
     const { data, error: err } = await supabase
       .from('equipment_transactions')
@@ -654,7 +661,11 @@ export async function handleEquipmentTransactionUpdate(req) {
       console.error('equipment-txn-update:', err.message)
       return json({ error: '入出庫の更新に失敗しました' }, 500)
     }
+    // 備品を変更した場合、旧・新どちらの備品の在庫警告状態も変わりうるので両方更新する
     await refreshWarning(supabase, existing.item_id)
+    if (patch.item_id && patch.item_id !== existing.item_id) {
+      await refreshWarning(supabase, patch.item_id)
+    }
     return json({ transaction: data })
   } catch (err) {
     console.error('equipment-txn-update 失敗:', err)
@@ -1131,8 +1142,12 @@ export async function handleEquipmentTenantSync(req, env) {
 const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024 // 実際は長辺600px程度に縮小したPNGなので数十KB程度で収まる想定
 
 // POST /api/equipment/signature（multipart: txn_id, file） — 署名の登録
+// 通常は canWrite（staff/admin）が必要だが、備品出庫限定ロールにも「当日入力分の出庫」への
+// 署名登録だけを開放する（2026-08-26。テナント設置の新規登録・当日修正で署名までできないと
+// 160番以降の一連の対応が完結しないため）。対象レコードのkind・occurred_atを見ないと
+// 判定できないため、write:trueでは縛らず読み込んでから個別に判定する
 export async function handleEquipmentSignatureUpload(req) {
-  const { error } = await requireAuth(req, { write: true })
+  const { auth, error } = await requireAuth(req)
   if (error) return error
   try {
     const form = await req.formData().catch(() => null)
@@ -1146,7 +1161,7 @@ export async function handleEquipmentSignatureUpload(req) {
     const supabase = getAdminClient()
     const { data: txn, error: loadErr } = await supabase
       .from('equipment_transactions')
-      .select('id, reason, signed_at')
+      .select('id, kind, reason, occurred_at, signed_at')
       .eq('id', txnId)
       .maybeSingle()
     if (loadErr) {
@@ -1154,6 +1169,13 @@ export async function handleEquipmentSignatureUpload(req) {
       return json({ error: '署名の登録に失敗しました' }, 500)
     }
     if (!txn) return json({ error: '対象が見つかりません' }, 404)
+
+    const fullWrite = canWrite(auth)
+    const limitedOutOnly = isEquipmentOutStaff(auth) && txn.kind === 'out' && isTodayJst(txn.occurred_at)
+    if (!fullWrite && !limitedOutOnly) {
+      return json({ error: 'この操作を行う権限がありません' }, 403)
+    }
+
     if (txn.reason !== 'tenant') return json({ error: 'テナント設置以外には署名を登録できません' }, 400)
     if (txn.signed_at) return json({ error: 'この記録はすでに署名済みです' }, 400)
 
