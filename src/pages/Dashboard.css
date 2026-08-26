@@ -1553,7 +1553,7 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   margin: 0 0 var(--space-3);
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-3);
 }
 
@@ -1701,7 +1701,8 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 /* 暗い背景向けの削除アイコン色（.icon-btn-delete-dark）も ui.css に統合済み */
 
 @media (max-width: 640px) {
-  .photo-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  /* 違反車両の枠（.parking-grid）と同じ「1カラムで幅いっぱい」に揃える（2026-08-26） */
+  .photo-grid { grid-template-columns: 1fr; }
   /* iOSのフォーカス時ズーム抑止は ui.css が textarea 全体に一括で効かせているため、
      ここで個別に font-size を指定する必要はない（UI標準の「二重管理をしない」） */
 }
