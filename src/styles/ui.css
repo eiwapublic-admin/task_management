@@ -342,7 +342,8 @@
 .icon-btn-download,
 .icon-btn-search,
 .icon-btn-archive,
-.icon-btn-inspection {
+.icon-btn-inspection,
+.icon-btn-refresh {
   flex-shrink: 0;
   width: var(--icon-btn);
   height: var(--icon-btn);
@@ -443,6 +444,13 @@
 
 /* 検索。開いている間は「現在地」なので選択状態を持てる */
 .icon-btn-search:hover:not(:disabled) { color: var(--color-primary); }
+
+/* 一覧の再読み込み（処理ログ。2026-08-27）。実行中はアイコンを回転させて進行中と分かるようにする */
+.icon-btn-refresh:hover:not(:disabled) { color: var(--color-primary); }
+.icon-btn-refresh.is-loading svg { animation: icon-btn-refresh-spin 0.8s linear infinite; }
+@keyframes icon-btn-refresh-spin {
+  to { transform: rotate(360deg); }
+}
 
 .icon-btn-search.is-active {
   background: var(--color-brand);
