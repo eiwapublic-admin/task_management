@@ -6,6 +6,7 @@ Gmail から業務メールを自動取得し、Claude API で担当者振り分
 
 - 設計書（現行・Cloudflare 版）: [`docs/task-management-spec-cloudflare.md`](./docs/task-management-spec-cloudflare.md)
 - 引き継ぎ書: [`docs/HANDOFF.md`](./docs/HANDOFF.md)
+- 障害復旧手順書（バックアップ・復元）: [`docs/disaster-recovery.md`](./docs/disaster-recovery.md)
 - 旧設計書（Netlify 版・初期計画の記録）: [`docs/task-management-spec.md`](./docs/task-management-spec.md)
 
 ## 実装状況
@@ -26,6 +27,7 @@ src/                  React フロントエンド（Vite）
 supabase/schema.sql   DB スキーマ（Supabase SQL Editor で実行）
 wrangler.jsonc        Worker 設定（静的アセット・Cron・SPAフォールバック）
 .github/workflows/deploy.yml  main への push で自動デプロイ
+.github/workflows/backup.yml  毎日 DB を別リポジトリへ自動バックアップ（要初回セットアップ。docs/disaster-recovery.md 参照）
 ```
 
 ## ローカル開発

@@ -134,15 +134,19 @@ as $$
     updated_at        = now();
 $$;
 
--- activity_logs: 操作ログ（メール取得の実行結果、タスクのステータス変更）
+-- activity_logs: 操作ログ（メール取得の実行結果、タスクのステータス変更、DBバックアップ）
 create table if not exists activity_logs (
   id         uuid primary key default gen_random_uuid(),
-  log_type   text not null check (log_type in ('fetch', 'status_change')),
+  log_type   text not null check (log_type in ('fetch', 'status_change', 'backup')),
   actor      text not null,          -- 実行者（担当者の表示名、または「システム（自動）」）
   message    text not null,          -- 画面表示用の内容
   detail     jsonb,                  -- 取得サマリー等の生データ
   created_at timestamptz not null default now()
 );
+
+-- log_type に 'backup' を追加（マイグレーション allow_backup_activity_log_type 適用済み。2026-08-27）
+alter table activity_logs drop constraint if exists activity_logs_log_type_check;
+alter table activity_logs add constraint activity_logs_log_type_check check (log_type in ('fetch', 'status_change', 'backup'));
 
 create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
 
