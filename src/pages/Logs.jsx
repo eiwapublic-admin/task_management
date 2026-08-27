@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
-import { IconChevronRight } from '../components/Icons'
+import { IconChevronRight, IconRefresh } from '../components/Icons'
 import { fetchLogs } from '../lib/tasks'
 import { formatDateTime } from '../lib/format'
 import './Dashboard.css'
@@ -37,12 +37,22 @@ export default function Logs() {
   // 日グループの開閉状態。ユーザーが手で切り替えた分だけ既定値からの例外として持つ
   // （残留塩素等検査の年月グループと同じやり方。Chlorine.jsx参照）
   const [collapseOverrides, setCollapseOverrides] = useState({})
+  // 再読み込み中フラグ（2026-08-27）。既存の一覧は残したまま更新するので、
+  // 読み込み中表示（logs === null の分岐）は使わずボタン側の見た目だけで進行中を示す。
+  const [reloading, setReloading] = useState(false)
 
-  useEffect(() => {
-    fetchLogs()
+  const load = useCallback(() => {
+    setReloading(true)
+    setError('')
+    return fetchLogs()
       .then(setLogs)
       .catch((err) => setError(err.message))
+      .finally(() => setReloading(false))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const filteredLogs = useMemo(() => {
     if (!logs) return logs
@@ -103,6 +113,18 @@ export default function Logs() {
                 </button>
               ))}
             </div>
+          }
+          actions={
+            <button
+              type="button"
+              className={`icon-btn-refresh${reloading ? ' is-loading' : ''}`}
+              onClick={load}
+              disabled={reloading}
+              aria-label="再読み込み"
+              title="再読み込み"
+            >
+              <IconRefresh size={20} />
+            </button>
           }
         />
         {error && (
