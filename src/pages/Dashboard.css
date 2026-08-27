@@ -629,6 +629,11 @@
   color: var(--color-brand);
 }
 
+.logs-type-backup {
+  background: color-mix(in srgb, var(--color-warn) 14%, var(--bg-surface));
+  color: var(--color-warn);
+}
+
 .logs-note {
   margin-top: var(--space-3);
   font-size: var(--fs-xs);

@@ -1,0 +1,209 @@
+# Supabase の毎日バックアップ（GitHub Actions → 別の private リポジトリ）
+#
+# Supabase の無料プランには自動バックアップが無い（Pro以上のみ）。公式ドキュメントでも
+# 「無料プランは db dump で自分でエクスポートし、オフサイト保管すること」が推奨されている。
+# そこで GitHub Actions で毎日ダンプを取得し、**別のプライベートリポジトリ**へコミットする。
+#
+# 保管先を別リポジトリにしているのは、Supabase とこのアプリの本番ホスティング(Cloudflare Workers)の
+# どちらが失われてもバックアップが無事に残るようにするため（第三の場所に置く）。
+# 世代管理は Git の履歴そのもの。「3日前の状態」は `git show HEAD~3:data.sql` で取り出せる。
+#
+# 導入経緯: 2026-08-25 に移行事故で本番データ（日報9日分・違反車両）を誤削除した際、
+# Supabase 無料プランのためバックアップ復元ができず、FileMaker側の近似データで部分復旧するしか
+# なかった（docs/HANDOFF.md 参照）。この再発防止として導入。
+#
+# 手動セットアップが必要（このワークフローを有効化する前に1回だけ行う。詳細は
+# docs/disaster-recovery.md と .claude/skills/supabase-github-backup/SKILL.md 参照）:
+#   1. 空の private リポジトリ eiwapublic-admin/task_management-backups を作成
+#      （このセッションから自動作成を試みたが、GitHub App が組織へのリポジトリ作成権限を
+#      持たず失敗した。手動で作成すること）
+#   2. そのリポジトリだけに書き込める fine-grained PAT を発行（Contents: Read and write）
+#   3. このリポジトリの Settings > Secrets and variables > Actions に登録:
+#      - SUPABASE_DB_PASSWORD … Supabase の DB パスワード（そのまま。URLエンコード不要）
+#      - BACKUP_REPO_TOKEN    … 手順2で発行したトークン
+#   4. Actions タブ →「Daily backup」→ Run workflow で手動実行し、
+#      backups リポジトリにコミットされることを確認する
+#
+# --- 各設計判断の理由（変更する前に読むこと） ---
+# - Supabase CLI は使わない: CLI は pg_dump をコンテナ内で実行する際に接続URLを解析し直すため、
+#   Session pooler 用のユーザー名(postgres.<project-ref>)が postgres に落ちて認証に失敗する。
+#   pg_dump を直接使えばこの解析が挟まらない。
+# - Session pooler(5432)を使う。Transaction pooler(6543)では pg_dump が動かない
+#   (prepared statement を使うため)。直結(db.<ref>.supabase.co)は GitHub Actions が IPv4 な一方、
+#   Supabase の直結は IPv4 だと有料アドオンが必要なので使えない。
+# - pg_dump はサーバーと同じメジャーバージョンが必要。GitHub の ubuntu ランナーには古いバージョンが
+#   入っていることがあるため、PGDG から Supabase 側と同じメジャー版を入れ、PATH の先頭に置く。
+#   (2026-08時点、本プロジェクトの Supabase は Postgres 17。バージョンが変わったら数字を合わせ直すこと)
+name: Daily backup
+
+on:
+  schedule:
+    # 毎日 JST 03:00（UTC 18:00）。GitHub のスケジュールは混雑時にずれることがある
+    - cron: "0 18 * * *"
+  workflow_dispatch: # 手動実行（動作確認用）
+
+env:
+  BACKUP_REPO: "eiwapublic-admin/task_management-backups"
+  # Supabase の Session pooler の接続先（秘密情報ではないのでここに置いてよい）。
+  # プロジェクト ref: pfiogfdnbctunkhslmcp / region: ap-southeast-2（docs/HANDOFF.md参照）
+  # ⚠️ pooler のホスト名の番号（aws-0- 等）はプロジェクトごとに異なることがあるため、初回実行前に
+  # Supabase ダッシュボード → Project Settings → Database → Connection string (Session pooler)
+  # に表示される実際のホスト名と一致するか必ず確認すること。
+  DB_HOST: aws-0-ap-southeast-2.pooler.supabase.com
+  DB_PORT: "5432"
+  # ⚠️ DB_USER は必ず `postgres.<project-ref>`。`postgres` だけだと認証に失敗する。
+  DB_USER: "postgres.pfiogfdnbctunkhslmcp"
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: バックアップ先リポジトリを取得
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.BACKUP_REPO }}
+          token: ${{ secrets.BACKUP_REPO_TOKEN }}
+          path: backup
+
+      - name: PostgreSQLクライアント(サーバーと同メジャー版)を用意
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          # ⚠️ Supabase側のPostgresメジャーバージョン(17)に合わせる(ずれると
+          # "aborting because of server version mismatch" で失敗する)
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      # 接続文字列はここで組み立てる。手で組み立てるとユーザー名の付け忘れ
+      # (Session pooler は postgres.<project-ref> が必須)やパスワードの記号の
+      # エンコード漏れで失敗しやすいため、機械的に作る。
+      - name: 接続文字列を組み立て
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_PASSWORD:-}" ]; then
+            echo "SUPABASE_DB_PASSWORD が設定されていません（Settings > Secrets and variables > Actions）" >&2
+            exit 1
+          fi
+          # Secrets に貼るとき末尾に改行や空白が入ることがあるため取り除く。
+          # 残っていると URL エンコードで %0A などになり、必ず認証に失敗する。
+          DB_PASSWORD=$(printf %s "$DB_PASSWORD" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          export DB_PASSWORD
+          ENC=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
+          URL="postgresql://${DB_USER}:${ENC}@${DB_HOST}:${DB_PORT}/postgres"
+          echo "::add-mask::$URL"
+          echo "DB_URL=$URL" >> "$GITHUB_ENV"
+          echo "接続先: ${DB_USER}@${DB_HOST}:${DB_PORT} / パスワード長: ${#DB_PASSWORD}"
+
+      # 認証が通るかどうかを最初に確かめる。ここで失敗するなら資格情報の問題、
+      # 通るのにダンプで失敗するならダンプ側の問題、と切り分けられる。
+      - name: 接続テスト
+        run: |
+          set -euo pipefail
+          echo "使用する pg_dump: $(command -v pg_dump) / $(pg_dump --version)"
+          psql "$DB_URL" -Atc "select current_user, version()"
+
+      - name: ダンプを取得
+        run: |
+          set -euo pipefail
+          cd backup
+          # スキーマ(テーブル・RLSポリシー・関数・トリガ・権限)。再構築の土台。
+          # --no-owner: 復元先では所有者が変わるため、所有者指定は落とす。
+          # 権限(GRANT)は落とさない。SECURITY DEFINER 関数の authenticated への
+          # 実行権限など、無いと動かないものが含まれるため。
+          pg_dump "$DB_URL" --schema-only --no-owner --schema=public -f schema.sql
+          # 業務データ
+          pg_dump "$DB_URL" --data-only --no-owner --schema=public -f data.sql
+          # 認証ユーザー。これが無いとログインを復元できない
+          # （このアプリはカスタム認証（Supabase の users テーブル + bcrypt。Supabase Auth の
+          # auth.users は未使用）だが、auth スキーマ自体は空でも将来使う可能性があるため
+          # 同じ構成のまま残す。空でも失敗しない）
+          pg_dump "$DB_URL" --data-only --no-owner \
+            --table=auth.users --table=auth.identities -f auth_data.sql
+
+      - name: 変更があればコミット
+        run: |
+          set -euo pipefail
+          cd backup
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            RESULT="変更なし"
+          else
+            git commit -m "backup: $(date -u +%Y-%m-%d)"
+            git push
+            RESULT="コミット済み"
+          fi
+          SIZES=$(du -h schema.sql data.sql auth_data.sql | awk '{printf "%s %s / ", $2, $1}' | sed 's| / $||')
+          echo "BACKUP_RESULT=$RESULT" >> "$GITHUB_ENV"
+          echo "BACKUP_SIZES=$SIZES" >> "$GITHUB_ENV"
+          {
+            echo "バックアップ: $RESULT"
+            echo ""
+            echo "$SIZES"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # バックアップ用トークンの有効期限を確認する。期限切れに気づかず
+      # バックアップが止まるのを防ぐため、残り30日を切ったら警告する。
+      - name: トークンの有効期限を確認
+        continue-on-error: true
+        env:
+          TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          set -uo pipefail
+          EXP=$(curl -sI -H "Authorization: Bearer $TOKEN" https://api.github.com/user \
+            | tr -d '\r' \
+            | awk -F': ' 'tolower($1)=="github-authentication-token-expiration"{print $2}')
+          if [ -z "$EXP" ]; then
+            echo "有効期限を取得できませんでした（無期限のトークンの可能性）"
+            exit 0
+          fi
+          DAYS=$(( ( $(date -d "$EXP" +%s) - $(date +%s) ) / 86400 ))
+          echo "トークンの有効期限: $EXP （残り ${DAYS} 日）"
+          echo "TOKEN_DAYS_LEFT=$DAYS" >> "$GITHUB_ENV"
+          if [ "$DAYS" -le 30 ]; then
+            echo "::warning::バックアップ用トークンの期限まで残り ${DAYS} 日です。再発行してください"
+            echo "⚠️ バックアップ用トークンの期限まで残り **${DAYS} 日**。再発行してください。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # このアプリには活動ログ(activity_logs)画面（/logs）があるため、GitHubを見に行かなくても
+      # 管理画面で毎日のバックアップ結果を確認できるようにする（log_type='backup'。
+      # 2026-08-27 のマイグレーション allow_backup_activity_log_type で許可済み）。
+      #
+      # ⚠️ psql の :'var' 変数展開は -c (コマンドライン引数) では機能せず、標準入力/ヒアストリング
+      # (<<<) 経由でSQLを渡した場合のみ機能する。-c "insert ... values(:'x')" は
+      # "syntax error at or near ':'" で失敗する。continue-on-error を付けたステップでこれをやると
+      # ワークフロー全体は緑のまま失敗が握りつぶされ、何ヶ月も気づけないことがあるため、
+      # 必ずヒアストリングでSQLを渡す（下記参照）。導入後に一度 workflow_dispatch で手動実行し、
+      # /logs 画面に実際に「バックアップ」種別の行が増えているかまで確認すること。
+      - name: 操作ログに記録
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          DETAIL="${BACKUP_RESULT:-不明} / ${BACKUP_SIZES:-}"
+          if [ -n "${TOKEN_DAYS_LEFT:-}" ] && [ "${TOKEN_DAYS_LEFT}" -le 30 ]; then
+            DETAIL="$DETAIL / ⚠️トークンの期限まで残り${TOKEN_DAYS_LEFT}日。再発行が必要です"
+          fi
+          SQL_TEXT="insert into public.activity_logs (log_type, actor, message) values ('backup', 'システム（自動バックアップ）', :'detail');"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -v detail="$DETAIL" <<< "$SQL_TEXT"
+
+      - name: 失敗を操作ログに記録
+        if: failure()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          [ -n "${DB_URL:-}" ] || exit 0
+          SQL_TEXT="insert into public.activity_logs (log_type, actor, message) values ('backup', 'システム（自動バックアップ）', :'detail');"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 \
+            -v detail="自動バックアップに失敗しました。GitHub Actions のログを確認してください: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" <<< "$SQL_TEXT"
