@@ -47,9 +47,10 @@ env:
   # Supabase の Session pooler の接続先（秘密情報ではないのでここに置いてよい）。
   # プロジェクト ref: pfiogfdnbctunkhslmcp / region: ap-southeast-2（docs/HANDOFF.md参照）
   # ⚠️ pooler のホスト名の番号（aws-0- 等）はプロジェクトごとに異なることがあるため、初回実行前に
-  # Supabase ダッシュボード → Project Settings → Database → Connection string (Session pooler)
-  # に表示される実際のホスト名と一致するか必ず確認すること。
-  DB_HOST: aws-0-ap-southeast-2.pooler.supabase.com
+  # Supabase ダッシュボード → Connect → Session pooler の接続文字列に表示される実際のホスト名と
+  # 一致するか必ず確認すること。当初 aws-0- で設定していたが、実際は aws-1- が正しく、
+  # 「tenant/user postgres.pfiogfdnbctunkhslmcp not found」で初回実行が失敗した（2026-08-27）。
+  DB_HOST: aws-1-ap-southeast-2.pooler.supabase.com
   DB_PORT: "5432"
   # ⚠️ DB_USER は必ず `postgres.<project-ref>`。`postgres` だけだと認証に失敗する。
   DB_USER: "postgres.pfiogfdnbctunkhslmcp"
