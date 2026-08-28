@@ -172,6 +172,26 @@
 /* 下の余白を親（flex の gap 等）が持っている画面用。二重に空けないための打ち消し */
 .ui-feature-head.is-flush { margin-bottom: 0; }
 
+/* .ui-container の上パディング（page-pad-y）をこの見出し自身に付け替える（2026-08-28）。
+   この見出しは .ui-container（＝.app-scroll）の最初の子要素として使われるが、
+   position: sticky の張り付き位置は「最も近いスクロールコンテナのパディング込みの
+   上端」を基準に決まるため、コンテナ自身の上パディングぶんだけ、見出しが張り付いても
+   なお覆われない帯がアプリヘッダのすぐ下に残ってしまう。パディングは何かを不透明に
+   塗って隠しているわけではないので、一覧の行がスクロールでちょうどその帯に重なると
+   そのまま透けて見える（処理ログ画面での実機報告）。
+   margin-top のマイナスでコンテナの上パディング帯へ見出しを引き上げようとしても、
+   sticky 要素はスクロールコンテナのパディング境界より外（＝パディング帯そのもの）へは
+   margin では出られない仕様のため効かない（実機検証済み）。そのため、コンテナ自身の
+   上パディングを丸ごと 0 にし、同じ量を見出し自身の内側の余白として持たせることで、
+   見出しの不透明な背景（上記 background）がこの帯ごと覆うようにする。
+   見た目の位置（フィルタ行がアプリヘッダから見える距離）はこれまでと変わらない */
+.ui-container:has(> .ui-feature-head:first-child) {
+  padding-top: 0;
+}
+.ui-container > .ui-feature-head:first-child {
+  padding-top: calc(var(--space-3) + var(--page-pad-y));
+}
+
 .ui-feature-head-row {
   display: flex;
   align-items: center;
