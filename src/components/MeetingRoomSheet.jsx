@@ -23,13 +23,16 @@ export default function MeetingRoomSheet({ month, range, holidays, closedDays })
   const monthNum = Number(month.slice(5, 7))
   // 日の行の高さは半月あたりの日数（14〜16日）で変わるため、どちらの半月ページでも
   // 表がちょうどA4いっぱいに収まるよう、行数から逆算する（InspectionSheetは列数が
-  // 常に16固定なのでこの計算は不要だったが、会議室予約表は行数が月ごとに変わるため必要）
-  const rowHeight = `calc((277mm - 21mm - 13mm - 11mm - 7mm) / ${range.days.length})`
+  // 常に16固定なのでこの計算は不要だったが、会議室予約表は行数が月ごとに変わるため必要）。
+  // A4横は縦の余白が少ないため、見出し行の高さ（12mm）を差し引いた残りで計算する
+  const rowHeight = `calc((190mm - 12mm - 13mm - 11mm - 7mm) / ${range.days.length})`
 
   return (
     <div className="mr-sheet" style={{ '--mr-row-h': rowHeight }}>
-      <div className="mr-sheet-title">備後町コイズミビル５階　会議室利用申込書</div>
-      <div className="mr-sheet-month-box">{month.slice(0, 4)}年{monthNum}月</div>
+      <div className="mr-sheet-header">
+        <span className="mr-sheet-month-box">{month.slice(0, 4)}年{monthNum}月</span>
+        <span className="mr-sheet-title">備後町コイズミビル５階　会議室利用申込書</span>
+      </div>
 
       <table className="mr-sheet-table">
         <colgroup>

@@ -39,12 +39,13 @@ export default function useMeetingRoomPdfExport(month) {
       try {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
+        // 日付・曜日＋18列の時間帯を並べる横に長い表のため、A4横で出力する（2026-08-29）
         const sheets = sheetsRef.current.querySelectorAll('.mr-sheet')
-        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
         for (const [i, sheet] of [...sheets].entries()) {
           const canvas = await html2canvas(sheet, { scale: 3, backgroundColor: '#ffffff' })
           if (i > 0) pdf.addPage()
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST')
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 297, 210, undefined, 'FAST')
         }
 
         const filename = `会議室予約表_${month}.pdf`
