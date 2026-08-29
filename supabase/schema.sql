@@ -606,3 +606,42 @@ create or replace view equipment_yearly_totals as
 
 -- create or replace はビューの権限を PUBLIC に戻すことがあるため、変更のたびに revoke を必ずセットで流す
 revoke all on equipment_stock, equipment_yearly_totals from anon, authenticated;
+
+-- ============================================================
+-- 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜）。
+-- 「登録していつでもダウンロードできる資料置き場」。日報等の業務データとは無関係の
+-- プロジェクト共通情報（closed_days と同じ扱い）。ファイル本体は Storage の
+-- `work-templates` バケット（非公開）、このテーブルはメタ情報のみを持つ。
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('work-templates', 'work-templates', false, 20971520, null)
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists document_templates (
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,             -- 資料名称（登録時に入力）
+  category          text not null,             -- 分類（登録時に入力。既存値からの選択式）
+  remark            text,                      -- 備考（登録時に入力）
+  -- 以下はアップロードされたファイルそのものから自動取得する
+  original_filename text not null,             -- 物理ファイル名
+  file_ext          text,                      -- 拡張子（ドット無し・小文字）
+  file_size         integer,                   -- バイト数
+  file_modified_at  timestamptz,               -- ファイルの最終更新日時（ブラウザのFile.lastModified）
+  mime              text,
+  storage_key       text not null unique,
+  created_by        uuid references users(id),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+create index if not exists document_templates_category_idx on document_templates (category, name);
+
+drop trigger if exists document_templates_set_updated_at on document_templates;
+create trigger document_templates_set_updated_at before update on document_templates
+  for each row execute function set_updated_at();
+
+alter table document_templates enable row level security;
+revoke all on document_templates from anon, authenticated;

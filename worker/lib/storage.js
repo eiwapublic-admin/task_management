@@ -1,14 +1,17 @@
-// Supabase Storage の薄いクライアント（2026-08-04〜。日報の写真保管用）。
+// Supabase Storage の薄いクライアント（2026-08-04〜。日報の写真保管用。
+// 2026-08-30に雛形ファイル（work-templates バケット）用に bucket 引数を追加）。
 // supabase-js のストレージ機能は使わず fetch を直叩きする（gmail.js と同じ方針。
 // Worker 上での依存を増やさないため）。
 //
-// バケット `report-photos` は**非公開**。anon/authenticated からは直接読めず、
+// バケットはすべて**非公開**。anon/authenticated からは直接読めず、
 // 取得は必ずこの service role キー経由（＝Worker の JWT 認証を通った後）になる。
-// 保管先を差し替える場合はこのファイルの3関数を差し替えれば済むようにしてある。
 
 import { resolveSupabaseUrl } from './supabase-admin.js'
 
 export const PHOTO_BUCKET = 'report-photos'
+// 業務で使う雛形ファイル（Word/Excel/PDF等）専用バケット（2026-08-30）。
+// 写真と混在させず別バケットに分けることで、用途ごとに削除・容量把握がしやすいようにする
+export const TEMPLATE_BUCKET = 'work-templates'
 
 function storageBase() {
   return `${resolveSupabaseUrl().replace(/\/$/, '')}/storage/v1`
@@ -23,8 +26,8 @@ function serviceKey() {
 // オブジェクトを保存する。既定では既存キーを上書きしない（キーは毎回 uuid で作るため
 // 衝突しない想定）。upsert: true を渡すと固定キーを毎回上書きできる（自主検査表PDFの
 // プレビュー保存など、ユーザーごとに1個だけ保持して溜め込みたくない用途向け）。
-export async function putObject(key, body, contentType, { upsert = false } = {}) {
-  const res = await fetch(`${storageBase()}/object/${PHOTO_BUCKET}/${encodeURI(key)}`, {
+export async function putObject(key, body, contentType, { upsert = false, bucket = PHOTO_BUCKET } = {}) {
+  const res = await fetch(`${storageBase()}/object/${bucket}/${encodeURI(key)}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${serviceKey()}`,
@@ -42,16 +45,16 @@ export async function putObject(key, body, contentType, { upsert = false } = {})
 }
 
 // オブジェクトを取得する。戻り値は Response（呼び出し側でそのまま body を流せる）
-export async function getObject(key) {
-  const res = await fetch(`${storageBase()}/object/${PHOTO_BUCKET}/${encodeURI(key)}`, {
+export async function getObject(key, bucket = PHOTO_BUCKET) {
+  const res = await fetch(`${storageBase()}/object/${bucket}/${encodeURI(key)}`, {
     headers: { Authorization: `Bearer ${serviceKey()}`, apikey: serviceKey() },
   })
   return res
 }
 
 // オブジェクトを削除する。存在しない場合もエラーにしない（冪等）
-export async function deleteObject(key) {
-  const res = await fetch(`${storageBase()}/object/${PHOTO_BUCKET}`, {
+export async function deleteObject(key, bucket = PHOTO_BUCKET) {
+  const res = await fetch(`${storageBase()}/object/${bucket}`, {
     method: 'DELETE',
     headers: {
       Authorization: `Bearer ${serviceKey()}`,

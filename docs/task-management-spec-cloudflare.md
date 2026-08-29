@@ -806,6 +806,18 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
   まま。メディアクエリで切替）。実機での確認は未実施
 - **未実装**: 過去データ（FileMaker）の移行、測定漏れ（週1回のペース）の警告表示
 
+### 4-15. 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜）
+
+「登録していつでもダウンロードできる資料置き場」。ハンバーガーメニュー・ダッシュボードの「雛形ファイル」（`/documents`）から入る。日報等の業務データとは無関係のプロジェクト共通情報（`closed_days`と同じ扱い）。
+
+- **管理情報**: メタ情報から自動取得する項目（物理ファイル名・拡張子・ファイルサイズ）と、登録画面で入力する項目（資料名称・分類・備考）を分ける。**ファイルの最終更新日付**だけは特殊で、multipart/form-data自体にはOS側のファイル更新日時を運ぶ仕組みが無いため、ブラウザがファイル選択時に読める`File.lastModified`をフロントエンド側で読み取り、`modified_at`という別フィールドでアップロードと一緒に送る（`src/lib/documents.js`の`createDocument()`）
+- **分類**: 既存データの分類から選べるようにするため、`GET /api/documents/suggest`で直近500件の`category`列を取得しJS側で重複除去（`DISTINCT`は使わず備品の担当者/場所/調達先サジェストと同じ方式）。`Combobox.jsx`（自由入力＋候補選択）に渡すため、固定のenumではなく自由入力の`text`列
+- **一覧**: 分類でグルーピングし、グループ内は資料名称順（`localeCompare('ja')`）に並べる
+- **ファイル保管**: Supabase Storageの新しいバケット`work-templates`（非公開。既存の`report-photos`は写真専用のため分けた）。`worker/lib/storage.js`の`putObject`/`getObject`/`deleteObject`に`bucket`引数を追加し、既定値（`report-photos`）を変えずに新バケットへ対応
+- **権限**: 一覧・ダウンロードは全ロール（owner・備品出庫限定ロールも含む）が可能、登録・削除はstaff/adminのみ
+- **API**: `GET/POST/DELETE /api/documents`、`GET /api/documents/suggest`、`GET /api/documents/download?id=`（`worker/lib/documents.js`）
+- **バックアップ**: 日次バックアップ（`.github/workflows/backup.yml`）は`public`スキーマ全体を`pg_dump`するため、`document_templates`テーブルの行データは設定変更なしで自動的に対象へ入る。**Storageに置いたファイル本体はpg_dumpの対象外**（バックアップされるのはメタ情報のみ）
+
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
 メール/フォーム/FAX/Googleカレンダーから**自動登録**されたタスクについて、購読中のブラウザ/端末へWeb Push通知を送る。手動登録（画面の「＋」からの登録）は対象外（登録した本人が既に画面上にいるため）。

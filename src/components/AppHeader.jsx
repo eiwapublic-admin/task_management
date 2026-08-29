@@ -35,6 +35,7 @@ const FEATURE_TITLES = [
   { path: '/usage', title: '従量課金事項' },
   { path: '/settings', title: '設定' },
   { path: '/reports/templates', title: '作業定型文' },
+  { path: '/documents', title: '雛形ファイル' },
   { path: '/reports/inspections', title: '自主検査表' },
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
@@ -272,6 +273,7 @@ export default function AppHeader({ lastFetchAt } = {}) {
                   <button className="btn-settings" onClick={() => goTo('/settings')}>設定</button>
                   <button onClick={() => goTo('/usage')}>従量課金事項</button>
                   <button onClick={() => goTo('/logs')}>処理ログ</button>
+                  <button onClick={() => goTo('/documents')}>雛形ファイル</button>
                 </>
               )}
               <div className="app-menu-divider" role="separator" />

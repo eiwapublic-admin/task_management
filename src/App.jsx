@@ -15,6 +15,7 @@ import Equipment from './pages/Equipment'
 import EquipmentItemHistory from './pages/EquipmentItemHistory'
 import EquipmentItems from './pages/EquipmentItems'
 import EquipmentTenants from './pages/EquipmentTenants'
+import DocumentTemplates from './pages/DocumentTemplates'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -169,6 +170,16 @@ function App() {
           element={
             <RequireAuth>
               <EquipmentTenants />
+            </RequireAuth>
+          }
+        />
+        {/* 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜）。owner・備品出庫限定
+            ロールも閲覧・ダウンロードはできるため RequireAuth（書き込みはサーバー側で拒否） */}
+        <Route
+          path="/documents"
+          element={
+            <RequireAuth>
+              <DocumentTemplates />
             </RequireAuth>
           }
         />
