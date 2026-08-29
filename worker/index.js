@@ -66,6 +66,7 @@ import {
   handleDocumentCreate,
   handleDocumentDelete,
   handleDocumentDownload,
+  handleDocumentPreviewToken,
 } from './lib/documents.js'
 
 // Cloudflare Worker 本体。
@@ -1042,6 +1043,9 @@ async function route(req, env) {
   }
   if (pathname === '/api/documents/download') {
     return req.method === 'GET' ? handleDocumentDownload(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/documents/preview-token') {
+    return req.method === 'POST' ? handleDocumentPreviewToken(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

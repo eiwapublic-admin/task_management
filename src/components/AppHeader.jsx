@@ -54,9 +54,9 @@ const NAV_ITEMS = [
   { path: '/', label: 'タスク', exact: true, staffOnly: true },
   { path: '/reports', label: '日報', exact: true },
   { path: '/equipment', label: '備品' },
-  { path: '/reports/inspections', label: '自主検査' },
   { path: '/reports/parking', label: '違反車両' },
   { path: '/reports/chlorine', label: '残留塩素' },
+  { path: '/documents', label: '雛形ファイル', staffOnly: true },
 ]
 
 function isNavItemActive(item, pathname) {

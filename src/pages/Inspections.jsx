@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
-import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
-import { IconChevronLeft, IconChevronRight, IconDownload } from '../components/Icons'
+import { IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
   INSPECTION_ITEMS,
@@ -20,10 +19,6 @@ import {
   todayJST,
 } from '../lib/reports'
 import './Dashboard.css'
-// AttachmentPreview（PDFのアプリ内プレビュー）の見た目は本来タスク管理側の
-// KanbanBoard.css で定義されており、日報セクションのみを直接開いた場合はまだ
-// 読み込まれていないことがあるため、ここでも明示的に import しておく。
-import '../components/KanbanBoard.css'
 
 // 自主検査表（日常）。紙の様式の置き換え。
 // 紙の記入ルール「不備が有る場合は項目に×とし、良好の場合は確認箇所一斉に○とすること」に
@@ -43,7 +38,6 @@ export default function Inspections() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null) // 入力中の日付（'YYYY-MM-DD'）
-  const pdf = useInspectionPdfExport(month, building)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -187,17 +181,6 @@ export default function Inspections() {
                   ＋
                 </button>
               )}
-              <button
-                type="button"
-                className="icon-btn-download icon-btn-download-print"
-                onClick={pdf.download}
-                disabled={pdf.busy || loading}
-                aria-label="紙の様式でPDFに出力する（半月ごとに1ページ）"
-                title={pdf.busy ? '作成中…' : '紙の様式でPDFに出力する（半月ごとに1ページ）'}
-              >
-                <IconDownload size={20} />
-                <span className="icon-btn-download-print-label">印刷用</span>
-              </button>
             </>
           }
         />
@@ -205,12 +188,6 @@ export default function Inspections() {
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
-          </p>
-        )}
-
-        {pdf.error && (
-          <p className="dashboard-error dashboard-banner" role="alert">
-            {pdf.error}
           </p>
         )}
 
@@ -312,8 +289,6 @@ export default function Inspections() {
         </p>
       </div>
 
-      {pdf.sheetsPortal}
-
       {editing && (
         <InspectionForm
           date={editing}
@@ -326,9 +301,6 @@ export default function Inspections() {
           onDelete={handleDelete}
         />
       )}
-
-      {pdf.previewModal}
-      {pdf.busyOverlay}
     </div>
   )
 }
