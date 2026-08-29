@@ -60,6 +60,13 @@ import {
   handleEquipmentInstallations,
   handleEquipmentTenantSync,
 } from './lib/equipment.js'
+import {
+  handleDocumentList,
+  handleDocumentCategorySuggest,
+  handleDocumentCreate,
+  handleDocumentDelete,
+  handleDocumentDownload,
+} from './lib/documents.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1021,6 +1028,20 @@ async function route(req, env) {
   }
   if (pathname === '/api/equipment/tenants/sync') {
     return req.method === 'POST' ? handleEquipmentTenantSync(req, env) : json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜。ハンドラは worker/lib/documents.js） ---
+  if (pathname === '/api/documents') {
+    if (req.method === 'GET') return handleDocumentList(req)
+    if (req.method === 'POST') return handleDocumentCreate(req)
+    if (req.method === 'DELETE') return handleDocumentDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/documents/suggest') {
+    return req.method === 'GET' ? handleDocumentCategorySuggest(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/documents/download') {
+    return req.method === 'GET' ? handleDocumentDownload(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

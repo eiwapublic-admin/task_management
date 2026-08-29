@@ -8,6 +8,7 @@ import {
   IconCheckCircle,
   IconClipboard,
   IconDroplet,
+  IconFolder,
   IconGear,
   IconHome,
   IconKanban,
@@ -265,6 +266,7 @@ export default function Portal() {
     { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
     { label: 'テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
     { label: '作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
+    { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
     { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
     { label: '設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
   ].filter((l) => !(isOwner && l.staffOnly))

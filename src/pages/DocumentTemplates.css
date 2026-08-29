@@ -1,0 +1,49 @@
+/* 雛形ファイル（業務で使う資料テンプレート）画面（2026-08-30〜）。
+   分類ごとにグループ化し、資料名称順に並べる。骨格は備品マスタ・処理ログ等の
+   一覧画面と同じ共通部品（.ui-group-head / .ui-table）を使う */
+
+.doc-group {
+  margin-bottom: var(--space-6);
+}
+
+.doc-table td.doc-name {
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.doc-remark {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.doc-meta {
+  font-size: var(--fs-sm);
+}
+
+.doc-meta-filename {
+  display: block;
+  color: var(--text-base);
+  word-break: break-all;
+}
+
+.doc-meta-sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.doc-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* 登録モーダルのファイル選択直後のプレビュー行（物理ファイル名・サイズ・更新日） */
+.doc-file-preview {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
