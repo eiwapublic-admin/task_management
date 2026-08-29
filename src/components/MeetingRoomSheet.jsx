@@ -66,7 +66,11 @@ export default function MeetingRoomSheet({ month, range, holidays, closedDays })
             <th colSpan={2}>記入例</th>
             <td colSpan={2} />
             <td className="mr-example-cell" colSpan={5}>
-              <div className="mr-example-arrow">10：00 〜 12：30</div>
+              <div className="mr-example-time">10：00 〜 12：30</div>
+              <div className="mr-example-arrow">
+                <span className="mr-example-arrowhead is-left" />
+                <span className="mr-example-arrowhead is-right" />
+              </div>
               <div className="mr-example-name">備後町ｺｲｽﾞﾐﾋﾞﾙ/鍵本(06-6251-9881）</div>
             </td>
             <td colSpan={SLOT_COUNT - 7} />
