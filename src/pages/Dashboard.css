@@ -642,16 +642,19 @@
 
 /* 日ごとのグループ見出し行（トグルの開閉ボタンを兼ねる）。日の区切り線の代わりに
    この行自体で日の境界が分かるようにした（2026-08-17。以前は logs-day-boundary の
-   太線区切りで日を分けていたが、グルーピング＋トグルを導入したため不要になった） */
+   太線区切りで日を分けていたが、グルーピング＋トグルを導入したため不要になった）。
+   背景は当初 var(--bg-subtle)（ほぼ白）だったが、日の区切りが見つけにくいとの指摘を
+   受け、従量課金画面の見出しバーと同じ濃いグレー var(--text-faint) に変更した
+   （2026-08-29。文字サイズも大きくして視認性を上げた） */
 .logs-table tbody tr.logs-day-head {
   cursor: pointer;
-  background: var(--bg-subtle);
+  background: var(--text-faint);
 }
 .logs-table tbody tr.logs-day-head td {
   padding: var(--space-2) var(--space-3);
 }
 .logs-table tbody tr.logs-day-head:hover td {
-  background: var(--bg-muted);
+  background: color-mix(in srgb, var(--text-faint) 85%, #000);
 }
 
 .logs-day-head-inner {
@@ -662,20 +665,21 @@
 
 .logs-day-toggle-icon {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-strong);
   transition: transform var(--transition);
 }
 .logs-day-toggle-icon.is-open { transform: rotate(90deg); }
 
 .logs-day-label {
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--text-strong);
   white-space: nowrap;
 }
 
 .logs-day-count {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
 }
 
 /* ---------- アーカイブ画面 ---------- */

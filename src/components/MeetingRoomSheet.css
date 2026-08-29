@@ -1,0 +1,136 @@
+/* 会議室利用申込書（会議室予約表）のPDF用シート。A4縦1枚＝半月分。
+   画面には出さず、PDF化のあいだだけ画面外（left:-10000px）に描画して html2canvas で撮る。
+   このシートは全てハードコードした色（hex）と mm 指定で組んでいる。html2canvas は
+   oklch などの新しい色関数を解釈できないため、ここに Tailwind 的なユーティリティや
+   最近の色関数を持ち込まないこと（プロジェクトスキル print-and-pdf-download を参照）。 */
+
+.mr-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .mr-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 10mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.mr-sheet * {
+  box-sizing: border-box;
+}
+
+/* ---- タイトル・対象月 ---- */
+.mr-sheet-title {
+  height: 8mm;
+  line-height: 8mm;
+  margin: 0;
+  font-size: 13pt;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* 対象月を目立たせる黄色い札。紙の様式どおり左上に置く（2026-08-29） */
+.mr-sheet-month-box {
+  display: inline-block;
+  height: 8mm;
+  line-height: 8mm;
+  margin: 2mm 0 3mm;
+  padding: 0 4mm;
+  background: #ffff00;
+  border: 0.3mm solid #000;
+  font-size: 11pt;
+  font-weight: 700;
+}
+
+/* ---- 本体の表 ---- */
+.mr-sheet-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 0.3mm solid #000;
+}
+
+.mr-col-date { width: 14mm; }
+.mr-col-wd { width: 10mm; }
+.mr-col-time { width: 9.2mm; }
+
+.mr-sheet-table th,
+.mr-sheet-table td {
+  border: 0.15mm solid #000;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: 400;
+  font-size: 8pt;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.mr-row-hours th {
+  height: 7mm;
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+
+.mr-row-minutes th {
+  height: 6mm;
+  font-size: 7pt;
+}
+
+/* 記入例（見本）の行。10:00〜12:30の予約例を1つのセルに2行で示す */
+.mr-row-example th {
+  height: 11mm;
+  font-size: 8pt;
+  font-weight: 700;
+  background: #f5f5f5;
+}
+
+.mr-example-cell {
+  vertical-align: middle;
+  padding: 0 1mm;
+}
+
+.mr-example-arrow {
+  font-size: 8pt;
+  font-weight: 700;
+  border-bottom: 0.2mm solid #000;
+  padding-bottom: 0.5mm;
+  margin-bottom: 0.8mm;
+}
+
+.mr-example-name {
+  font-size: 6.5pt;
+  color: #333;
+}
+
+/* 日ごとの行。高さは半月あたりの日数に応じて MeetingRoomSheet.jsx から
+   --mr-row-h（カスタムプロパティ）で渡し、月によらず表がA4いっぱいに収まるようにする */
+.mr-sheet-table tbody tr:not(.mr-row-example) td {
+  height: var(--mr-row-h, 15mm);
+}
+
+.mr-date,
+.mr-wd {
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+
+/* 土曜＝青、日曜・祝日・休館日＝ピンク（依頼元指定。2026-08-29） */
+.mr-row-blue td { background: #cfe0f3; }
+.mr-row-pink td { background: #f3cfd6; }
+
+/* ---- 表の下の注意書き ---- */
+.mr-sheet-note {
+  margin: 0;
+  padding-top: 3mm;
+  font-size: 8pt;
+}

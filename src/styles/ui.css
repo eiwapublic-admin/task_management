@@ -547,6 +547,32 @@
   }
 }
 
+/* 日報カレンダー画面の会議室予約表PDFボタン（2026-08-29）。骨格は上の印刷用ボタンと同じ */
+.icon-btn-download-meeting {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+.icon-btn-download-meeting:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.icon-btn-download-meeting-label { display: none; }
+
+@media (min-width: 769px) {
+  .icon-btn-download-meeting {
+    width: auto;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
+  .icon-btn-download-meeting-label {
+    display: inline;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+  }
+}
+
 /* 削除。ホバーで初めて赤くなる（置いてあるだけで不安にさせない） */
 .icon-btn-delete:hover:not(:disabled) {
   color: var(--color-danger);
