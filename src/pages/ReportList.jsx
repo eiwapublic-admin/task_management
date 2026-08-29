@@ -5,6 +5,7 @@ import ReportDetail from './ReportDetail'
 import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
 import useMeetingRoomPdfExport from '../hooks/useMeetingRoomPdfExport'
+import useInspectionPdfExport from '../hooks/useInspectionPdfExport'
 import {
   IconCar,
   IconClip,
@@ -160,6 +161,10 @@ export default function ReportList() {
   // 会議室予約表のPDF出力（2026-08-29）。カレンダー画面でのみ使うボタンだが、
   // フックは他のPDF出力（自主検査表等）と同じくページ側で常に呼んでおく
   const meetingRoomPdf = useMeetingRoomPdfExport(month)
+  // 自主検査表のPDF出力（2026-08-29、自主検査表画面から日報一覧へ移設）。
+  // 自主検査表画面自体は一旦ペンディング（今後使われないと判断すれば廃止予定）だが、
+  // 紙の様式へのPDF出力はここでも引き続き使えるようにする
+  const inspectionPdf = useInspectionPdfExport(month, building)
 
   useEffect(() => {
     const mq = window.matchMedia(WIDE_SCREEN_QUERY)
@@ -767,21 +772,37 @@ export default function ReportList() {
             </>
           }
           actions={
-            // 会議室予約表のPDF出力（2026-08-29）。カレンダー型表示のときだけ意味を持つ
-            // ボタンなので、リスト型・検索結果表示中は出さない
-            activeView === 'calendar' &&
             !searching && (
-              <button
-                type="button"
-                className="icon-btn-download icon-btn-download-meeting"
-                onClick={meetingRoomPdf.download}
-                disabled={meetingRoomPdf.busy}
-                aria-label="会議室予約表をPDFに出力する"
-                title={meetingRoomPdf.busy ? '作成中…' : '会議室予約表をPDFに出力する'}
-              >
-                <IconDownload size={20} />
-                <span className="icon-btn-download-meeting-label">会議室予約表</span>
-              </button>
+              <>
+                {/* 自主検査表のPDF出力（2026-08-29、自主検査表画面から移設）。
+                    月単位の帳票なので表示形式（リスト／カレンダー）に関わらず出す */}
+                <button
+                  type="button"
+                  className="icon-btn-download icon-btn-download-print"
+                  onClick={inspectionPdf.download}
+                  disabled={inspectionPdf.busy}
+                  aria-label="自主検査表を紙の様式でPDFに出力する（半月ごとに1ページ）"
+                  title={inspectionPdf.busy ? '作成中…' : '自主検査表を紙の様式でPDFに出力する（半月ごとに1ページ）'}
+                >
+                  <IconDownload size={20} />
+                  <span className="icon-btn-download-print-label">自主検査</span>
+                </button>
+                {/* 会議室予約表のPDF出力（2026-08-29）。カレンダー型表示のときだけ意味を持つ
+                    ボタンなので、リスト型では出さない */}
+                {activeView === 'calendar' && (
+                  <button
+                    type="button"
+                    className="icon-btn-download icon-btn-download-meeting"
+                    onClick={meetingRoomPdf.download}
+                    disabled={meetingRoomPdf.busy}
+                    aria-label="会議室予約表をPDFに出力する"
+                    title={meetingRoomPdf.busy ? '作成中…' : '会議室予約表をPDFに出力する'}
+                  >
+                    <IconDownload size={20} />
+                    <span className="icon-btn-download-meeting-label">会議室予約表</span>
+                  </button>
+                )}
+              </>
             )
           }
         >
@@ -820,6 +841,12 @@ export default function ReportList() {
         {meetingRoomPdf.error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {meetingRoomPdf.error}
+          </p>
+        )}
+
+        {inspectionPdf.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {inspectionPdf.error}
           </p>
         )}
 
@@ -866,6 +893,11 @@ export default function ReportList() {
       {meetingRoomPdf.sheetsPortal}
       {meetingRoomPdf.previewModal}
       {meetingRoomPdf.busyOverlay}
+
+      {/* 自主検査表PDF（2026-08-29、自主検査表画面から移設） */}
+      {inspectionPdf.sheetsPortal}
+      {inspectionPdf.previewModal}
+      {inspectionPdf.busyOverlay}
     </div>
   )
 }

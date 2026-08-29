@@ -3,12 +3,23 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import DocumentTemplateForm from '../components/DocumentTemplateForm'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
+import AttachmentPreview from '../components/AttachmentPreview'
 import { IconDownload } from '../components/Icons'
-import { fetchDocuments, fetchDocumentCategories, deleteDocument, downloadDocument } from '../lib/documents'
+import {
+  fetchDocuments,
+  fetchDocumentCategories,
+  deleteDocument,
+  downloadDocument,
+  getDocumentPreviewUrl,
+} from '../lib/documents'
 import { formatBytes } from '../lib/imageResize'
 import { formatDate } from '../lib/format'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import './DocumentTemplates.css'
+// AttachmentPreview（プレビューモーダル）の見た目は本来タスク管理側の KanbanBoard.css で
+// 定義されており、日報等を経由せずこの画面を直接開いた場合はまだ読み込まれていないことが
+// あるため、ここでも明示的に import しておく（Inspections.jsx と同じ対応）
+import '../components/KanbanBoard.css'
 
 // 雛形ファイル（業務で使う資料テンプレート）画面（2026-08-30〜）。
 // 「登録していつでもダウンロードできる資料置き場」。分類ごとにグループ化し、
@@ -23,6 +34,8 @@ export default function DocumentTemplates() {
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState(null)
+  // プレビュー表示中のファイル（{ doc, filename, mimeType, url }）。null なら非表示
+  const [preview, setPreview] = useState(null)
 
   const load = useCallback(() => {
     setError('')
@@ -62,6 +75,38 @@ export default function DocumentTemplates() {
     try {
       await downloadDocument(doc.id, doc.original_filename)
     } catch (err) {
+      setError(err.message)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  // 一覧の操作アイコン。まずダウンロードではなくプレビュー表示にする。
+  // 画像・PDFはアプリ内プレビュー（AttachmentPreview）で開き、それ以外（Word/Excel等、
+  // ブラウザに内蔵ビューアが無い形式）は実URL（Content-Disposition: inline）を新規タブで
+  // 開き、ブラウザ・OS側の既定アプリでの表示に委ねる（可能な環境ではダウンロードなしで
+  // そのまま印刷できる。プロジェクトスキル multi-env-attachment-preview 参照）
+  async function handleOpen(doc) {
+    setDownloadingId(doc.id)
+    setError('')
+    const isPdf = doc.mime === 'application/pdf'
+    const isImage = (doc.mime || '').startsWith('image/')
+    // 新規タブは非同期処理（トークン発行）の後に window.open() すると、クリックの
+    // ユーザー操作から切り離されたとポップアップブロッカーに扱われて弾かれることがある。
+    // クリック直後に空タブを同期的に開いておき、URLが揃ってから遷移させる
+    // ('noopener'を付けると window.open() の戻り値が null になり、後から
+    // location を差し込めなくなるため付けない。開く先はブラウザ・OSに任せる
+    // 自ファイルのダウンロード配信であり任意の外部ページではないため問題ない)
+    const win = !isPdf && !isImage ? window.open('', '_blank') : null
+    try {
+      const url = await getDocumentPreviewUrl(doc.id)
+      if (isPdf || isImage) {
+        setPreview({ doc, filename: doc.original_filename, mimeType: doc.mime, url })
+      } else if (win) {
+        win.location.href = url
+      }
+    } catch (err) {
+      win?.close()
       setError(err.message)
     } finally {
       setDownloadingId(null)
@@ -142,10 +187,10 @@ export default function DocumentTemplates() {
                           <button
                             type="button"
                             className="icon-btn-download"
-                            onClick={() => handleDownload(d)}
+                            onClick={() => handleOpen(d)}
                             disabled={downloadingId === d.id}
-                            aria-label={`${d.name}をダウンロード`}
-                            title="ダウンロード"
+                            aria-label={`${d.name}をプレビュー`}
+                            title="プレビュー"
                           >
                             <IconDownload size={20} />
                           </button>
@@ -169,6 +214,24 @@ export default function DocumentTemplates() {
 
       {formOpen && (
         <DocumentTemplateForm categories={categories} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
+      )}
+
+      {preview && (
+        <AttachmentPreview
+          attachment={{ filename: preview.filename, mimeType: preview.mimeType }}
+          url={preview.url}
+          onClose={() => setPreview(null)}
+          headerAction={
+            <button
+              type="button"
+              className="attachment-preview-share"
+              onClick={() => handleDownload(preview.doc)}
+              disabled={downloadingId === preview.doc.id}
+            >
+              ダウンロード
+            </button>
+          }
+        />
       )}
     </div>
   )

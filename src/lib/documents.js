@@ -50,6 +50,20 @@ export async function createDocument({ name, category, remark, file }) {
   return data.document
 }
 
+// アプリ内プレビュー（またはOS既定アプリでの直接表示）用に、短時間（120秒）だけ有効な
+// 直接アクセスURLを発行する（/api/documents/preview-token）。<iframe src>や新規タブへの
+// 直接ナビゲーションはAuthorizationヘッダを送れないため、発行したトークンをクエリ文字列で
+// 代わりに使う（自主検査表PDF・Gmail添付のプレビューと同じ方式。src/lib/api.js の
+// getAttachmentPreviewUrl 参照）。
+export async function getDocumentPreviewUrl(id) {
+  const { token } = await authFetch('/api/documents/preview-token', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  })
+  const params = new URLSearchParams({ id, preview_token: token })
+  return `/api/documents/download?${params.toString()}`
+}
+
 export async function deleteDocument(id) {
   await authFetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }

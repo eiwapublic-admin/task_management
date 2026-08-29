@@ -5,7 +5,6 @@ import {
   IconArchive,
   IconBox,
   IconCar,
-  IconCheckCircle,
   IconClipboard,
   IconDroplet,
   IconFolder,
@@ -25,7 +24,6 @@ import {
   daysInMonth,
   fetchChlorineTests,
   fetchClosedDays,
-  fetchInspections,
   fetchParkingViolations,
   fetchReports,
   formatReportDate,
@@ -105,18 +103,17 @@ export default function Portal() {
         fetchParkingViolations(),
         // 残留塩素は「過去10日間」の判定に年をまたぐ可能性があるため、年で絞らず全期間取得する
         fetchChlorineTests(),
-        fetchInspections({ month }),
         fetchClosedDays({ month }),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, inspections, closedDays] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, closedDays] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, inspections, closedDays, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, closedDays, month, year })
       setLoading(false)
     }
 
@@ -155,12 +152,6 @@ export default function Portal() {
         : null
     const lowestBelowWarn =
       lowestItem != null && lowestItem.warn_qty != null && lowestItem.stock_qty <= lowestItem.warn_qty
-
-    // --- 自主検査：昨日までの未起票日数（休館日を除く。2026-08-14） ---
-    const inspections = stats?.inspections
-    const unfiledInspectionDays = inspections
-      ? countUnfiledDays(month, new Set(inspections.map((i) => i.inspected_on)), closedDays, today)
-      : undefined
 
     // --- 違反車両：過去30日間（当日含む）の件数（2026-08-14） ---
     const parking = stats?.parking
@@ -216,17 +207,6 @@ export default function Portal() {
         caption: '在庫最少',
         sub: items == null ? '取得できませんでした' : lowestItem ? lowestItem.name : '在庫管理の対象がありません',
         alert: lowestBelowWarn,
-      },
-      {
-        key: 'inspections',
-        label: '自主検査',
-        icon: <IconCheckCircle size={24} />,
-        path: '/reports/inspections',
-        value: unfiledInspectionDays,
-        unit: '日',
-        caption: '未起票（昨日まで）',
-        sub: inspections == null ? '取得できませんでした' : '日常の防火・避難点検',
-        alert: unfiledInspectionDays > 0,
       },
       {
         key: 'parking',
