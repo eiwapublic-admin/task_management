@@ -95,6 +95,22 @@ body.pdf-capture-mode .mr-sheet {
   font-size: 7pt;
 }
 
+/* 毎時「00」と「30」の間の縦罫線は、毎時の境界線（30→次の00）より細い点線にして
+   区別する（2026-08-30）。列位置は date/wd の2列を除いた時間帯18列のうち、
+   奇数列目（1,3,5…）が「00」・偶数列目（2,4,6…）が「30」にあたる。
+   ・分見出し行（.mr-row-minutes）は date/wd 分の先頭2列を持たない（rowSpanで
+     上の行に譲っている）ため、そのままnth-child(odd/even)で「00」「30」を判定できる
+   ・日の行・列見出し（記入例は colspan で個々のセルを持たないため対象外）は
+     先頭2列（日付・曜日）がある分、2n+3（00）/2n+4（30）で判定する */
+.mr-row-minutes th:nth-child(odd),
+.mr-sheet-table tbody tr:not(.mr-row-example) td:nth-child(2n+3) {
+  border-right: 0.1mm dotted #000;
+}
+.mr-row-minutes th:nth-child(even),
+.mr-sheet-table tbody tr:not(.mr-row-example) td:nth-child(2n+4) {
+  border-left: 0.1mm dotted #000;
+}
+
 /* 記入例（見本）の行。10:00〜12:30の予約例を1つのセルに2行で示す */
 .mr-row-example th {
   height: 11mm;
