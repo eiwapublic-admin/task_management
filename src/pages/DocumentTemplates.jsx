@@ -94,8 +94,15 @@ export default function DocumentTemplates() {
   async function handleOpen(doc) {
     setDownloadingId(doc.id)
     setError('')
-    const isPdf = doc.mime === 'application/pdf'
-    const isImage = (doc.mime || '').startsWith('image/')
+    // mime列はアップロード時のブラウザ報告値（File.type）をそのまま保存しているため、
+    // 環境によっては拡張子が.pdfでもmimeが空/不正確なことがある。雛形ファイルは
+    // 「PDFなら毎回すぐプレビュー→印刷」という定常利用が多いため、mimeだけでなく
+    // 拡張子（file_ext）でも判定して確実にプレビューへ回す
+    const ext = (doc.file_ext || '').toLowerCase()
+    const isPdf = doc.mime === 'application/pdf' || ext === 'pdf'
+    const isImage =
+      (doc.mime || '').startsWith('image/') ||
+      ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(ext)
     // 新規タブは非同期処理（トークン発行）の後に window.open() すると、クリックの
     // ユーザー操作から切り離されたとポップアップブロッカーに扱われて弾かれることがある。
     // クリック直後に空タブを同期的に開いておき、URLが揃ってから遷移させる
@@ -106,7 +113,11 @@ export default function DocumentTemplates() {
     try {
       const url = await getDocumentPreviewUrl(doc.id)
       if (isPdf || isImage) {
-        setPreview({ doc, filename: doc.original_filename, mimeType: doc.mime, url })
+        // AttachmentPreview自身もmimeTypeで表示方法を判定するため、拡張子だけで
+        // PDF/画像と判定した場合（mime列が空/不正確）でもそちらに正しく伝わるよう、
+        // 実際のmime値ではなく判定結果を優先した値を渡す
+        const previewMime = isPdf ? 'application/pdf' : doc.mime?.startsWith('image/') ? doc.mime : 'image/*'
+        setPreview({ doc, filename: doc.original_filename, mimeType: previewMime, url })
       } else if (win) {
         win.location.href = url
         setTimeout(() => {
