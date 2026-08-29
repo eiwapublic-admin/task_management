@@ -396,6 +396,20 @@ export function halfMonthRanges(month, dayCount) {
   return [build(1, Math.min(half, dayCount)), build(half + 1, dayCount)]
 }
 
+// 会議室予約表（PDF。2026-08-29）の半月ごとの日付リスト。自主検査表と違い列数の
+// 制約（16列）が無いため、単純に月の日数をちょうど半分に分ける
+// （31日の月は前半16日・後半15日、それ以外は均等）
+export function halfMonthDayRanges(month) {
+  const total = daysInMonth(month)
+  const firstCount = Math.ceil(total / 2)
+  const build = (from, to) => {
+    const days = []
+    for (let d = from; d <= to; d += 1) days.push(`${month}-${String(d).padStart(2, '0')}`)
+    return { from, to, days }
+  }
+  return [build(1, firstCount), build(firstCount + 1, total)]
+}
+
 // ---- 不正駐車（Phase 4。2026-08-05〜）----
 
 export const VIOLATION_LABELS = {

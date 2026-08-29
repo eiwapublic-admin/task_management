@@ -4,6 +4,7 @@ import AppHeader from '../components/AppHeader'
 import ReportDetail from './ReportDetail'
 import FeatureHeader from '../components/FeatureHeader'
 import InspectionForm from '../components/InspectionForm'
+import useMeetingRoomPdfExport from '../hooks/useMeetingRoomPdfExport'
 import {
   IconCar,
   IconClip,
@@ -14,6 +15,7 @@ import {
   IconCalendar,
   IconSearch,
   IconDroplet,
+  IconDownload,
 } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { assigneeColor, assigneeInitial } from '../lib/format'
@@ -154,6 +156,10 @@ export default function ReportList() {
   // 狭い画面では常にリスト型にフォールバックする（state自体は保持し、広い画面に戻れば
   // 選んでいた表示に復帰する）
   const activeView = isWideScreen ? view : 'list'
+
+  // 会議室予約表のPDF出力（2026-08-29）。カレンダー画面でのみ使うボタンだが、
+  // フックは他のPDF出力（自主検査表等）と同じくページ側で常に呼んでおく
+  const meetingRoomPdf = useMeetingRoomPdfExport(month)
 
   useEffect(() => {
     const mq = window.matchMedia(WIDE_SCREEN_QUERY)
@@ -760,6 +766,24 @@ export default function ReportList() {
               </button>
             </>
           }
+          actions={
+            // 会議室予約表のPDF出力（2026-08-29）。カレンダー型表示のときだけ意味を持つ
+            // ボタンなので、リスト型・検索結果表示中は出さない
+            activeView === 'calendar' &&
+            !searching && (
+              <button
+                type="button"
+                className="icon-btn-download icon-btn-download-meeting"
+                onClick={meetingRoomPdf.download}
+                disabled={meetingRoomPdf.busy}
+                aria-label="会議室予約表をPDFに出力する"
+                title={meetingRoomPdf.busy ? '作成中…' : '会議室予約表をPDFに出力する'}
+              >
+                <IconDownload size={20} />
+                <span className="icon-btn-download-meeting-label">会議室予約表</span>
+              </button>
+            )
+          }
         >
           {searchOpen && (
             <div className="reports-search-bar">
@@ -790,6 +814,12 @@ export default function ReportList() {
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
+          </p>
+        )}
+
+        {meetingRoomPdf.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {meetingRoomPdf.error}
           </p>
         )}
 
@@ -830,6 +860,12 @@ export default function ReportList() {
           onDelete={handleInspectionDelete}
         />
       )}
+
+      {/* 会議室予約表PDF（2026-08-29）。sheetsPortal は画面外の紙様式シート（PDF作成中だけ描画）、
+          previewModal はアプリ内プレビュー、busyOverlay は作成中の全画面ブロック */}
+      {meetingRoomPdf.sheetsPortal}
+      {meetingRoomPdf.previewModal}
+      {meetingRoomPdf.busyOverlay}
     </div>
   )
 }
