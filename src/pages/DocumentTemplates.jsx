@@ -85,7 +85,12 @@ export default function DocumentTemplates() {
   // 画像・PDFはアプリ内プレビュー（AttachmentPreview）で開き、それ以外（Word/Excel等、
   // ブラウザに内蔵ビューアが無い形式）は実URL（Content-Disposition: inline）を新規タブで
   // 開き、ブラウザ・OS側の既定アプリでの表示に委ねる（可能な環境ではダウンロードなしで
-  // そのまま印刷できる。プロジェクトスキル multi-env-attachment-preview 参照）
+  // そのまま印刷できる。プロジェクトスキル multi-env-attachment-preview 参照）。
+  // ただしデスクトップ版Chrome等、その形式を表示できるビューアを持たないブラウザは
+  // inline指定を無視してダウンロードだけ行い、開いたタブは空白のまま残る
+  // （実機確認で判明。2026-08-30）。空白タブが残るのは紛らわしいため、遷移後は
+  // ダウンロードが始まるのを待ってから自動で閉じる（ダウンロード自体はブラウザの
+  // ダウンロードマネージャ側で継続するため、タブを閉じても中断されない）
   async function handleOpen(doc) {
     setDownloadingId(doc.id)
     setError('')
@@ -104,6 +109,13 @@ export default function DocumentTemplates() {
         setPreview({ doc, filename: doc.original_filename, mimeType: doc.mime, url })
       } else if (win) {
         win.location.href = url
+        setTimeout(() => {
+          try {
+            win.close()
+          } catch {
+            // 既に閉じられている等は無視してよい
+          }
+        }, 1500)
       }
     } catch (err) {
       win?.close()
