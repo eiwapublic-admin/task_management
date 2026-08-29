@@ -1,4 +1,5 @@
-/* 会議室利用申込書（会議室予約表）のPDF用シート。A4縦1枚＝半月分。
+/* 会議室利用申込書（会議室予約表）のPDF用シート。A4横1枚＝半月分（2026-08-29。
+   日付・曜日＋18列の時間帯を並べる横に長い表のため、縦ではなく横向きにした）。
    画面には出さず、PDF化のあいだだけ画面外（left:-10000px）に描画して html2canvas で撮る。
    このシートは全てハードコードした色（hex）と mm 指定で組んでいる。html2canvas は
    oklch などの新しい色関数を解釈できないため、ここに Tailwind 的なユーティリティや
@@ -15,8 +16,8 @@ body.pdf-capture-mode .mr-sheet {
   left: -10000px;
   z-index: -1;
   box-sizing: border-box;
-  width: 210mm;
-  height: 297mm;
+  width: 297mm;
+  height: 210mm;
   overflow: hidden;
   padding: 10mm;
   background: #fff;
@@ -28,22 +29,30 @@ body.pdf-capture-mode .mr-sheet {
   box-sizing: border-box;
 }
 
-/* ---- タイトル・対象月 ---- */
-.mr-sheet-title {
+/* ---- タイトル・対象月 ----
+   A4横は縦の余白が少ないため、対象月の札とタイトルを縦に積まず同じ行に並べる
+   （2026-08-29。A4縦だったころは札の下にタイトルを積んでいたが、表の行の高さを
+   少しでも稼ぐため1行にまとめた） */
+.mr-sheet-header {
+  display: flex;
+  align-items: center;
   height: 8mm;
-  line-height: 8mm;
+  margin-bottom: 4mm;
+}
+
+.mr-sheet-title {
+  flex: 1;
   margin: 0;
   font-size: 13pt;
   font-weight: 700;
   text-align: center;
 }
 
-/* 対象月を目立たせる黄色い札。紙の様式どおり左上に置く（2026-08-29） */
+/* 対象月を目立たせる黄色い札。紙の様式どおり左に置く（2026-08-29） */
 .mr-sheet-month-box {
   display: inline-block;
   height: 8mm;
   line-height: 8mm;
-  margin: 2mm 0 3mm;
   padding: 0 4mm;
   background: #ffff00;
   border: 0.3mm solid #000;
