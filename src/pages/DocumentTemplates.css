@@ -16,15 +16,15 @@
 
 .doc-table th:nth-child(1),
 .doc-table td:nth-child(1) {
-  width: 34%;
+  width: 26%;
 }
 .doc-table th:nth-child(2),
 .doc-table td:nth-child(2) {
-  width: 30%;
+  width: 34%;
 }
 .doc-table th:nth-child(3),
 .doc-table td:nth-child(3) {
-  width: 26%;
+  width: 30%;
 }
 .doc-table th:nth-child(4),
 .doc-table td:nth-child(4) {
@@ -58,16 +58,15 @@
   word-break: break-word;
 }
 
-/* 列幅を固定しているため、ボタンの右に続くファイル情報が長いと桁あふれして
-   隣の列に重なって見えることがある。折り返しを許可して同じセル内に収める
-   （nowrapのまま固定幅にすると、はみ出た分が視覚的に隣の列へ乗り上げてしまう） */
+/* ファイル情報（サイズ・更新タイムスタンプ）はボタンの下に1行で表示する（2026-08-30）。
+   ボタンと横並びにすると列幅次第で隣の列に文字が乗り上げることがあったため、
+   ボタンの真下に独立した行として置き、かつ列幅も広めに確保して1行に収まるようにする */
 .doc-file-info {
-  display: inline-block;
-  margin-left: var(--space-2);
+  display: block;
+  margin-top: 2px;
   color: var(--text-muted);
   font-size: var(--fs-xs);
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
 }
 
 .doc-pdf-missing {

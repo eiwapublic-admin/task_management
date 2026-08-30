@@ -30,6 +30,17 @@ export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
 
   const originalIsPdf = file ? isPdfFile(file) : false
 
+  // ファイル選択時、資料名称が未入力ならファイル名（拡張子なし）を自動で入れる
+  // （2026-08-30追加）。既に入力済みの名称を選び直しで上書きしてしまわないよう、
+  // 空のときだけ補完する
+  function handleFileChange(e) {
+    const f = e.target.files?.[0] || null
+    setFile(f)
+    if (f && !name.trim()) {
+      setName(f.name.replace(/\.[^./]+$/, ''))
+    }
+  }
+
   async function handleSave() {
     setError('')
     if (!name.trim()) return setError('資料名称は必須です')
@@ -72,11 +83,7 @@ export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
 
           <label className="ui-field">
             <span>ファイル</span>
-            <input
-              type="file"
-              className="ui-input"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
+            <input type="file" className="ui-input" onChange={handleFileChange} />
           </label>
           {/* 物理ファイル名・拡張子・サイズ・最終更新日はここで自動取得したものをそのまま
               登録時に送る（ユーザーが手で入力する項目ではないため、確認用に見せるだけ） */}
