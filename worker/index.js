@@ -69,6 +69,7 @@ import {
   handleDocumentPreviewToken,
   handleDocumentPdfAttach,
   handleDocumentPdfDelete,
+  handleDocumentOriginalAttach,
 } from './lib/documents.js'
 
 // Cloudflare Worker 本体。
@@ -1053,6 +1054,9 @@ async function route(req, env) {
     if (req.method === 'POST') return handleDocumentPdfAttach(req)
     if (req.method === 'DELETE') return handleDocumentPdfDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/documents/original') {
+    return req.method === 'POST' ? handleDocumentOriginalAttach(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

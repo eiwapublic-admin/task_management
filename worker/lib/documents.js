@@ -40,6 +40,20 @@ function looksLikePdf(file) {
   return file?.type === 'application/pdf' || extOf(file?.name) === 'pdf'
 }
 
+// 差し替え時に古いオブジェクトを消すための、失敗しても全体を失敗にしないベストエフォート削除。
+// 呼び出し時点でDBの更新（新しい参照への切り替え）は既に成功しているため、ここで例外を
+// 投げてしまうと「実際には差し替えが成功したのに失敗と表示される」ことになる。
+// 万一削除に失敗した場合は古いオブジェクトがStorageに孤児として残るが、ログに残しておけば
+// storage.objects と document_templates を突き合わせて後から特定できる（docs/HANDOFF.md参照）
+async function safeDeleteObject(key, bucket) {
+  if (!key) return
+  try {
+    await deleteObject(key, bucket)
+  } catch (err) {
+    console.error('document-storage: 古いオブジェクトの削除に失敗（孤児として残る可能性）:', key, err)
+  }
+}
+
 // GET /api/documents — 一覧（分類→資料名称の順。並び替え自体は画面側でも行うが、
 // 一覧取得の時点である程度揃えておく）
 export async function handleDocumentList(req) {
@@ -219,12 +233,71 @@ export async function handleDocumentPdfAttach(req) {
       console.error('document-pdf-attach:', err.message)
       return json({ error: 'PDF版の登録に失敗しました' }, 500)
     }
-    // 差し替えの場合は古いPDFオブジェクトを消して孤児を残さない
-    if (existing.pdf_storage_key) await deleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
+    // 差し替えの場合は古いPDFオブジェクトを消して孤児を残さない（失敗しても登録自体は成功扱い）
+    await safeDeleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
     return json({ document: data })
   } catch (err) {
     console.error('document-pdf-attach 失敗:', err)
     return json({ error: 'PDF版の登録に失敗しました' }, 500)
+  }
+}
+
+// POST /api/documents/original — 既存の登録の原本ファイルを差し替える
+// （multipart/form-data。id・file必須、modified_at任意）。書き込み権限が必要。
+// PDF版とは異なり形式は問わない（原本はもともとWord/Excel/PDF等どれでも良いため）。
+export async function handleDocumentOriginalAttach(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const form = await req.formData().catch(() => null)
+    if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
+
+    const id = String(form.get('id') || '')
+    const file = form.get('file')
+    const modifiedAtMs = Number(form.get('modified_at'))
+
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
+    if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（20MBまで）' }, 413)
+
+    const supabase = getAdminClient()
+    const { data: existing } = await supabase
+      .from('document_templates')
+      .select('storage_key')
+      .eq('id', id)
+      .maybeSingle()
+    if (!existing) return json({ error: '雛形ファイルが見つかりません' }, 404)
+
+    const originalFilename = file.name || 'file'
+    const ext = extOf(originalFilename)
+    const key = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+    await putObject(key, file.stream(), file.type || 'application/octet-stream', { bucket: TEMPLATE_BUCKET })
+
+    const { data, error: err } = await supabase
+      .from('document_templates')
+      .update({
+        original_filename: originalFilename.slice(0, 255),
+        file_ext: ext || null,
+        file_size: file.size,
+        file_modified_at:
+          Number.isFinite(modifiedAtMs) && modifiedAtMs > 0 ? new Date(modifiedAtMs).toISOString() : null,
+        mime: file.type || null,
+        storage_key: key,
+      })
+      .eq('id', id)
+      .select(DOCUMENT_COLUMNS)
+      .single()
+    if (err) {
+      await deleteObject(key, TEMPLATE_BUCKET)
+      console.error('document-original-attach:', err.message)
+      return json({ error: '原本の差し替えに失敗しました' }, 500)
+    }
+    // 差し替え前の古い原本オブジェクトを消して孤児を残さない（失敗しても差し替え自体は成功扱い）
+    await safeDeleteObject(existing.storage_key, TEMPLATE_BUCKET)
+    return json({ document: data })
+  } catch (err) {
+    console.error('document-original-attach 失敗:', err)
+    return json({ error: '原本の差し替えに失敗しました' }, 500)
   }
 }
 
@@ -260,7 +333,7 @@ export async function handleDocumentPdfDelete(req) {
       console.error('document-pdf-delete:', err.message)
       return json({ error: 'PDF版の削除に失敗しました' }, 500)
     }
-    await deleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
+    await safeDeleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
     return json({ document: data })
   } catch (err) {
     console.error('document-pdf-delete 失敗:', err)
@@ -289,8 +362,10 @@ export async function handleDocumentDelete(req) {
       console.error('document-delete:', err.message)
       return json({ error: '雛形ファイルの削除に失敗しました' }, 500)
     }
-    await deleteObject(doc.storage_key, TEMPLATE_BUCKET)
-    if (doc.pdf_storage_key) await deleteObject(doc.pdf_storage_key, TEMPLATE_BUCKET)
+    // DBの行は既に削除済みのため、Storageの削除が失敗しても「削除は成功」として返す
+    // （失敗すると孤児オブジェクトが残るが、レコード削除自体を失敗扱いにする方が誤解を招く）
+    await safeDeleteObject(doc.storage_key, TEMPLATE_BUCKET)
+    await safeDeleteObject(doc.pdf_storage_key, TEMPLATE_BUCKET)
     return json({ ok: true })
   } catch (err) {
     console.error('document-delete 失敗:', err)
