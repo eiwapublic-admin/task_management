@@ -461,6 +461,23 @@
   cursor: default;
 }
 
+/* ハンバーガーメニューの「トップ」領域（2026-08-30整理）。ユーザー名＋各業務への
+   直接ジャンプをまとめたブロックで、PC幅では常時見えるヘッダー中央の業務メニュー
+   （.app-header-nav＝NAV_ITEMS）とユーザー名表示が既にあるため出さない
+   （.app-header-nav を隠す閾値と同じ768px以下でだけ表示する） */
+.app-menu-top {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+@media (min-width: 769px) {
+  .app-menu-top,
+  .app-menu-top-divider {
+    display: none;
+  }
+}
+
 /* 誰でログインしているか（狭幅ではヘッダーに出さないためここで必ず分かるようにする） */
 .app-menu-user {
   margin: 0 0 var(--space-1);

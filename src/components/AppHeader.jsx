@@ -161,25 +161,67 @@ export default function AppHeader({ lastFetchAt } = {}) {
     }
   }
 
-  // 現在どのセクションを見ているか。'portal' | 'tasks' | 'reports' | 'equipment'
-  // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理とダッシュボードが増えた）。
+  // 現在どのセクションを見ているか。'portal' | 'documents' | 'tasks' | 'reports' | 'equipment'
+  // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理とダッシュボードが増えた。
+  // 2026-08-30、雛形ファイルを独立したセクションとして切り出し。それまでは他のどの
+  // プレフィックスにも当たらず'tasks'扱いになっていたため、ハンバーガーメニューの
+  // 「業務別メニュー」がタスク向けの内容になってしまっていた）。
   // 各セクションのパスは /reports・/equipment 配下にまとめている。window.location ではなく
   // useLocation を使い、クライアント側遷移でも確実に再評価されるようにする。
   const section = location.pathname.startsWith('/portal')
     ? 'portal'
-    : location.pathname.startsWith('/equipment')
-      ? 'equipment'
-      : location.pathname.startsWith('/reports')
-        ? 'reports'
-        : 'tasks'
+    : location.pathname.startsWith('/documents')
+      ? 'documents'
+      : location.pathname.startsWith('/equipment')
+        ? 'equipment'
+        : location.pathname.startsWith('/reports')
+          ? 'reports'
+          : 'tasks'
   const inPortal = section === 'portal'
-  const inReports = section === 'reports'
-  const inEquipment = section === 'equipment'
   // owner（小泉産業様）・備品出庫限定ロール（2026-08-25追加）は日報・備品等の閲覧のみ
   // （備品出庫限定ロールは備品の出庫だけ書き込み可）。どちらもタスク管理のメニューは出さない
   const isOwner = isLimitedRole(user)
   // ヘッダーに大きく出す機能名（2026-08-12。従来のセクション切替の置き換え）
   const featureTitle = featureTitleFor(location.pathname)
+
+  // ハンバーガーメニュー「業務別メニュー」（2026-08-30に領域を整理）。表示中の業務に
+  // 応じて内容が変わり、ダッシュボード・雛形ファイル画面ではそもそも出さない
+  // （トップ領域の業務ナビ・共通メニューだけで用が足りるため）。
+  let businessMenuItems = null
+  if (section === 'tasks') {
+    businessMenuItems = (
+      <>
+        <button onClick={handleRunFetch} disabled={fetching}>
+          {fetching ? '取得中…' : '今すぐ取得'}
+        </button>
+        <button onClick={() => goTo('/archive')}>アーカイブタスク</button>
+        <button className="btn-settings" onClick={() => goTo('/settings')}>
+          タスク設定
+        </button>
+        <button
+          onClick={() => {
+            setMenuOpen(false)
+            setAboutOpen(true)
+          }}
+        >
+          「タスク」の仕組み
+        </button>
+      </>
+    )
+  } else if (section === 'reports' && !isOwner) {
+    // 定型文の設定（旧・日報一覧ツールバーの歯車ボタン。2026-08-10に移設）
+    businessMenuItems = <button onClick={() => goTo('/reports/templates')}>作業定型文の設定</button>
+  } else if (section === 'equipment') {
+    // 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
+    // （マスタ編集は出さない。docs/equipment-plan.md 5-0）
+    businessMenuItems = (
+      <>
+        <button onClick={() => goTo('/equipment')}>在庫一覧</button>
+        {!isOwner && <button onClick={() => goTo('/equipment/items')}>備品マスタ</button>}
+        {!isOwner && <button onClick={() => goTo('/equipment/tenants')}>テナントマスタ</button>}
+      </>
+    )
+  }
 
   // ロゴは「ダッシュボードへ戻る」ボタン。ダッシュボードにいるときだけ最新化を担う
   function handleLogoClick() {
@@ -239,49 +281,35 @@ export default function AppHeader({ lastFetchAt } = {}) {
               <span className="app-menu-icon" aria-hidden="true"></span>
             </button>
             <div className={`app-menu-panel${menuOpen ? ' is-open' : ''}`}>
-              {/* ユーザー名はヘッダーでは広い画面にしか出さない（狭幅では場所を取るため）。
-                  誰でログインしているかはここで必ず確認できるようにしておく */}
-              {user?.display_name && (
-                <p className="app-menu-user">{user.display_name} さん</p>
-              )}
-              <button onClick={() => goTo('/portal')}>ダッシュボード</button>
-              <div className="app-menu-divider" role="separator" />
-              {inEquipment ? (
+              {/* 領域1: トップ（2026-08-30整理。iPhone等の狭幅でのみ表示）。
+                  PC幅は常時見えるヘッダー中央の業務メニュー（NAV_ITEMS）とユーザー名表示が
+                  既にあるためここには出さない（.app-menu-top のCSSで幅により出し分ける）。
+                  ユーザー名＋各業務（ダッシュボード／タスク／日報／…／雛形ファイル）への
+                  直接ジャンプをまとめる */}
+              <div className="app-menu-top">
+                {user?.display_name && <p className="app-menu-user">{user.display_name} さん</p>}
+                <button onClick={() => goTo('/portal')}>ダッシュボード</button>
+                {NAV_ITEMS.filter((item) => !item.staffOnly || !isOwner).map((item) => (
+                  <button key={item.path} onClick={() => goTo(item.path)}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div className="app-menu-divider app-menu-top-divider" role="separator" />
+
+              {/* 領域2: 業務別メニュー（表示中の業務に応じて内容が変わる。上でsectionごとに
+                  組み立てたbusinessMenuItemsをそのまま出す。ダッシュボード・雛形ファイル
+                  画面では出す内容が無いため区切り線ごと省く） */}
+              {businessMenuItems && (
                 <>
-                  {/* 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
-                      （マスタ編集は出さない。docs/equipment-plan.md 5-0） */}
-                  <button onClick={() => goTo('/equipment')}>在庫一覧</button>
-                  {!isOwner && <button onClick={() => goTo('/equipment/items')}>備品マスタ</button>}
-                  {!isOwner && <button onClick={() => goTo('/equipment/tenants')}>テナントマスタ</button>}
-                  {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
-                </>
-              ) : inReports || isOwner ? (
-                <>
-                  {/* 自主検査表は日報一覧画面の見える位置に移動済み（2026-08-05）。
-                      ここには日報セクションへ戻る導線だけを残す */}
-                  <button onClick={() => goTo('/reports')}>日報一覧</button>
-                  {/* 従量課金事項は日報表示中でも確認できるようにする（2026-08-05）。オーナーは対象外 */}
-                  {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
-                  {/* 定型文の設定（旧・日報一覧ツールバーの歯車ボタン）をここへ移動
-                      （2026-08-10。iPhone幅でツールバーのボタンが1行に収まるようにするため） */}
-                  {!isOwner && <button onClick={() => goTo('/reports/templates')}>作業定型文の設定</button>}
-                </>
-              ) : (
-                <>
-                  <button onClick={() => goTo('/')}>カンバン</button>
-                  <button onClick={() => goTo('/archive')}>アーカイブ</button>
-                  <button className="btn-settings" onClick={() => goTo('/settings')}>設定</button>
-                  <button onClick={() => goTo('/usage')}>従量課金事項</button>
-                  <button onClick={() => goTo('/logs')}>処理ログ</button>
-                  <button onClick={() => goTo('/documents')}>雛形ファイル</button>
+                  {businessMenuItems}
+                  <div className="app-menu-divider" role="separator" />
                 </>
               )}
-              <div className="app-menu-divider" role="separator" />
-              {!inReports && !inEquipment && !isOwner && (
-                <button onClick={handleRunFetch} disabled={fetching}>
-                  {fetching ? '取得中…' : '今すぐ取得'}
-                </button>
-              )}
+
+              {/* 領域3: 共通メニュー（全画面で共通。2026-08-30にここへ集約） */}
+              {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
+              {!isOwner && <button onClick={() => goTo('/logs')}>処理ログ</button>}
               {pushStatus !== 'unsupported' && (
                 <button
                   onClick={handleTogglePush}
@@ -298,14 +326,6 @@ export default function AppHeader({ lastFetchAt } = {}) {
                   {pushStatus === 'loading' && '通知'}
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setMenuOpen(false)
-                  setAboutOpen(true)
-                }}
-              >
-                当システムについて
-              </button>
               <button className="btn-logout" onClick={handleLogout}>ログアウト</button>
               {/* ビルド時刻。ヘッダーからここへ移した（2026-08-12）。端末が最新の
                   デプロイを取得できているかの確認用で、常時見えている必要はない */}

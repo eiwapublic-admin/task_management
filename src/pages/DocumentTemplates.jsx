@@ -15,7 +15,7 @@ import {
   attachDocumentOriginal,
 } from '../lib/documents'
 import { formatBytes } from '../lib/imageResize'
-import { formatDate } from '../lib/format'
+import { formatDateTime } from '../lib/format'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import './DocumentTemplates.css'
 // AttachmentPreview（PDFのプレビューモーダル）の見た目は本来タスク管理側の KanbanBoard.css で
@@ -264,10 +264,10 @@ export default function DocumentTemplates() {
                                 <IconDownload size={12} />
                                 {(d.file_ext || 'FILE').toUpperCase()}
                               </button>
-                              <span className="doc-file-info">
+                              <div className="doc-file-info">
                                 {d.file_size != null ? formatBytes(d.file_size) : ''}
-                                {d.file_modified_at ? ` ・ 更新 ${formatDate(d.file_modified_at)}` : ''}
-                              </span>
+                                {d.file_modified_at ? ` ・ 更新 ${formatDateTime(d.file_modified_at)}` : ''}
+                              </div>
                             </td>
                             <td className="doc-file-cell">
                               {effectivePdf ? (
@@ -283,10 +283,10 @@ export default function DocumentTemplates() {
                                     PDF
                                   </button>
                                   {effectivePdf.hasOwnInfo && (
-                                    <span className="doc-file-info">
+                                    <div className="doc-file-info">
                                       {d.pdf_file_size != null ? formatBytes(d.pdf_file_size) : ''}
-                                      {d.pdf_file_modified_at ? ` ・ 更新 ${formatDate(d.pdf_file_modified_at)}` : ''}
-                                    </span>
+                                      {d.pdf_file_modified_at ? ` ・ 更新 ${formatDateTime(d.pdf_file_modified_at)}` : ''}
+                                    </div>
                                   )}
                                 </>
                               ) : (

@@ -241,14 +241,14 @@ export default function Portal() {
 
   // 統計を出すほどではない画面への導線。押すとその画面へ移動する
   const links = [
-    { label: 'アーカイブ', icon: <IconArchive size={20} />, path: '/archive', staffOnly: true },
+    { label: 'アーカイブタスク', icon: <IconArchive size={20} />, path: '/archive', staffOnly: true },
     { label: '処理ログ', icon: <IconList size={20} />, path: '/logs', staffOnly: true },
     { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
     { label: 'テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
     { label: '作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
     { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
     { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
-    { label: '設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
+    { label: 'タスク設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
   ].filter((l) => !(isOwner && l.staffOnly))
 
   return (
