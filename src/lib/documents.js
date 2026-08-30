@@ -15,6 +15,31 @@ export async function fetchDocumentCategories() {
   return data.values || []
 }
 
+// createDocument・attachDocumentPdf・attachDocumentOriginal はいずれも
+// 「multipart/form-dataをPOSTし、タイムアウト付きで結果のdocumentを受け取る」形が共通のため、
+// ここに1本化する（timeoutMessage/failureMessageだけ呼び出し側で変える）
+async function postMultipart(url, form, { timeoutMessage, failureMessage }) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 45000)
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(timeoutMessage)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || failureMessage)
+  return data.document
+}
+
 // file: ブラウザの File オブジェクト（input[type=file]）。物理ファイル名・拡張子・
 // サイズ・最終更新日時はここから自動で取り、サーバー側では改めて解釈しない。
 // pdfFile（任意。2026-08-30追加）: 原本（Word/Excel等）とは別に、印刷用のPDF版を
@@ -32,28 +57,10 @@ export async function createDocument({ name, category, remark, file, pdfFile }) 
     form.append('pdf_file', pdfFile, pdfFile.name)
     form.append('pdf_modified_at', String(pdfFile.lastModified || ''))
   }
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 45000)
-  let res
-  try {
-    res = await fetch('/api/documents', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
-      body: form,
-      signal: controller.signal,
-    })
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('ファイルのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
-    }
-    throw err
-  } finally {
-    clearTimeout(timeoutId)
-  }
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || '雛形ファイルの登録に失敗しました')
-  return data.document
+  return postMultipart('/api/documents', form, {
+    timeoutMessage: 'ファイルのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
+    failureMessage: '雛形ファイルの登録に失敗しました',
+  })
 }
 
 // 登録済みの雛形ファイルへ、印刷用のPDF版を追加・差し替える（2026-08-30追加）。
@@ -64,28 +71,23 @@ export async function attachDocumentPdf(id, file) {
   form.append('id', id)
   form.append('file', file, file.name)
   form.append('modified_at', String(file.lastModified || ''))
+  return postMultipart('/api/documents/pdf', form, {
+    timeoutMessage: 'PDFのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
+    failureMessage: 'PDF版の登録に失敗しました',
+  })
+}
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 45000)
-  let res
-  try {
-    res = await fetch('/api/documents/pdf', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
-      body: form,
-      signal: controller.signal,
-    })
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('PDFのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
-    }
-    throw err
-  } finally {
-    clearTimeout(timeoutId)
-  }
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'PDF版の登録に失敗しました')
-  return data.document
+// 登録済みの雛形ファイルの原本を差し替える（2026-08-30追加）。PDF版とは異なり
+// 形式は問わない（原本はもともとWord/Excel/PDF等どれでも良いため）
+export async function attachDocumentOriginal(id, file) {
+  const form = new FormData()
+  form.append('id', id)
+  form.append('file', file, file.name)
+  form.append('modified_at', String(file.lastModified || ''))
+  return postMultipart('/api/documents/original', form, {
+    timeoutMessage: 'ファイルのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
+    failureMessage: '原本の差し替えに失敗しました',
+  })
 }
 
 // PDF版だけを削除する（原本・登録自体は残す）

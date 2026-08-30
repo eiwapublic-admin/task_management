@@ -826,18 +826,22 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
 - **一覧**: 分類でグルーピングし、グループ内は資料名称順（`localeCompare('ja')`）に並べる
 - **ファイル保管**: Supabase Storageの新しいバケット`work-templates`（非公開。既存の`report-photos`は写真専用のため分けた）。`worker/lib/storage.js`の`putObject`/`getObject`/`deleteObject`に`bucket`引数を追加し、既定値（`report-photos`）を変えずに新バケットへ対応
 - **権限**: 一覧・ダウンロードは全ロール（owner・備品出庫限定ロールも含む）が可能、登録・削除はstaff/adminのみ
-- **一覧アイコンは強制ダウンロードではなくプレビュー表示（2026-08-30）**: 「まずプレビューを表示し、可能ならダウンロードせずOS既定のアプリで表示できるようにしてほしい」との依頼を受け、一覧の操作アイコンをダウンロードではなくプレビュー表示に変更した。
-  - **PDF・画像**: 既存の添付ファイルプレビュー・自主検査表PDFと同じ「短時間有効な署名トークン＋実URLへの`<iframe>`ナビゲーション」方式（`multi-env-attachment-preview`スキル参照）で`AttachmentPreview.jsx`にアプリ内表示する。ブラウザ内蔵のPDFビューア／画像表示がそのまま使えるため、印刷もそのビューアの機能で行える。プレビュー内の「ダウンロード」ボタンで従来どおりのBlobダウンロードもできる
-  - **それ以外（Word/Excel等）**: ブラウザに内蔵ビューアが無いため、同じ実URL（`Content-Disposition: inline`）を新規タブへ直接ナビゲーションさせ、ブラウザ・OS側の既定の扱い（iOS Safari等では組み込みのドキュメントプレビューが開くことがある）に委ねる。新規タブは`getDocumentPreviewUrl()`（トークン発行の非同期処理）を待ってから開くとポップアップブロッカーに弾かれることがあるため、**クリック直後に空タブを同期的に`window.open()`しておき、トークンが揃ってから`location.href`で遷移させる**（`'noopener'`を付けると戻り値が`null`になり後から操作できなくなるため付けない。配信先は自サイトのファイル配信APIであり任意の外部ページではないため実害は無い）
-  - **トークン発行**: `POST /api/documents/preview-token`（ログイン必須。書き込み権限は不要）が120秒だけ有効なJWTを発行し、`GET /api/documents/download?id=…&preview_token=…`がそれを通常のBearer認証の代わりに受け付けて`inline`で返す（`worker/lib/documents.js`の`handleDocumentPreviewToken`）
 - **原本とPDF版の2ファイル登録（2026-08-30追加）**: 「原本（Word/Excel等）とPDF版の2つの物理ファイルを登録できるようにしてほしい。原本がPDF以外の場合にPDFを生成して登録できるか」との依頼。
   - **サーバー側でのOffice文書→PDF自動変換は実装していない**（Cloudflare Workers上で実用的な変換手段が無いため）。依頼元の「ユーザーのアクションを挟んでも良い」という許可を踏まえ、依頼元が自分の環境（Word/Excelの「PDFとして保存」機能等）でPDF化したファイルを、原本とは別にもう1つ登録する運用にした
   - **DB**: `document_templates`に`pdf_storage_key`（unique）・`pdf_original_filename`・`pdf_file_size`・`pdf_file_modified_at`の4列を追加（原本の列とは独立。分類・資料名称・備考は共通）
   - **登録画面**: 原本を選択し、かつ原本がPDF以外のときだけ「PDF版（任意）」の2つ目のファイル欄を表示する。あとから登録することもできる旨を案内
+- **一覧のレイアウト（2026-08-30に2行組みへ全面刷新）**: 1件を2行で表示する。
+  - **1行目**: 資料名称 ／ 原本ボタン（黒・角丸「↓ {拡張子}」）＋ファイルサイズ・更新日 ／ PDFボタン（青・角丸「🔍 PDF」）＋ファイルサイズ・更新日 ／ 削除（ゴミ箱アイコン）
+  - **2行目**: 備考（インデント＋グレーで控えめ）／ 原本の差し替えリンク（原本ボタンの真下）／ PDFの差し替え or 追加リンク（PDFボタンの真下）
+  - **列幅は`table-layout: fixed`で固定**（分類ごとに別々の`<table>`を描画しているため、内容依存の自動幅だと分類をまたいで列位置がガクガクしてしまうのを防ぐ）
+  - **原本ボタン＝常に直接ダウンロード**（`downloadDocument(id, filename, 'original')`。プレビューは試みない）。**PDFボタン＝アプリ内プレビュー**（`AttachmentPreview.jsx`。既存の添付ファイルプレビュー・自主検査表PDFと同じ「短時間有効な署名トークン＋実URLへの`<iframe>`ナビゲーション」方式。`multi-env-attachment-preview`スキル参照）
+  - **PDFボタンが表す対象**（`getEffectivePdf()`）: 別登録のPDF版があればそれを、無くても**原本自体が既にPDF形式ならその原本**をプレビュー対象にする。どちらも無ければ「未登録」と表示し「＋ 追加」リンクを出す
+  - **原本の差し替えにも対応**: `POST /api/documents/original`（`handleDocumentOriginalAttach`）を新設。PDF版と異なり形式は問わない
+  - **経緯**: 当初（189・190番）は一覧の主操作を「まずプレビュー、Word/Excel等はブラウザ既定の扱いに委ねて新規タブ表示」としていたが、デスクトップ版Chrome等では結局ダウンロードに落ちて空白タブが残るだけだったため（実機報告により判明）、192番で「原本＝ダウンロード」「PDF＝プレビュー」の2ボタンに整理し、新規タブを開く実装ごと廃止した
   - **一覧からの追加・差し替え**: 登録済みの行にも「＋ 追加」／「差し替え」のリンクがあり、`POST /api/documents/pdf`（multipart、id・file必須）でいつでもPDF版を追加・上書きできる。差し替え時は古いStorageオブジェクトを削除。`DELETE /api/documents/pdf?id=`でPDF版だけの削除APIも用意（UIには未接続。行ごと削除すれば原本・PDF版とも消える）
-  - **一覧の主操作（プレビュー）の優先順位**: PDF版がある行はプレビューアイコンが**PDF版を優先して**開く（雛形ファイルは印刷用途が多いため）。原本を見たい場合は「原本」欄の「開く」リンクから個別に開ける
   - **kind対応**: `POST /api/documents/preview-token`・`GET /api/documents/download`に`kind`（`'original'`|`'pdf'`。既定`'original'`）を追加。プレビュートークンの署名対象にも`kind`を含め、原本用トークンでPDF版を（またはその逆を）取得できないようにしている
-- **API**: `GET/POST/DELETE /api/documents`、`GET /api/documents/suggest`、`POST /api/documents/preview-token`、`GET /api/documents/download?id=[&kind=pdf][&preview_token=]`、`POST/DELETE /api/documents/pdf`（`worker/lib/documents.js`）
+- **Storageの孤児（ゴミ）ファイルについて（2026-08-30）**: 差し替え・削除のたびにDB更新の直後に古いStorageオブジェクトを`safeDeleteObject()`で削除しており、通常運用では溜まらない。ごくまれに（Worker処理がアップロード直後・DB更新前に異常終了する、またはネットワーク的理由で古いオブジェクトの削除自体が失敗する）孤児が残り得るが、`storage.objects`（Supabase Storageのメタ情報を持つ実テーブル）に対して`document_templates.storage_key`／`pdf_storage_key`のどちらにも一致しないオブジェクトを抽出するSQLで簡単に特定できる（具体的なSQLはdocs/HANDOFF.md 192番を参照）。ストレージキーは`crypto.randomUUID()`ベースで衝突しないため、この突き合わせだけで確実に判定できる
+- **API**: `GET/POST/DELETE /api/documents`、`GET /api/documents/suggest`、`POST /api/documents/preview-token`、`GET /api/documents/download?id=[&kind=pdf][&preview_token=]`、`POST/DELETE /api/documents/pdf`、`POST /api/documents/original`（`worker/lib/documents.js`）
 - **バックアップ**: 日次バックアップ（`.github/workflows/backup.yml`）は`public`スキーマ全体を`pg_dump`するため、`document_templates`テーブルの行データ（PDF版の情報も含む）は設定変更なしで自動的に対象へ入る。**Storageに置いたファイル本体（原本・PDF版とも）はpg_dumpの対象外**（バックアップされるのはメタ情報のみ）
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）

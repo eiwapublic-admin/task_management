@@ -6,74 +6,133 @@
   margin-bottom: var(--space-6);
 }
 
+/* 1件を2行（原本/PDFのボタン行＋差し替えリンク・備考行）で表示する（2026-08-30）。
+   table-layout: fixed で列幅を固定し、分類（グループ）が違ってもタブ位置が
+   揃うようにする（グループごとに別々の<table>のため、内容依存の自動幅だと
+   グループをまたいで列位置がガクガクしてしまう） */
+.doc-table {
+  table-layout: fixed;
+}
+
+.doc-table th:nth-child(1),
+.doc-table td:nth-child(1) {
+  width: 34%;
+}
+.doc-table th:nth-child(2),
+.doc-table td:nth-child(2) {
+  width: 30%;
+}
+.doc-table th:nth-child(3),
+.doc-table td:nth-child(3) {
+  width: 26%;
+}
+.doc-table th:nth-child(4),
+.doc-table td:nth-child(4) {
+  width: 10%;
+}
+
+/* 1件の中の1行目（資料名称／原本ボタン／PDFボタン／削除）と2行目（備考／差し替えリンク）を
+   1つのまとまりに見せるため、1行目の下罫線を消し2行目にだけ罫線を残す */
+.doc-table tr.doc-row-primary td {
+  border-bottom: none;
+  padding-bottom: 2px;
+  vertical-align: middle;
+}
+
+.doc-table tr.doc-row-sub td {
+  padding-top: 2px;
+}
+
 .doc-table td.doc-name {
   font-weight: 600;
   color: var(--text-strong);
-  white-space: nowrap;
+  word-break: break-word;
 }
 
+/* 備考はインデントを付けてグレーで控えめに表示する（資料名称とは違う開始位置にして
+   「補足情報」であることを見た目でも示す） */
 .doc-remark {
+  padding-left: var(--space-4);
   color: var(--text-muted);
   font-size: var(--fs-sm);
+  word-break: break-word;
 }
 
-.doc-meta {
-  font-size: var(--fs-sm);
-}
-
-.doc-meta-filename {
-  display: block;
-  color: var(--text-base);
-  word-break: break-all;
-}
-
-.doc-meta-sub {
-  display: block;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  white-space: nowrap;
-}
-
-/* 原本／PDF版の2行表示（2026-08-30追加）。原本とは別にPDF版を持てるようになったため、
-   ファイル情報セル内で「原本」「PDF」を見出し付きで分けて出す */
-.doc-meta-file {
-  display: block;
-  margin-top: var(--space-1);
-}
-
-.doc-meta-file:first-child {
-  margin-top: 0;
-}
-
-.doc-meta-file-label {
+/* 列幅を固定しているため、ボタンの右に続くファイル情報が長いと桁あふれして
+   隣の列に重なって見えることがある。折り返しを許可して同じセル内に収める
+   （nowrapのまま固定幅にすると、はみ出た分が視覚的に隣の列へ乗り上げてしまう） */
+.doc-file-info {
   display: inline-block;
-  min-width: 3.2em;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-}
-
-.doc-meta-pdf-missing {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
-
-.doc-meta-pdf-action {
   margin-left: var(--space-2);
-  color: var(--color-primary);
+  color: var(--text-muted);
   font-size: var(--fs-xs);
-  font-weight: 600;
-  background: none;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.doc-pdf-missing {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* 原本ボタン（黒・角丸）「↓ XLSX」＝ダウンロードのイメージ。
+   PDFボタン（青・角丸）「🔍 PDF」＝プレビューのイメージ。
+   差し替えリンク（2行目）は同じ<td>内で左寄せにするだけで、ボタンの真下に揃う */
+.doc-btn-original,
+.doc-btn-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   border: none;
-  padding: 0;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.doc-meta-pdf-action:hover {
-  text-decoration: underline;
+.doc-btn-original {
+  background: var(--text-strong);
+  color: var(--ink-on-fill);
+}
+.doc-btn-original:hover:not(:disabled) {
+  opacity: 0.85;
 }
 
-.doc-meta-pdf-action:disabled {
+.doc-btn-pdf {
+  background: var(--color-primary);
+  color: var(--ink-on-fill);
+}
+.doc-btn-pdf:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.doc-btn-original:disabled,
+.doc-btn-pdf:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.doc-replace-cell {
+  vertical-align: top;
+}
+
+.doc-replace-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.doc-replace-link:hover {
+  text-decoration: underline;
+}
+.doc-replace-link:disabled {
   color: var(--text-muted);
   cursor: default;
   text-decoration: none;
