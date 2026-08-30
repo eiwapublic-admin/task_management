@@ -5,9 +5,18 @@ import { createDocument } from '../lib/documents'
 import { formatBytes } from '../lib/imageResize'
 import { formatDate } from '../lib/format'
 
+// 拡張子が .pdf かどうか（mimeは環境により空/不正確なことがあるため拡張子で見る。
+// DocumentTemplates.jsx のPDF判定と同じ考え方）
+function isPdfFile(f) {
+  return /\.pdf$/i.test(f?.name || '')
+}
+
 // 雛形ファイルの登録モーダル（2026-08-30）。資料名称・分類・備考は画面で入力し、
 // 物理ファイル名・拡張子・サイズ・最終更新日はファイル選択と同時に自動で取得して見せる
 // （分類は既存データからの選択式にするため、呼び出し元から候補一覧を受け取る）。
+// 原本（Word/Excel等）とは別に、印刷用のPDF版もあわせて登録できる（2026-08-30追加）。
+// サーバー側でOffice文書からPDFへ自動変換する仕組みは無いため、原本がPDF以外の場合は
+// 依頼元が自分の環境（Word/Excel等の「PDFとして保存」機能）でPDF化したものを選んでもらう
 export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
   useBodyScrollLock()
 
@@ -15,14 +24,18 @@ export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
   const [category, setCategory] = useState('')
   const [remark, setRemark] = useState('')
   const [file, setFile] = useState(null)
+  const [pdfFile, setPdfFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const originalIsPdf = file ? isPdfFile(file) : false
 
   async function handleSave() {
     setError('')
     if (!name.trim()) return setError('資料名称は必須です')
     if (!category.trim()) return setError('分類は必須です')
     if (!file) return setError('ファイルを選択してください')
+    if (pdfFile && !isPdfFile(pdfFile)) return setError('PDF版はPDFファイル（拡張子.pdf）を選択してください')
 
     setSaving(true)
     try {
@@ -31,6 +44,7 @@ export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
         category: category.trim(),
         remark: remark.trim(),
         file,
+        pdfFile: originalIsPdf ? null : pdfFile,
       })
       onSaved(saved)
     } catch (err) {
@@ -71,6 +85,31 @@ export default function DocumentTemplateForm({ categories, onClose, onSaved }) {
               {file.name} ・ {formatBytes(file.size)}
               {file.lastModified ? ` ・ 更新日 ${formatDate(file.lastModified)}` : ''}
             </p>
+          )}
+
+          {/* 原本がPDF以外（Word/Excel等）の場合だけ、印刷用のPDF版もあわせて登録できる
+              （2026-08-30追加）。原本自体が既にPDFなら重複登録になるため出さない */}
+          {file && !originalIsPdf && (
+            <label className="ui-field">
+              <span>PDF版（任意）</span>
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                className="ui-input"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+              />
+              <p className="doc-field-hint">
+                原本がPDF以外の場合、あわせてPDF版を登録すると一覧からすぐプレビュー・印刷できます。
+                原本をご自身のアプリ（Word/Excel等の「PDFとして保存」機能）でPDF化してから選んでください。
+                登録は後からでも行えます。
+              </p>
+              {pdfFile && (
+                <p className="doc-file-preview">
+                  {pdfFile.name} ・ {formatBytes(pdfFile.size)}
+                  {pdfFile.lastModified ? ` ・ 更新日 ${formatDate(pdfFile.lastModified)}` : ''}
+                </p>
+              )}
+            </label>
           )}
 
           <label className="ui-field">

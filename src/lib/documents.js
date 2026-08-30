@@ -16,8 +16,10 @@ export async function fetchDocumentCategories() {
 }
 
 // file: ブラウザの File オブジェクト（input[type=file]）。物理ファイル名・拡張子・
-// サイズ・最終更新日時はここから自動で取り、サーバー側では改めて解釈しない
-export async function createDocument({ name, category, remark, file }) {
+// サイズ・最終更新日時はここから自動で取り、サーバー側では改めて解釈しない。
+// pdfFile（任意。2026-08-30追加）: 原本（Word/Excel等）とは別に、印刷用のPDF版を
+// 同時に登録したい場合に渡す
+export async function createDocument({ name, category, remark, file, pdfFile }) {
   const form = new FormData()
   form.append('name', name)
   form.append('category', category)
@@ -26,6 +28,10 @@ export async function createDocument({ name, category, remark, file }) {
   // File.lastModified はOS側のファイル最終更新日時（epoch ms）。multipart自体には
   // 運ぶ仕組みが無いため、ブラウザで読めるこの値を別フィールドとして送る
   form.append('modified_at', String(file.lastModified || ''))
+  if (pdfFile) {
+    form.append('pdf_file', pdfFile, pdfFile.name)
+    form.append('pdf_modified_at', String(pdfFile.lastModified || ''))
+  }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 45000)
@@ -50,17 +56,56 @@ export async function createDocument({ name, category, remark, file }) {
   return data.document
 }
 
+// 登録済みの雛形ファイルへ、印刷用のPDF版を追加・差し替える（2026-08-30追加）。
+// 原本がWord/Excel等の場合、ユーザーが自分の環境でPDFに変換してから登録する運用を想定
+// （サーバー側でのOffice文書→PDF変換は行わない）。
+export async function attachDocumentPdf(id, file) {
+  const form = new FormData()
+  form.append('id', id)
+  form.append('file', file, file.name)
+  form.append('modified_at', String(file.lastModified || ''))
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 45000)
+  let res
+  try {
+    res = await fetch('/api/documents/pdf', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('PDFのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'PDF版の登録に失敗しました')
+  return data.document
+}
+
+// PDF版だけを削除する（原本・登録自体は残す）
+export async function deleteDocumentPdf(id) {
+  const data = await authFetch(`/api/documents/pdf?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return data.document
+}
+
 // アプリ内プレビュー（またはOS既定アプリでの直接表示）用に、短時間（120秒）だけ有効な
 // 直接アクセスURLを発行する（/api/documents/preview-token）。<iframe src>や新規タブへの
 // 直接ナビゲーションはAuthorizationヘッダを送れないため、発行したトークンをクエリ文字列で
 // 代わりに使う（自主検査表PDF・Gmail添付のプレビューと同じ方式。src/lib/api.js の
 // getAttachmentPreviewUrl 参照）。
-export async function getDocumentPreviewUrl(id) {
+// kind（既定 'original'）: 'pdf' を指定すると原本ではなくPDF版のURLを発行する
+export async function getDocumentPreviewUrl(id, kind = 'original') {
   const { token } = await authFetch('/api/documents/preview-token', {
     method: 'POST',
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ id, kind }),
   })
-  const params = new URLSearchParams({ id, preview_token: token })
+  const params = new URLSearchParams({ id, kind, preview_token: token })
   return `/api/documents/download?${params.toString()}`
 }
 
@@ -69,9 +114,11 @@ export async function deleteDocument(id) {
 }
 
 // ダウンロードは<iframe>や<a>から直接叩けないため（Authorizationヘッダが送れない）、
-// blobとして取得してから保存する（自主検査表PDFの共有/保存と同じ考え方）
-export async function downloadDocument(id, filename) {
-  const res = await fetch(`/api/documents/download?id=${encodeURIComponent(id)}`, {
+// blobとして取得してから保存する（自主検査表PDFの共有/保存と同じ考え方）。
+// kind（既定 'original'）で原本／PDF版のどちらをダウンロードするか選べる
+export async function downloadDocument(id, filename, kind = 'original') {
+  const params = new URLSearchParams({ id, kind })
+  const res = await fetch(`/api/documents/download?${params.toString()}`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   })
   if (!res.ok) {

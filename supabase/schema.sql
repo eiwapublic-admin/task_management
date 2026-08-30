@@ -626,13 +626,19 @@ create table if not exists document_templates (
   name              text not null,             -- 資料名称（登録時に入力）
   category          text not null,             -- 分類（登録時に入力。既存値からの選択式）
   remark            text,                      -- 備考（登録時に入力）
-  -- 以下はアップロードされたファイルそのものから自動取得する
+  -- 以下はアップロードされたファイルそのものから自動取得する（原本。Word/Excel/PDF等どれでも良い）
   original_filename text not null,             -- 物理ファイル名
   file_ext          text,                      -- 拡張子（ドット無し・小文字）
   file_size         integer,                   -- バイト数
   file_modified_at  timestamptz,               -- ファイルの最終更新日時（ブラウザのFile.lastModified）
   mime              text,
   storage_key       text not null unique,
+  -- PDF版（任意。2026-08-30追加）。原本がWord/Excel等の場合に、印刷用のPDFを別ファイルとして
+  -- あわせて登録できるようにする（原本と別の物理ファイル。常にPDFなので拡張子・mime列は持たない）
+  pdf_storage_key         text unique,
+  pdf_original_filename   text,
+  pdf_file_size           integer,
+  pdf_file_modified_at    timestamptz,
   created_by        uuid references users(id),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()

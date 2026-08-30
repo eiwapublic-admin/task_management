@@ -34,6 +34,51 @@
   white-space: nowrap;
 }
 
+/* 原本／PDF版の2行表示（2026-08-30追加）。原本とは別にPDF版を持てるようになったため、
+   ファイル情報セル内で「原本」「PDF」を見出し付きで分けて出す */
+.doc-meta-file {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.doc-meta-file:first-child {
+  margin-top: 0;
+}
+
+.doc-meta-file-label {
+  display: inline-block;
+  min-width: 3.2em;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.doc-meta-pdf-missing {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.doc-meta-pdf-action {
+  margin-left: var(--space-2);
+  color: var(--color-primary);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.doc-meta-pdf-action:hover {
+  text-decoration: underline;
+}
+
+.doc-meta-pdf-action:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
 .doc-actions {
   display: flex;
   gap: var(--space-2);
@@ -46,4 +91,12 @@
   margin: calc(-1 * var(--space-2)) 0 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
+}
+
+/* PDF版フィールドの補足説明（2026-08-30追加） */
+.doc-field-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-weight: 400;
 }

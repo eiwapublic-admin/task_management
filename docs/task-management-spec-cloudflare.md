@@ -830,8 +830,15 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
   - **PDF・画像**: 既存の添付ファイルプレビュー・自主検査表PDFと同じ「短時間有効な署名トークン＋実URLへの`<iframe>`ナビゲーション」方式（`multi-env-attachment-preview`スキル参照）で`AttachmentPreview.jsx`にアプリ内表示する。ブラウザ内蔵のPDFビューア／画像表示がそのまま使えるため、印刷もそのビューアの機能で行える。プレビュー内の「ダウンロード」ボタンで従来どおりのBlobダウンロードもできる
   - **それ以外（Word/Excel等）**: ブラウザに内蔵ビューアが無いため、同じ実URL（`Content-Disposition: inline`）を新規タブへ直接ナビゲーションさせ、ブラウザ・OS側の既定の扱い（iOS Safari等では組み込みのドキュメントプレビューが開くことがある）に委ねる。新規タブは`getDocumentPreviewUrl()`（トークン発行の非同期処理）を待ってから開くとポップアップブロッカーに弾かれることがあるため、**クリック直後に空タブを同期的に`window.open()`しておき、トークンが揃ってから`location.href`で遷移させる**（`'noopener'`を付けると戻り値が`null`になり後から操作できなくなるため付けない。配信先は自サイトのファイル配信APIであり任意の外部ページではないため実害は無い）
   - **トークン発行**: `POST /api/documents/preview-token`（ログイン必須。書き込み権限は不要）が120秒だけ有効なJWTを発行し、`GET /api/documents/download?id=…&preview_token=…`がそれを通常のBearer認証の代わりに受け付けて`inline`で返す（`worker/lib/documents.js`の`handleDocumentPreviewToken`）
-- **API**: `GET/POST/DELETE /api/documents`、`GET /api/documents/suggest`、`POST /api/documents/preview-token`、`GET /api/documents/download?id=[&preview_token=]`（`worker/lib/documents.js`）
-- **バックアップ**: 日次バックアップ（`.github/workflows/backup.yml`）は`public`スキーマ全体を`pg_dump`するため、`document_templates`テーブルの行データは設定変更なしで自動的に対象へ入る。**Storageに置いたファイル本体はpg_dumpの対象外**（バックアップされるのはメタ情報のみ）
+- **原本とPDF版の2ファイル登録（2026-08-30追加）**: 「原本（Word/Excel等）とPDF版の2つの物理ファイルを登録できるようにしてほしい。原本がPDF以外の場合にPDFを生成して登録できるか」との依頼。
+  - **サーバー側でのOffice文書→PDF自動変換は実装していない**（Cloudflare Workers上で実用的な変換手段が無いため）。依頼元の「ユーザーのアクションを挟んでも良い」という許可を踏まえ、依頼元が自分の環境（Word/Excelの「PDFとして保存」機能等）でPDF化したファイルを、原本とは別にもう1つ登録する運用にした
+  - **DB**: `document_templates`に`pdf_storage_key`（unique）・`pdf_original_filename`・`pdf_file_size`・`pdf_file_modified_at`の4列を追加（原本の列とは独立。分類・資料名称・備考は共通）
+  - **登録画面**: 原本を選択し、かつ原本がPDF以外のときだけ「PDF版（任意）」の2つ目のファイル欄を表示する。あとから登録することもできる旨を案内
+  - **一覧からの追加・差し替え**: 登録済みの行にも「＋ 追加」／「差し替え」のリンクがあり、`POST /api/documents/pdf`（multipart、id・file必須）でいつでもPDF版を追加・上書きできる。差し替え時は古いStorageオブジェクトを削除。`DELETE /api/documents/pdf?id=`でPDF版だけの削除APIも用意（UIには未接続。行ごと削除すれば原本・PDF版とも消える）
+  - **一覧の主操作（プレビュー）の優先順位**: PDF版がある行はプレビューアイコンが**PDF版を優先して**開く（雛形ファイルは印刷用途が多いため）。原本を見たい場合は「原本」欄の「開く」リンクから個別に開ける
+  - **kind対応**: `POST /api/documents/preview-token`・`GET /api/documents/download`に`kind`（`'original'`|`'pdf'`。既定`'original'`）を追加。プレビュートークンの署名対象にも`kind`を含め、原本用トークンでPDF版を（またはその逆を）取得できないようにしている
+- **API**: `GET/POST/DELETE /api/documents`、`GET /api/documents/suggest`、`POST /api/documents/preview-token`、`GET /api/documents/download?id=[&kind=pdf][&preview_token=]`、`POST/DELETE /api/documents/pdf`（`worker/lib/documents.js`）
+- **バックアップ**: 日次バックアップ（`.github/workflows/backup.yml`）は`public`スキーマ全体を`pg_dump`するため、`document_templates`テーブルの行データ（PDF版の情報も含む）は設定変更なしで自動的に対象へ入る。**Storageに置いたファイル本体（原本・PDF版とも）はpg_dumpの対象外**（バックアップされるのはメタ情報のみ）
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
