@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import DocumentTemplateForm from '../components/DocumentTemplateForm'
@@ -11,6 +11,7 @@ import {
   deleteDocument,
   downloadDocument,
   getDocumentPreviewUrl,
+  attachDocumentPdf,
 } from '../lib/documents'
 import { formatBytes } from '../lib/imageResize'
 import { formatDate } from '../lib/format'
@@ -21,10 +22,25 @@ import './DocumentTemplates.css'
 // あるため、ここでも明示的に import しておく（Inspections.jsx と同じ対応）
 import '../components/KanbanBoard.css'
 
+// 拡張子・mimeからプレビュー方法を判定する（プレビュー方式の判定は雛形ファイル全体で
+// 共通の考え方。kind==='pdf' のときは呼び出し元が既にPDFと分かっているので無条件でPDF扱い）
+function detectPreviewKind(doc, kind) {
+  if (kind === 'pdf') return { isPdf: true, isImage: false }
+  const ext = (doc.file_ext || '').toLowerCase()
+  const isPdf = doc.mime === 'application/pdf' || ext === 'pdf'
+  const isImage =
+    (doc.mime || '').startsWith('image/') ||
+    ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(ext)
+  return { isPdf, isImage }
+}
+
 // 雛形ファイル（業務で使う資料テンプレート）画面（2026-08-30〜）。
 // 「登録していつでもダウンロードできる資料置き場」。分類ごとにグループ化し、
 // グループ内は資料名称順に並べる。owner・備品出庫限定ロールは閲覧・ダウンロードのみ
-// （書き込みはサーバー側でも拒否されるが、UIでもボタン自体を出さない）
+// （書き込みはサーバー側でも拒否されるが、UIでもボタン自体を出さない）。
+// 原本（Word/Excel等）とは別に、印刷用のPDF版をあわせて登録できる（2026-08-30追加）。
+// PDF版がある場合、一覧の主操作（プレビュー）はPDF版を優先して開く
+// （雛形ファイルは「定期的に印刷するだけ」の用途が多いため）。
 export default function DocumentTemplates() {
   const user = getCurrentUser()
   const readOnly = isLimitedRole(user)
@@ -34,8 +50,14 @@ export default function DocumentTemplates() {
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState(null)
-  // プレビュー表示中のファイル（{ doc, filename, mimeType, url }）。null なら非表示
+  const [attachingPdfId, setAttachingPdfId] = useState(null)
+  // プレビュー表示中のファイル（{ doc, kind, filename, mimeType, url }）。null なら非表示
   const [preview, setPreview] = useState(null)
+
+  // PDF版の追加・差し替え用の隠しinput。一覧の行ごとに<input>を持たず、
+  // クリックされた行のidだけ覚えておいて共有の1個を使い回す
+  const pdfInputRef = useRef(null)
+  const pendingPdfDocIdRef = useRef(null)
 
   const load = useCallback(() => {
     setError('')
@@ -69,11 +91,12 @@ export default function DocumentTemplates() {
     return entries.map(([category, rows]) => ({ category, rows }))
   }, [documents])
 
-  async function handleDownload(doc) {
+  async function handleDownload(doc, kind) {
     setDownloadingId(doc.id)
     setError('')
     try {
-      await downloadDocument(doc.id, doc.original_filename)
+      const filename = kind === 'pdf' ? doc.pdf_original_filename : doc.original_filename
+      await downloadDocument(doc.id, filename, kind)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -90,19 +113,13 @@ export default function DocumentTemplates() {
   // inline指定を無視してダウンロードだけ行い、開いたタブは空白のまま残る
   // （実機確認で判明。2026-08-30）。空白タブが残るのは紛らわしいため、遷移後は
   // ダウンロードが始まるのを待ってから自動で閉じる（ダウンロード自体はブラウザの
-  // ダウンロードマネージャ側で継続するため、タブを閉じても中断されない）
-  async function handleOpen(doc) {
+  // ダウンロードマネージャ側で継続するため、タブを閉じても中断されない）。
+  // kind: 'original'（既定）または 'pdf'。PDF版はサーバー側で常にPDFと分かっているため
+  // 拡張子・mimeでの判定を経ずに必ずプレビューモーダルへ回す
+  async function handleOpen(doc, kind = 'original') {
     setDownloadingId(doc.id)
     setError('')
-    // mime列はアップロード時のブラウザ報告値（File.type）をそのまま保存しているため、
-    // 環境によっては拡張子が.pdfでもmimeが空/不正確なことがある。雛形ファイルは
-    // 「PDFなら毎回すぐプレビュー→印刷」という定常利用が多いため、mimeだけでなく
-    // 拡張子（file_ext）でも判定して確実にプレビューへ回す
-    const ext = (doc.file_ext || '').toLowerCase()
-    const isPdf = doc.mime === 'application/pdf' || ext === 'pdf'
-    const isImage =
-      (doc.mime || '').startsWith('image/') ||
-      ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(ext)
+    const { isPdf, isImage } = detectPreviewKind(doc, kind)
     // 新規タブは非同期処理（トークン発行）の後に window.open() すると、クリックの
     // ユーザー操作から切り離されたとポップアップブロッカーに扱われて弾かれることがある。
     // クリック直後に空タブを同期的に開いておき、URLが揃ってから遷移させる
@@ -111,13 +128,14 @@ export default function DocumentTemplates() {
     // 自ファイルのダウンロード配信であり任意の外部ページではないため問題ない)
     const win = !isPdf && !isImage ? window.open('', '_blank') : null
     try {
-      const url = await getDocumentPreviewUrl(doc.id)
+      const url = await getDocumentPreviewUrl(doc.id, kind)
       if (isPdf || isImage) {
+        const filename = kind === 'pdf' ? doc.pdf_original_filename : doc.original_filename
         // AttachmentPreview自身もmimeTypeで表示方法を判定するため、拡張子だけで
         // PDF/画像と判定した場合（mime列が空/不正確）でもそちらに正しく伝わるよう、
         // 実際のmime値ではなく判定結果を優先した値を渡す
         const previewMime = isPdf ? 'application/pdf' : doc.mime?.startsWith('image/') ? doc.mime : 'image/*'
-        setPreview({ doc, filename: doc.original_filename, mimeType: previewMime, url })
+        setPreview({ doc, kind, filename, mimeType: previewMime, url })
       } else if (win) {
         win.location.href = url
         setTimeout(() => {
@@ -136,6 +154,12 @@ export default function DocumentTemplates() {
     }
   }
 
+  // 一覧の主操作（プレビュー）。PDF版が登録されていればそちらを優先して開く
+  // （雛形ファイルは「定期的に印刷するだけ」の用途が多いため）
+  function handleOpenPrimary(doc) {
+    return handleOpen(doc, doc.pdf_original_filename ? 'pdf' : 'original')
+  }
+
   async function handleDelete(id) {
     setError('')
     try {
@@ -150,6 +174,31 @@ export default function DocumentTemplates() {
     setFormOpen(false)
     setDocuments((prev) => [...(prev || []), doc])
     setCategories((prev) => (prev.includes(doc.category) ? prev : [doc.category, ...prev]))
+  }
+
+  // PDF版の追加・差し替え。原本はWord/Excel等のままで、印刷用のPDFだけを別に持たせる
+  // （サーバー側でOffice文書→PDF変換は行わないため、依頼元が自分の環境でPDF化したものを
+  // ここで登録する運用。docs/HANDOFF.md参照）
+  function handleAddOrReplacePdf(doc) {
+    pendingPdfDocIdRef.current = doc.id
+    pdfInputRef.current?.click()
+  }
+
+  async function handlePdfFileChange(e) {
+    const file = e.target.files?.[0]
+    const id = pendingPdfDocIdRef.current
+    e.target.value = '' // 同じファイルを選び直しても onChange が発火するようにする
+    if (!file || !id) return
+    setAttachingPdfId(id)
+    setError('')
+    try {
+      const updated = await attachDocumentPdf(id, file)
+      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAttachingPdfId(null)
+    }
   }
 
   return (
@@ -199,18 +248,53 @@ export default function DocumentTemplates() {
                         <td className="doc-name">{d.name}</td>
                         <td className="doc-remark">{d.remark || ''}</td>
                         <td className="doc-meta">
-                          <span className="doc-meta-filename">{d.original_filename}</span>
-                          <span className="doc-meta-sub">
-                            {d.file_ext ? d.file_ext.toUpperCase() : ''}
-                            {d.file_size != null ? ` ・ ${formatBytes(d.file_size)}` : ''}
-                            {d.file_modified_at ? ` ・ 更新 ${formatDate(d.file_modified_at)}` : ''}
+                          <span className="doc-meta-file">
+                            <span className="doc-meta-file-label">原本</span>
+                            <span className="doc-meta-filename">{d.original_filename}</span>
+                            <span className="doc-meta-sub">
+                              {d.file_ext ? d.file_ext.toUpperCase() : ''}
+                              {d.file_size != null ? ` ・ ${formatBytes(d.file_size)}` : ''}
+                              {d.file_modified_at ? ` ・ 更新 ${formatDate(d.file_modified_at)}` : ''}
+                              {/* PDF版がある場合、主操作がPDF優先になるため原本を開く手段を残す */}
+                              {d.pdf_original_filename && (
+                                <button
+                                  type="button"
+                                  className="doc-meta-pdf-action"
+                                  onClick={() => handleOpen(d, 'original')}
+                                  disabled={downloadingId === d.id}
+                                >
+                                  開く
+                                </button>
+                              )}
+                            </span>
+                          </span>
+                          <span className="doc-meta-file">
+                            <span className="doc-meta-file-label">PDF</span>
+                            {d.pdf_original_filename ? (
+                              <span className="doc-meta-sub">
+                                {d.pdf_file_size != null ? formatBytes(d.pdf_file_size) : ''}
+                                {d.pdf_file_modified_at ? ` ・ 更新 ${formatDate(d.pdf_file_modified_at)}` : ''}
+                              </span>
+                            ) : (
+                              <span className="doc-meta-pdf-missing">未登録</span>
+                            )}
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                className="doc-meta-pdf-action"
+                                onClick={() => handleAddOrReplacePdf(d)}
+                                disabled={attachingPdfId === d.id}
+                              >
+                                {attachingPdfId === d.id ? '登録中…' : d.pdf_original_filename ? '差し替え' : '＋ 追加'}
+                              </button>
+                            )}
                           </span>
                         </td>
                         <td className="is-numeric doc-actions">
                           <button
                             type="button"
                             className="icon-btn-download"
-                            onClick={() => handleOpen(d)}
+                            onClick={() => handleOpenPrimary(d)}
                             disabled={downloadingId === d.id}
                             aria-label={`${d.name}をプレビュー`}
                             title="プレビュー"
@@ -235,6 +319,16 @@ export default function DocumentTemplates() {
         )}
       </div>
 
+      {/* PDF版の追加・差し替え用。画面に1個だけ置き、行ごとにクリックされたidを
+          pendingPdfDocIdRef で覚えておいてから開く */}
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        style={{ display: 'none' }}
+        onChange={handlePdfFileChange}
+      />
+
       {formOpen && (
         <DocumentTemplateForm categories={categories} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
       )}
@@ -248,7 +342,7 @@ export default function DocumentTemplates() {
             <button
               type="button"
               className="attachment-preview-share"
-              onClick={() => handleDownload(preview.doc)}
+              onClick={() => handleDownload(preview.doc, preview.kind)}
               disabled={downloadingId === preview.doc.id}
             >
               ダウンロード
