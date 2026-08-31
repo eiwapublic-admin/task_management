@@ -1022,8 +1022,9 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 
 ### リポジトリ・鍵管理
 - **リポジトリは非公開（Private）**（2026-07-16、審査での指摘 C2 に対応。従来は public だった）
-- 公開リポジトリに含まれていた anon(publishable) キー（`sb_publishable_...`）は Supabase 側で削除済み。レガシーの `anon`/`service_role`（JWT形式）キーは公開されたことがなく、`service_role` はWorkerの稼働に必要なため意図的に未変更
+- 公開リポジトリに含まれていた anon(publishable) キー（`sb_publishable_...`）は Supabase 側で削除済み
 - GitHub の Secret Protection / Push protection は有効化済み（確認済み）
+- **`SUPABASE_SERVICE_KEY` は新方式のシークレットキー（`sb_secret_...`）を使用（2026-08-31〜）**: 以前はレガシーJWT形式の`service_role`キーを使用していたが、チャットへの誤貼り付けによる漏洩（HANDOFF.md 195番）を機に、Supabaseの新しいAPIキー体系（`sb_secret_...`）へ移行した。レガシーの`anon`/`service_role`キーはSupabaseダッシュボード側で無効化済み（Disable JWT-based API keys）。**レガシーキーは一度無効化する（またはJWTシークレットを失効させる）と新しい値へ再生成する手段が無い**（Settings → JWT Keys → Legacy JWT Secret タブに明記）ため、万一再度キーが漏洩した場合は、レガシー形式への回帰ではなく`sb_secret_`キーの再作成で対応すること。`worker/lib/storage.js`（`authHeaders()`）・`worker/lib/supabase-admin.js`（`getAdminClient()`）とも、鍵の形式（`sb_secret_`/`sb_publishable_`プレフィックス）で自動判別し、新方式キーの場合は`Authorization: Bearer`を送らず`apikey`ヘッダーのみを送る（`@supabase/supabase-js`側がこの判別をせず新方式キーでも`Authorization: Bearer`に載せてしまう不具合があるため、アプリ側で補正している）
 
 ### 残課題（運用ルール整備。コード変更なし）
 審査の N3〜N7（Anthropicへの送信データ最小化の検討・秘密情報のローテーション運用・アカウント運用ルール・ログのPII保持ルール・依存関係の定期監査）は未着手。緊急性は低く、運用ルール化が中心。
