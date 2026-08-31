@@ -11,7 +11,15 @@ import { signJwt, verifyJwt } from './jwt.js'
 
 const DOCUMENT_COLUMNS =
   'id, name, category, remark, original_filename, file_ext, file_size, file_modified_at, mime, ' +
-  'pdf_original_filename, pdf_file_size, pdf_file_modified_at, created_at, updated_at'
+  'pdf_original_filename, pdf_file_size, pdf_file_modified_at, thumbnail_storage_key, created_at, updated_at'
+
+// thumbnail_storage_key はダウンロード等の他のキー列と同じく外部に出さず、
+// 「あるかどうか」だけを has_thumbnail として返す（2026-08-31追加）
+function withThumbnailFlag(row) {
+  if (!row) return row
+  const { thumbnail_storage_key, ...rest } = row
+  return { ...rest, has_thumbnail: Boolean(thumbnail_storage_key) }
+}
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // 1ファイル20MB（帳票・様式集程度を想定）
 
@@ -70,7 +78,7 @@ export async function handleDocumentList(req) {
       console.error('document-list:', err.message)
       return json({ error: '雛形ファイルの取得に失敗しました' }, 500)
     }
-    return json({ documents: data || [] })
+    return json({ documents: (data || []).map(withThumbnailFlag) })
   } catch (err) {
     console.error('document-list 失敗:', err)
     return json({ error: '雛形ファイルの取得に失敗しました' }, 500)
@@ -125,6 +133,7 @@ export async function handleDocumentCreate(req) {
     const file = form.get('file')
     const pdfFile = form.get('pdf_file')
     const pdfModifiedAtMs = Number(form.get('pdf_modified_at'))
+    const thumbnail = form.get('thumbnail')
 
     if (!name) return json({ error: '資料名称は必須です' }, 400)
     if (!category) return json({ error: '分類は必須です' }, 400)
@@ -135,6 +144,7 @@ export async function handleDocumentCreate(req) {
       if (pdfFile.size > MAX_UPLOAD_BYTES) return json({ error: 'PDFファイルが大きすぎます（20MBまで）' }, 413)
       if (!looksLikePdf(pdfFile)) return json({ error: 'PDF版はPDFファイル（拡張子.pdf）を選択してください' }, 400)
     }
+    const hasThumbnail = thumbnail && typeof thumbnail !== 'string'
 
     const originalFilename = file.name || 'file'
     const ext = extOf(originalFilename)
@@ -145,6 +155,12 @@ export async function handleDocumentCreate(req) {
     if (hasPdfFile) {
       pdfKey = `${crypto.randomUUID()}.pdf`
       await putObject(pdfKey, pdfFile.stream(), 'application/pdf', { bucket: TEMPLATE_BUCKET })
+    }
+
+    let thumbnailKey = null
+    if (hasThumbnail) {
+      thumbnailKey = `${crypto.randomUUID()}.jpg`
+      await putObject(thumbnailKey, thumbnail.stream(), 'image/jpeg', { bucket: TEMPLATE_BUCKET })
     }
 
     const supabase = getAdminClient()
@@ -166,6 +182,8 @@ export async function handleDocumentCreate(req) {
         hasPdfFile && Number.isFinite(pdfModifiedAtMs) && pdfModifiedAtMs > 0
           ? new Date(pdfModifiedAtMs).toISOString()
           : null,
+      thumbnail_storage_key: thumbnailKey,
+      thumbnail_mime: thumbnailKey ? 'image/jpeg' : null,
       created_by: auth.sub,
     }
     const { data, error: err } = await supabase
@@ -177,19 +195,23 @@ export async function handleDocumentCreate(req) {
       // DB に入らなかった場合は保管したオブジェクトを消して孤児を残さない
       await deleteObject(key, TEMPLATE_BUCKET)
       if (pdfKey) await deleteObject(pdfKey, TEMPLATE_BUCKET)
+      if (thumbnailKey) await deleteObject(thumbnailKey, TEMPLATE_BUCKET)
       console.error('document-create:', err.message)
       return json({ error: '雛形ファイルの登録に失敗しました' }, 500)
     }
-    return json({ document: data })
+    return json({ document: withThumbnailFlag(data) })
   } catch (err) {
     console.error('document-create 失敗:', err)
     return json({ error: '雛形ファイルの登録に失敗しました' }, 500)
   }
 }
 
-// POST /api/documents/pdf — 既存の登録に、印刷用のPDF版を追加・差し替える
-// （multipart/form-data。id・file必須、modified_at任意）。書き込み権限が必要。
-export async function handleDocumentPdfAttach(req) {
+// PUT /api/documents — 名称・分類・備考・原本・PDF版・サムネイルを1回のリクエストでまとめて
+// 更新する（2026-08-31追加。登録画面を新規/編集で共通化したのに伴い、一覧側の行内
+// 差し替えリンクの代わりにこの1本で全項目を扱えるようにする）。
+// file・pdf_file・thumbnail はいずれも任意で、指定されたものだけ差し替える
+// （指定しなければ既存のまま。thumbnailは常にJPEG）。
+export async function handleDocumentUpdate(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
   try {
@@ -197,107 +219,88 @@ export async function handleDocumentPdfAttach(req) {
     if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
 
     const id = String(form.get('id') || '')
-    const file = form.get('file')
+    const name = String(form.get('name') || '').trim().slice(0, 200)
+    const category = String(form.get('category') || '').trim().slice(0, 100)
+    const remark = String(form.get('remark') || '').trim().slice(0, 500) || null
     const modifiedAtMs = Number(form.get('modified_at'))
+    const file = form.get('file')
+    const pdfFile = form.get('pdf_file')
+    const pdfModifiedAtMs = Number(form.get('pdf_modified_at'))
+    const thumbnail = form.get('thumbnail')
 
     if (!id) return json({ error: 'id は必須です' }, 400)
-    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
-    if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（20MBまで）' }, 413)
-    if (!looksLikePdf(file)) return json({ error: 'PDFファイル（拡張子.pdf）を選択してください' }, 400)
+    if (!name) return json({ error: '資料名称は必須です' }, 400)
+    if (!category) return json({ error: '分類は必須です' }, 400)
+    const hasFile = file && typeof file !== 'string'
+    const hasPdfFile = pdfFile && typeof pdfFile !== 'string'
+    const hasThumbnail = thumbnail && typeof thumbnail !== 'string'
+    if (hasFile && file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（20MBまで）' }, 413)
+    if (hasPdfFile) {
+      if (pdfFile.size > MAX_UPLOAD_BYTES) return json({ error: 'PDFファイルが大きすぎます（20MBまで）' }, 413)
+      if (!looksLikePdf(pdfFile)) return json({ error: 'PDF版はPDFファイル（拡張子.pdf）を選択してください' }, 400)
+    }
 
     const supabase = getAdminClient()
     const { data: existing } = await supabase
       .from('document_templates')
-      .select('pdf_storage_key')
+      .select('storage_key, pdf_storage_key, thumbnail_storage_key')
       .eq('id', id)
       .maybeSingle()
     if (!existing) return json({ error: '雛形ファイルが見つかりません' }, 404)
 
-    const key = `${crypto.randomUUID()}.pdf`
-    await putObject(key, file.stream(), 'application/pdf', { bucket: TEMPLATE_BUCKET })
+    const update = { name, category, remark }
+
+    if (hasFile) {
+      const originalFilename = file.name || 'file'
+      const ext = extOf(originalFilename)
+      const key = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
+      await putObject(key, file.stream(), file.type || 'application/octet-stream', { bucket: TEMPLATE_BUCKET })
+      update.original_filename = originalFilename.slice(0, 255)
+      update.file_ext = ext || null
+      update.file_size = file.size
+      update.file_modified_at =
+        Number.isFinite(modifiedAtMs) && modifiedAtMs > 0 ? new Date(modifiedAtMs).toISOString() : null
+      update.mime = file.type || null
+      update.storage_key = key
+    }
+    if (hasPdfFile) {
+      const pdfKey = `${crypto.randomUUID()}.pdf`
+      await putObject(pdfKey, pdfFile.stream(), 'application/pdf', { bucket: TEMPLATE_BUCKET })
+      update.pdf_storage_key = pdfKey
+      update.pdf_original_filename = (pdfFile.name || 'file.pdf').slice(0, 255)
+      update.pdf_file_size = pdfFile.size
+      update.pdf_file_modified_at =
+        Number.isFinite(pdfModifiedAtMs) && pdfModifiedAtMs > 0 ? new Date(pdfModifiedAtMs).toISOString() : null
+    }
+    if (hasThumbnail) {
+      const thumbnailKey = `${crypto.randomUUID()}.jpg`
+      await putObject(thumbnailKey, thumbnail.stream(), 'image/jpeg', { bucket: TEMPLATE_BUCKET })
+      update.thumbnail_storage_key = thumbnailKey
+      update.thumbnail_mime = 'image/jpeg'
+    }
 
     const { data, error: err } = await supabase
       .from('document_templates')
-      .update({
-        pdf_storage_key: key,
-        pdf_original_filename: (file.name || 'file.pdf').slice(0, 255),
-        pdf_file_size: file.size,
-        pdf_file_modified_at:
-          Number.isFinite(modifiedAtMs) && modifiedAtMs > 0 ? new Date(modifiedAtMs).toISOString() : null,
-      })
+      .update(update)
       .eq('id', id)
       .select(DOCUMENT_COLUMNS)
       .single()
     if (err) {
-      await deleteObject(key, TEMPLATE_BUCKET)
-      console.error('document-pdf-attach:', err.message)
-      return json({ error: 'PDF版の登録に失敗しました' }, 500)
+      // 新しく保管したオブジェクトのうち今回分だけを孤児として残さない
+      if (hasFile) await safeDeleteObject(update.storage_key, TEMPLATE_BUCKET)
+      if (hasPdfFile) await safeDeleteObject(update.pdf_storage_key, TEMPLATE_BUCKET)
+      if (hasThumbnail) await safeDeleteObject(update.thumbnail_storage_key, TEMPLATE_BUCKET)
+      console.error('document-update:', err.message)
+      return json({ error: '雛形ファイルの更新に失敗しました' }, 500)
     }
-    // 差し替えの場合は古いPDFオブジェクトを消して孤児を残さない（失敗しても登録自体は成功扱い）
-    await safeDeleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
-    return json({ document: data })
+    // 差し替えた分だけ、古いオブジェクトを消して孤児を残さない
+    if (hasFile) await safeDeleteObject(existing.storage_key, TEMPLATE_BUCKET)
+    if (hasPdfFile) await safeDeleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
+    if (hasThumbnail) await safeDeleteObject(existing.thumbnail_storage_key, TEMPLATE_BUCKET)
+    return json({ document: withThumbnailFlag(data) })
   } catch (err) {
-    console.error('document-pdf-attach 失敗:', err)
-    return json({ error: 'PDF版の登録に失敗しました' }, 500)
-  }
-}
-
-// POST /api/documents/original — 既存の登録の原本ファイルを差し替える
-// （multipart/form-data。id・file必須、modified_at任意）。書き込み権限が必要。
-// PDF版とは異なり形式は問わない（原本はもともとWord/Excel/PDF等どれでも良いため）。
-export async function handleDocumentOriginalAttach(req) {
-  const { error } = await requireAuth(req, { write: true })
-  if (error) return error
-  try {
-    const form = await req.formData().catch(() => null)
-    if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
-
-    const id = String(form.get('id') || '')
-    const file = form.get('file')
-    const modifiedAtMs = Number(form.get('modified_at'))
-
-    if (!id) return json({ error: 'id は必須です' }, 400)
-    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
-    if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（20MBまで）' }, 413)
-
-    const supabase = getAdminClient()
-    const { data: existing } = await supabase
-      .from('document_templates')
-      .select('storage_key')
-      .eq('id', id)
-      .maybeSingle()
-    if (!existing) return json({ error: '雛形ファイルが見つかりません' }, 404)
-
-    const originalFilename = file.name || 'file'
-    const ext = extOf(originalFilename)
-    const key = `${crypto.randomUUID()}${ext ? `.${ext}` : ''}`
-    await putObject(key, file.stream(), file.type || 'application/octet-stream', { bucket: TEMPLATE_BUCKET })
-
-    const { data, error: err } = await supabase
-      .from('document_templates')
-      .update({
-        original_filename: originalFilename.slice(0, 255),
-        file_ext: ext || null,
-        file_size: file.size,
-        file_modified_at:
-          Number.isFinite(modifiedAtMs) && modifiedAtMs > 0 ? new Date(modifiedAtMs).toISOString() : null,
-        mime: file.type || null,
-        storage_key: key,
-      })
-      .eq('id', id)
-      .select(DOCUMENT_COLUMNS)
-      .single()
-    if (err) {
-      await deleteObject(key, TEMPLATE_BUCKET)
-      console.error('document-original-attach:', err.message)
-      return json({ error: '原本の差し替えに失敗しました' }, 500)
-    }
-    // 差し替え前の古い原本オブジェクトを消して孤児を残さない（失敗しても差し替え自体は成功扱い）
-    await safeDeleteObject(existing.storage_key, TEMPLATE_BUCKET)
-    return json({ document: data })
-  } catch (err) {
-    console.error('document-original-attach 失敗:', err)
-    return json({ error: '原本の差し替えに失敗しました' }, 500)
+    console.error('document-update 失敗:', err)
+    return json({ error: '雛形ファイルの更新に失敗しました' }, 500)
   }
 }
 
@@ -334,10 +337,47 @@ export async function handleDocumentPdfDelete(req) {
       return json({ error: 'PDF版の削除に失敗しました' }, 500)
     }
     await safeDeleteObject(existing.pdf_storage_key, TEMPLATE_BUCKET)
-    return json({ document: data })
+    return json({ document: withThumbnailFlag(data) })
   } catch (err) {
     console.error('document-pdf-delete 失敗:', err)
     return json({ error: 'PDF版の削除に失敗しました' }, 500)
+  }
+}
+
+// GET /api/documents/thumbnail?id=… — サムネイル画像本体を返す（一覧のカード表示用）。
+// バケットは非公開なので、この経路（JWT認証済み）以外からは取得できない
+// （日報写真の handlePhotoGet と同じ考え方。書き込み権限は不要）
+export async function handleDocumentThumbnailGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: doc } = await supabase
+      .from('document_templates')
+      .select('thumbnail_storage_key')
+      .eq('id', id)
+      .maybeSingle()
+    if (!doc) return json({ error: '雛形ファイルが見つかりません' }, 404)
+    if (!doc.thumbnail_storage_key) return json({ error: 'サムネイルは登録されていません' }, 404)
+
+    const res = await getObject(doc.thumbnail_storage_key, TEMPLATE_BUCKET)
+    if (!res.ok) {
+      console.error('document-thumbnail-get: storage が', res.status, 'を返した')
+      return json({ error: 'サムネイルの取得に失敗しました' }, 404)
+    }
+    return new Response(res.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'private, max-age=3600',
+      },
+    })
+  } catch (err) {
+    console.error('document-thumbnail-get 失敗:', err)
+    return json({ error: 'サムネイルの取得に失敗しました' }, 500)
   }
 }
 
@@ -352,7 +392,7 @@ export async function handleDocumentDelete(req) {
     const supabase = getAdminClient()
     const { data: doc } = await supabase
       .from('document_templates')
-      .select('storage_key, pdf_storage_key')
+      .select('storage_key, pdf_storage_key, thumbnail_storage_key')
       .eq('id', id)
       .maybeSingle()
     if (!doc) return json({ error: '雛形ファイルが見つかりません' }, 404)
@@ -366,6 +406,7 @@ export async function handleDocumentDelete(req) {
     // （失敗すると孤児オブジェクトが残るが、レコード削除自体を失敗扱いにする方が誤解を招く）
     await safeDeleteObject(doc.storage_key, TEMPLATE_BUCKET)
     await safeDeleteObject(doc.pdf_storage_key, TEMPLATE_BUCKET)
+    await safeDeleteObject(doc.thumbnail_storage_key, TEMPLATE_BUCKET)
     return json({ ok: true })
   } catch (err) {
     console.error('document-delete 失敗:', err)

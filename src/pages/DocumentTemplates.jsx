@@ -1,8 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import DocumentTemplateForm from '../components/DocumentTemplateForm'
-import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import AttachmentPreview from '../components/AttachmentPreview'
 import { IconDownload, IconSearch } from '../components/Icons'
 import {
@@ -11,11 +10,10 @@ import {
   deleteDocument,
   downloadDocument,
   getDocumentPreviewUrl,
-  attachDocumentPdf,
-  attachDocumentOriginal,
+  fetchDocumentThumbnailUrl,
+  getEffectivePdf,
 } from '../lib/documents'
-import { formatBytes } from '../lib/imageResize'
-import { formatDateTime } from '../lib/format'
+import { formatDate } from '../lib/format'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import './DocumentTemplates.css'
 // AttachmentPreview（PDFのプレビューモーダル）の見た目は本来タスク管理側の KanbanBoard.css で
@@ -23,31 +21,16 @@ import './DocumentTemplates.css'
 // あるため、ここでも明示的に import しておく（Inspections.jsx と同じ対応）
 import '../components/KanbanBoard.css'
 
-// このドキュメントで「プレビュー可能なPDF」として扱えるものを1つ求める（2026-08-30追加）。
-// 優先順位: 別登録されたPDF版 > 原本自体がPDFの場合はその原本。どちらも無ければnull
-// （原本がWord/Excel等でPDF版も未登録の場合。一覧では「未登録」表示になる）
-function getEffectivePdf(doc) {
-  if (doc.pdf_original_filename) {
-    return { kind: 'pdf', filename: doc.pdf_original_filename, hasOwnInfo: true }
-  }
-  const ext = (doc.file_ext || '').toLowerCase()
-  if (doc.mime === 'application/pdf' || ext === 'pdf') {
-    return { kind: 'original', filename: doc.original_filename, hasOwnInfo: false }
-  }
-  return null
-}
-
 // 雛形ファイル（業務で使う資料テンプレート）画面（2026-08-30〜）。
 // 「登録していつでもダウンロードできる資料置き場」。分類ごとにグループ化し、
 // グループ内は資料名称順に並べる。owner・備品出庫限定ロールは閲覧・ダウンロードのみ
 // （書き込みはサーバー側でも拒否されるが、UIでもボタン自体を出さない）。
 //
-// 一覧の1件は2行で表示する（2026-08-30の依頼によるレイアウト）。
-//   1行目: 資料名称／[原本ボタン(黒)]+ファイル情報／[PDFボタン(青)]+ファイル情報／削除
-//   2行目: 備考（インデント・グレー）／原本の差し替えリンク／PDFの差し替え(or追加)リンク
-// 差し替えリンクは対応するボタンの真下（同じ列）に来るようにし、表全体は
-// table-layout: fixed で列幅を固定することで、グループ（分類）が違っても
-// タブ位置が揃うようにしている（DocumentTemplates.css参照）。
+// 一覧はカード型で表示する（2026-08-31の依頼によるレイアウト変更。以前は表形式だった）。
+// カードをクリックすると登録画面と同じフォーム（DocumentTemplateForm）を編集モードで開き、
+// 原本・PDF版・サムネイルの差し替えも含めてそこで行う。カード自体には追加や差し替えの
+// ボタンは置かず、PDFプレビュー・原本ダウンロードの2つのボタンだけを持つ
+// （クリックはstopPropagationしてカード自体のクリック＝編集起動と分離する）。
 export default function DocumentTemplates() {
   const user = getCurrentUser()
   const readOnly = isLimitedRole(user)
@@ -55,19 +38,16 @@ export default function DocumentTemplates() {
   const [documents, setDocuments] = useState(null)
   const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [activeDoc, setActiveDoc] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
-  const [attachingOriginalId, setAttachingOriginalId] = useState(null)
-  const [attachingPdfId, setAttachingPdfId] = useState(null)
   // プレビュー表示中のファイル（{ doc, kind, filename, url }）。null なら非表示
   const [preview, setPreview] = useState(null)
 
-  // 原本・PDF版それぞれの差し替え用の隠しinput。行ごとに<input>を持たず、
-  // クリックされた行のidだけ覚えておいて共有の1個を使い回す
-  const originalInputRef = useRef(null)
-  const pendingOriginalDocIdRef = useRef(null)
-  const pdfInputRef = useRef(null)
-  const pendingPdfDocIdRef = useRef(null)
+  // カードのサムネイル画像（doc.id -> Blob URL）。非公開バケットのため認証付きで
+  // 取得する必要があり、日報写真の一覧（ReportPhotos.jsx）と同じ方式にする
+  const [thumbUrls, setThumbUrls] = useState({})
+  const createdThumbUrls = useRef(new Set())
 
   const load = useCallback(() => {
     setError('')
@@ -82,6 +62,36 @@ export default function DocumentTemplates() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!documents) return
+    let cancelled = false
+    for (const d of documents) {
+      if (!d.has_thumbnail || thumbUrls[d.id]) continue
+      fetchDocumentThumbnailUrl(d.id)
+        .then((url) => {
+          if (cancelled) {
+            URL.revokeObjectURL(url)
+            return
+          }
+          createdThumbUrls.current.add(url)
+          setThumbUrls((prev) => ({ ...prev, [d.id]: url }))
+        })
+        .catch(() => {}) // 1枚取れなくても他の表示は続ける
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [documents, thumbUrls])
+
+  // アンマウント時に Blob URL をまとめて解放する
+  useEffect(() => {
+    const set = createdThumbUrls.current
+    return () => {
+      for (const url of set) URL.revokeObjectURL(url)
+      set.clear()
+    }
+  }, [])
 
   // 分類ごとにグループ化し、グループは分類名順・グループ内は資料名称順に並べる
   // （備品マスタの年月グループと同じ「Mapに積んでからentriesをsortする」やり方）
@@ -142,77 +152,122 @@ export default function DocumentTemplates() {
     }
   }
 
+  // サムネイルのキャッシュ済みURLを破棄する（差し替え・削除で古い画像を出さないようにする）
+  function invalidateThumb(id) {
+    setThumbUrls((prev) => {
+      const url = prev[id]
+      if (!url) return prev
+      URL.revokeObjectURL(url)
+      createdThumbUrls.current.delete(url)
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
   async function handleDelete(id) {
     setError('')
     try {
       await deleteDocument(id)
       setDocuments((prev) => prev.filter((d) => d.id !== id))
+      invalidateThumb(id)
+      setActiveDoc(null)
     } catch (err) {
       setError(err.message)
     }
   }
 
   function handleSaved(doc) {
-    setFormOpen(false)
-    setDocuments((prev) => [...(prev || []), doc])
+    setShowNewForm(false)
+    setActiveDoc(null)
+    setDocuments((prev) => (prev.some((d) => d.id === doc.id) ? prev.map((d) => (d.id === doc.id ? doc : d)) : [...prev, doc]))
     setCategories((prev) => (prev.includes(doc.category) ? prev : [doc.category, ...prev]))
+    invalidateThumb(doc.id) // 原本・PDF版・サムネイルが変わっている可能性があるため再取得させる
   }
 
-  function handleReplaceOriginal(doc) {
-    pendingOriginalDocIdRef.current = doc.id
-    originalInputRef.current?.click()
-  }
+  function renderCard(d) {
+    const effectivePdf = getEffectivePdf(d)
+    return (
+      <div
+        className="doc-card"
+        key={d.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => setActiveDoc(d)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setActiveDoc(d)
+          }
+        }}
+      >
+        <div className="doc-card-main">
+          <div className="doc-card-name">{d.name}</div>
+          {d.remark && <p className="doc-card-remark">{d.remark}</p>}
+        </div>
 
-  async function handleOriginalFileChange(e) {
-    const file = e.target.files?.[0]
-    const id = pendingOriginalDocIdRef.current
-    e.target.value = '' // 同じファイルを選び直しても onChange が発火するようにする
-    if (!file || !id) return
-    setAttachingOriginalId(id)
-    setError('')
-    try {
-      const updated = await attachDocumentOriginal(id, file)
-      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setAttachingOriginalId(null)
-    }
-  }
+        <div className="doc-card-files">
+          <div className="doc-card-file-row">
+            {effectivePdf ? (
+              <>
+                <button
+                  type="button"
+                  className="doc-btn-pdf"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handlePreviewPdf(d, effectivePdf)
+                  }}
+                  disabled={downloadingId === d.id}
+                  title={effectivePdf.filename}
+                >
+                  <IconSearch size={12} />
+                  PDF
+                </button>
+                {d.pdf_file_modified_at && <span className="doc-file-date">{formatDate(d.pdf_file_modified_at)}</span>}
+              </>
+            ) : (
+              <span className="doc-pdf-missing">未登録</span>
+            )}
+          </div>
+          <div className="doc-card-file-row">
+            <button
+              type="button"
+              className="doc-btn-original"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownloadOriginal(d)
+              }}
+              disabled={downloadingId === d.id}
+              title={d.original_filename}
+            >
+              <IconDownload size={12} />
+              {(d.file_ext || 'FILE').toUpperCase()}
+            </button>
+            {d.file_modified_at && <span className="doc-file-date">{formatDate(d.file_modified_at)}</span>}
+          </div>
+        </div>
 
-  // PDF版の追加・差し替え。原本はWord/Excel等のままで、印刷用のPDFだけを別に持たせる
-  // （サーバー側でOffice文書→PDF変換は行わないため、依頼元が自分の環境でPDF化したものを
-  // ここで登録する運用。docs/HANDOFF.md参照）
-  function handleAddOrReplacePdf(doc) {
-    pendingPdfDocIdRef.current = doc.id
-    pdfInputRef.current?.click()
-  }
-
-  async function handlePdfFileChange(e) {
-    const file = e.target.files?.[0]
-    const id = pendingPdfDocIdRef.current
-    e.target.value = '' // 同じファイルを選び直しても onChange が発火するようにする
-    if (!file || !id) return
-    setAttachingPdfId(id)
-    setError('')
-    try {
-      const updated = await attachDocumentPdf(id, file)
-      setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)))
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setAttachingPdfId(null)
-    }
+        <div className="doc-card-thumb">
+          {thumbUrls[d.id] ? (
+            <img src={thumbUrls[d.id]} alt="" />
+          ) : (
+            <span className="doc-thumb-placeholder">サムネ</span>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-narrow app-scroll">
+      {/* PCではウインドウ幅を十分に使う（2026-08-31。カード型に変更したのに伴い、
+          違反車両一覧と同じ全幅表示にしてほしいとの依頼） */}
+      <div className="ui-container app-scroll">
         <FeatureHeader
           actions={
             !readOnly && (
-              <button type="button" className="btn-primary" onClick={() => setFormOpen(true)}>
+              <button type="button" className="btn-primary" onClick={() => setShowNewForm(true)}>
                 ＋ 登録
               </button>
             )
@@ -232,133 +287,29 @@ export default function DocumentTemplates() {
         ) : (
           groups.map((g) => (
             <section className="doc-group" key={g.category}>
-              <h3 className="ui-group-head">
+              <div className="doc-group-band">
                 {g.category}
-                <span className="ui-group-head-sub">{g.rows.length}件</span>
-              </h3>
-              <div className="ui-table-wrap">
-                <table className="ui-table doc-table">
-                  <thead>
-                    <tr>
-                      <th>資料名称</th>
-                      <th>原本</th>
-                      <th>PDF</th>
-                      <th className="is-numeric">削除</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.rows.map((d) => {
-                      const effectivePdf = getEffectivePdf(d)
-                      return (
-                        <Fragment key={d.id}>
-                          <tr className="doc-row-primary">
-                            <td className="doc-name">{d.name}</td>
-                            <td className="doc-file-cell">
-                              <button
-                                type="button"
-                                className="doc-btn-original"
-                                onClick={() => handleDownloadOriginal(d)}
-                                disabled={downloadingId === d.id}
-                                title={d.original_filename}
-                              >
-                                <IconDownload size={12} />
-                                {(d.file_ext || 'FILE').toUpperCase()}
-                              </button>
-                              <div className="doc-file-info">
-                                {d.file_size != null ? formatBytes(d.file_size) : ''}
-                                {d.file_modified_at ? ` ・ 更新 ${formatDateTime(d.file_modified_at)}` : ''}
-                              </div>
-                            </td>
-                            <td className="doc-file-cell">
-                              {effectivePdf ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="doc-btn-pdf"
-                                    onClick={() => handlePreviewPdf(d, effectivePdf)}
-                                    disabled={downloadingId === d.id}
-                                    title={effectivePdf.filename}
-                                  >
-                                    <IconSearch size={12} />
-                                    PDF
-                                  </button>
-                                  {effectivePdf.hasOwnInfo && (
-                                    <div className="doc-file-info">
-                                      {d.pdf_file_size != null ? formatBytes(d.pdf_file_size) : ''}
-                                      {d.pdf_file_modified_at ? ` ・ 更新 ${formatDateTime(d.pdf_file_modified_at)}` : ''}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="doc-pdf-missing">未登録</span>
-                              )}
-                            </td>
-                            <td className="is-numeric doc-actions">
-                              {!readOnly && (
-                                <ConfirmDeleteButton
-                                  onConfirm={() => handleDelete(d.id)}
-                                  label={`${d.name}を削除`}
-                                  size={20}
-                                />
-                              )}
-                            </td>
-                          </tr>
-                          <tr className="doc-row-sub">
-                            <td className="doc-remark">{d.remark || ''}</td>
-                            <td className="doc-replace-cell">
-                              {!readOnly && (
-                                <button
-                                  type="button"
-                                  className="doc-replace-link"
-                                  onClick={() => handleReplaceOriginal(d)}
-                                  disabled={attachingOriginalId === d.id}
-                                >
-                                  {attachingOriginalId === d.id ? '更新中…' : '差し替え'}
-                                </button>
-                              )}
-                            </td>
-                            <td className="doc-replace-cell">
-                              {!readOnly && (
-                                <button
-                                  type="button"
-                                  className="doc-replace-link"
-                                  onClick={() => handleAddOrReplacePdf(d)}
-                                  disabled={attachingPdfId === d.id}
-                                >
-                                  {attachingPdfId === d.id
-                                    ? '登録中…'
-                                    : d.pdf_original_filename
-                                      ? '差し替え'
-                                      : '＋ 追加'}
-                                </button>
-                              )}
-                            </td>
-                            <td />
-                          </tr>
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                <span className="doc-group-band-count">{g.rows.length}件</span>
               </div>
+              <div className="doc-cards">{g.rows.map(renderCard)}</div>
             </section>
           ))
         )}
       </div>
 
-      {/* 原本・PDF版それぞれの差し替え用。画面に1個ずつ置き、行ごとにクリックされたidを
-          pendingOriginalDocIdRef／pendingPdfDocIdRef で覚えておいてから開く */}
-      <input ref={originalInputRef} type="file" style={{ display: 'none' }} onChange={handleOriginalFileChange} />
-      <input
-        ref={pdfInputRef}
-        type="file"
-        accept=".pdf,application/pdf"
-        style={{ display: 'none' }}
-        onChange={handlePdfFileChange}
-      />
+      {showNewForm && (
+        <DocumentTemplateForm categories={categories} onClose={() => setShowNewForm(false)} onSaved={handleSaved} />
+      )}
 
-      {formOpen && (
-        <DocumentTemplateForm categories={categories} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
+      {activeDoc && (
+        <DocumentTemplateForm
+          doc={activeDoc}
+          categories={categories}
+          readOnly={readOnly}
+          onClose={() => setActiveDoc(null)}
+          onSaved={handleSaved}
+          onDelete={handleDelete}
+        />
       )}
 
       {preview && (

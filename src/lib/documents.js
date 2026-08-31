@@ -9,22 +9,36 @@ export async function fetchDocuments() {
   return data.documents || []
 }
 
+// このドキュメントで「プレビュー可能なPDF」として扱えるものを1つ求める（2026-08-30追加）。
+// 優先順位: 別登録されたPDF版 > 原本自体がPDFの場合はその原本。どちらも無ければnull
+// （原本がWord/Excel等でPDF版も未登録の場合。一覧では「未登録」表示になる）
+export function getEffectivePdf(doc) {
+  if (doc.pdf_original_filename) {
+    return { kind: 'pdf', filename: doc.pdf_original_filename, hasOwnInfo: true }
+  }
+  const ext = (doc.file_ext || '').toLowerCase()
+  if (doc.mime === 'application/pdf' || ext === 'pdf') {
+    return { kind: 'original', filename: doc.original_filename, hasOwnInfo: false }
+  }
+  return null
+}
+
 // 登録済みの分類（重複除く。既存データからの選択式にするため）
 export async function fetchDocumentCategories() {
   const data = await authFetch('/api/documents/suggest')
   return data.values || []
 }
 
-// createDocument・attachDocumentPdf・attachDocumentOriginal はいずれも
-// 「multipart/form-dataをPOSTし、タイムアウト付きで結果のdocumentを受け取る」形が共通のため、
-// ここに1本化する（timeoutMessage/failureMessageだけ呼び出し側で変える）
-async function postMultipart(url, form, { timeoutMessage, failureMessage }) {
+// createDocument・updateDocument はいずれも「multipart/form-dataを送信し、タイムアウト付きで
+// 結果のdocumentを受け取る」形が共通のため、ここに1本化する
+// （method/timeoutMessage/failureMessageだけ呼び出し側で変える）
+async function submitMultipart(url, method, form, { timeoutMessage, failureMessage }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 45000)
   let res
   try {
     res = await fetch(url, {
-      method: 'POST',
+      method,
       headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
       signal: controller.signal,
@@ -40,53 +54,51 @@ async function postMultipart(url, form, { timeoutMessage, failureMessage }) {
   return data.document
 }
 
+// 資料名称・分類・備考・原本・PDF版・サムネイルをフォームに積む共通処理
+// （createDocument・updateDocument で共通のため1本化する）。
 // file: ブラウザの File オブジェクト（input[type=file]）。物理ファイル名・拡張子・
 // サイズ・最終更新日時はここから自動で取り、サーバー側では改めて解釈しない。
-// pdfFile（任意。2026-08-30追加）: 原本（Word/Excel等）とは別に、印刷用のPDF版を
-// 同時に登録したい場合に渡す
-export async function createDocument({ name, category, remark, file, pdfFile }) {
+// pdfFile（任意）: 原本（Word/Excel等）とは別に、印刷用のPDF版を同時に登録したい場合に渡す。
+// thumbnail（任意）: 一覧のカードに出すサムネイル画像（ブラウザ側で縮小済みのBlob/File。
+// 常にJPEGとして送る）
+function buildDocumentForm({ name, category, remark, file, pdfFile, thumbnail }) {
   const form = new FormData()
   form.append('name', name)
   form.append('category', category)
   if (remark) form.append('remark', remark)
-  form.append('file', file, file.name)
-  // File.lastModified はOS側のファイル最終更新日時（epoch ms）。multipart自体には
-  // 運ぶ仕組みが無いため、ブラウザで読めるこの値を別フィールドとして送る
-  form.append('modified_at', String(file.lastModified || ''))
+  if (file) {
+    form.append('file', file, file.name)
+    // File.lastModified はOS側のファイル最終更新日時（epoch ms）。multipart自体には
+    // 運ぶ仕組みが無いため、ブラウザで読めるこの値を別フィールドとして送る
+    form.append('modified_at', String(file.lastModified || ''))
+  }
   if (pdfFile) {
     form.append('pdf_file', pdfFile, pdfFile.name)
     form.append('pdf_modified_at', String(pdfFile.lastModified || ''))
   }
-  return postMultipart('/api/documents', form, {
+  if (thumbnail) {
+    form.append('thumbnail', thumbnail, 'thumbnail.jpg')
+  }
+  return form
+}
+
+export async function createDocument({ name, category, remark, file, pdfFile, thumbnail }) {
+  const form = buildDocumentForm({ name, category, remark, file, pdfFile, thumbnail })
+  return submitMultipart('/api/documents', 'POST', form, {
     timeoutMessage: 'ファイルのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
     failureMessage: '雛形ファイルの登録に失敗しました',
   })
 }
 
-// 登録済みの雛形ファイルへ、印刷用のPDF版を追加・差し替える（2026-08-30追加）。
-// 原本がWord/Excel等の場合、ユーザーが自分の環境でPDFに変換してから登録する運用を想定
-// （サーバー側でのOffice文書→PDF変換は行わない）。
-export async function attachDocumentPdf(id, file) {
-  const form = new FormData()
+// 既存の雛形ファイルを更新する（2026-08-31追加。新規登録と同じ画面で編集も行うため、
+// 名称・分類・備考は常に送り、原本・PDF版・サムネイルは差し替える分だけ渡す
+// （file/pdfFile/thumbnailを省略すればそれぞれ既存のまま）
+export async function updateDocument(id, { name, category, remark, file, pdfFile, thumbnail }) {
+  const form = buildDocumentForm({ name, category, remark, file, pdfFile, thumbnail })
   form.append('id', id)
-  form.append('file', file, file.name)
-  form.append('modified_at', String(file.lastModified || ''))
-  return postMultipart('/api/documents/pdf', form, {
-    timeoutMessage: 'PDFのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
-    failureMessage: 'PDF版の登録に失敗しました',
-  })
-}
-
-// 登録済みの雛形ファイルの原本を差し替える（2026-08-30追加）。PDF版とは異なり
-// 形式は問わない（原本はもともとWord/Excel/PDF等どれでも良いため）
-export async function attachDocumentOriginal(id, file) {
-  const form = new FormData()
-  form.append('id', id)
-  form.append('file', file, file.name)
-  form.append('modified_at', String(file.lastModified || ''))
-  return postMultipart('/api/documents/original', form, {
+  return submitMultipart('/api/documents', 'PUT', form, {
     timeoutMessage: 'ファイルのアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。',
-    failureMessage: '原本の差し替えに失敗しました',
+    failureMessage: '雛形ファイルの更新に失敗しました',
   })
 }
 
@@ -113,6 +125,17 @@ export async function getDocumentPreviewUrl(id, kind = 'original') {
 
 export async function deleteDocument(id) {
   await authFetch(`/api/documents?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// サムネイル画像を取得して Blob URL を作る（2026-08-31追加。一覧のカード表示用）。
+// バケットは非公開なので必ずこの経路を通す（日報写真の fetchPhotoObjectUrl と同じ考え方）。
+// 呼び出し側は使い終わったら URL.revokeObjectURL で解放すること
+export async function fetchDocumentThumbnailUrl(id) {
+  const res = await fetch(`/api/documents/thumbnail?id=${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) throw new Error('サムネイルを取得できませんでした')
+  return URL.createObjectURL(await res.blob())
 }
 
 // ダウンロードは<iframe>や<a>から直接叩けないため（Authorizationヘッダが送れない）、
