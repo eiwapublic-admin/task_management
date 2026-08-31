@@ -24,7 +24,7 @@ Supabase 無料プランのためバックアップ復元ができず、FileMake
 | シークレット類 | **パスワードマネージャ（要・人手で管理）** | 再発行で対応可 |
 | Supabase の各種設定 | Supabase ダッシュボードのみ → 本書 §4 | 中（手作業で再設定） |
 | Cloudflare（ホスティング）側の設定 | Cloudflare ダッシュボードのみ → 本書 §5 | 中（手作業で再設定） |
-| Storage のファイル本体（`report-photos` バケット） | Supabase Storage のみ（バケット定義は`schema.sql`で復元されるが中身は無い） | 中（日報・違反車両・備品署名の写真が失われる） |
+| Storage のファイル本体（`report-photos`・`work-templates` バケット） | **GitHub `eiwapublic-admin/task_management-backups`（毎日自動。2026-08-31〜）** | 中〜大（日報・違反車両・備品署名の写真、雛形ファイルの原本・PDF版が失われる） |
 
 **Supabase の無料プランには自動バックアップが無い**（Pro以上のみ）。公式ドキュメントでも
 無料プランは `db dump` で自分でエクスポートしオフサイト保管することが推奨されている。
@@ -47,10 +47,24 @@ Supabase 無料プランのためバックアップ復元ができず、FileMake
 | `schema.sql` | テーブル・RLSポリシー・関数・トリガ・権限（**再構築の土台**） |
 | `data.sql` | 業務データ（public スキーマ。`public.users` のログイン情報を含む） |
 | `auth_data.sql` | Supabase Auth のユーザー（`auth.users` / `auth.identities`。未使用のため通常は空） |
+| `storage/manifest.json` | Storageの全ファイルの一覧（バケット名・パス・MIMEタイプ） |
+| `storage/<バケット名>/<パス>` | Storageの各ファイル本体（`report-photos`・`work-templates`。2026-08-31〜） |
 
 取得には **`pg_dump` を直接**使う（Supabase CLI は使わない）。CLI は `pg_dump` を
 コンテナ内で実行する際に接続URLを解析し直すため、**Session pooler 用のユーザー名
 `postgres.<project-ref>` が `postgres` に落ちて認証に失敗する**。
+
+**Storageのファイル本体（2026-08-31追加）**: `storage.objects`テーブル（パス・MIMEタイプ等の
+メタ情報のみで、ファイルの中身は持たない）を`psql`で一覧取得し、実体はStorage REST API
+（`GET /storage/v1/object/{bucket}/{path}`）から個別にダウンロードする。DBの各テーブル
+（`document_templates`等）が保持しているのは**Supabaseが内部で管理する非公開のIDではなく、
+アプリ自身が発行したファイルパス文字列そのもの**なので、復元時に同じバケット名・同じパスへ
+ファイルを置き直せばDBとの紐付けは自動的に再現される（特別な対応表は不要。本書§3参照）。
+`storage/`配下は実行のたびに一度全削除してから再取得する完全なミラー方式のため、
+Supabase側で削除されたファイルはバックアップリポジトリからも消える
+（過去日の状態はGit履歴として残るので、`schema.sql`/`data.sql`の「上書き」と同じ考え方）。
+一覧取得〜ダウンロードの間に個別のファイルが削除される等で1件だけ取得に失敗しても、
+その1件を警告に留めてバックアップ全体は失敗にしない（DBダンプ自体は別工程のため影響を受けない）。
 
 - **世代管理は Git の履歴そのもの。** 「3日前の状態」は `git show HEAD~3:data.sql` で取り出せる。
   保存期間の上限が無いため、法定保存年数などの要件にも対応できる。
@@ -106,6 +120,7 @@ GitHub App が組織へのリポジトリ作成権限を持っておらず失敗
 |---|---|
 | `SUPABASE_DB_PASSWORD` | Supabase のDBパスワード（そのまま。URLエンコード不要） |
 | `BACKUP_REPO_TOKEN` | `task_management-backups` へ push できる Personal Access Token |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | Storageのファイル本体取得用。`deploy.yml`が使っているものと同じ（リポジトリ単位のSecretsのためワークフローをまたいで共有される。このワークフロー専用の追加登録は不要） |
 
 > ⚠️ **Session pooler のユーザー名は `postgres.pfiogfdnbctunkhslmcp`。**
 > ただし **`password authentication failed for user "postgres"` というエラーからは原因を判別できない。**
@@ -148,6 +163,46 @@ psql "<新プロジェクトの接続文字列>" -f data.sql
 - `settings` テーブルの各設定値（`org_context` / `company_domains` / `calendar_name` 等）が
   入っているか
 
+### 3-1. Storageのファイル本体を復元する（2026-08-31〜）
+
+DBの復元（上記）とは別に、`storage/`配下のファイルも新しいプロジェクトへ戻す必要がある。
+**DBの各テーブルが保持しているのはファイルパス文字列そのもの**（Supabase内部のIDではない）
+ため、下記の通り**同じバケット名・同じパスへ**再アップロードするだけで、DBとの紐付けは
+自動的に再現される（特別な対応表・SQLでの再リンクは不要）。
+
+```bash
+cd task_management-backups  # 上記でcloneした場所
+
+NEW_SUPABASE_URL="https://<新プロジェクトref>.supabase.co"
+NEW_SUPABASE_SERVICE_KEY="<新プロジェクトの新しいシークレットキー。sb_secret_...>"
+
+# 1. バケットをあらかじめ作成する（非公開。既存と同じ名前で）
+#    manifest.json に含まれるバケット名の分だけ、Supabaseダッシュボードの
+#    Storage画面から「New bucket」で作成する（Public bucket はオフのまま）。
+#    バケット名は以下で確認できる:
+jq -r '[.[].bucket_id] | unique | .[]' storage/manifest.json
+
+# 2. 各ファイルを元のパス・元のMIMEタイプで再アップロードする
+jq -c '.[]' storage/manifest.json | while IFS= read -r row; do
+  bucket=$(echo "$row" | jq -r '.bucket_id')
+  name=$(echo "$row" | jq -r '.name')
+  mimetype=$(echo "$row" | jq -r '.mimetype')
+  encoded_name=$(echo "$row" | jq -rn --argjson row "$row" '$row.name | split("/") | map(@uri) | join("/")')
+  src="storage/${bucket}/${name}"
+  [ -f "$src" ] || { echo "スキップ（ファイルが無い）: $src" >&2; continue; }
+  curl -fsS -X POST \
+    -H "apikey: ${NEW_SUPABASE_SERVICE_KEY}" \
+    -H "Content-Type: ${mimetype}" \
+    -H "x-upsert: true" \
+    --data-binary "@${src}" \
+    "${NEW_SUPABASE_URL}/storage/v1/object/${bucket}/${encoded_name}"
+done
+```
+
+新方式のシークレットキー（`sb_secret_...`）は`Authorization: Bearer`に載せると拒否されるため、
+上記は`apikey`ヘッダーのみを使っている（レガシーのJWT形式キーを使う場合は
+`-H "Authorization: Bearer ${NEW_SUPABASE_SERVICE_KEY}"`も追加すること）。
+
 ---
 
 ## 4. Supabase を作り直す場合の設定（Git に無い）
@@ -157,9 +212,10 @@ psql "<新プロジェクトの接続文字列>" -f data.sql
 1. **Authentication > URL Configuration**: Site URL / Redirect URLs
    （このアプリはカスタム認証で Supabase Auth のログインフローを使わないため、
    実際に必要になるかは要確認。念のため本番URLに合わせておく）
-2. **Storage**: `report-photos` バケットの定義は `schema.sql` に含まれるが、**中の写真ファイルは
-   含まれない**（日報・違反車両・備品テナント署名の写真）。必要なら別途バックアップするか、
-   失われた前提で運用する
+2. **Storage**: バケット定義（`report-photos`・`work-templates`）は`storage`スキーマのテーブルで
+   あり`schema.sql`（`--schema=public`のみ）には含まれないため、**バケット自体を手作業で
+   作り直す必要がある**（非公開のまま。本書 §3-1 参照）。中のファイル本体は
+   `task_management-backups`から復元できる（2026-08-31〜。§3-1の手順を実行）
 3. 新しい Project URL・service role key をホスティング側（Cloudflare Workers の Secrets、
    `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`）に反映する（本書 §5・`docs/HANDOFF.md` 3章参照）
 
@@ -184,7 +240,7 @@ psql "<新プロジェクトの接続文字列>" -f data.sql
 以下は**どこにも自動保存されていない**。人が保管する必要がある。
 
 - Supabase の **DBパスワード**（`SUPABASE_DB_PASSWORD` と同じ値）
-- Supabase の **service role key**（`SUPABASE_SERVICE_KEY` と同じ値）
+- Supabase の **シークレットキー**（`SUPABASE_SERVICE_KEY` と同じ値。2026-08-31〜新方式の`sb_secret_...`。docs/HANDOFF.md 195・196番参照）
 - GitHub の **Personal Access Token**（`BACKUP_REPO_TOKEN`。再発行も可能）
 - Gmail OAuth のクライアントID/シークレット・リフレッシュトークン
 - Anthropic API キー
@@ -199,6 +255,10 @@ psql "<新プロジェクトの接続文字列>" -f data.sql
       2026-08-25 の事故時点ではこの復元ドリルが未実施だったため、実際に詰まった。
       **2026-08-27、本稼働開始前に前倒しで初回実施し、主要18テーブル全件が本番と一致することを
       確認済み**（`docs/HANDOFF.md` 182番）。次回は1年後を目安に再実施すること。
+      **2026-08-31にStorageのファイル本体もバックアップ対象に追加したため、次回のドリルでは
+      本書§3-1の手順で写真・雛形ファイルの実ファイルまで正しく復元できることも確認すること**
+      （ドリル自体はまだ未実施。バックアップ・復元スクリプトはローカルの模擬サーバーで
+      動作確認済みだが、実際のSupabaseプロジェクトに対する検証はこれから）。
 - [ ] **年1回**、Cloudflare Workers 側も別アカウントで実際にデプロイできるか試す
 - [ ] バックアップの Actions が失敗していないか（失敗時はメールが届く。アプリの `/logs` 画面でも
       「バックアップ」種別を確認できる）
@@ -213,5 +273,7 @@ psql "<新プロジェクトの接続文字列>" -f data.sql
 - `supabase/migrations/` に相当するものは無く、`supabase/schema.sql` をIaCの正としている
   （`docs/HANDOFF.md` 3章「DB スキーマ変更」参照）。ダッシュボードから直接適用した変更は
   記録に残らないことがあるため、再構築には必ず**バックアップの `schema.sql`**を使うこと。
-- `report-photos` バケットの写真本体はこのバックアップ対象外（本書 §1・§4）。将来的に必要性が
-  高まれば、Storage の定期エクスポートも検討する。
+- Storageのバケット**定義**（非公開設定・ファイルサイズ上限等）自体はバックアップ対象外
+  （`storage.objects`の中身＝ファイル一覧とファイル本体はバックアップ済みだが、
+  `storage.buckets`のバケット設定は含まれない）。再構築時はバケットを手作業で作り直す
+  必要がある（本書 §3-1・§4参照。設定はごく単純＝非公開のみのため実務上の影響は小さい）。

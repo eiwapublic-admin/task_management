@@ -84,6 +84,21 @@ backups — Pro tier and above only). Ports the exact pattern battle-tested in t
 - **Watch the PAT's expiry, not just the DB password.** The token-expiry-check step reads the
   `github-authentication-token-expiration` response header from a `GET /user` call and warns
   at ≤30 days left; wire that warning into wherever the app's owner will actually see it.
+- **If backing up Storage file contents too, and the project uses Supabase's newer
+  `sb_secret_...`/`sb_publishable_...` API keys: never send that key on `Authorization:
+  Bearer`.** Those keys aren't JWTs, and the platform rejects the request outright if you do.
+  Send `apikey: <key>` only. Legacy JWT-format `service_role` keys still need both headers.
+  Branch on the key's prefix rather than hardcoding one or the other, since a project can
+  migrate between the two formats over its lifetime.
+- **When downloading/uploading Storage object paths, percent-encode each path segment but
+  leave `/` alone** — Supabase object names can contain `/` as a virtual "folder" separator.
+  `jq`'s `@uri` filter (like JS `encodeURIComponent`) encodes `/` too, which breaks such
+  paths; split on `/`, encode each segment, then rejoin (matching JS `encodeURI()`, which the
+  app's own upload code should already be using for the same reason).
+- **Don't let one missing/already-deleted Storage object fail the whole backup job.** A file
+  can be deleted between the `storage.objects` listing and the per-object download a few
+  seconds later — treat that one failure as a warning and keep going, so a real DB backup
+  success isn't reported as a failure over an unrelated race condition.
 
 ## What this does NOT capture (must be a separate manual runbook)
 
@@ -92,8 +107,18 @@ no git representation — losing the project loses them too unless documented se
 
 - Auth → URL Configuration (Site URL, Redirect URLs)
 - Auth → Email templates and SMTP settings
-- Storage bucket **file contents** (bucket *definitions* are in `schema.sql`, the files
-  inside them are not — back those up separately if they matter)
+- Storage bucket **definitions** (`storage.buckets` — public/private, size limits) are
+  **not** in `schema.sql` either, since that dump is `--schema=public` only and `storage`
+  is a separate schema. Bucket file *contents* can be captured with an extra step: list
+  `storage.objects` (path + mimetype metadata, no bytes) via `psql`, then download each
+  object's bytes from the Storage REST API (`GET /storage/v1/object/{bucket}/{path}`) and
+  commit them alongside the SQL dumps. Restoring is the mirror: recreate the buckets, then
+  re-upload each file to its *original* bucket+path via `POST .../object/{bucket}/{path}`
+  with `x-upsert: true`. Because the app's own DB rows reference that path string directly
+  (not a Supabase-internal object ID), restoring to the same path re-establishes the DB↔file
+  link with no reconciliation step. See `eiwapublic-admin/task_management`'s
+  `.github/workflows/backup.yml` (Storage step) and `docs/disaster-recovery.md` §3-1 for a
+  working reference implementation, including the header quirk below.
 - Any platform secrets/env vars on the hosting side (Cloudflare/Vercel/etc. dashboard vars)
 - The PAT and DB password themselves — must live in a password manager; nothing in this
   pipeline stores them for you
