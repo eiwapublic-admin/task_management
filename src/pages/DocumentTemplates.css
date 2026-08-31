@@ -1,71 +1,99 @@
 /* 雛形ファイル（業務で使う資料テンプレート）画面（2026-08-30〜）。
-   分類ごとにグループ化し、資料名称順に並べる。骨格は備品マスタ・処理ログ等の
-   一覧画面と同じ共通部品（.ui-group-head / .ui-table）を使う */
+   分類ごとにグループ化し、資料名称順に並べる。2026-08-31、明細をカード型に変更し、
+   グループ見出しは他画面（自主検査表ヘッダ・日報カレンダー曜日行・備品在庫一覧の
+   備品名バナー・テナントマスタの階帯）と同じ塗り潰し型の帯に揃えた */
 
 .doc-group {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
 }
 
-/* 1件を2行（原本/PDFのボタン行＋差し替えリンク・備考行）で表示する（2026-08-30）。
-   table-layout: fixed で列幅を固定し、分類（グループ）が違ってもタブ位置が
-   揃うようにする（グループごとに別々の<table>のため、内容依存の自動幅だと
-   グループをまたいで列位置がガクガクしてしまう） */
-.doc-table {
-  table-layout: fixed;
+.doc-group-band {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
-.doc-table th:nth-child(1),
-.doc-table td:nth-child(1) {
-  width: 26%;
-}
-.doc-table th:nth-child(2),
-.doc-table td:nth-child(2) {
-  width: 34%;
-}
-.doc-table th:nth-child(3),
-.doc-table td:nth-child(3) {
-  width: 30%;
-}
-.doc-table th:nth-child(4),
-.doc-table td:nth-child(4) {
-  width: 10%;
-}
-
-/* 1件の中の1行目（資料名称／原本ボタン／PDFボタン／削除）と2行目（備考／差し替えリンク）を
-   1つのまとまりに見せるため、1行目の下罫線を消し2行目にだけ罫線を残す */
-.doc-table tr.doc-row-primary td {
-  border-bottom: none;
-  padding-bottom: 2px;
-  vertical-align: middle;
-}
-
-.doc-table tr.doc-row-sub td {
-  padding-top: 2px;
-}
-
-.doc-table td.doc-name {
+.doc-group-band-count {
+  font-size: var(--fs-sm);
   font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* カード一覧。PC幅では横に複数枚並べ、幅を十分に活用する（違反車両一覧と同じ考え方） */
+.doc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--space-3);
+}
+
+.doc-card {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+}
+.doc-card:hover {
+  border-color: var(--color-brand);
+}
+
+.doc-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.doc-card-name {
+  font-size: var(--fs-lg);
+  font-weight: 700;
   color: var(--text-strong);
   word-break: break-word;
 }
 
 /* 備考はインデントを付けてグレーで控えめに表示する（資料名称とは違う開始位置にして
    「補足情報」であることを見た目でも示す） */
-.doc-remark {
-  padding-left: var(--space-4);
+.doc-card-remark {
+  margin: 0;
+  padding-left: var(--space-2);
   color: var(--text-muted);
   font-size: var(--fs-sm);
+  white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* ファイル情報（サイズ・更新タイムスタンプ）はボタンの下に1行で表示する（2026-08-30）。
-   ボタンと横並びにすると列幅次第で隣の列に文字が乗り上げることがあったため、
-   ボタンの真下に独立した行として置き、かつ列幅も広めに確保して1行に収まるようにする */
-.doc-file-info {
-  display: block;
-  margin-top: 2px;
+/* 原本・PDFの2つのボタンを縦に並べる列。各ボタンの下に更新日を添える */
+.doc-card-files {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.doc-card-file-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.doc-file-date {
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
-  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -75,8 +103,7 @@
 }
 
 /* 原本ボタン（黒・角丸）「↓ XLSX」＝ダウンロードのイメージ。
-   PDFボタン（青・角丸）「🔍 PDF」＝プレビューのイメージ。
-   差し替えリンク（2行目）は同じ<td>内で左寄せにするだけで、ボタンの真下に揃う */
+   PDFボタン（青・角丸）「🔍 PDF」＝プレビューのイメージ */
 .doc-btn-original,
 .doc-btn-pdf {
   display: inline-flex;
@@ -115,46 +142,92 @@
   cursor: default;
 }
 
-.doc-replace-cell {
-  vertical-align: top;
-}
-
-.doc-replace-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--color-primary);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  cursor: pointer;
-}
-.doc-replace-link:hover {
-  text-decoration: underline;
-}
-.doc-replace-link:disabled {
-  color: var(--text-muted);
-  cursor: default;
-  text-decoration: none;
-}
-
-.doc-actions {
+/* カード右端のサムネイル。画像が無ければ「サムネ」のプレースホルダーを出す */
+.doc-card-thumb {
+  flex: 0 0 auto;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--bg-subtle);
   display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
   align-items: center;
+  justify-content: center;
+}
+.doc-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+@media (max-width: 640px) {
+  .doc-cards {
+    grid-template-columns: 1fr;
+  }
+  .doc-card {
+    flex-wrap: wrap;
+  }
+  .doc-card-thumb {
+    width: 72px;
+    height: 72px;
+  }
 }
 
-/* 登録モーダルのファイル選択直後のプレビュー行（物理ファイル名・サイズ・更新日） */
+/* --- 登録・編集モーダル（DocumentTemplateForm）--- */
+
+/* 登録・編集モーダルのファイル選択直後のプレビュー行（物理ファイル名・サイズ・更新日、
+   または編集時の現在の登録内容） */
 .doc-file-preview {
   margin: calc(-1 * var(--space-2)) 0 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
-/* PDF版フィールドの補足説明（2026-08-30追加） */
+/* PDF版・サムネイル欄の補足説明 */
 .doc-field-hint {
   margin: 0;
   font-size: var(--fs-xs);
   color: var(--text-muted);
   font-weight: 400;
+}
+
+/* サムネイル欄（2026-08-31追加）。カードの .doc-card-thumb より一回り大きくして
+   選んだ画像・自動生成結果を確認しやすくする */
+.doc-thumb-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.doc-thumb-preview {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.doc-thumb-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.doc-thumb-loading,
+.doc-thumb-placeholder {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.doc-thumb-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
 }

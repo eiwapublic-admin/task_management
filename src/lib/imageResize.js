@@ -111,6 +111,18 @@ export async function prepareImage(file, category = 'work') {
   return { file: blob, thumb, width, height, resized: true }
 }
 
+// 雛形ファイルのサムネイル（カード表示用。2026-08-31追加）。写真用の RESIZE_PRESETS とは
+// 別に単独の定数として持つ（用途がカードの正方形枠であり、撮影写真の一覧とは性格が違うため）
+const DOCUMENT_THUMB_EDGE = 480
+const DOCUMENT_THUMB_QUALITY = 0.75
+
+// ユーザーが任意に選んだ画像ファイルを、雛形ファイルのサムネイル用に縮小する
+export async function prepareDocumentThumbnail(file) {
+  const img = await loadImage(file)
+  const { blob } = await drawResized(img, DOCUMENT_THUMB_EDGE, DOCUMENT_THUMB_QUALITY)
+  return blob
+}
+
 // バイト数をMB単位で整形する（写真の下に表示する縮小後サイズに使う）
 export function formatMB(bytes) {
   if (!bytes) return null

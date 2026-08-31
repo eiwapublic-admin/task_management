@@ -639,6 +639,11 @@ create table if not exists document_templates (
   pdf_original_filename   text,
   pdf_file_size           integer,
   pdf_file_modified_at    timestamptz,
+  -- サムネイル（任意。2026-08-31追加）。カード一覧に出す縮小画像。ユーザーが任意の画像を
+  -- 指定した場合はそれを、PDF（原本 or PDF版）が登録された場合はその1ページ目をブラウザ側で
+  -- 縮小したものを自動で貼り付ける。常にJPEGに揃えるので拡張子列は持たない
+  thumbnail_storage_key   text unique,
+  thumbnail_mime          text,
   created_by        uuid references users(id),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()

@@ -64,12 +64,12 @@ import {
   handleDocumentList,
   handleDocumentCategorySuggest,
   handleDocumentCreate,
+  handleDocumentUpdate,
   handleDocumentDelete,
   handleDocumentDownload,
+  handleDocumentThumbnailGet,
   handleDocumentPreviewToken,
-  handleDocumentPdfAttach,
   handleDocumentPdfDelete,
-  handleDocumentOriginalAttach,
 } from './lib/documents.js'
 
 // Cloudflare Worker 本体。
@@ -1038,6 +1038,7 @@ async function route(req, env) {
   if (pathname === '/api/documents') {
     if (req.method === 'GET') return handleDocumentList(req)
     if (req.method === 'POST') return handleDocumentCreate(req)
+    if (req.method === 'PUT') return handleDocumentUpdate(req)
     if (req.method === 'DELETE') return handleDocumentDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
@@ -1047,16 +1048,14 @@ async function route(req, env) {
   if (pathname === '/api/documents/download') {
     return req.method === 'GET' ? handleDocumentDownload(req) : json({ error: 'Method Not Allowed' }, 405)
   }
+  if (pathname === '/api/documents/thumbnail') {
+    return req.method === 'GET' ? handleDocumentThumbnailGet(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
   if (pathname === '/api/documents/preview-token') {
     return req.method === 'POST' ? handleDocumentPreviewToken(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/documents/pdf') {
-    if (req.method === 'POST') return handleDocumentPdfAttach(req)
-    if (req.method === 'DELETE') return handleDocumentPdfDelete(req)
-    return json({ error: 'Method Not Allowed' }, 405)
-  }
-  if (pathname === '/api/documents/original') {
-    return req.method === 'POST' ? handleDocumentOriginalAttach(req) : json({ error: 'Method Not Allowed' }, 405)
+    return req.method === 'DELETE' ? handleDocumentPdfDelete(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {
