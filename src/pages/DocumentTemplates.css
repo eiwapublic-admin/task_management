@@ -183,6 +183,14 @@
   color: var(--text-muted);
 }
 
+/* 現在登録済みのファイル情報（「現在: ○○」）は、新しく選び直したファイルのプレビューと
+   見分けがつくよう、インデント＋濃い色の太字で強調する（2026-08-31） */
+.doc-file-current {
+  padding-left: var(--space-4);
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
 /* PDF版・サムネイル欄の補足説明 */
 .doc-field-hint {
   margin: 0;

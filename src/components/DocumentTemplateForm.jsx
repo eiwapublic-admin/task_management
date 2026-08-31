@@ -206,7 +206,7 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
             </p>
           ) : (
             isEdit && (
-              <p className="doc-file-preview">
+              <p className="doc-file-preview doc-file-current">
                 現在: {doc.original_filename}
                 {doc.file_size != null ? ` ・ ${formatBytes(doc.file_size)}` : ''}
                 {doc.file_modified_at ? ` ・ 更新日 ${formatDate(doc.file_modified_at)}` : ''}
@@ -232,7 +232,7 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
                 </p>
               ) : (
                 doc?.pdf_original_filename && (
-                  <p className="doc-file-preview">
+                  <p className="doc-file-preview doc-file-current">
                     現在: {doc.pdf_original_filename}
                     {doc.pdf_file_size != null ? ` ・ ${formatBytes(doc.pdf_file_size)}` : ''}
                     {doc.pdf_file_modified_at ? ` ・ 更新日 ${formatDate(doc.pdf_file_modified_at)}` : ''}
