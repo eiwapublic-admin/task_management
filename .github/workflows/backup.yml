@@ -21,6 +21,9 @@
 #   3. このリポジトリの Settings > Secrets and variables > Actions に登録:
 #      - SUPABASE_DB_PASSWORD … Supabase の DB パスワード（そのまま。URLエンコード不要）
 #      - BACKUP_REPO_TOKEN    … 手順2で発行したトークン
+#      - SUPABASE_URL / SUPABASE_SERVICE_KEY … Storageのファイル本体バックアップ用。
+#        deploy.yml で既に登録済みのものをそのまま使う（リポジトリ単位のSecretsのため
+#        ワークフローをまたいで共有される。このワークフロー用に新規登録は不要）
 #   4. Actions タブ →「Daily backup」→ Run workflow で手動実行し、
 #      backups リポジトリにコミットされることを確認する
 #
@@ -34,6 +37,20 @@
 # - pg_dump はサーバーと同じメジャーバージョンが必要。GitHub の ubuntu ランナーには古いバージョンが
 #   入っていることがあるため、PGDG から Supabase 側と同じメジャー版を入れ、PATH の先頭に置く。
 #   (2026-08時点、本プロジェクトの Supabase は Postgres 17。バージョンが変わったら数字を合わせ直すこと)
+# - Storage（report-photos・work-templates バケット）のファイル本体は pg_dump の対象外
+#   （実体は Postgres の外＝S3互換オブジェクトストレージにあるため）。2026-08-31追加で、
+#   Storage REST API から一覧・本体を取得しあわせてバックアップする（`storage.objects`は
+#   バイト本体を持たない、パス・サイズ・MIMEタイプ等のメタ情報だけのテーブルなので、
+#   一覧はpsqlで取得し、本体はStorage APIでダウンロードする2段構成）。
+#   DBの各テーブル（document_templates等）が保持しているのはSupabase内部のIDではなく
+#   このアプリが発行したファイルパス文字列そのものなので、リストア時に同じバケット名・
+#   同じパスへ復元すればDBとの紐付けは自動的に再現される（docs/disaster-recovery.md §3参照）。
+#   新方式のシークレットキー（sb_secret_...）はJWTでないためAuthorization: Bearerに載せると
+#   拒否される（worker/lib/storage.jsのauthHeaders()と同じ理由）ので、ここでも鍵の形式で
+#   ヘッダーを出し分ける。バックアップのたびに`backup/storage/`配下を一度全削除してから
+#   再取得する（＝その日時点の完全なミラー。Supabase側で削除されたファイルはバックアップ
+#   リポジトリからも消える。過去日の状態はGit履歴として残るので、schema.sql/data.sqlの
+#   「上書き」と同じ考え方）。
 name: Daily backup
 
 on:
@@ -135,6 +152,73 @@ jobs:
           pg_dump "$DB_URL" --data-only --no-owner \
             --table=auth.users --table=auth.identities -f auth_data.sql
 
+      - name: Storageのファイル本体を取得
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          cd backup
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
+            echo "SUPABASE_URL/SUPABASE_SERVICE_KEY が未設定のため、Storageのバックアップをスキップします" >&2
+            exit 0
+          fi
+          # 新方式のシークレットキー（sb_secret_.../sb_publishable_...）はJWTでないため、
+          # Authorization: Bearer に載せると拒否される。レガシーJWT形式キーでは両方送る
+          # （worker/lib/storage.js の authHeaders() と同じ考え方）
+          KEY_HEADERS=(-H "apikey: ${SUPABASE_SERVICE_KEY}")
+          case "$SUPABASE_SERVICE_KEY" in
+            sb_secret_*|sb_publishable_*) ;;
+            *) KEY_HEADERS+=(-H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}") ;;
+          esac
+
+          # storage.objects はファイル本体を持たないメタ情報テーブル（バケット名・パス・
+          # MIMEタイプ・サイズ）。本体はStorage REST APIから別途ダウンロードする
+          psql "$DB_URL" -Atc "
+            select coalesce(json_agg(row_to_json(t)), '[]')
+            from (
+              select bucket_id, name,
+                     coalesce(metadata->>'mimetype', 'application/octet-stream') as mimetype
+              from storage.objects
+              order by bucket_id, name
+            ) t
+          " > storage_manifest.json
+
+          # その日時点の完全なミラーにする（Supabase側で削除済みのファイルは
+          # バックアップリポジトリからも消す。過去日の状態はGit履歴に残る）
+          rm -rf storage
+          mkdir -p storage
+          mv storage_manifest.json storage/manifest.json
+
+          COUNT=$(jq 'length' storage/manifest.json)
+          echo "Storageオブジェクト数: $COUNT"
+          # 一覧取得〜ダウンロードの間に削除される等、1件だけの失敗でバックアップ全体
+          # （既に成功しているDBダンプも含め）を失敗扱いにしないよう、失敗した1件は
+          # 警告に留めて残りの取得を続ける（worker側のsafeDeleteObject()と同じ考え方）。
+          # while読み取りをパイプでなくプロセス置換にしているのは、パイプだとサブシェルに
+          # なりFAILED変数の更新がループの外に反映されないため。
+          FAILED=0
+          while IFS= read -r row; do
+            bucket=$(echo "$row" | jq -r '.bucket_id')
+            name=$(echo "$row" | jq -r '.name')
+            # パスの区切り(/)はそのまま、各セグメントだけをURLエンコードする
+            # （worker/lib/storage.js が encodeURI() を使うのと同じ考え方。jqの@uriは
+            # encodeURIComponent相当で/も%2Fにしてしまうため、セグメントごとに分けて使う）
+            encoded_name=$(echo "$row" | jq -rn --argjson row "$row" '$row.name | split("/") | map(@uri) | join("/")')
+            dest="storage/${bucket}/${name}"
+            mkdir -p "$(dirname "$dest")"
+            if ! curl -fsS "${KEY_HEADERS[@]}" \
+              "${SUPABASE_URL%/}/storage/v1/object/${bucket}/${encoded_name}" -o "$dest"; then
+              echo "::warning::Storageオブジェクトの取得に失敗しました（取得中に削除された可能性）: ${bucket}/${name}"
+              rm -f "$dest"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(jq -c '.[]' storage/manifest.json)
+          echo "STORAGE_FAILED=$FAILED" >> "$GITHUB_ENV"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::warning::Storageバックアップで${FAILED}件の取得に失敗しました（DBダンプ自体は正常）"
+          fi
+
       - name: 変更があればコミット
         run: |
           set -euo pipefail
@@ -150,6 +234,14 @@ jobs:
             RESULT="コミット済み"
           fi
           SIZES=$(du -h schema.sql data.sql auth_data.sql | awk '{printf "%s %s / ", $2, $1}' | sed 's| / $||')
+          if [ -d storage ]; then
+            STORAGE_COUNT=$(find storage -type f ! -name manifest.json | wc -l)
+            STORAGE_SIZE=$(du -sh storage | awk '{print $1}')
+            SIZES="$SIZES / storage ${STORAGE_SIZE} (${STORAGE_COUNT}件)"
+            if [ "${STORAGE_FAILED:-0}" -gt 0 ]; then
+              SIZES="$SIZES ・取得失敗${STORAGE_FAILED}件"
+            fi
+          fi
           echo "BACKUP_RESULT=$RESULT" >> "$GITHUB_ENV"
           echo "BACKUP_SIZES=$SIZES" >> "$GITHUB_ENV"
           {
