@@ -23,6 +23,15 @@ function serviceKey() {
   return key
 }
 
+// 新方式のシークレットキー（sb_secret_...）はJWTではないため、Authorization: Bearer に載せると
+// 「JWTとして解釈できない」扱いで拒否される（Supabase公式ドキュメント）。apikeyヘッダのみを送る。
+// 旧方式（JWT形式のservice_role。eyJ...で始まる）は従来どおり両方に載せる（後方互換）。
+function authHeaders() {
+  const key = serviceKey()
+  if (key.startsWith('sb_secret_')) return { apikey: key }
+  return { Authorization: `Bearer ${key}`, apikey: key }
+}
+
 // オブジェクトを保存する。既定では既存キーを上書きしない（キーは毎回 uuid で作るため
 // 衝突しない想定）。upsert: true を渡すと固定キーを毎回上書きできる（自主検査表PDFの
 // プレビュー保存など、ユーザーごとに1個だけ保持して溜め込みたくない用途向け）。
@@ -30,8 +39,7 @@ export async function putObject(key, body, contentType, { upsert = false, bucket
   const res = await fetch(`${storageBase()}/object/${bucket}/${encodeURI(key)}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${serviceKey()}`,
-      apikey: serviceKey(),
+      ...authHeaders(),
       'Content-Type': contentType || 'application/octet-stream',
       'x-upsert': upsert ? 'true' : 'false',
     },
@@ -47,7 +55,7 @@ export async function putObject(key, body, contentType, { upsert = false, bucket
 // オブジェクトを取得する。戻り値は Response（呼び出し側でそのまま body を流せる）
 export async function getObject(key, bucket = PHOTO_BUCKET) {
   const res = await fetch(`${storageBase()}/object/${bucket}/${encodeURI(key)}`, {
-    headers: { Authorization: `Bearer ${serviceKey()}`, apikey: serviceKey() },
+    headers: authHeaders(),
   })
   return res
 }
@@ -57,8 +65,7 @@ export async function deleteObject(key, bucket = PHOTO_BUCKET) {
   const res = await fetch(`${storageBase()}/object/${bucket}`, {
     method: 'DELETE',
     headers: {
-      Authorization: `Bearer ${serviceKey()}`,
-      apikey: serviceKey(),
+      ...authHeaders(),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ prefixes: [key] }),
