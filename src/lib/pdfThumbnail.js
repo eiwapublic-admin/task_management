@@ -39,8 +39,11 @@ function canvasToBlob(canvas, quality) {
 export async function renderPdfFirstPageToBlob(file) {
   const pdfjsLib = await loadPdfjs()
   const data = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data }).promise
+  // 破棄（ワーカー終了含む）は PDFDocumentProxy ではなく、getDocument() が返す
+  // loadingTask 側の destroy() で行う（PDFDocumentProxy 自体には destroy が無い）
+  const loadingTask = pdfjsLib.getDocument({ data })
   try {
+    const pdf = await loadingTask.promise
     const page = await pdf.getPage(1)
     const unscaled = page.getViewport({ scale: 1 })
     const scale = THUMB_EDGE / Math.max(unscaled.width, unscaled.height)
@@ -54,6 +57,6 @@ export async function renderPdfFirstPageToBlob(file) {
 
     return await canvasToBlob(canvas, THUMB_QUALITY)
   } finally {
-    await pdf.destroy()
+    await loadingTask.destroy()
   }
 }

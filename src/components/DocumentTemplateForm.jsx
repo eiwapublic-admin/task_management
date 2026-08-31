@@ -182,7 +182,7 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
     <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
-          <h3 className="ui-modal-title">{isEdit ? '雛形ファイルを編集' : '雛形ファイルを登録'}</h3>
+          <h3 className="ui-modal-title">{isEdit ? doc.name : '雛形ファイルを登録'}</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
@@ -194,35 +194,6 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
               {error}
             </p>
           )}
-
-          <div className="doc-thumb-field">
-            <div className="doc-thumb-preview">
-              {thumbBusy ? (
-                <span className="doc-thumb-loading">生成中…</span>
-              ) : previewUrl ? (
-                <img src={previewUrl} alt="サムネイル" />
-              ) : (
-                <span className="doc-thumb-placeholder">サムネ</span>
-              )}
-            </div>
-            {!readOnly && (
-              <div className="doc-thumb-actions">
-                <button type="button" className="btn-plain" onClick={() => thumbInputRef.current?.click()}>
-                  画像を選ぶ
-                </button>
-                <p className="doc-field-hint">
-                  未指定ならPDF（原本またはPDF版）の1ページ目から自動で作成されます。
-                </p>
-              </div>
-            )}
-            <input
-              ref={thumbInputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
-            />
-          </div>
 
           <label className="ui-field">
             <span>原本ファイル{isEdit ? '（差し替える場合のみ選択）' : ''}</span>
@@ -254,10 +225,6 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
                 disabled={readOnly}
                 onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
               />
-              <p className="doc-field-hint">
-                原本がPDF以外の場合、あわせてPDF版を登録すると一覧からすぐプレビュー・印刷できます。
-                原本をご自身のアプリ（Word/Excel等の「PDFとして保存」機能）でPDF化してから選んでください。
-              </p>
               {pdfFile ? (
                 <p className="doc-file-preview">
                   {pdfFile.name} ・ {formatBytes(pdfFile.size)}
@@ -274,6 +241,35 @@ export default function DocumentTemplateForm({ doc, categories, readOnly, onClos
               )}
             </label>
           )}
+
+          <div className="doc-thumb-field">
+            <div className="doc-thumb-preview">
+              {thumbBusy ? (
+                <span className="doc-thumb-loading">生成中…</span>
+              ) : previewUrl ? (
+                <img src={previewUrl} alt="サムネイル" />
+              ) : (
+                <span className="doc-thumb-placeholder">サムネ</span>
+              )}
+            </div>
+            {!readOnly && (
+              <div className="doc-thumb-actions">
+                <button type="button" className="btn-plain" onClick={() => thumbInputRef.current?.click()}>
+                  画像を選ぶ
+                </button>
+                <p className="doc-field-hint">
+                  未指定ならPDF（原本またはPDF版）の1ページ目から自動で作成されます。
+                </p>
+              </div>
+            )}
+            <input
+              ref={thumbInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+            />
+          </div>
 
           <label className="ui-field">
             <span>資料名称</span>
