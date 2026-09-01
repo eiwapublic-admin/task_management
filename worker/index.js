@@ -71,6 +71,14 @@ import {
   handleDocumentPreviewToken,
   handleDocumentPdfDelete,
 } from './lib/documents.js'
+import {
+  handleContactList,
+  handleContactCategorySuggest,
+  handleContactCreate,
+  handleContactUpdate,
+  handleContactDelete,
+  handleContactSync,
+} from './lib/contacts.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1056,6 +1064,21 @@ async function route(req, env) {
   }
   if (pathname === '/api/documents/pdf') {
     return req.method === 'DELETE' ? handleDocumentPdfDelete(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- 連絡帳（顧客の連絡先台帳。2026-08-31〜。ハンドラは worker/lib/contacts.js） ---
+  if (pathname === '/api/contacts') {
+    if (req.method === 'GET') return handleContactList(req)
+    if (req.method === 'POST') return handleContactCreate(req)
+    if (req.method === 'PATCH') return handleContactUpdate(req)
+    if (req.method === 'DELETE') return handleContactDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/contacts/suggest') {
+    return req.method === 'GET' ? handleContactCategorySuggest(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/contacts/sync') {
+    return req.method === 'POST' ? handleContactSync(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

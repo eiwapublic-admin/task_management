@@ -721,6 +721,9 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         ? extractEmail(email.replyTo) || extractEmail(email.from)
         : extractEmail(result.sender_email) || extractEmail(email.replyTo) || extractEmail(email.from)
 
+      // 受信メールのCcに入っていた先方アドレス（連絡帳の自動作成用。自社アドレスは除く）
+      const senderCc = extractEmails(email.cc || '').filter((a) => !isCompanyAddress(a)).join(', ') || null
+
       // docSummary は title の直前で計算済み（FAX 転送メールは本文がほぼ無いため、
       // この要約を本文としても表示する。通常メールで本文もある場合は本文の後ろに
       // 添付内容を追記する。FAX読み取り失敗時は要約自体が信頼できないため使わず、
@@ -785,6 +788,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         sender_display: senderDisplay,
         contact,
         sender_email: senderEmail,
+        sender_cc: senderCc,
         subject: email.subject || '（件名なし）',
         body_preview: bodyPreview,
         received_at: email.receivedAt || new Date().toISOString(),

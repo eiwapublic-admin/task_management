@@ -16,6 +16,7 @@ import EquipmentItemHistory from './pages/EquipmentItemHistory'
 import EquipmentItems from './pages/EquipmentItems'
 import EquipmentTenants from './pages/EquipmentTenants'
 import DocumentTemplates from './pages/DocumentTemplates'
+import Contacts from './pages/Contacts'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -181,6 +182,17 @@ function App() {
             <RequireAuth>
               <DocumentTemplates />
             </RequireAuth>
+          }
+        />
+        {/* 連絡帳（顧客の連絡先台帳。2026-08-31〜）。タスク・メールの取得実績（顧客の
+            メールアドレス等）から自動作成するため、owner（小泉産業様）・備品出庫限定
+            ロールには見せない（日報等の閲覧専用画面とは異なり中身が他社の顧客情報のため） */}
+        <Route
+          path="/contacts"
+          element={
+            <RequireStaff>
+              <Contacts />
+            </RequireStaff>
           }
         />
         {/* 日報詳細は一覧の上のモーダルとして出す（2026-08-07）。URL（/reports/:date）は

@@ -36,6 +36,7 @@ const FEATURE_TITLES = [
   { path: '/settings', title: '設定' },
   { path: '/reports/templates', title: '作業定型文' },
   { path: '/documents', title: '雛形ファイル' },
+  { path: '/contacts', title: '連絡帳' },
   { path: '/reports/inspections', title: '自主検査表' },
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
   { path: '/reports/parking', label: '違反車両' },
   { path: '/reports/chlorine', label: '残留塩素' },
   { path: '/documents', label: '雛形ファイル', staffOnly: true },
+  { path: '/contacts', label: '連絡帳', staffOnly: true },
 ]
 
 function isNavItemActive(item, pathname) {
@@ -161,22 +163,24 @@ export default function AppHeader({ lastFetchAt } = {}) {
     }
   }
 
-  // 現在どのセクションを見ているか。'portal' | 'documents' | 'tasks' | 'reports' | 'equipment'
+  // 現在どのセクションを見ているか。'portal' | 'documents' | 'contacts' | 'tasks' | 'reports' | 'equipment'
   // （2026-08-04。日報機能の追加に伴う切替。2026-08-12、備品管理とダッシュボードが増えた。
-  // 2026-08-30、雛形ファイルを独立したセクションとして切り出し。それまでは他のどの
-  // プレフィックスにも当たらず'tasks'扱いになっていたため、ハンバーガーメニューの
-  // 「業務別メニュー」がタスク向けの内容になってしまっていた）。
+  // 2026-08-30、雛形ファイルを独立したセクションとして切り出し。2026-08-31、連絡帳も同様に
+  // 切り出し。それまでは他のどのプレフィックスにも当たらず'tasks'扱いになっていたため、
+  // ハンバーガーメニューの「業務別メニュー」がタスク向けの内容になってしまっていた）。
   // 各セクションのパスは /reports・/equipment 配下にまとめている。window.location ではなく
   // useLocation を使い、クライアント側遷移でも確実に再評価されるようにする。
   const section = location.pathname.startsWith('/portal')
     ? 'portal'
     : location.pathname.startsWith('/documents')
       ? 'documents'
-      : location.pathname.startsWith('/equipment')
-        ? 'equipment'
-        : location.pathname.startsWith('/reports')
-          ? 'reports'
-          : 'tasks'
+      : location.pathname.startsWith('/contacts')
+        ? 'contacts'
+        : location.pathname.startsWith('/equipment')
+          ? 'equipment'
+          : location.pathname.startsWith('/reports')
+            ? 'reports'
+            : 'tasks'
   const inPortal = section === 'portal'
   // owner（小泉産業様）・備品出庫限定ロール（2026-08-25追加）は日報・備品等の閲覧のみ
   // （備品出庫限定ロールは備品の出庫だけ書き込み可）。どちらもタスク管理のメニューは出さない
@@ -185,7 +189,7 @@ export default function AppHeader({ lastFetchAt } = {}) {
   const featureTitle = featureTitleFor(location.pathname)
 
   // ハンバーガーメニュー「業務別メニュー」（2026-08-30に領域を整理）。表示中の業務に
-  // 応じて内容が変わり、ダッシュボード・雛形ファイル画面ではそもそも出さない
+  // 応じて内容が変わり、ダッシュボード・雛形ファイル・連絡帳画面ではそもそも出さない
   // （トップ領域の業務ナビ・共通メニューだけで用が足りるため）。
   let businessMenuItems = null
   if (section === 'tasks') {

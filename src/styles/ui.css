@@ -363,7 +363,10 @@
 .icon-btn-search,
 .icon-btn-archive,
 .icon-btn-inspection,
-.icon-btn-refresh {
+.icon-btn-refresh,
+.icon-btn-phone,
+.icon-btn-mail,
+.icon-btn-globe {
   flex-shrink: 0;
   width: var(--icon-btn);
   height: var(--icon-btn);
@@ -591,6 +594,23 @@
 .icon-btn-delete.icon-btn-delete-dark,
 .icon-btn-download.icon-btn-download-dark {
   color: var(--text-on-dark);
+}
+
+/* 連絡帳：電話発信・メール作成・ホームページ（2026-08-31）。表の行内に置くため
+   .icon-btn-add.is-compact と同じ縮小サイズを既定にする */
+.icon-btn-phone,
+.icon-btn-mail,
+.icon-btn-globe {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+}
+
+.icon-btn-phone:hover:not(:disabled),
+.icon-btn-mail:hover:not(:disabled),
+.icon-btn-globe:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 /* モーダル・オーバーレイを閉じる × */
