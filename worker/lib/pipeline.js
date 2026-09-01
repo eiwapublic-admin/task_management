@@ -715,6 +715,19 @@ export async function runPipeline({ force = false, actor = 'システム（自�
             ? `${senderDisplay} 様`
             : null
 
+      // contact（先方＝顧客の宛名）を会社名・氏名に構造化して分けたもの（連絡帳の自動作成用。
+      // 2026-09-01追加）。sender_display は「送信元」＝自社発信のメールでは自社側の氏名になって
+      // しまうため使わない。contact は往信・返信どちらでも常に「先方（顧客）」を指すため、
+      // これを分割する方が連絡帳の会社名・担当者名として正しい
+      const contactCompany =
+        !isFaxReadFailure && typeof result.contact_company === 'string' && result.contact_company.trim()
+          ? result.contact_company.trim().slice(0, 120)
+          : null
+      const contactPerson =
+        !isFaxReadFailure && typeof result.contact_person === 'string' && result.contact_person.trim()
+          ? result.contact_person.trim().slice(0, 120)
+          : null
+
       // 返信先アドレス: Claude の抽出（フォーム経由は本文のアドレス）を優先し、
       // 無ければ Reply-To → From の順にフォールバック
       const senderEmail = isFaxReadFailure
@@ -787,6 +800,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         sender: email.from || '（不明）',
         sender_display: senderDisplay,
         contact,
+        contact_company: contactCompany,
+        contact_person: contactPerson,
         sender_email: senderEmail,
         sender_cc: senderCc,
         subject: email.subject || '（件名なし）',
