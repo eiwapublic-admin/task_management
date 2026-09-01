@@ -160,9 +160,13 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
   const replyHref = isEmail ? buildReplyMailto(task) : null
   const isUnassigned = assignee === UNASSIGNED
 
-  // 送信者の右隣に出す発信元の宛名。contact（AI 抽出の敬称付き宛名）を優先し、
-  // 無ければ sender_display に「様」を付けて補う（contact 生成前の既存タスク向け）。
-  const contactLabel = task.contact || (task.sender_display ? `${task.sender_display} 様` : null)
+  // 顧客社名・担当者（2026-09-01。以前は「送信者」の右隣に表示していたが、独立した行に
+  // 変更した）。contact_company/contact_person は先方（顧客）を会社名・氏名に分割した列
+  // （連絡帳の自動作成と共通のフィールド。worker/lib/anthropic.js 参照）。
+  // どちらも無い場合（分割前の旧タスクや社内メモ的なタスク）は contact の結合文字列に
+  // フォールバックする
+  const customerCompany = task.contact_company || task.contact || null
+  const customerPerson = task.contact_person || null
 
   // 担当者の選択肢（既存の担当者一覧 + 未設定 + 現在値の取りこぼし防止）
   const assigneeOptions = Array.from(new Set([UNASSIGNED, ...assignees, task.assignee].filter(Boolean)))
@@ -395,11 +399,17 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
         </div>
 
         <dl className="task-detail-fields">
+          {(customerCompany || customerPerson) && (
+            <>
+              <dt>顧客</dt>
+              <dd className="task-detail-customer">
+                {customerCompany}
+                {customerPerson && <span className="task-detail-customer-person">　担当者：{customerPerson}</span>}
+              </dd>
+            </>
+          )}
           <dt>送信者</dt>
-          <dd>
-            {task.sender}
-            {contactLabel && <span className="task-detail-contact">{contactLabel}</span>}
-          </dd>
+          <dd>{task.sender}</dd>
           <dt>件名</dt>
           <dd>{task.subject}</dd>
           {isEmail && (
@@ -464,13 +474,6 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
           </dd>
           <dt>本文プレビュー</dt>
           <dd>
-            {mailUrl && (
-              <div className="task-detail-body-head">
-                <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
-                  メール参照
-                </a>
-              </div>
-            )}
             <div className="task-detail-body">{task.body_preview}</div>
           </dd>
           {task.classification_note && (
@@ -486,6 +489,11 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
             {saveError && <span className="task-detail-save-error">{saveError}</span>}
             {saved && !dirty && <span className="task-detail-save-ok">保存しました</span>}
             {addReportError && <span className="task-detail-save-error">{addReportError}</span>}
+            {mailUrl && (
+              <a className="task-action-btn" href={mailUrl} target="_blank" rel="noopener noreferrer">
+                メール参照
+              </a>
+            )}
             {replyHref && (
               <a className="task-action-btn task-action-dark" href={replyHref}>
                 返信
