@@ -29,6 +29,8 @@ create table if not exists tasks (
   classification_note text,        -- Claude が付けた判定理由（振り分けルール調整の参考用）
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   contact          text,           -- 先方担当者の宛名（会社・氏名＋様。返信メール冒頭に使う。Claude 抽出 or sender_display+様）
+  contact_company  text,           -- contactを構造化: 先方（顧客）の会社名・組織名のみ。連絡帳の自動作成に使う（2026-09-01追加）
+  contact_person   text,           -- contactを構造化: 先方（顧客）の担当者の氏名のみ（2026-09-01追加）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
   sender_cc        text,           -- 受信メールのCcに入っていた先方アドレス（自社アドレスは除く。カンマ区切り。
                                     -- 連絡帳の自動作成でメールCC欄の初期値に使う。2026-08-31追加）
@@ -52,6 +54,8 @@ create table if not exists tasks (
 alter table tasks add column if not exists classification_note text;
 alter table tasks add column if not exists sender_display text;
 alter table tasks add column if not exists contact text;
+alter table tasks add column if not exists contact_company text;
+alter table tasks add column if not exists contact_person text;
 alter table tasks add column if not exists sender_email text;
 alter table tasks add column if not exists sender_cc text;
 alter table tasks add column if not exists remarks text;

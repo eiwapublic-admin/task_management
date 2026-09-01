@@ -174,20 +174,60 @@ export async function handleContactDelete(req) {
   }
 }
 
+// FAX転送メールの送信元は複合機の固定アドレス（worker/lib/pipeline.js の FAX_GATEWAY_SENDER と
+// 同じ値）で、多数の異なる送信元FAXがこの1つのアドレスに集約される。実在の顧客の
+// メールアドレスではないため、channelでの除外に加えて値そのものでも二重に弾く
+const FAX_GATEWAY_SENDER = 'mimi@eiwa-up.com'
+
+// 自社アドレス（自社ドメイン・共有Gmail）かどうかの判定関数を settings から作る
+// （worker/lib/pipeline.js の isCompanyAddress と同じ考え方）。
+// これに一致する sender_email は、Claude が本文から先方のアドレスを見つけられず
+// From（自社スタッフのアドレス）にフォールバックした結果である可能性が高く、
+// 連絡帳に自社スタッフ自身を「顧客」として登録してしまう事故になるため除外する
+async function loadIsCompanyAddress(supabase) {
+  const { data } = await supabase.from('settings').select('key, value').in('key', ['company_domains', 'shared_gmail'])
+  const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]))
+  const sharedGmail = (map.shared_gmail || '').trim().toLowerCase()
+  const companyDomains = (map.company_domains || 'eiwa-up.jp')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  return (addr) => {
+    const a = (addr || '').trim().toLowerCase()
+    if (!a) return false
+    const domain = a.slice(a.lastIndexOf('@') + 1)
+    return a === sharedGmail || companyDomains.includes(domain)
+  }
+}
+
+// 敬称（様・御中）を取り除く。連絡帳の会社名にそのまま「様」が付くのを防ぐ
+function stripHonorific(s) {
+  const t = (s || '').replace(/\s*(様|御中)\s*$/, '').trim()
+  return t || null
+}
+
 // POST /api/contacts/sync — タスク（メール取得実績）から連絡帳を自動作成する。
 // tasks.sender_email（大文字小文字を区別せず重複除去）ごとに、まだ連絡帳に無いものだけ
 // 新規作成する（既存の連絡帳は上書きしない＝手動で編集した内容を壊さない）。
-// スパム判定済み・sender_email が空のタスクは対象外。
+// スパム判定済み・sender_email が空・FAX経由・自社アドレスのタスクは対象外
+// （FAXは複合機の固定アドレスに集約され実在の顧客アドレスではない。自社アドレスは
+// Claudeが先方のアドレスを特定できずFromへフォールバックした結果である可能性が高い）。
+// 会社名・担当者名は sender_display/contact ではなく contact_company/contact_person を使う
+// （sender_display は「送信元」なので自社発信メールでは自社側の氏名になってしまうが、
+// contact_company/contact_person は往信・返信どちらでも常に先方＝顧客を指すため）
 export async function handleContactSync(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
   try {
     const supabase = getAdminClient()
+    const isCompanyAddress = await loadIsCompanyAddress(supabase)
+
     const { data: taskRows, error: taskErr } = await supabase
       .from('tasks')
-      .select('sender_display, contact, sender_email, sender_cc, received_at')
+      .select('contact, contact_company, contact_person, sender_email, sender_cc, received_at')
       .eq('is_spam', false)
       .not('sender_email', 'is', null)
+      .neq('channel', 'fax')
       .order('received_at', { ascending: true })
     if (taskErr) {
       console.error('contact-sync(tasks):', taskErr.message)
@@ -199,7 +239,7 @@ export async function handleContactSync(req) {
     const byEmail = new Map()
     for (const t of taskRows || []) {
       const email = (t.sender_email || '').trim().toLowerCase()
-      if (!email) continue
+      if (!email || email === FAX_GATEWAY_SENDER || isCompanyAddress(email)) continue
       byEmail.set(email, t)
     }
     if (byEmail.size === 0) return json({ created: 0, skipped: 0 })
@@ -216,9 +256,10 @@ export async function handleContactSync(req) {
     const toInsert = []
     for (const [email, t] of byEmail) {
       if (existingEmails.has(email)) continue
+      const companyName = t.contact_company || t.contact_person || stripHonorific(t.contact) || email
       toInsert.push({
-        company_name: t.sender_display || t.contact || email,
-        contact_person: t.contact && t.contact !== t.sender_display ? t.contact : null,
+        company_name: companyName,
+        contact_person: t.contact_person && t.contact_person !== companyName ? t.contact_person : null,
         email_to: email,
         email_cc: t.sender_cc || null,
         created_via: 'auto',
