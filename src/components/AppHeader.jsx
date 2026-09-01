@@ -78,7 +78,19 @@ function featureTitleFor(pathname) {
 // タスク画面（Dashboard.jsx＝カンバン）だけがこの値を持つため、渡さない画面では
 // 何も表示しない（2026-08-13。以前はカンバンの機能ヘッダ右側に置いていたが、
 // 「今すぐ取得」ボタンと同じくハンバーガーメニューの近くにまとめてほしいとの依頼で移設）
-export default function AppHeader({ lastFetchAt } = {}) {
+//
+// onContactSync/contactSyncBusy・onInspectionDownload/inspectionDownloadBusy（2026-09-01）:
+// それぞれ連絡帳（Contacts.jsx）・日報一覧（ReportList.jsx）だけが持つ操作を、モバイル幅で
+// ハンバーガーメニューの業務メニューへ出すために渡す（.app-menu-mobile-only。狭幅でヘッダ行を
+// 1行に収めるため、該当のヘッダーボタン自体はモバイル幅では非表示にしている）。
+// 渡さない画面ではボタン自体を出さない
+export default function AppHeader({
+  lastFetchAt,
+  onContactSync,
+  contactSyncBusy,
+  onInspectionDownload,
+  inspectionDownloadBusy,
+} = {}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [fetching, setFetching] = useState(false)
@@ -189,8 +201,11 @@ export default function AppHeader({ lastFetchAt } = {}) {
   const featureTitle = featureTitleFor(location.pathname)
 
   // ハンバーガーメニュー「業務別メニュー」（2026-08-30に領域を整理）。表示中の業務に
-  // 応じて内容が変わり、ダッシュボード・雛形ファイル・連絡帳画面ではそもそも出さない
+  // 応じて内容が変わり、ダッシュボード・雛形ファイル画面ではそもそも出さない
   // （トップ領域の業務ナビ・共通メニューだけで用が足りるため）。
+  // 連絡帳・日報は2026-09-01に追加。どちらもモバイル幅でヘッダ行を1行に収めるため、
+  // 該当画面のヘッダーボタンをハンバーガーへ移した分だけをここに出す
+  // （.app-menu-mobile-only。PC幅では元のヘッダーボタン側に残っているのでここでは隠す）
   let businessMenuItems = null
   if (section === 'tasks') {
     businessMenuItems = (
@@ -213,8 +228,40 @@ export default function AppHeader({ lastFetchAt } = {}) {
       </>
     )
   } else if (section === 'reports' && !isOwner) {
-    // 定型文の設定（旧・日報一覧ツールバーの歯車ボタン。2026-08-10に移設）
-    businessMenuItems = <button onClick={() => goTo('/reports/templates')}>作業定型文の設定</button>
+    businessMenuItems = (
+      <>
+        {/* 自主検査表のPDF出力（2026-09-01、日報一覧のヘッダから移設。モバイル幅限定） */}
+        {onInspectionDownload && (
+          <button
+            className="app-menu-mobile-only"
+            onClick={() => {
+              setMenuOpen(false)
+              onInspectionDownload()
+            }}
+            disabled={inspectionDownloadBusy}
+          >
+            {inspectionDownloadBusy ? '作成中…' : '自主検査表を出力'}
+          </button>
+        )}
+        {/* 定型文の設定（旧・日報一覧ツールバーの歯車ボタン。2026-08-10に移設） */}
+        <button onClick={() => goTo('/reports/templates')}>作業定型文の設定</button>
+      </>
+    )
+  } else if (section === 'contacts') {
+    // 連絡帳を自動作成（2026-09-01、連絡帳のヘッダから移設。モバイル幅限定。
+    // PC幅では引き続きヘッダーのボタンから実行できる）
+    businessMenuItems = onContactSync ? (
+      <button
+        className="app-menu-mobile-only"
+        onClick={() => {
+          setMenuOpen(false)
+          onContactSync()
+        }}
+        disabled={contactSyncBusy}
+      >
+        {contactSyncBusy ? '作成中…' : '連絡帳を自動作成'}
+      </button>
+    ) : null
   } else if (section === 'equipment') {
     // 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
     // （マスタ編集は出さない。docs/equipment-plan.md 5-0）

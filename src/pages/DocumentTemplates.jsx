@@ -3,7 +3,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import DocumentTemplateForm from '../components/DocumentTemplateForm'
 import AttachmentPreview from '../components/AttachmentPreview'
-import { IconDownload, IconSearch } from '../components/Icons'
+import { IconDownload, IconDocument } from '../components/Icons'
 import {
   fetchDocuments,
   fetchDocumentCategories,
@@ -220,7 +220,7 @@ export default function DocumentTemplates() {
                   disabled={downloadingId === d.id}
                   title={effectivePdf.filename}
                 >
-                  <IconSearch size={12} />
+                  <IconDocument size={12} />
                   PDF
                 </button>
                 {d.pdf_file_modified_at && <span className="doc-file-date">{formatDate(d.pdf_file_modified_at)}</span>}

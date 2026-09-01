@@ -264,6 +264,18 @@ export function IconMail(props) {
   )
 }
 
+// プレビュー表示（PDF等の帳票を開くボタン共通。2026-09-01）。
+// 折れた角を持つ書類の形。ダウンロード（↓）とは区別し、「開いて見る」操作であることを示す
+export function IconDocument(props) {
+  return (
+    <Icon {...props}>
+      <path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 13h6M9 16.5h6" />
+    </Icon>
+  )
+}
+
 // ホームページアドレス
 export function IconGlobe(props) {
   return (

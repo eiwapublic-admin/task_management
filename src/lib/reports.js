@@ -359,6 +359,8 @@ export function weekdayInfo(date, holidays = {}) {
   return {
     label: WEEKDAY_LABELS[dow],
     holidayName,
+    // 日曜・祝日か（2026-09-01。自主検査表の休館日スイッチの既定値に使う）
+    isRed,
     className: isRed ? 'is-holiday' : isBlue ? 'is-saturday' : '',
   }
 }

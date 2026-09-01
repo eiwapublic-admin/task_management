@@ -1,6 +1,26 @@
 /* 連絡帳（2026-08-31〜）。一覧表は EquipmentItems.jsx 等の .ui-table を流用し、
    ここでは行クリックの見た目と、行内の電話・メール・ホームページアイコンの並びだけを追加する。 */
 
+/* 検索窓・機能ボタンの並び（2026-09-01）。検索窓は常時表示に変更したうえで、
+   PC幅では検索窓・自動作成・追加ボタンを1行に収め、モバイル幅では自動作成を
+   ハンバーガーメニューへ移し、追加は＋アイコンだけに省略する（AppHeader.jsx参照）。
+   PC/モバイルの分岐は他画面のハンバーガー領域と同じ768px幅に揃えている */
+.contacts-search-bar {
+  flex: 1 1 240px;
+  min-width: 160px;
+  margin-bottom: 0;
+}
+
+.contacts-add-icon-btn { display: none; }
+
+@media (max-width: 768px) {
+  .contacts-sync-btn,
+  .contacts-add-btn {
+    display: none;
+  }
+  .contacts-add-icon-btn { display: inline-flex; }
+}
+
 .contact-row { cursor: pointer; }
 .contact-row:hover { background: var(--bg-subtle); }
 

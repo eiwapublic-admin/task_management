@@ -16,7 +16,7 @@ import {
   IconCalendar,
   IconSearch,
   IconDroplet,
-  IconDownload,
+  IconDocument,
 } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { assigneeColor, assigneeInitial } from '../lib/format'
@@ -401,7 +401,8 @@ export default function ReportList() {
   }
 
   // 休館日の指定／解除ボタン。リスト型・カレンダー型で共通
-  function renderClosedDayButton(date, { closed, isFuture }, className) {
+  // 未来日付でも指定できる（2026-09-01。休館日が事前に分かっている場合の運用に対応）
+  function renderClosedDayButton(date, { closed }, className) {
     if (isOwner) return null
     if (closed) {
       return (
@@ -417,7 +418,6 @@ export default function ReportList() {
         </button>
       )
     }
-    if (isFuture) return null
     return (
       <button
         type="button"
@@ -694,7 +694,7 @@ export default function ReportList() {
 
   return (
     <div className="ui-page">
-      <AppHeader />
+      <AppHeader onInspectionDownload={inspectionPdf.download} inspectionDownloadBusy={inspectionPdf.busy} />
       {/* 検索結果表示中は（カレンダー型であっても）リスト型と同じ900px幅に戻す。
           検索結果はリスト型の行レイアウトを再利用しているため（2026-08-08） */}
       <div className={`ui-container reports-container app-scroll${activeView === 'calendar' && !searching ? ' is-calendar' : ' is-narrow'}`}>
@@ -784,7 +784,7 @@ export default function ReportList() {
                   aria-label="自主検査表を紙の様式でPDFに出力する（半月ごとに1ページ）"
                   title={inspectionPdf.busy ? '作成中…' : '自主検査表を紙の様式でPDFに出力する（半月ごとに1ページ）'}
                 >
-                  <IconDownload size={20} />
+                  <IconDocument size={20} />
                   <span className="icon-btn-download-print-label">自主検査</span>
                 </button>
                 {/* 会議室予約表のPDF出力（2026-08-29）。カレンダー型表示のときだけ意味を持つ
@@ -798,7 +798,7 @@ export default function ReportList() {
                     aria-label="会議室予約表をPDFに出力する"
                     title={meetingRoomPdf.busy ? '作成中…' : '会議室予約表をPDFに出力する'}
                   >
-                    <IconDownload size={20} />
+                    <IconDocument size={20} />
                     <span className="icon-btn-download-meeting-label">会議室予約表</span>
                   </button>
                 )}
@@ -881,6 +881,7 @@ export default function ReportList() {
           building={building}
           existing={inspectionsByDate.get(editingInspection) || null}
           initialClosed={closedDays.has(editingInspection)}
+          isSundayOrHoliday={weekdayInfo(editingInspection, holidays).isRed}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditingInspection(null)}
           onSaved={handleInspectionSaved}

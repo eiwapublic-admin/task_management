@@ -180,6 +180,12 @@
   cursor: pointer;
 }
 
+/* iPhone幅では省略する（2026-09-01。並べ順・表示期間・出庫/入庫ボタンだけで
+   ヘッダ行がいっぱいになるため、優先度の低い絞り込みを割愛して1行に収める） */
+@media (max-width: 480px) {
+  .equipment-toggle-disabled { display: none; }
+}
+
 /* 出庫・入庫ボタン。表示期間・絞り込みと同じ行にモバイルでも収まるよう、
    標準の .btn-primary（左右 24px）より左右パディングを詰める（2026-08-13） */
 .equipment-header-btn { padding: 0 var(--space-3); }
