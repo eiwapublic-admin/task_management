@@ -179,6 +179,10 @@ export async function handleContactDelete(req) {
 // メールアドレスではないため、channelでの除外に加えて値そのものでも二重に弾く
 const FAX_GATEWAY_SENDER = 'mimi@eiwa-up.com'
 
+// tasks.assignee の「未設定」を表す値（worker/lib/pipeline.js の UNASSIGNED と同じ）。
+// 連絡帳の主担当者に「（担当未設定）」という文字列をそのまま入れてしまわないよう弾く
+const UNASSIGNED = '（担当未設定）'
+
 // 自社アドレス（自社ドメイン・共有Gmail）かどうかの判定関数を settings から作る
 // （worker/lib/pipeline.js の isCompanyAddress と同じ考え方）。
 // これに一致する sender_email は、Claude が本文から先方のアドレスを見つけられず
@@ -214,7 +218,9 @@ function stripHonorific(s) {
 // Claudeが先方のアドレスを特定できずFromへフォールバックした結果である可能性が高い）。
 // 会社名・担当者名は sender_display/contact ではなく contact_company/contact_person を使う
 // （sender_display は「送信元」なので自社発信メールでは自社側の氏名になってしまうが、
-// contact_company/contact_person は往信・返信どちらでも常に先方＝顧客を指すため）
+// contact_company/contact_person は往信・返信どちらでも常に先方＝顧客を指すため）。
+// 当社の主担当者（staff_name）はタスクに割り当てられていた assignee をそのまま反映する
+// （2026-09-01追加。未設定のタスクだった場合は null のままにする）
 export async function handleContactSync(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
@@ -224,7 +230,7 @@ export async function handleContactSync(req) {
 
     const { data: taskRows, error: taskErr } = await supabase
       .from('tasks')
-      .select('contact, contact_company, contact_person, sender_email, sender_cc, received_at')
+      .select('contact, contact_company, contact_person, sender_email, sender_cc, assignee, received_at')
       .eq('is_spam', false)
       .not('sender_email', 'is', null)
       .neq('channel', 'fax')
@@ -260,6 +266,7 @@ export async function handleContactSync(req) {
       toInsert.push({
         company_name: companyName,
         contact_person: t.contact_person && t.contact_person !== companyName ? t.contact_person : null,
+        staff_name: t.assignee && t.assignee !== UNASSIGNED ? t.assignee : null,
         email_to: email,
         email_cc: t.sender_cc || null,
         created_via: 'auto',

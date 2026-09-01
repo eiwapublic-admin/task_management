@@ -496,11 +496,15 @@
   margin-left: auto;
 }
 
-/* 送信者の右隣に出す発信元の名前（contact） */
-.task-detail-contact {
-  margin-left: var(--space-3);
+/* 顧客社名・担当者（2026-09-01。送信者の上の独立した行。以前は送信者の右隣に表示していた） */
+.task-detail-customer {
   color: var(--text-strong);
   font-weight: 600;
+}
+
+.task-detail-customer-person {
+  font-weight: 400;
+  color: var(--text-base);
 }
 
 .task-detail-fields {
@@ -521,13 +525,6 @@
   /* 長いメールアドレスやURLがはみ出さないよう折り返す */
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-/* 「メール参照」を本文プレビューの右肩に置く（2026-08-18。フッタから移設） */
-.task-detail-body-head {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-2);
 }
 
 .task-detail-body {
