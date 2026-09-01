@@ -3,6 +3,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import EquipmentInForm from '../components/EquipmentInForm'
 import EquipmentOutForm from '../components/EquipmentOutForm'
+import { IconDocument } from '../components/Icons'
 import useEquipmentSlipPdfExport from '../hooks/useEquipmentSlipPdfExport'
 import { getCurrentUser } from '../lib/auth'
 import { todayJST, jstDateOnly } from '../lib/reports'
@@ -297,6 +298,7 @@ export default function Equipment() {
                         disabled={tenantCount === 0 || slipExport.busy}
                         title={tenantCount === 0 ? 'この月にテナント設置分の記録がありません' : '修理伝票PDFを作成'}
                       >
+                        <IconDocument size={16} />
                         伝票出力
                       </button>
                     </h3>

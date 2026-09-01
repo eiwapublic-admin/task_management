@@ -31,7 +31,6 @@ export default function Contacts() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [syncing, setSyncing] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [editingContact, setEditingContact] = useState(null) // null | 'new' | contact
 
@@ -57,15 +56,6 @@ export default function Contacts() {
   useEffect(() => {
     load()
   }, [load])
-
-  function handleToggleSearch() {
-    if (searchOpen) {
-      setSearchOpen(false)
-      setQuery('')
-    } else {
-      setSearchOpen(true)
-    }
-  }
 
   async function handleSync() {
     setSyncing(true)
@@ -108,32 +98,18 @@ export default function Contacts() {
 
   return (
     <div className="ui-page">
-      <AppHeader />
+      <AppHeader onContactSync={handleSync} contactSyncBusy={syncing} />
       <div className="ui-container is-narrow app-scroll">
+        {/* 検索窓は常時表示（2026-09-01。以前は虫眼鏡アイコンで開閉していたが、連絡帳は
+            一覧の主要な操作が検索のため常に出したままにしてほしいとの依頼）。
+            PC幅では検索窓・自動作成・追加を1行に収めるため、検索窓は filters 側
+            （.ui-feature-head-main）へ置いて actions と同じ行を共有させる。
+            モバイル幅では「連絡帳を自動作成」をハンバーガーメニューの業務メニューへ
+            移し（AppHeader の onContactSync 経由）、「連絡先を追加」は＋アイコンだけに
+            省略する（表示切替は Contacts.css 側のCSSで行う） */}
         <FeatureHeader
-          actions={
-            <>
-              <button type="button" className="btn-plain" onClick={handleSync} disabled={syncing}>
-                {syncing ? '作成中…' : '連絡帳を自動作成'}
-              </button>
-              <button
-                type="button"
-                className={`icon-btn-search${searchOpen ? ' is-active' : ''}`}
-                onClick={handleToggleSearch}
-                aria-label="会社名・担当者名などで検索"
-                aria-pressed={searchOpen}
-                title="会社名・担当者名などで検索"
-              >
-                <IconSearch size={20} />
-              </button>
-              <button type="button" className="btn-primary" onClick={() => setEditingContact('new')}>
-                連絡先を追加
-              </button>
-            </>
-          }
-        >
-          {searchOpen && (
-            <div className="reports-search-bar">
+          filters={
+            <div className="reports-search-bar contacts-search-bar">
               <IconSearch size={18} />
               <input
                 type="search"
@@ -142,7 +118,6 @@ export default function Contacts() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="会社名・担当者名などで検索"
                 aria-label="会社名・担当者名などで検索"
-                autoFocus
               />
               {query && (
                 <button
@@ -155,8 +130,36 @@ export default function Contacts() {
                 </button>
               )}
             </div>
-          )}
-        </FeatureHeader>
+          }
+          actions={
+            <>
+              <button
+                type="button"
+                className="btn-plain contacts-sync-btn"
+                onClick={handleSync}
+                disabled={syncing}
+              >
+                {syncing ? '作成中…' : '連絡帳を自動作成'}
+              </button>
+              <button
+                type="button"
+                className="btn-primary contacts-add-btn"
+                onClick={() => setEditingContact('new')}
+              >
+                連絡先を追加
+              </button>
+              <button
+                type="button"
+                className="icon-btn-add contacts-add-icon-btn"
+                onClick={() => setEditingContact('new')}
+                aria-label="連絡先を追加"
+                title="連絡先を追加"
+              >
+                ＋
+              </button>
+            </>
+          }
+        />
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">

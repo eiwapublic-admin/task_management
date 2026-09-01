@@ -213,8 +213,8 @@ export default function Inspections() {
                   const closed = closedDays.has(date)
                   const wd = weekdayInfo(date, holidays)
                   // 未入力/既存どちらも行全体のタップで詳細モーダルを開く（追加と変更を区別しない）。
-                  // 未来日はまだ記録できないので、既に何かある場合を除きタップ不可にする
-                  const clickable = !readOnly && (Boolean(rec) || closed || !isFuture)
+                  // 未来日でも休館日の指定はできるようにタップ可能にする（2026-09-01）
+                  const clickable = !readOnly
                   const rowClass = [
                     date === today && 'is-today',
                     closed && 'is-closed',
@@ -295,6 +295,7 @@ export default function Inspections() {
           building={building}
           existing={byDate.get(editing) || null}
           initialClosed={closedDays.has(editing)}
+          isSundayOrHoliday={weekdayInfo(editing, holidays).isRed}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}

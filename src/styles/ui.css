@@ -550,6 +550,12 @@
   }
 }
 
+/* モバイル幅ではハンバーガーメニューの業務メニューへ移すため、ヘッダー側の
+   ボタン自体を消す（2026-09-01。ヘッダ行を1行に収めるための移設） */
+@media (max-width: 768px) {
+  .icon-btn-download-print { display: none; }
+}
+
 /* 日報カレンダー画面の会議室予約表PDFボタン（2026-08-29）。骨格は上の印刷用ボタンと同じ */
 .icon-btn-download-meeting {
   background: var(--bg-surface);
