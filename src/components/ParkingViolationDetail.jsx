@@ -157,6 +157,9 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
         takenAt: file.lastModified ? new Date(file.lastModified).toISOString() : null,
       })
       setPhotos((prev) => [...prev, photo])
+      // 撮影・選択した写真をそのまま拡大表示に開く（2026-09-01）。続けて「写真から読み取る」
+      // （ナンバー・車種のAI読み取り）へ操作を流せるようにするため
+      setPreview(photo)
     } catch (err) {
       setError(err.message)
     } finally {
