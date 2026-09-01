@@ -1962,7 +1962,11 @@ button.report-row-icon:hover { filter: brightness(1.15); }
    基準線側は直角・隣接する棒は最低2px以上の隙間）に沿ったプレーンCSSで組む */
 .parking-dashboard {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr): 単に 1fr だけだとグリッド項目の暗黙の最小幅が中身の
+     min-content幅（ランキング行の折り返さないラベル等）になり、画面より
+     カードが広がって右にはみ出す（2026-09-01、iPhoneでの実機報告により発覚）。
+     0 を明示することでカード自身を画面幅まで縮められるようにする */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -1972,7 +1976,10 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   .parking-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
 }
 
-.parking-chart-card { display: flex; flex-direction: column; }
+/* min-width: 0 は grid item としての自身の最小幅を明示するための保険（上の
+   minmax(0, 1fr) と同じ理由。Safari は入れ子のflex/grid間での縮小可否の伝播が
+   Chromiumと異なることがあるため、grid item側にも直接指定して二重に防ぐ） */
+.parking-chart-card { display: flex; flex-direction: column; min-width: 0; }
 
 /* カード見出し内に収める分、標準の .ui-segmented より一回り小さくする */
 .parking-chart-toggle.ui-segmented { padding: 2px; gap: 2px; }
