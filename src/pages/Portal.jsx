@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import {
   IconArchive,
+  IconAddressBook,
   IconBox,
   IconCar,
   IconClipboard,
@@ -247,6 +248,7 @@ export default function Portal() {
     { label: 'テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
     { label: '作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
     { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
+    { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
     { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
     { label: 'タスク設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
   ].filter((l) => !(isOwner && l.staffOnly))

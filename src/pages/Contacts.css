@@ -1,0 +1,12 @@
+/* 連絡帳（2026-08-31〜）。一覧表は EquipmentItems.jsx 等の .ui-table を流用し、
+   ここでは行クリックの見た目と、行内の電話・メール・ホームページアイコンの並びだけを追加する。 */
+
+.contact-row { cursor: pointer; }
+.contact-row:hover { background: var(--bg-subtle); }
+
+.contact-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}

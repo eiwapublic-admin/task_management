@@ -30,6 +30,8 @@ create table if not exists tasks (
   sender_display   text,           -- 送信元の会社名・氏名（Claude が件名/本文から抽出）
   contact          text,           -- 先方担当者の宛名（会社・氏名＋様。返信メール冒頭に使う。Claude 抽出 or sender_display+様）
   sender_email     text,           -- 返信先アドレス（フォーム経由は本文記載のアドレスを優先）
+  sender_cc        text,           -- 受信メールのCcに入っていた先方アドレス（自社アドレスは除く。カンマ区切り。
+                                    -- 連絡帳の自動作成でメールCC欄の初期値に使う。2026-08-31追加）
   -- スパム（迷惑メール・営業FAX等）と人が判定した目印。カードの「スパム」ボタンで
   -- true にすると同時に完了＋アーカイブへ移る。アーカイブ画面で解除・復帰できる（2026-07-30）。
   is_spam          boolean not null default false,
@@ -51,6 +53,7 @@ alter table tasks add column if not exists classification_note text;
 alter table tasks add column if not exists sender_display text;
 alter table tasks add column if not exists contact text;
 alter table tasks add column if not exists sender_email text;
+alter table tasks add column if not exists sender_cc text;
 alter table tasks add column if not exists remarks text;
 alter table tasks add column if not exists last_reply_message_id text;
 alter table tasks add column if not exists source text not null default 'email';
@@ -656,3 +659,36 @@ create trigger document_templates_set_updated_at before update on document_templ
 
 alter table document_templates enable row level security;
 revoke all on document_templates from anon, authenticated;
+
+-- ============================================================
+-- 連絡帳（顧客の連絡先台帳。2026-08-31追加）
+-- タスク・メールの取得実績（tasks.sender_email 等）から自動作成できるほか、手動でも登録・編集できる。
+-- ============================================================
+
+create table if not exists contacts (
+  id                  uuid primary key default gen_random_uuid(),
+  company_name        text not null,             -- 会社名
+  business_category   text,                       -- 業務分類（自由入力。既存値からの選択式候補あり。運用しながら整理する想定）
+  contact_person      text,                       -- 顧客担当者名
+  staff_name          text,                       -- 当社の主担当者（settings.assignees の値を想定。自由入力可）
+  company_phone       text,                       -- 会社電話番号
+  mobile_phone        text,                       -- 携帯電話番号
+  email_to            text,                       -- メールTO（新規メール作成時の宛先）
+  email_cc            text,                       -- メールCC（連絡の際に定例で付く先。カンマ区切りで複数可）
+  website_url         text,                       -- ホームページアドレス
+  -- 'manual'（画面から手動登録・編集）/ 'auto'（タスク・メール実績からの自動作成。編集すると以後は手動扱いにはしない）
+  created_via         text not null default 'manual',
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+create index if not exists contacts_company_name_idx on contacts (company_name);
+-- タスク・メール実績からの自動作成で同一アドレスの重複登録を防ぐ（大文字小文字は区別しない）
+create unique index if not exists contacts_email_to_unique_idx on contacts (lower(email_to))
+  where email_to is not null and email_to <> '';
+
+drop trigger if exists contacts_set_updated_at on contacts;
+create trigger contacts_set_updated_at before update on contacts
+  for each row execute function set_updated_at();
+
+alter table contacts enable row level security;
+revoke all on contacts from anon, authenticated;

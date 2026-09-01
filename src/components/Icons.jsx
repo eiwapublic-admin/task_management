@@ -230,3 +230,47 @@ export function IconRefresh(props) {
     </Icon>
   )
 }
+
+// --- 連絡帳（2026-08-31）--------------------------------------------------
+
+// 連絡帳（ダッシュボードのカード・一覧アイコン）。開いた住所録を模した形
+export function IconAddressBook(props) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <circle cx="12" cy="10" r="2.5" />
+      <path d="M8 17c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5" />
+      <path d="M4 8h1M4 13h1" />
+    </Icon>
+  )
+}
+
+// 電話発信（モバイルの tel: リンク用）
+export function IconPhone(props) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4h3l1.5 4.5-2 1.5a11 11 0 0 0 5 5l1.5-2L18 14.5v3a1.5 1.5 0 0 1-1.6 1.5A15 15 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4Z" />
+    </Icon>
+  )
+}
+
+// メール新規作成（mailto: リンク用）
+export function IconMail(props) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M4 6.5 12 13l8-6.5" />
+    </Icon>
+  )
+}
+
+// ホームページアドレス
+export function IconGlobe(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3Z" />
+    </Icon>
+  )
+}
