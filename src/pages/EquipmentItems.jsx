@@ -104,7 +104,7 @@ export default function EquipmentItems() {
                 {groups.map((g) => (
                   <Fragment key={g.name}>
                     <tr>
-                      <td colSpan={6} className="equipment-master-group-head">
+                      <td colSpan={6} className="ui-table-group-head">
                         {g.name}
                       </td>
                     </tr>

@@ -236,29 +236,38 @@ export default function Equipment() {
                 />
                 無効品込み
               </label>
+              {/* 修理伝票（テナント設置分）は年月順表示からしか出力できないため、
+                  備品順を見ている人にも気付けるよう注釈を添える（2026-09-02。
+                  PC幅限定。モバイル・タブレット幅はヘッダ行を1行に収める都合で省く） */}
+              <span className="equipment-slip-hint">
+                修理伝票を出力する場合は「年月順」表示にして下さい
+              </span>
               {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外）。
                   表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
                   専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
                   iPhone幅で「入庫」だけ2行目に折り返していた）。
-                  備品出庫限定ロール（2026-08-25追加）は「出庫」だけを見せる */}
-              {canRegisterOut && (
-                <button
-                  type="button"
-                  className="btn-primary equipment-header-btn"
-                  onClick={() => openTransactionForm('out')}
-                >
-                  出庫
-                </button>
-              )}
-              {canFullWrite && (
-                <button
-                  type="button"
-                  className="btn-primary equipment-header-btn"
-                  onClick={() => openTransactionForm('in')}
-                >
-                  入庫
-                </button>
-              )}
+                  備品出庫限定ロール（2026-08-25追加）は「出庫」だけを見せる。
+                  2026-09-02: 他の絞り込みと視覚的に混ざらないよう、行の右端へ寄せる */}
+              <div className="equipment-header-actions">
+                {canRegisterOut && (
+                  <button
+                    type="button"
+                    className="btn-primary equipment-header-btn"
+                    onClick={() => openTransactionForm('out')}
+                  >
+                    出庫
+                  </button>
+                )}
+                {canFullWrite && (
+                  <button
+                    type="button"
+                    className="btn-primary equipment-header-btn"
+                    onClick={() => openTransactionForm('in')}
+                  >
+                    入庫
+                  </button>
+                )}
+              </div>
             </>
           }
         />
