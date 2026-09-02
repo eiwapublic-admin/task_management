@@ -197,6 +197,13 @@ export default function Portal() {
         caption: '未起票（昨日まで）',
         sub: reports == null ? '取得できませんでした' : `${monthLabel}の記録 ${monthReports.length} 日`,
         alert: unfiledReportDays > 0,
+        // タイル右上の「本日」（2026-09-02）。日報一覧へ遷移した上で本日の詳細を
+        // 開きたいので、詳細モーダルも兼ねる /reports/:date へ直接ジャンプする
+        quickAction: {
+          label: '本日',
+          ariaLabel: '本日の日報を開く',
+          onClick: () => navigate(`/reports/${today}`),
+        },
       },
       {
         key: 'equipment',
@@ -218,6 +225,16 @@ export default function Portal() {
         unit: '件',
         caption: '過去30日',
         sub: parking == null ? '取得できませんでした' : `累計 ${parking.length} 件`,
+        // タイル右上の「＋」（2026-09-02）。違反車両一覧へ遷移した上で新規入力を
+        // 開きたいので、遷移先へその意図を渡す（ParkingViolations.jsx側で受け取る）。
+        // owner（小泉産業様）は違反車両の登録ができないため出さない
+        quickAction: isOwner
+          ? undefined
+          : {
+              label: '＋',
+              ariaLabel: '違反車両を新規記録',
+              onClick: () => navigate('/reports/parking', { state: { openNew: true } }),
+            },
       },
       {
         key: 'chlorine',
@@ -234,11 +251,20 @@ export default function Portal() {
               ? `最終測定 ${formatReportDate(jstDateOnly(lastChlorine))}`
               : 'まだ記録がありません',
         alert: belowStandardCount > 0,
+        // タイル右上の「＋」（2026-09-02）。残留塩素画面へ遷移した上で新規入力を開く。
+        // owner（小泉産業様）は測定の登録ができないため出さない
+        quickAction: isOwner
+          ? undefined
+          : {
+              label: '＋',
+              ariaLabel: '残留塩素の測定を新規記録',
+              onClick: () => navigate('/reports/chlorine', { state: { openNew: true } }),
+            },
       },
     ]
 
     return all.filter((c) => !(isOwner && c.staffOnly))
-  }, [stats, isOwner])
+  }, [stats, isOwner, navigate])
 
   // 統計を出すほどではない画面への導線。押すとその画面へ移動する
   const links = [
@@ -273,27 +299,45 @@ export default function Portal() {
 
         <div className="portal-grid">
           {cards.map((card) => (
-            <button
-              key={card.key}
-              type="button"
-              className={`portal-card is-${card.key}`}
-              onClick={() => navigate(card.path)}
-            >
-              <span className="portal-card-head">
-                <span className="portal-card-icon" aria-hidden="true">
-                  {card.icon}
+            <div key={card.key} className="portal-card-slot">
+              <button
+                type="button"
+                className={`portal-card is-${card.key}`}
+                onClick={() => navigate(card.path)}
+              >
+                <span className="portal-card-head">
+                  <span className="portal-card-icon" aria-hidden="true">
+                    {card.icon}
+                  </span>
+                  <span className="portal-card-label">{card.label}</span>
                 </span>
-                <span className="portal-card-label">{card.label}</span>
-              </span>
-              <span className="portal-card-stat">
-                <span className={`portal-card-value${card.alert ? ' is-alert' : ''}`}>
-                  {loading || card.value == null ? '—' : card.value}
+                <span className="portal-card-stat">
+                  <span className={`portal-card-value${card.alert ? ' is-alert' : ''}`}>
+                    {loading || card.value == null ? '—' : card.value}
+                  </span>
+                  <span className="portal-card-unit">{card.unit}</span>
+                  <span className="portal-card-caption">{card.caption}</span>
                 </span>
-                <span className="portal-card-unit">{card.unit}</span>
-                <span className="portal-card-caption">{card.caption}</span>
-              </span>
-              <span className="portal-card-sub">{loading ? '読み込み中…' : card.sub}</span>
-            </button>
+                <span className="portal-card-sub">{loading ? '読み込み中…' : card.sub}</span>
+              </button>
+              {/* カード本体のボタンとは別の兄弟要素として右上に重ねる（2026-09-02）。
+                  ボタンの入れ子はHTML上不正なため、position:absoluteで角に載せるだけに
+                  留め、ここ以外を押せば従来どおりカードの遷移が動く */}
+              {card.quickAction && (
+                <button
+                  type="button"
+                  className="portal-card-quick"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    card.quickAction.onClick()
+                  }}
+                  aria-label={card.quickAction.ariaLabel}
+                  title={card.quickAction.ariaLabel}
+                >
+                  {card.quickAction.label}
+                </button>
+              )}
+            </div>
           ))}
         </div>
 

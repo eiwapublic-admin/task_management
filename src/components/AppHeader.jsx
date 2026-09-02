@@ -199,6 +199,8 @@ export default function AppHeader({
   const isOwner = isLimitedRole(user)
   // ヘッダーに大きく出す機能名（2026-08-12。従来のセクション切替の置き換え）
   const featureTitle = featureTitleFor(location.pathname)
+  // ハンバーガーメニュー「トップ」領域（下記）で使う、権限で絞り込んだ業務一覧
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.staffOnly || !isOwner)
 
   // ハンバーガーメニュー「業務別メニュー」（2026-08-30に領域を整理）。表示中の業務に
   // 応じて内容が変わり、ダッシュボード・雛形ファイル画面ではそもそも出さない
@@ -300,7 +302,7 @@ export default function AppHeader({
           {featureTitle && <h1 className="app-header-title">{featureTitle}</h1>}
         </div>
         <nav className="app-header-nav" aria-label="機能メニュー">
-          {NAV_ITEMS.filter((item) => !item.staffOnly || !isOwner).map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.path}
               type="button"
@@ -332,21 +334,25 @@ export default function AppHeader({
               <span className="app-menu-icon" aria-hidden="true"></span>
             </button>
             <div className={`app-menu-panel${menuOpen ? ' is-open' : ''}`}>
-              {/* 領域1: トップ（2026-08-30整理。iPhone等の狭幅でのみ表示）。
-                  PC幅は常時見えるヘッダー中央の業務メニュー（NAV_ITEMS）とユーザー名表示が
-                  既にあるためここには出さない（.app-menu-top のCSSで幅により出し分ける）。
-                  ユーザー名＋各業務（ダッシュボード／タスク／日報／…／雛形ファイル）への
-                  直接ジャンプをまとめる */}
-              <div className="app-menu-top">
-                {user?.display_name && <p className="app-menu-user">{user.display_name} さん</p>}
-                <button onClick={() => goTo('/portal')}>ダッシュボード</button>
-                {NAV_ITEMS.filter((item) => !item.staffOnly || !isOwner).map((item) => (
-                  <button key={item.path} onClick={() => goTo(item.path)}>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <div className="app-menu-divider app-menu-top-divider" role="separator" />
+              {/* 領域1: トップ（2026-08-30整理・2026-09-02にユーザー名/ダッシュボードを削除。
+                  iPhone等の狭幅でのみ表示）。PC幅は常時見えるヘッダー中央の業務メニュー
+                  （NAV_ITEMS）とユーザー名表示が既にあるためここには出さない
+                  （.app-menu-top のCSSで幅により出し分ける）。
+                  各業務（タスク／日報／…／雛形ファイル／連絡帳）への直接ジャンプをまとめる。
+                  ダッシュボード（Portal）画面自体はこの一覧と同じ内容をタイルで既に
+                  見せているため、そこにいる間は丸ごと出さない */}
+              {!inPortal && visibleNavItems.length > 0 && (
+                <>
+                  <div className="app-menu-top">
+                    {visibleNavItems.map((item) => (
+                      <button key={item.path} onClick={() => goTo(item.path)}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="app-menu-divider app-menu-top-divider" role="separator" />
+                </>
+              )}
 
               {/* 領域2: 業務別メニュー（表示中の業務に応じて内容が変わる。上でsectionごとに
                   組み立てたbusinessMenuItemsをそのまま出す。ダッシュボード・雛形ファイル

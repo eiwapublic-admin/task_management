@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import ReportParkingViolations from '../components/ReportParkingViolations'
 import ParkingViolationDetail from '../components/ParkingViolationDetail'
@@ -129,6 +130,8 @@ function buildRanking(violations, resolvedTenants, by, mode, cutoffMonthKey) {
 // 違反車両一覧。日報入力（各日の日報詳細）とは独立し、日を跨って検索・確認できる画面。
 export default function ParkingViolations() {
   const user = getCurrentUser()
+  const location = useLocation()
+  const navigate = useNavigate()
   // 違反車両の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
   const isOwner = isLimitedRole(user)
   const [violations, setViolations] = useState([])
@@ -172,8 +175,9 @@ export default function ParkingViolations() {
 
   // 「＋」ボタン。この一覧は日を跨るため、新規登録は常に本日分として扱う
   // （現行アプリの現場での「今すぐ記録する」用途に合わせる。他日の追加は日報詳細から）。
-  // 本日の日報が無ければここで作成する（既にあれば作成済みのものがそのまま返る）
-  async function handleOpenQuickAdd() {
+  // 本日の日報が無ければここで作成する（既にあれば作成済みのものがそのまま返る）。
+  // ダッシュボードのタイル右上の「＋」（下のuseEffect）からも呼ぶためuseCallback化する
+  const handleOpenQuickAdd = useCallback(async () => {
     if (preparingQuickAdd || isOwner) return
     setPreparingQuickAdd(true)
     setError('')
@@ -186,7 +190,16 @@ export default function ParkingViolations() {
     } finally {
       setPreparingQuickAdd(false)
     }
-  }
+  }, [preparingQuickAdd, isOwner])
+
+  // ダッシュボード（ポータル）のタイル右上の「＋」から遷移してきた場合（2026-09-02）。
+  // navigateのstateで意図を受け取り、開いたらこの画面独自の「＋」と同じ処理を呼ぶ。
+  // 一度開いたら state を消しておき、以後の再訪問（一覧に戻る等）で再発火しないようにする
+  useEffect(() => {
+    if (!location.state?.openNew) return
+    navigate(location.pathname, { replace: true, state: null })
+    handleOpenQuickAdd()
+  }, [location.state, location.pathname, navigate, handleOpenQuickAdd])
 
   // モーダルを閉じたら一覧を読み直す（今の登録分を反映するため）
   function handleCloseQuickAdd() {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ChlorineForm from '../components/ChlorineForm'
@@ -52,6 +53,8 @@ const CHLORINE_TREND_COLORS = ['var(--color-primary)', '#eb6834', '#1baf7a']
 
 export default function Chlorine() {
   const user = getCurrentUser()
+  const location = useLocation()
+  const navigate = useNavigate()
   // 残留塩素の書き込みは owner・備品出庫限定ロール（2026-08-25追加）どちらも不可
   const readOnly = isLimitedRole(user)
 
@@ -181,6 +184,24 @@ export default function Chlorine() {
     return CHLORINE_BUILDINGS.find((b) => !recorded.has(b)) || CHLORINE_BUILDINGS[0]
   }
 
+  // 「＋」（測定を記録）。ヘッダーのボタンと、ダッシュボードのタイル右上の「＋」から
+  // 遷移してきた場合（2026-09-02。openNewの処理は下のuseEffect参照）の両方から使う
+  const handleQuickAdd = useCallback(() => {
+    if (readOnly) return
+    setPairNotice('')
+    setNewBuilding(pickBuildingFor(todayJST(), tests))
+    setEditing('new')
+  }, [readOnly, tests])
+
+  // ダッシュボードのタイル右上の「＋」から遷移してきた場合。pickBuildingForがtestsに
+  // 依存するため、一覧の初回取得が終わってから開く。一度開いたら state を消しておき、
+  // 以後の再訪問で再発火しないようにする
+  useEffect(() => {
+    if (!location.state?.openNew || loading) return
+    navigate(location.pathname, { replace: true, state: null })
+    handleQuickAdd()
+  }, [location.state, loading, location.pathname, navigate, handleQuickAdd])
+
   function handleSaved(saved) {
     const wasNew = editing === 'new'
     const nextTests = [saved, ...tests.filter((t) => t.id !== saved.id)]
@@ -235,11 +256,7 @@ export default function Chlorine() {
               <button
                 type="button"
                 className="icon-btn-add"
-                onClick={() => {
-                  setPairNotice('')
-                  setNewBuilding(pickBuildingFor(todayJST(), tests))
-                  setEditing('new')
-                }}
+                onClick={handleQuickAdd}
                 aria-label="測定を記録"
                 title="測定を記録"
               >
