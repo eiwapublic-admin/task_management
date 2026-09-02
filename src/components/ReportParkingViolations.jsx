@@ -16,7 +16,7 @@ import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import Combobox from './Combobox'
-import { IconDownload } from './Icons'
+import { IconDownload, IconCamera, IconFolder } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -337,14 +337,42 @@ export default function ReportParkingViolations({ reportId, readOnly, filterIds,
                     e.target.value = ''
                   }}
                 />
-                <button
-                  type="button"
-                  className="btn-primary photo-add-btn"
-                  disabled={uploading}
-                  onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
-                >
-                  {uploading ? '追加中…' : isMobile ? '撮影して追加' : 'ファイルから選ぶ'}
-                </button>
+                {isMobile ? (
+                  // モバイルは撮影・ライブラリ選択の両方を出す（2026-09-02。以前は撮影のみで
+                  // 写真ライブラリから選べなかった）。残留塩素の測定写真ボタンと同じアイコン
+                  // （撮影＝カメラ、ライブラリ＝フォルダ）に揃える
+                  <div className="photo-add-icon-row">
+                    <button
+                      type="button"
+                      className="icon-btn-camera"
+                      disabled={uploading}
+                      onClick={() => cameraRef.current?.click()}
+                      aria-label={uploading ? '追加中…' : '撮影して追加'}
+                      title={uploading ? '追加中…' : '撮影して追加'}
+                    >
+                      <IconCamera size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn-folder"
+                      disabled={uploading}
+                      onClick={() => fileRef.current?.click()}
+                      aria-label="ライブラリから選ぶ"
+                      title="ライブラリから選ぶ"
+                    >
+                      <IconFolder size={20} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-primary photo-add-btn"
+                    disabled={uploading}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    {uploading ? '追加中…' : 'ファイルから選ぶ'}
+                  </button>
+                )}
               </li>
             )}
           </ul>
@@ -444,15 +472,40 @@ function ParkingCard({
                   e.target.value = ''
                 }}
               />
-              <button
-                type="button"
-                className="parking-card-photo-add-btn"
-                onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
-                aria-label="写真を追加"
-                title="写真を追加"
-              >
-                ＋
-              </button>
+              {isMobile ? (
+                // モバイルは撮影・ライブラリ選択の両方を出す（2026-09-02。以前は撮影のみ
+                // だった）。残留塩素の測定写真ボタンと同じアイコンに揃える
+                <div className="parking-card-photo-add-icons">
+                  <button
+                    type="button"
+                    className="icon-btn-camera"
+                    onClick={() => cameraRef.current?.click()}
+                    aria-label="撮影して追加"
+                    title="撮影して追加"
+                  >
+                    <IconCamera size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn-folder"
+                    onClick={() => fileRef.current?.click()}
+                    aria-label="ライブラリから選ぶ"
+                    title="ライブラリから選ぶ"
+                  >
+                    <IconFolder size={18} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="parking-card-photo-add-btn"
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="写真を追加"
+                  title="写真を追加"
+                >
+                  ＋
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -1654,6 +1654,14 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 .photo-add-btn { width: 100%; height: 36px; font-size: var(--fs-sm); padding: 0 var(--space-2); }
 
+/* モバイルの「撮影して追加」「ライブラリから選ぶ」を横並びにする（2026-09-02。
+   日報の写真・違反車両の写真で共通。アイコン自体（.icon-btn-camera/.icon-btn-folder）は
+   残留塩素の測定写真ボタンと同じ見た目をui.cssから流用する） */
+.photo-add-icon-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .photo-hint { margin: 0; }
 
 /* 拡大表示。タスク詳細モーダル(z-index:50)より前面に出す */
@@ -1814,6 +1822,15 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 }
 
 .parking-card-photo-add-btn:hover { background: var(--color-primary-hover); }
+
+/* 2枚目までの追加枠のモバイル版。撮影・ライブラリ選択のアイコン2つを枠の中央に
+   横並びで収める（2026-09-02。タイル自体は120px以上あるので2つ並べても収まる） */
+.parking-card-photo-add-icons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
 
 .parking-card-fields { display: flex; flex-direction: column; gap: 6px; }
 

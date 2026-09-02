@@ -1065,13 +1065,15 @@ input.ui-input[type="datetime-local"] {
 
 /* 表内のグルーピング見出し行（2026-08-26に備品マスタで導入、2026-09-02に連絡帳の
    業務分類グルーピングでも使うため共通部品へ格上げ。colSpanで表の全幅を使う1セルの
-   行として差し込む）。通常の行より控えめな塗り・小さめの文字にして、あくまで
-   区切りだと分かる程度に留める */
+   行として差し込む）。当初は --bg-subtle（#f9fafb）を使っていたが、表の地の色
+   （--bg-surface＝白）とほぼ差が無く区切りが見えないとの実機指摘を受け、
+   ブランド色を薄く敷いた帯（--color-brand-soft。選択中の行等で使う塗りと同じ）に
+   変更し、文字も濃くした（2026-09-02） */
 .ui-table-group-head {
-  background: var(--bg-subtle);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--text-muted);
+  background: var(--color-brand-soft);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
 /* =========================================================================
