@@ -18,6 +18,7 @@ import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import Combobox from './Combobox'
 import TimeInput from './TimeInput'
+import { IconCamera, IconFolder } from './Icons'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 
 function uniqueSorted(list) {
@@ -319,16 +320,44 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
                       e.target.value = ''
                     }}
                   />
-                  <button
-                    type="button"
-                    className="parking-card-photo-add-btn"
-                    onClick={() => (isMobile ? cameraRef : fileRef).current?.click()}
-                    disabled={uploading}
-                    aria-label="写真を追加"
-                    title="写真を追加"
-                  >
-                    {uploading ? '…' : '＋'}
-                  </button>
+                  {isMobile ? (
+                    // モバイルは撮影・ライブラリ選択の両方を出す（2026-09-02）。
+                    // 一覧側の登録フォーム（ReportParkingViolations.jsx）・残留塩素の
+                    // 測定写真ボタンと同じアイコンに揃える
+                    <div className="parking-card-photo-add-icons">
+                      <button
+                        type="button"
+                        className="icon-btn-camera"
+                        onClick={() => cameraRef.current?.click()}
+                        disabled={uploading}
+                        aria-label={uploading ? '追加中…' : '撮影して追加'}
+                        title={uploading ? '追加中…' : '撮影して追加'}
+                      >
+                        <IconCamera size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn-folder"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploading}
+                        aria-label="ライブラリから選ぶ"
+                        title="ライブラリから選ぶ"
+                      >
+                        <IconFolder size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="parking-card-photo-add-btn"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                      aria-label="写真を追加"
+                      title="写真を追加"
+                    >
+                      {uploading ? '…' : '＋'}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
