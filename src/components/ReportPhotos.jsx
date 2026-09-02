@@ -9,7 +9,7 @@ import {
 import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
-import { IconDownload } from './Icons'
+import { IconDownload, IconCamera, IconFolder } from './Icons'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -247,20 +247,29 @@ export default function ReportPhotos({ reportId, readOnly }) {
                   }}
                 />
                 {isMobile ? (
-                  <>
-                    {/* モバイルは撮影・ライブラリ選択の両方を出す（2026-08-26。以前は撮影のみで
-                        写真ライブラリから選べなかった） */}
+                  // モバイルは撮影・ライブラリ選択の両方を出す（2026-08-26。以前は撮影のみで
+                  // 写真ライブラリから選べなかった）。2026-09-02: 残留塩素の測定写真ボタンと
+                  // 同じアイコン（撮影＝カメラ、ライブラリ＝フォルダ）に揃えた
+                  <div className="photo-add-icon-row">
                     <button
                       type="button"
-                      className="btn-plain photo-add-btn"
+                      className="icon-btn-camera"
                       onClick={() => cameraRef.current?.click()}
+                      aria-label="撮影して追加"
+                      title="撮影して追加"
                     >
-                      撮影して追加
+                      <IconCamera size={20} />
                     </button>
-                    <button type="button" className="btn-plain photo-add-btn" onClick={() => fileRef.current?.click()}>
-                      ライブラリから選ぶ
+                    <button
+                      type="button"
+                      className="icon-btn-folder"
+                      onClick={() => fileRef.current?.click()}
+                      aria-label="ライブラリから選ぶ"
+                      title="ライブラリから選ぶ"
+                    >
+                      <IconFolder size={20} />
                     </button>
-                  </>
+                  </div>
                 ) : (
                   <button type="button" className="btn-plain photo-add-btn" onClick={() => fileRef.current?.click()}>
                     ファイルから選ぶ
