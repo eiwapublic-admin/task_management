@@ -20,6 +20,33 @@
 
 ---
 
+## URL 一覧（作業で開くページ）
+
+使う順に並べています。**Google 側の操作は `eiwa.public@gmail.com` でログインした状態で行ってください。**
+
+| # | 用途 | URL |
+|---|---|---|
+| 1 | **OAuth 同意画面**（「本番環境」か確認。1章 #1） | https://console.cloud.google.com/apis/credentials/consent |
+| 2 | **有効なAPI**（Gmail API・Google Calendar API の確認。1章 #2・#3） | https://console.cloud.google.com/apis/dashboard |
+| 3 | **認証情報**（クライアントID／シークレットの確認、リダイレクトURIの追加・削除。手順1・手順7） | https://console.cloud.google.com/apis/credentials |
+| 4 | **OAuth Playground**（認可とトークン取得。手順2〜4） | https://developers.google.com/oauthplayground/ |
+| 5 | **GitHub Secrets**（`GMAIL_REFRESH_TOKEN` の更新。手順5） | https://github.com/eiwapublic-admin/task_management/settings/secrets/actions |
+| 6 | **GitHub Actions**（デプロイの実行と結果確認。手順6） | https://github.com/eiwapublic-admin/task_management/actions |
+| 7 | **操作ログ画面**（動作確認。手順6） | https://task-management.eiwa-public.workers.dev/logs |
+
+**手順1でクライアントに追加するリダイレクト URI**（この文字列そのものを登録します。末尾スラッシュなし）:
+
+```
+https://developers.google.com/oauthplayground
+```
+
+> Google Cloud Console で**複数のプロジェクトがある場合**は、画面上部のプロジェクト選択で
+> このシステム用のプロジェクト（Gmail/Calendar API を有効にしてあるもの）に切り替えてから
+> 上記URLの各ページを開いてください。プロジェクトを取り違えると、目的のクライアントIDが
+> 一覧に出てきません。
+
+---
+
 ## 1. 作業の前に（前提の確認）
 
 以下はすべて**既に満たされているはず**ですが、念のため確認してください。
