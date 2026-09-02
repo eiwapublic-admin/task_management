@@ -34,6 +34,25 @@ function RequireStaff({ children }) {
   return children
 }
 
+// モバイル幅の判定。他画面（ReportList.jsxのWIDE_SCREEN_QUERY等）と同じ768pxを閾値にする
+const MOBILE_QUERY = '(max-width: 768px)'
+
+// アプリ起動時、モバイル幅だけはダッシュボード（ポータル）を既定表示にする（2026-09-02）。
+// 起動直後の最初の「/」だけをポータルへ振り替えたい（ヘッダー・ハンバーガーの「タスク」
+// リンクで明示的に「/」へ来たときはカンバンをそのまま見せる必要がある）ため、
+// モジュールスコープのフラグで「まだ振り替えていない最初の1回」だけに限定する
+// （コンポーネントのrefだとルートの出入りで作り直されてしまい使えない）
+let mobileLaunchRedirected = false
+
+function DefaultRoute() {
+  const isMobile = typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
+  if (!mobileLaunchRedirected && isMobile) {
+    mobileLaunchRedirected = true
+    return <Navigate to="/portal" replace />
+  }
+  return <Dashboard />
+}
+
 function App() {
   return (
     <>
@@ -54,13 +73,14 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* 起動時の既定表示。カンバン以外はまだ正式リリースではないため、
-            ルート（/）はダッシュボードではなくカンバンのままにしている */}
+        {/* 起動時の既定表示。PC/iPad幅はカンバン（従来どおり）、モバイル幅だけは
+            ポータルを既定にする（2026-09-02。DefaultRoute参照）。ヘッダー等から
+            明示的に「/」（タスク）を選んだ場合はモバイルでもカンバンをそのまま見せる */}
         <Route
           path="/"
           element={
             <RequireStaff>
-              <Dashboard />
+              <DefaultRoute />
             </RequireStaff>
           }
         />
