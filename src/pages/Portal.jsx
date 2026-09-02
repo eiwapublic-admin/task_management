@@ -5,6 +5,7 @@ import {
   IconArchive,
   IconAddressBook,
   IconBox,
+  IconBuildingWrench,
   IconCar,
   IconClipboard,
   IconDroplet,
@@ -18,6 +19,7 @@ import {
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
+import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
 import {
   CHLORINE_STANDARD_MIN,
   currentMonthJST,
@@ -105,16 +107,19 @@ export default function Portal() {
         // 残留塩素は「過去10日間」の判定に年をまたぐ可能性があるため、年で絞らず全期間取得する
         fetchChlorineTests(),
         fetchClosedDays({ month }),
+        // ビルメン（2026-09-02）。当月を起点に3ヶ月分だけ引く（カードに出すのは当月の件数と
+        // 未確定件数のみで、全期間を読む必要がないため）
+        fetchBilmenSchedules({ month, months: 3 }),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, closedDays] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, closedDays, bilmen] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, closedDays, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, month, year })
       setLoading(false)
     }
 
@@ -169,6 +174,11 @@ export default function Portal() {
       return t.concentration !== null && t.concentration !== undefined && Number(t.concentration) < CHLORINE_STANDARD_MIN
     }).length
 
+    // --- ビルメン：当月の予定件数と、日付・作業IDが未入力の「未確定」件数（2026-09-02） ---
+    const bilmen = stats?.bilmen
+    const monthBilmen = bilmen?.filter((s) => s.target_month === month)
+    const bilmenUnsettled = monthBilmen?.filter(isUnsettled).length
+
     const monthLabel = `${Number(month.slice(5, 7))}月`
 
     const all = [
@@ -204,6 +214,22 @@ export default function Portal() {
           ariaLabel: '本日の日報を開く',
           onClick: () => navigate(`/reports/${today}`),
         },
+      },
+      {
+        key: 'bilmen',
+        label: 'ビルメン',
+        icon: <IconBuildingWrench size={24} />,
+        path: '/bilmen',
+        value: monthBilmen?.length,
+        unit: '件',
+        caption: `${monthLabel}の予定`,
+        sub:
+          bilmen == null
+            ? '取得できませんでした'
+            : bilmenUnsettled > 0
+              ? `未確定 ${bilmenUnsettled} 件（日付・作業IDが未入力）`
+              : 'すべて確定済み',
+        alert: bilmenUnsettled > 0,
       },
       {
         key: 'equipment',
@@ -270,6 +296,8 @@ export default function Portal() {
   const links = [
     { label: 'アーカイブタスク', icon: <IconArchive size={20} />, path: '/archive', staffOnly: true },
     { label: '処理ログ', icon: <IconList size={20} />, path: '/logs', staffOnly: true },
+    // 作業マスタは owner（小泉産業様）も閲覧できる（docs/bilmen-plan.md 10章）
+    { label: '作業マスタ', icon: <IconBuildingWrench size={20} />, path: '/bilmen/masters' },
     { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
     { label: 'テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
     { label: '作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },

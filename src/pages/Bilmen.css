@@ -1,0 +1,277 @@
+/* ビルメンテナンス管理（Phase 1。2026-09-02〜）。docs/bilmen-plan.md 5章。
+   色・寸法はトークン（src/index.css）だけを使い、生値は書かない（docs/ui-standard.md 原則2）。 */
+
+/* ---- 一覧（/bilmen・/bilmen/masters 共通） ---- */
+
+.bilmen-row.is-canceled td { opacity: 0.6; }
+.bilmen-row.is-disabled td { color: var(--text-muted); }
+
+/* 作業マスタ一覧は行クリックで編集モーダルを開く（予定一覧は作業名ボタンから開く） */
+.bilmen-row.is-clickable { cursor: pointer; }
+.ui-table tbody tr.bilmen-row.is-clickable:hover { background: var(--bg-subtle); }
+
+/* 予定日付。日曜・祝日は赤、土曜は青（既存の weekdayInfo() の className に合わせる） */
+.bilmen-date { white-space: nowrap; }
+.bilmen-date.is-saturday { color: var(--color-primary-hover); }
+.bilmen-date.is-holiday { color: var(--color-danger); }
+
+.bilmen-holiday-name {
+  margin-left: var(--space-1);
+  font-size: var(--fs-2xs);
+  color: var(--color-danger);
+}
+
+/* 未入力（予定日付・作業ID）。確定作業が残っていることを示す */
+.bilmen-undecided {
+  color: var(--color-warn);
+  font-size: var(--fs-xs);
+}
+
+.bilmen-title-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bilmen-title-btn:hover { text-decoration: underline; }
+
+.bilmen-title-note,
+.bilmen-row-sub,
+.bilmen-sub {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.bilmen-row-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-top: var(--space-05);
+}
+
+.bilmen-work-no { font-variant-numeric: tabular-nums; }
+
+.bilmen-main { display: block; }
+
+/* セルの中身を縦に積む入れ物。狭幅のカード表示（td を flex にする）でも
+   セル内の要素が横に並んでしまわないようにする */
+.bilmen-cell-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* 実施日パターン・周期のメモ（現行の作業マスタ一覧では緑文字） */
+.bilmen-pattern {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--color-brand);
+}
+
+.bilmen-time-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.bilmen-time-cell .ui-input { width: 5.5em; text-align: center; }
+
+.bilmen-check-cell { text-align: center; }
+
+/* 「予定通り ➡」。予定日を過ぎたのに実績が空の行だけオレンジで催促する（2-1） */
+.bilmen-copy-btn {
+  display: block;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bilmen-copy-btn:hover { text-decoration: underline; }
+.bilmen-copy-btn.is-overdue { color: var(--color-warn); font-weight: 700; }
+
+.bilmen-actual {
+  display: block;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bilmen-group-count {
+  margin-left: var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* 月グループの中の「未確定」小見出し（集計見出しより一段控えめにして階層を作る） */
+.bilmen-subgroup-head {
+  background: var(--color-warn-surface);
+  color: var(--color-warn-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.bilmen-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4) 0;
+}
+
+/* ---- モーダル（予定詳細・作業マスタ・自動作成） ---- */
+
+.bilmen-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  margin: 0;
+}
+
+.bilmen-fieldset > legend {
+  padding: 0 var(--space-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.bilmen-month-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-2);
+}
+
+.bilmen-month-check,
+.bilmen-check-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  color: var(--text-base);
+  cursor: pointer;
+}
+
+.bilmen-month-check { justify-content: center; }
+
+.bilmen-radio-row {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.bilmen-detail-head {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.bilmen-detail-head > .ui-field { flex: 1 1 12rem; min-width: 0; }
+
+/* PC は左＝予定・右＝実績の2カラム、iPhone 幅では1カラムに縦積み（5-2） */
+.bilmen-detail-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.bilmen-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* 開始・終了のように2つ並べたい入力欄の行（.report-fields は既定だと中身の幅で
+   並ぶため、時刻欄のように幅を持たない入力だと折り返ってしまう） */
+.bilmen-halves > .ui-field { flex: 1 1 0; min-width: 0; }
+
+.bilmen-generate-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.bilmen-generate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bilmen-generate-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.bilmen-generate-item.is-created { background: var(--bg-subtle); color: var(--text-muted); }
+
+.bilmen-generate-item > .bilmen-check-field { flex: 1 1 auto; min-width: 0; }
+
+.bilmen-generate-title { display: block; }
+
+/* ---- 狭幅（768px以下）: 表を2段組みのカードに落とす ---- */
+
+@media (max-width: 768px) {
+  .bilmen-detail-cols { grid-template-columns: 1fr; }
+
+  /* 列見出しは読み上げ用にも不要（各セルが data-label を持つ）ため隠す */
+  .bilmen-table thead { display: none; }
+
+  .bilmen-table,
+  .bilmen-table tbody,
+  .bilmen-table tr,
+  .bilmen-table td { display: block; width: 100%; }
+
+  .bilmen-table tr.bilmen-row {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    margin-bottom: var(--space-3);
+    padding: var(--space-2);
+    background: var(--bg-surface);
+  }
+
+  .bilmen-table tr.bilmen-row td {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    border-bottom: none;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* セルの左側に列名を出す（表の列見出しの代わり） */
+  .bilmen-table tr.bilmen-row td::before {
+    content: attr(data-label);
+    flex: 0 0 5.5rem;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+
+  .bilmen-table tr.bilmen-row td.bilmen-check-cell { justify-content: flex-start; }
+
+  .bilmen-month-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* 予定日付が未入力の行では実績へ写せないため、押せないことを見た目でも示す */
+.bilmen-copy-btn:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  text-decoration: none;
+}

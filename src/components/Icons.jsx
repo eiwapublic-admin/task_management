@@ -286,3 +286,17 @@ export function IconGlobe(props) {
     </Icon>
   )
 }
+
+// --- ビルメンテナンス管理（2026-09-02）------------------------------------
+
+// ビルメン（ダッシュボードのカード・ヘッダーの業務メニュー）。
+// 建物とメンテナンスを表すレンチを組み合わせた形
+export function IconBuildingWrench(props) {
+  return (
+    <Icon {...props}>
+      <path d="M4 21V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v17" />
+      <path d="M7 7h1M11 7h1M7 11h1M11 11h1M7 15h1M11 15h1" />
+      <path d="M21 12.5a2.8 2.8 0 0 1-3.7 2.65L16 16.5V21h4v-4.2" />
+    </Icon>
+  )
+}

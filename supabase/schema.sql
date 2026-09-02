@@ -696,3 +696,114 @@ create trigger contacts_set_updated_at before update on contacts
 
 alter table contacts enable row level security;
 revoke all on contacts from anon, authenticated;
+
+-- ============================================================
+-- ビルメンテナンス管理（ビルメン。Phase 1。2026-09-02〜）
+-- 現行 FileMaker「BKB-Mgt / 作業管理」の移行。詳細は docs/bilmen-plan.md 参照。
+-- 建物は「備後町コイズミビル」1棟で確定のため building 列は持たない（同 13-4）。
+-- 既存方針どおり anon/authenticated からは一切触れない（Worker の service role 経由のみ）。
+-- ============================================================
+
+-- ---------- 作業マスタ（bilmen-plan 2-6・2-7） ----------
+create table if not exists bilmen_masters (
+  id            uuid primary key default gen_random_uuid(),
+  -- FileMaker の「作業マスタID」（1, 2, 3, 5, 14, 21, 28…）。移行の突合キーなので必ず保持する。
+  -- 欠番は正常（無効化・統合された作業がありうる）
+  master_no     int  not null unique,
+  title         text not null,                  -- 作業名（作業タイトル）
+  title_note    text,                           -- 作業の補足（連絡票で作業名の下に青文字で出る）
+  content       text,                           -- 作業内容（予定詳細の「補足」）
+  notice        text,                           -- 注意事項（告知）。連絡票の「(4) 留意事項」
+  place         text,                           -- 作業場所。連絡票の「(2) 場所」
+  enter_room    boolean not null default false, -- 入室作業（日程表の「入室あり*」に ✓）
+  notify        boolean not null default false, -- 報知対象（掲示・メールに載せるか。3-4）
+  jurisdiction  text,                           -- 管轄（'栄和' | '小泉産業'）
+  vendor_code   text,                           -- 担当会社コード（K-004 等）
+  vendor_name   text,                           -- 担当会社名（セコム / 明和ビル管理 …）
+  worker_name   text,                           -- 実施業者名（担当会社の下請け等）
+  prep_note     text,                           -- 管理側作業・準備（一覧の青■ラベル）
+  plan_start    time,                           -- 既定の予定開始時刻
+  plan_end      time,                           -- 既定の予定終了時刻
+  -- 定例実施月。{1,3,5,7,9,11}。空配列＝自動作成の対象外（随時作業）
+  months        int[] not null default '{}',
+  day_pattern   text,                           -- 実施日パターン（'月半ば' 等。フリーテキスト）
+  -- 不規則周期のメモ（'2019,2022,2025,2028' / '3年に1回（2025年〜）'）。機械判定はしない
+  cycle_pattern text,
+  memo          text,                           -- 管理メモ／注意事項（社内専用）
+  remark        text,                           -- 備考
+  sort_order    int  not null default 999,      -- 表示順（10, 20, 30…。再採番機能あり）
+  disabled      boolean not null default false, -- 無効（選択肢に出さない。過去の予定は残す）
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists bilmen_masters_order_idx
+  on bilmen_masters (disabled, sort_order, master_no);
+
+drop trigger if exists bilmen_masters_set_updated_at on bilmen_masters;
+create trigger bilmen_masters_set_updated_at before update on bilmen_masters
+  for each row execute function set_updated_at();
+
+-- ---------- メンテナンス予定・実績（bilmen-plan 2-1・2-2） ----------
+create table if not exists bilmen_schedules (
+  id            uuid primary key default gen_random_uuid(),
+  -- 作業ID（W260901-27）。カレンダー説明欄にも出す識別子。移行時は現行の値をそのまま継承し、
+  -- 新規分も現行どおり手入力（自動採番はしない。13-5）。
+  -- ★nullable にしてある: 予定の自動作成は複数行を一括生成するため、その時点では
+  --   まだ人が作業IDを入力していない。unique は NULL を重複と見なさないので
+  --   「未入力の行は複数あってよい／入力された値は一意」をこの1本で表現できる
+  work_no       text unique,
+  master_id     uuid references bilmen_masters(id) on delete set null,
+  -- 対象月 'YYYY-MM'。予定日が未定でも「その月の予定」として一覧・帳票に並べるため必須
+  target_month  text not null,
+  plan_date     date,                            -- 予定日付（自動作成直後は null＝日付未定）
+  plan_start    time,
+  plan_end      time,
+
+  -- ↓ マスタからの複写（3-2）。以後マスタを直しても過去の予定は変わらない
+  title         text not null,
+  title_note    text,
+  content       text,
+  notice        text,
+  place         text,
+  enter_room    boolean not null default false,
+  notify        boolean not null default false,
+  jurisdiction  text,
+  vendor_code   text,
+  vendor_name   text,
+  worker_name   text,
+  prep_note     text,
+  remark        text,
+
+  memo          text,                            -- 管理メモ（'9/3から9/4に変更されました'）
+
+  -- ↓ 実績
+  actual_date   date,
+  actual_start  time,
+  actual_end    time,
+  actual_note   text,                            -- 作業実績報告事項
+  report_confirmed_on date,                      -- 報告書確認日付
+  canceled      boolean not null default false,  -- 中止
+  cancel_reason text,
+
+  -- ↓ Google カレンダー連携（Phase 3。7-2）
+  google_event_id  text,
+  google_synced_at timestamptz,
+
+  sort_order    int  not null default 999,       -- 同一日内の並び
+  created_by    text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists bilmen_schedules_month_idx
+  on bilmen_schedules (target_month desc, plan_date, sort_order);
+create index if not exists bilmen_schedules_date_idx
+  on bilmen_schedules (plan_date);
+
+drop trigger if exists bilmen_schedules_set_updated_at on bilmen_schedules;
+create trigger bilmen_schedules_set_updated_at before update on bilmen_schedules
+  for each row execute function set_updated_at();
+
+alter table bilmen_masters   enable row level security;
+alter table bilmen_schedules enable row level security;
+revoke all on bilmen_masters   from anon, authenticated;
+revoke all on bilmen_schedules from anon, authenticated;
