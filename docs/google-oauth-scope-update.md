@@ -146,6 +146,39 @@ https://www.googleapis.com/auth/calendar.events
    → 「詳細」→「（安全でないページ）に移動」で続行してよい（自社アプリのため。`HANDOFF.md` 参照）
 5. 権限の確認画面で、**4つの権限がすべて表示されていること**を確認してから「続行 / 許可」
 
+   実際に表示される日本語の文言と、対応するスコープは次のとおり:
+
+   | 同意画面の表示 | スコープ |
+   |---|---|
+   | メール メッセージと設定の表示 | `gmail.readonly` |
+   | 下書きの管理とメールの送信 | `gmail.compose` |
+   | すべてのカレンダーの予定の表示と編集 | `calendar.events` |
+   | Google カレンダーを使用してアクセスできるすべてのカレンダーの参照、ダウンロード | `calendar.readonly` |
+
+### ⚠ 手順3.5【必ず確認】自社クライアントが使われているか
+
+**認可後、画面右の「Request / Response」欄に出る `client_id=` を必ず見てください。**
+
+| 表示 | 判定 |
+|---|---|
+| `client_id=407408718192.apps.googleusercontent.com` | ❌ **NG**。これは **OAuth Playground の共有クライアントID**。手順2の設定が効いていない |
+| `client_id=`（`GMAIL_CLIENT_ID` と同じ値） | ✅ OK。次へ進む |
+
+**NG のまま進めると、発行されるトークンは Playground のクライアントに紐づくため、
+Worker が `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` で更新しようとして弾かれます**
+（`invalid_grant`）。さらに Playground のトークンは**24時間で自動失効**します。
+画面下部に出る次の注記が、その状態であることのサインです:
+
+> *Note: The OAuth Playground will automatically revoke refresh tokens after 24h.
+> You can avoid this by specifying your own application OAuth credentials using the Configuration panel.*
+
+**NG だった場合の直し方**: 歯車 ⚙ →「Use your own OAuth credentials」にチェック →
+Client ID / Client secret を入力 → パネルを閉じ、**手順3（Authorize APIs）からやり直す**。
+
+> このとき初めて**手順1のリダイレクトURI登録が実際に必要**になります（Playground の共有
+> クライアントには登録済みだが、自社クライアントには登録が要る）。未登録だと
+> `redirect_uri_mismatch` が出るので、認証情報ページで追加してください。
+
 ### 手順4. リフレッシュトークンを取得する
 
 1. 「**Step 2: Exchange authorization code for tokens**」の
