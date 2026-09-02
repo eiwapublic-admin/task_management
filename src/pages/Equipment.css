@@ -8,10 +8,12 @@
   margin-top: var(--space-4);
 }
 
-/* カテゴリ名。以前は備品名より一段控えめ(fs-md・text-muted)にしていたが、
-   実機フィードバックで見づらいとの指摘を受け、備品名（.equipment-stock-name）と
-   同じ大きさ・濃さに揃えた（2026-08-19） */
-.equipment-stock-group-head {
+/* カテゴリ名（備品順）・年月見出し（年月順）に共通の見出し帯（2026-09-02に
+   両者のフォーマット・色を確実に揃えるため1つのルールへ統合）。以前は備品名より
+   一段控えめ(fs-md・text-muted)にしていたが、実機フィードバックで見づらいとの
+   指摘を受け、備品名（.equipment-stock-name）と同じ大きさ・濃さに揃えた（2026-08-19） */
+.equipment-stock-group-head,
+.equipment-month-head {
   margin: 0 0 var(--space-2);
   padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--border);
@@ -28,19 +30,13 @@
   margin-top: var(--space-4);
 }
 
-/* 年月の見出し。.equipment-stock-group-head と同じ見た目に、件数と「伝票出力」
-   ボタンを右側へ添える（.equipment-stock-name と同じ考え方でflex化） */
+/* 年月の見出しだけ、件数と「伝票出力」ボタンを右側へ添えるためflex化する
+   （.equipment-stock-name と同じ考え方。見た目の基本部分は上のルールで揃えている） */
 .equipment-month-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
-  margin: 0 0 var(--space-2);
-  padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--fs-xl);
-  font-weight: 700;
-  color: var(--text-strong);
 }
 
 .equipment-month-head-count {
@@ -49,9 +45,19 @@
   color: var(--text-muted);
 }
 
+/* 伝票出力。備品順の他ボタン（.btn-plain）は中立色だが、こちらは押すと帳票の
+   PDFが作られる操作なので、常時ブルー（アクション色）で目立たせる（2026-09-02） */
 .equipment-slip-btn {
   margin-left: auto;
   flex-shrink: 0;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.equipment-slip-btn:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-hover);
 }
 
 .equipment-stock-rows {
@@ -184,6 +190,31 @@
    ヘッダ行がいっぱいになるため、優先度の低い絞り込みを割愛して1行に収める） */
 @media (max-width: 480px) {
   .equipment-toggle-disabled { display: none; }
+}
+
+/* 修理伝票は年月順表示からしか出力できない旨の注釈（2026-09-02）。「無効品込み」の
+   すぐ右に置く。狭幅ではヘッダ行を1行に収めたいうえ、テキストが長く収まらないため
+   PC幅（769px以上）だけに出す */
+.equipment-slip-hint {
+  display: none;
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+@media (min-width: 769px) {
+  .equipment-slip-hint { display: inline; }
+}
+
+/* 出庫・入庫ボタンをまとめて機能ヘッダの右端へ寄せる（2026-09-02。並べ順・表示期間・
+   絞り込みという「表示条件」の並びと、実際に記録する操作であるこの2ボタンを
+   視覚的に分けるための依頼）。折り返してもこの2つはひとまとまりのまま右へ付く */
+.equipment-header-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* 出庫・入庫ボタン。表示期間・絞り込みと同じ行にモバイルでも収まるよう、
@@ -341,13 +372,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
-}
-
-.equipment-master-group-head {
-  background: var(--bg-subtle);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--text-muted);
 }
 
 /* テナントマスタ（2026-08-26）。.ui-table は width:100% のため、テナント名等の

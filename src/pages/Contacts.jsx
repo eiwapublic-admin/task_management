@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ContactForm from '../components/ContactForm'
@@ -96,6 +96,19 @@ export default function Contacts() {
     )
   }, [contacts, query])
 
+  // 業務分類でグルーピング表示する（2026-09-02。備品マスタ画面の.equipment-master-group-head
+  // と同じ考え方で、表の行の中に分類見出し行を差し込む。並び順はAPIが返す順の中で
+  // 各分類が最初に現れた位置に従う（備品側のgroups実装と同じ、追加のソートはしない）
+  const groups = useMemo(() => {
+    const map = new Map()
+    for (const c of filtered) {
+      const key = c.business_category || ''
+      if (!map.has(key)) map.set(key, { name: c.business_category || '（業務分類未設定）', rows: [] })
+      map.get(key).rows.push(c)
+    }
+    return [...map.values()]
+  }, [filtered])
+
   return (
     <div className="ui-page">
       <AppHeader onContactSync={handleSync} contactSyncBusy={syncing} />
@@ -180,68 +193,75 @@ export default function Contacts() {
               <thead>
                 <tr>
                   <th>会社名</th>
-                  <th>業務分類</th>
                   <th>顧客担当者名</th>
                   <th>主担当者</th>
                   <th>連絡先</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => {
-                  const mailto = buildContactMailto(c)
-                  return (
-                    <tr key={c.id} className="contact-row" onClick={() => setEditingContact(c)}>
-                      <td>{c.company_name}</td>
-                      <td>{c.business_category || ''}</td>
-                      <td>{c.contact_person || ''}</td>
-                      <td>{c.staff_name || ''}</td>
-                      <td className="contact-actions-cell" onClick={(e) => e.stopPropagation()}>
-                        {c.company_phone && (
-                          <a
-                            className="icon-btn-phone"
-                            href={`tel:${c.company_phone}`}
-                            aria-label={`会社に電話（${c.company_phone}）`}
-                            title={`会社に電話（${c.company_phone}）`}
-                          >
-                            <IconPhone size={18} />
-                          </a>
-                        )}
-                        {c.mobile_phone && (
-                          <a
-                            className="icon-btn-phone"
-                            href={`tel:${c.mobile_phone}`}
-                            aria-label={`携帯に電話（${c.mobile_phone}）`}
-                            title={`携帯に電話（${c.mobile_phone}）`}
-                          >
-                            <IconPhone size={18} />
-                          </a>
-                        )}
-                        {mailto && (
-                          <a
-                            className="icon-btn-mail"
-                            href={mailto}
-                            aria-label={`メールを作成（${c.email_to}）`}
-                            title={`メールを作成（${c.email_to}）`}
-                          >
-                            <IconMail size={18} />
-                          </a>
-                        )}
-                        {c.website_url && (
-                          <a
-                            className="icon-btn-globe"
-                            href={c.website_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label="ホームページを開く"
-                            title="ホームページを開く"
-                          >
-                            <IconGlobe size={18} />
-                          </a>
-                        )}
+                {groups.map((g) => (
+                  <Fragment key={g.name}>
+                    <tr>
+                      <td colSpan={4} className="ui-table-group-head">
+                        {g.name}
                       </td>
                     </tr>
-                  )
-                })}
+                    {g.rows.map((c) => {
+                      const mailto = buildContactMailto(c)
+                      return (
+                        <tr key={c.id} className="contact-row" onClick={() => setEditingContact(c)}>
+                          <td>{c.company_name}</td>
+                          <td>{c.contact_person || ''}</td>
+                          <td>{c.staff_name || ''}</td>
+                          <td className="contact-actions-cell" onClick={(e) => e.stopPropagation()}>
+                            {c.company_phone && (
+                              <a
+                                className="icon-btn-phone"
+                                href={`tel:${c.company_phone}`}
+                                aria-label={`会社に電話（${c.company_phone}）`}
+                                title={`会社に電話（${c.company_phone}）`}
+                              >
+                                <IconPhone size={18} />
+                              </a>
+                            )}
+                            {c.mobile_phone && (
+                              <a
+                                className="icon-btn-phone"
+                                href={`tel:${c.mobile_phone}`}
+                                aria-label={`携帯に電話（${c.mobile_phone}）`}
+                                title={`携帯に電話（${c.mobile_phone}）`}
+                              >
+                                <IconPhone size={18} />
+                              </a>
+                            )}
+                            {mailto && (
+                              <a
+                                className="icon-btn-mail"
+                                href={mailto}
+                                aria-label={`メールを作成（${c.email_to}）`}
+                                title={`メールを作成（${c.email_to}）`}
+                              >
+                                <IconMail size={18} />
+                              </a>
+                            )}
+                            {c.website_url && (
+                              <a
+                                className="icon-btn-globe"
+                                href={c.website_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="ホームページを開く"
+                                title="ホームページを開く"
+                              >
+                                <IconGlobe size={18} />
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </Fragment>
+                ))}
               </tbody>
             </table>
           </div>
