@@ -90,7 +90,14 @@ wrangler.jsonc          Worker 設定（assets / cron / nodejs_compat）
 .github/workflows/
 ├── deploy.yml          main push → ビルド → デプロイ → シークレット同期
 └── cleanup-worker.yml  不要 Worker の手動削除（workflow_dispatch）
-docs/                   本書・引き継ぎ書・旧設計書
+docs/                   本書・引き継ぎ書・旧設計書・UI標準・機能ごとの開発計画書
+    ├── HANDOFF.md                       引き継ぎ書（日付ごと・番号付きの作業履歴）
+    ├── ui-standard.md                   UI標準（3層構造・デザイントークン・ボタン方針）
+    ├── daily-report-plan.md             日報・自主検査表・違反車両・残留塩素の開発計画
+    ├── equipment-plan.md                備品管理の開発計画（FileMaker移行の先例）
+    ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02。★未着手）
+    ├── disaster-recovery.md             Supabaseバックアップからの復旧手順
+    └── ai-cost-and-alternatives.md      AI利用コストの試算と代替案
 ```
 
 ---
