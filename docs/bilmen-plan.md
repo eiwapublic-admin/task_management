@@ -1,6 +1,15 @@
 # ビルメンテナンス管理機能 開発計画（ビルメン）
 
-最終更新: 2026-09-02（**計画初版**。現行 FileMaker「BKB-Mgt」の画面ショット9点をもとに作成。実装は未着手。
+最終更新: 2026-09-02（**Phase 1 を実装した**。DBスキーマ（`bilmen_masters` / `bilmen_schedules`）・
+`worker/lib/bilmen.js`・作業マスタ画面（`/bilmen/masters`）・メンテナンス予定一覧（`/bilmen`）・
+予定詳細モーダル・予定の自動作成・実績入力までが動く。ヘッダの並びも 5-0 のとおり変更済み
+（ビルメンを日報の右隣に追加し、連絡帳をハンバーガーの共通メニューへ移設）。
+**Supabase へのスキーマ適用（`supabase/schema.sql` 末尾のビルメン用ブロック）は未実施**で、
+これを流すまで画面はエラーになる。Phase 2〜5 は未着手。以下は計画時点の記述をそのまま残す。
+
+---
+
+（計画初版の記録）**計画初版**。現行 FileMaker「BKB-Mgt」の画面ショット9点をもとに作成。実装は未着手。
 **同日、確認事項のうち 13-2・13-3・13-10 について回答をいただき反映済み**。
 主な変更点は3つ。①メールは「Gmail下書き（方式A）」と「`mailto:`（方式B。現行方式）」の**両方を実装**し
 設定で切り替える形にした（3-5・7-3）。**方式BはOAuthスコープ不要のため、メール機能がスコープ拡張の
@@ -949,7 +958,7 @@ FileMaker から CSV を受領して一括投入する（備品管理 8-1・8-2 
 
 | Phase | 内容 | 目安 | 前提 |
 |---|---|---|---|
-| **1** | DBスキーマ ／ `worker/lib/bilmen.js` ／ 作業マスタ画面 ／ 予定一覧・詳細 ／ 予定の自動作成 ／ 実績入力 | 3〜4日 | なし |
+| **1** ✅**実装済み（2026-09-02）** | DBスキーマ ／ `worker/lib/bilmen.js` ／ 作業マスタ画面 ／ 予定一覧・詳細 ／ 予定の自動作成 ／ 実績入力 | 3〜4日 | なし |
 | **2** | 掲示PDF 2種 ／ 今月の注釈 | 2日 | Phase 1 |
 | **3** | Google カレンダー反映 | 1〜2日 | **7-1 の `calendar.events` 追加が完了していること** |
 | **4** | メール設定（文面・宛先）／ 送信プレビュー ／ **方式B（`mailto:`）** | 2日 | なし（スコープ不要） |
@@ -957,6 +966,40 @@ FileMaker から CSV を受領して一括投入する（備品管理 8-1・8-2 
 | **5** | 実施報告書ファイル ／ CSV移行 ／ 実機フィードバック反映 | 2日＋α | Phase 1〜4 |
 
 **合計の目安: 10〜13日**（実機フィードバックの往復を含めるとさらに数日）
+
+### Phase 1 の実装内容（2026-09-02）
+
+| 追加・変更したもの | 内容 |
+|---|---|
+| `supabase/schema.sql` | `bilmen_masters` / `bilmen_schedules` を追記（RLS有効・`anon`/`authenticated` へのGRANTなし）。**Supabase への適用は未実施** |
+| `worker/lib/bilmen.js` | 作業マスタ・予定・自動作成のAPIハンドラ。owner は GET のみ（`canWrite`） |
+| `worker/index.js` | `/api/bilmen/masters`・`/masters/renumber`・`/schedules`・`/schedules/generate` をルーティング |
+| `src/lib/bilmen.js` | API 呼び出しと表示ユーティリティ（実施月の表記・未確定判定・催促表示の判定） |
+| `src/pages/Bilmen.jsx` | メンテナンス予定一覧（月グループ・未確定グループ・その場編集・検索・もっと見る） |
+| `src/pages/BilmenMasters.jsx` | 作業マスタ一覧（表示順の再採番つき） |
+| `src/components/BilmenScheduleForm.jsx` | 予定詳細モーダル（左＝予定・右＝実績。狭幅で1カラム） |
+| `src/components/BilmenMasterForm.jsx` | 作業マスタの追加・編集モーダル |
+| `src/components/BilmenGenerateForm.jsx` | 予定の自動作成モーダル |
+| `src/pages/Bilmen.css` | ビルメン画面のCSS（狭幅では表を2段組みカードに落とす） |
+| `src/App.jsx` / `src/components/AppHeader.jsx` / `src/pages/Portal.jsx` | ルート・ヘッダの並び（5-0）・ダッシュボードのカードと導線 |
+
+**計画からあえて変えた点**（いずれも 3-1「既存の作りに合わせる」の方針を優先した）:
+
+- **APIのパス設計**: 6章は `/api/bilmen/schedules/:id` のようなパスパラメータ方式だったが、
+  既存の `equipment.js` / `contacts.js` と同じ「平たいパス＋ id はクエリ/ボディ」方式にした
+  （`PATCH /api/bilmen/schedules`（ボディに id）／`DELETE /api/bilmen/schedules?id=…`）。
+  ルーティングの書き方を既存と揃えるため
+- **自動作成の候補取得**: 6章に無かった `GET /api/bilmen/schedules/generate?month=…` を足した
+  （対象月に該当するマスタと「作成済み」フラグを返す。5-3 のモーダルが必要とするため）
+- **一覧の「日付未定」グループ**: 5-3 の注記どおり作業IDの未入力も拾うため、見出しは
+  「未確定（予定日付・作業IDが未入力）」とした
+- **カレンダー反映日時の「未反映」表示**（5-1 の明細2段目）は Phase 3 と同時に入れる。
+  反映する手段が無いうちに全行へ「未反映」と出しても混乱を招くため、いまは
+  反映済みの日時が入っているときだけ詳細モーダルに出す
+
+**Phase 1 時点で意図的に入れていないもの**: 月見出しの掲示PDF・テナントへメール・今月の注釈
+（Phase 2・4）、カレンダー反映ボタン（Phase 3）、実施報告書ファイル（Phase 5）、
+メール設定画面 `/bilmen/mail`（Phase 4）。
 
 **13-3 の回答（`mailto:` 方式も可）により、スコープ拡張に依存しない範囲が広がった**:
 

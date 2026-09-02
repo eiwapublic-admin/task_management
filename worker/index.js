@@ -79,6 +79,19 @@ import {
   handleContactDelete,
   handleContactSync,
 } from './lib/contacts.js'
+import {
+  handleBilmenMasterList,
+  handleBilmenMasterCreate,
+  handleBilmenMasterUpdate,
+  handleBilmenMasterDelete,
+  handleBilmenMasterRenumber,
+  handleBilmenScheduleList,
+  handleBilmenScheduleCreate,
+  handleBilmenScheduleUpdate,
+  handleBilmenScheduleDelete,
+  handleBilmenGenerateCandidates,
+  handleBilmenScheduleGenerate,
+} from './lib/bilmen.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1079,6 +1092,32 @@ async function route(req, env) {
   }
   if (pathname === '/api/contacts/sync') {
     return req.method === 'POST' ? handleContactSync(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- ビルメンテナンス管理（Phase 1。2026-09-02〜。ハンドラは worker/lib/bilmen.js） ---
+  if (pathname === '/api/bilmen/masters') {
+    if (req.method === 'GET') return handleBilmenMasterList(req)
+    if (req.method === 'POST') return handleBilmenMasterCreate(req)
+    if (req.method === 'PATCH') return handleBilmenMasterUpdate(req)
+    if (req.method === 'DELETE') return handleBilmenMasterDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/bilmen/masters/renumber') {
+    return req.method === 'POST' ? handleBilmenMasterRenumber(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/bilmen/schedules') {
+    if (req.method === 'GET') return handleBilmenScheduleList(req)
+    if (req.method === 'POST') return handleBilmenScheduleCreate(req)
+    if (req.method === 'PATCH') return handleBilmenScheduleUpdate(req)
+    if (req.method === 'DELETE') return handleBilmenScheduleDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 自動作成（5-3）。GET＝候補一覧（対象月に該当する有効なマスタ＋作成済みフラグ）、
+  // POST＝選んだマスタから予定を一括生成
+  if (pathname === '/api/bilmen/schedules/generate') {
+    if (req.method === 'GET') return handleBilmenGenerateCandidates(req)
+    if (req.method === 'POST') return handleBilmenScheduleGenerate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   if (pathname.startsWith('/api/')) {

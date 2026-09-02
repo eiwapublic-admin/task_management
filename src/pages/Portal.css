@@ -180,6 +180,7 @@
    - 違反車両は「不良の記録」なので赤、残留塩素は水なので青 */
 .portal-card.is-tasks { --card-accent: var(--color-brand); }
 .portal-card.is-reports { --card-accent: var(--status-progress); }
+.portal-card.is-bilmen { --card-accent: var(--color-warn); }
 .portal-card.is-equipment { --card-accent: var(--status-done); }
 .portal-card.is-parking { --card-accent: var(--color-danger); }
 .portal-card.is-chlorine { --card-accent: var(--color-primary); }

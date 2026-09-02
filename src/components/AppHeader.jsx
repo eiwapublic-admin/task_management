@@ -37,6 +37,8 @@ const FEATURE_TITLES = [
   { path: '/reports/templates', title: '作業定型文' },
   { path: '/documents', title: '雛形ファイル' },
   { path: '/contacts', title: '連絡帳' },
+  { path: '/bilmen/masters', title: '作業マスタ', exact: true },
+  { path: '/bilmen', title: 'ビルメン' },
   { path: '/reports/inspections', title: '自主検査表' },
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
@@ -51,14 +53,17 @@ const FEATURE_TITLES = [
 // 各機能へ直接ジャンプできるようにする（モバイルはハンバーガーメニューのみのまま）。
 // タスク（カンバン）は owner（小泉産業様）・備品出庫限定ロールには見せない
 // （RequireStaffガードで結局 /reports へ送り返されるだけのため。App.jsx参照）
+// 2026-09-02: ビルメン（ビルメンテナンス管理）を日報の右隣に追加し、代わりに連絡帳を
+// この並びから外してハンバーガーの共通メニュー（第3領域）へ移した（項目数は7のまま。
+// docs/bilmen-plan.md 5-0・13-11）。ビルメンは owner も閲覧できるので staffOnly にしない
 const NAV_ITEMS = [
   { path: '/', label: 'タスク', exact: true, staffOnly: true },
   { path: '/reports', label: '日報', exact: true },
+  { path: '/bilmen', label: 'ビルメン' },
   { path: '/equipment', label: '備品' },
   { path: '/reports/parking', label: '違反車両' },
   { path: '/reports/chlorine', label: '残留塩素' },
   { path: '/documents', label: '雛形ファイル', staffOnly: true },
-  { path: '/contacts', label: '連絡帳', staffOnly: true },
 ]
 
 function isNavItemActive(item, pathname) {
@@ -188,11 +193,13 @@ export default function AppHeader({
       ? 'documents'
       : location.pathname.startsWith('/contacts')
         ? 'contacts'
-        : location.pathname.startsWith('/equipment')
-          ? 'equipment'
-          : location.pathname.startsWith('/reports')
-            ? 'reports'
-            : 'tasks'
+        : location.pathname.startsWith('/bilmen')
+          ? 'bilmen'
+          : location.pathname.startsWith('/equipment')
+            ? 'equipment'
+            : location.pathname.startsWith('/reports')
+              ? 'reports'
+              : 'tasks'
   const inPortal = section === 'portal'
   // owner（小泉産業様）・備品出庫限定ロール（2026-08-25追加）は日報・備品等の閲覧のみ
   // （備品出庫限定ロールは備品の出庫だけ書き込み可）。どちらもタスク管理のメニューは出さない
@@ -264,6 +271,16 @@ export default function AppHeader({
         {contactSyncBusy ? '作成中…' : '連絡帳を自動作成'}
       </button>
     ) : null
+  } else if (section === 'bilmen') {
+    // ビルメンセクション（2026-09-02〜）。owner には閲覧できるものだけを出す
+    // （メール設定は社員のみ。Phase 4 で /bilmen/mail を足したらここに追加する。
+    // docs/bilmen-plan.md 5-0・10章）
+    businessMenuItems = (
+      <>
+        <button onClick={() => goTo('/bilmen')}>メンテナンス予定</button>
+        <button onClick={() => goTo('/bilmen/masters')}>作業マスタ</button>
+      </>
+    )
   } else if (section === 'equipment') {
     // 備品セクション（2026-08-12〜）。owner には閲覧できるものだけを出す
     // （マスタ編集は出さない。docs/equipment-plan.md 5-0）
@@ -365,6 +382,10 @@ export default function AppHeader({
               )}
 
               {/* 領域3: 共通メニュー（全画面で共通。2026-08-30にここへ集約） */}
+              {/* 連絡帳はヘッダーの業務メニュー（NAV_ITEMS）からここへ移した（2026-09-02。
+                  ビルメンを業務メニューに入れる代わり。全画面から1タップで開けるよう、
+                  業務別メニューではなく共通領域に置く。docs/bilmen-plan.md 5-0） */}
+              {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
               {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
               {!isOwner && <button onClick={() => goTo('/logs')}>処理ログ</button>}
               {pushStatus !== 'unsupported' && (

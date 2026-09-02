@@ -15,6 +15,8 @@ import Equipment from './pages/Equipment'
 import EquipmentItemHistory from './pages/EquipmentItemHistory'
 import EquipmentItems from './pages/EquipmentItems'
 import EquipmentTenants from './pages/EquipmentTenants'
+import Bilmen from './pages/Bilmen'
+import BilmenMasters from './pages/BilmenMasters'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
@@ -191,6 +193,25 @@ function App() {
           element={
             <RequireAuth>
               <EquipmentTenants />
+            </RequireAuth>
+          }
+        />
+        {/* ビルメンテナンス管理（Phase 1。2026-09-02〜）。owner（小泉産業様）は閲覧のみ
+            のため RequireAuth（書き込み・カレンダー反映・メール送信はサーバー側で拒否。
+            docs/bilmen-plan.md 10章）。メール設定（/bilmen/mail）は Phase 4 で追加する */}
+        <Route
+          path="/bilmen"
+          element={
+            <RequireAuth>
+              <Bilmen />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bilmen/masters"
+          element={
+            <RequireAuth>
+              <BilmenMasters />
             </RequireAuth>
           }
         />
