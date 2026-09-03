@@ -84,7 +84,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
               </div>
               <div className="ui-field">
                 <label>本文（プレビュー）</label>
-                <textarea className="ui-input" rows={6} value={body} readOnly />
+                <textarea className="ui-textarea" rows={6} value={body} readOnly />
               </div>
 
               <p className="bilmen-undecided">
