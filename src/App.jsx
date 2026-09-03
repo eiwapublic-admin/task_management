@@ -20,6 +20,7 @@ import BilmenMasters from './pages/BilmenMasters'
 import BilmenMail from './pages/BilmenMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
+import Waste from './pages/Waste'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -194,6 +195,16 @@ function App() {
           element={
             <RequireAuth>
               <EquipmentTenants />
+            </RequireAuth>
+          }
+        />
+        {/* 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜）。owner・備品出庫限定
+            ロールも閲覧できるため RequireAuth（書き込みはサーバー側で拒否。docs/waste-plan.md 7章） */}
+        <Route
+          path="/waste"
+          element={
+            <RequireAuth>
+              <Waste />
             </RequireAuth>
           }
         />

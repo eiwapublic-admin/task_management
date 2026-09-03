@@ -300,3 +300,17 @@ export function IconBuildingWrench(props) {
     </Icon>
   )
 }
+
+// 廃棄物実測値管理（重量計測）の天秤アイコン。既存の IconTrash（削除ボタン専用）とは
+// 意味が違うため、ゴミ箱の絵は流用せず別の見た目にする（2026-09-03）
+export function IconScale(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v18" />
+      <path d="M5 8h14" />
+      <path d="M9 21h6" />
+      <path d="M5 8 2 15a3 3 0 0 0 6 0z" />
+      <path d="M19 8l-3 7a3 3 0 0 0 6 0z" />
+    </Icon>
+  )
+}

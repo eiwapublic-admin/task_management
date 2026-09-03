@@ -1,0 +1,72 @@
+/* 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜）。docs/waste-plan.md 参照。
+   色・寸法はトークン（src/index.css）だけを使い、生値は書かない（docs/ui-standard.md 原則2）。 */
+
+.waste-table th,
+.waste-table td { text-align: center; white-space: nowrap; }
+
+/* 見出し行は行数の多い一覧のため濃くする（docs/ui-standard.md 3章「表の見出し行の濃さ」） */
+.waste-table thead th {
+  background: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.waste-table tbody tr:nth-child(even) { background: var(--bg-app); }
+
+.waste-day { font-weight: 600; }
+.waste-day.is-saturday { color: var(--color-primary-hover); }
+.waste-day.is-holiday { color: var(--color-danger); }
+
+.waste-col-cell { padding: var(--space-1) !important; }
+
+.waste-cell-input {
+  width: 100%;
+  min-width: 3.5em;
+  height: var(--control-h);
+  padding: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: center;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.waste-cell-input:hover:not(:disabled) { border-color: var(--border-strong); }
+.waste-cell-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-weak);
+  background: var(--bg-surface);
+}
+.waste-cell-input:disabled { color: var(--text-muted); }
+
+/* 異常値（3-3）。自動修正はせず、色分け表示だけで保存自体は妨げない */
+.waste-cell-input.is-high { background: var(--color-warn-surface); color: var(--color-warn-ink); font-weight: 700; }
+.waste-cell-input.is-extreme { background: var(--color-danger-surface); color: var(--color-danger); font-weight: 700; }
+
+/* スキャン取込直後・未確認のマス（3-2）。点線の枠で「まだ人が見ていない」ことを示す */
+.waste-cell-input.is-unconfirmed { border-style: dashed; border-color: var(--color-primary); }
+
+.waste-row-total,
+.waste-table .waste-total-row td {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.waste-total-row { background: var(--bg-muted); }
+.waste-total-row td:first-child { text-align: left; }
+
+.waste-legend { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.waste-legend-high { color: var(--color-warn-ink); font-weight: 700; }
+.waste-legend-extreme { color: var(--color-danger); font-weight: 700; }
+
+/* スキャン取込モーダル */
+.waste-scan-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  margin: var(--space-2) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  object-fit: contain;
+}

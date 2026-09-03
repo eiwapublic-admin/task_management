@@ -253,3 +253,85 @@ export async function recognizeVehicle(imageBase64, mediaType) {
   }
   return { result: parsed, usage }
 }
+
+// 廃棄物実測集計表（手書き。1ヶ月分・1〜7階×日次のマス目）の写真から実測値を読み取る
+// （2026-09-03〜。手動トリガー式。docs/waste-plan.md）。ナンバープレート読み取りと同じ
+// 「判読できないマスは推測せず null」という考え方。「合計」列・「合計」行は転記済みの
+// 集計値であり実測値そのものではないため読み取らせない（アプリ側で日次値から計算する）。
+export async function recognizeWasteSheet(imageBase64, mediaType, { month, floors }) {
+  const { ANTHROPIC_API_KEY } = process.env
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY が設定されていません')
+  }
+  const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
+  const floorList = floors.join('・')
+
+  const system = [
+    'あなたは廃棄物の実測集計表（手書き）の読み取りを補助するアシスタントです。',
+    `与えられた写真は${month.replace('-', '年')}月分の「廃棄物実測集計表」です。`,
+    `表は日付（1日〜月末）を行に、${floorList}階を列に持ち、各マスに手書きで実測重量（kg）が記入されています。`,
+    '「合計」の列・行は転記済みの集計値なので読み取らないでください（無視してよい）。',
+    '指定のJSON形式のみで回答してください。説明文やコードフェンスは不要です。',
+    '',
+    '【重要: 読み取れないときに創作しないこと】',
+    'マスが空欄、文字が不鮮明・読み取れない、消しゴムで消した跡が残っている等、自信を持って読み取れないマスは、',
+    '推測や創作をせず必ず null にしてください。誤った数値を記録すると役所への報告に影響するため、',
+    '確実に読み取れたマスだけを埋めてください。',
+    '',
+    '【出力JSONの形式】',
+    '{',
+    '  "days": {',
+    '    "1": { "1": 12.5, "2": null, "3": 8, ... },',
+    '    "2": { ... },',
+    '    ...',
+    '  }',
+    '}',
+    `days のキーは日（1〜月末の数字文字列）、その中のキーは階（${floorList}のいずれか）です。`,
+    'その日の行が無い・存在しない日は days に含めないでください。',
+    '',
+    '必ず有効なJSONのみを返してください。',
+  ].join('\n')
+
+  const res = await fetch(API_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: '添付の写真から、日ごと・階ごとの実測重量（kg）を読み取ってください。' },
+          ],
+        },
+      ],
+    }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
+    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
+      err.isBillingError = true
+    }
+    throw err
+  }
+
+  const data = await res.json()
+  const text = (data.content || []).map((b) => b.text || '').join('')
+  const parsed = extractJson(text)
+  if (!parsed || typeof parsed.days !== 'object' || parsed.days === null) {
+    throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
+  }
+  const usage = {
+    input_tokens: data.usage?.input_tokens || 0,
+    output_tokens: data.usage?.output_tokens || 0,
+  }
+  return { days: parsed.days, usage }
+}

@@ -96,6 +96,7 @@ docs/                   本書・引き継ぎ書・旧設計書・UI標準・機
     ├── daily-report-plan.md             日報・自主検査表・違反車両・残留塩素の開発計画
     ├── equipment-plan.md                備品管理の開発計画（FileMaker移行の先例）
     ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02〜。Phase 1・2・4方式B実装済み）
+    ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み）
     ├── google-oauth-scope-update.md     Google OAuth スコープ拡張の作業手順（トークン再発行）
     ├── disaster-recovery.md             Supabaseバックアップからの復旧手順
     └── ai-cost-and-alternatives.md      AI利用コストの試算と代替案
