@@ -169,24 +169,26 @@ export default function Bilmen() {
         <td data-label="予定日付" className="bilmen-col-date">
           {renderDate(s.plan_date)}
         </td>
-        <td data-label="予定時刻" className="bilmen-col-time bilmen-time-cell">
-          <span className="bilmen-time-display">{toTimeValue(s.plan_start) || '—'}</span>
-          <span className="bilmen-time-edit" onClick={(e) => e.stopPropagation()}>
-            <TimeInput
-              className="ui-input is-compact"
-              value={toTimeValue(s.plan_start)}
-              disabled={readOnly}
-              onChange={(v) => patchSchedule(s.id, { plan_start: v })}
-              aria-label="予定開始時刻"
-            />
-            <span aria-hidden="true">〜</span>
-            <TimeInput
-              className="ui-input is-compact"
-              value={toTimeValue(s.plan_end)}
-              disabled={readOnly}
-              onChange={(v) => patchSchedule(s.id, { plan_end: v })}
-              aria-label="予定終了時刻"
-            />
+        <td data-label="予定時刻" className="bilmen-col-time">
+          <span className="bilmen-time-cell">
+            <span className="bilmen-time-display">{toTimeValue(s.plan_start) || '—'}</span>
+            <span className="bilmen-time-edit" onClick={(e) => e.stopPropagation()}>
+              <TimeInput
+                className="ui-input is-compact"
+                value={toTimeValue(s.plan_start)}
+                disabled={readOnly}
+                onChange={(v) => patchSchedule(s.id, { plan_start: v })}
+                aria-label="予定開始時刻"
+              />
+              <span aria-hidden="true">〜</span>
+              <TimeInput
+                className="ui-input is-compact"
+                value={toTimeValue(s.plan_end)}
+                disabled={readOnly}
+                onChange={(v) => patchSchedule(s.id, { plan_end: v })}
+                aria-label="予定終了時刻"
+              />
+            </span>
           </span>
         </td>
         <td data-label="作業" className="bilmen-col-title">

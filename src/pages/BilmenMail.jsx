@@ -148,7 +148,7 @@ export default function BilmenMail() {
               </div>
               <div className="ui-field">
                 <label>本文</label>
-                <textarea className="ui-input" rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
+                <textarea className="ui-textarea" rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
               </div>
               <button type="button" className="btn-primary" onClick={handleSaveSettings} disabled={savingSettings}>
                 {savingSettings ? '保存中…' : '文面を保存'}

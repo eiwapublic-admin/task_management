@@ -71,12 +71,14 @@ body.pdf-capture-mode .bno-sheet {
 
 .bno-item-content {
   margin: 1mm 0;
+  padding-left: 8mm;
   font-size: 9pt;
   color: #06c;
 }
 
 .bno-item-rows {
   margin: 1.5mm 0 0;
+  padding-left: 8mm;
 }
 
 .bno-item-row {
