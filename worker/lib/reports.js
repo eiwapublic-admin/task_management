@@ -935,7 +935,14 @@ const MAX_PDF_PREVIEW_BYTES = 20 * 1024 * 1024 // 自主検査表PDFは通常1MB
 // 後から書き込みが完了した方の内容で上書きされ「違う種類の帳票が表示される」ことがあった
 // （どちらも非同期でアップロードに数秒かかるため、続けて別のPDFを操作すると起こりうる）。
 // 'equipment'（修理伝票PDF）は2026-08-26追加。'meeting-room'（会議室予約表）は2026-08-29追加。
-const VALID_PDF_KINDS = new Set(['inspection', 'chlorine', 'equipment', 'meeting-room'])
+const VALID_PDF_KINDS = new Set([
+  'inspection',
+  'chlorine',
+  'equipment',
+  'meeting-room',
+  'bilmen-schedule',
+  'bilmen-notice',
+])
 
 function pdfPreviewKey(userId, kind) {
   return `inspection-pdf-preview/${kind}/${userId}.pdf`

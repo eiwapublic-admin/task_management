@@ -75,12 +75,79 @@ export async function generateBilmenSchedules(month, masterIds) {
   })
 }
 
+// ---- メール設定（文面・宛先） ----
+// 画面（/bilmen/mail）自体を owner・備品出庫限定ロールには出さない（AppHeader・App.jsx側）が、
+// API 側でも同じ判定で塞いである（worker/lib/bilmen.js の requireMailAccess）。
+
+export async function fetchBilmenMailSettings() {
+  const data = await authFetch('/api/bilmen/mail/settings')
+  return data.settings
+}
+
+export async function updateBilmenMailSettings(patch) {
+  const data = await authFetch('/api/bilmen/mail/settings', { method: 'PUT', body: JSON.stringify(patch) })
+  return data.settings
+}
+
+export async function fetchBilmenMailRecipients() {
+  const data = await authFetch('/api/bilmen/mail/recipients')
+  return data.recipients || []
+}
+
+export async function createBilmenMailRecipient(payload) {
+  const data = await authFetch('/api/bilmen/mail/recipients', { method: 'POST', body: JSON.stringify(payload) })
+  return data.recipient
+}
+
+export async function updateBilmenMailRecipient(id, patch) {
+  const data = await authFetch('/api/bilmen/mail/recipients', { method: 'PATCH', body: JSON.stringify({ id, ...patch }) })
+  return data.recipient
+}
+
+export async function deleteBilmenMailRecipient(id) {
+  await authFetch(`/api/bilmen/mail/recipients?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 建物名（13-4。1棟のみで確定のため settings テーブルには持たせず、帳票・メールの
+// 3箇所で共通して使うここに定数として置く）
+export const BILMEN_BUILDING_NAME = '備後町コイズミビル'
+
+// 掲示・案内メールの対象＝報知対象☑ かつ 予定日付あり かつ 中止でない行（3-4・8-1）。
+// PDF・メール送信のどちらからも同じ条件で数えられるよう共通化する
+export function notifyTargets(schedules) {
+  return schedules.filter((s) => s.notify && s.plan_date && !s.canceled)
+}
+
+// メール本文・件名の変数展開（4-2）。%今月の注釈% は今月の注釈機能が未実装のため
+// 対応する変数を用意していない（Phase 2 追加分）
+export function expandMailVariables(text, { month, count }) {
+  return (text || '')
+    .replaceAll('%対象年月%', `${month.replace('-', '年')}月度`)
+    .replaceAll('%建物名%', BILMEN_BUILDING_NAME)
+    .replaceAll('%作業件数%', String(count))
+}
+
+// mailto: リンクの組み立て（3-5・7-3 方式B）。宛先は BCC にまとめ、TO は空欄にする
+// （共有アドレス自身が送信元になるため。src/lib/mail.js の buildReplyMailto と同じ考え方）
+export function buildBilmenNoticeMailto(subject, body, recipientEmails) {
+  const bcc = recipientEmails.join(',')
+  const params = new URLSearchParams({ subject, body })
+  if (bcc) params.set('bcc', bcc)
+  return `mailto:?${params.toString().replace(/\+/g, '%20')}`
+}
+
 // ---- 表示用のユーティリティ ----
 
 // 実施月の配列を現行表記（'1, 3, 5, 7, 9, 11'）にする。空なら「随時」
 export function formatMonths(months) {
   if (!Array.isArray(months) || months.length === 0) return '随時'
   return months.join(', ')
+}
+
+// 予定日付を 'mm/dd' にする（一覧・PDFの年月ヘッダで年は分かるため年を出さない。修正依頼）
+export function formatMonthDay(date) {
+  if (!date) return ''
+  return date.slice(5).replace('-', '/')
 }
 
 // time 型（'09:10:00' / '09:10'）を 'HH:MM' にそろえる。TimeInput の value に渡す形

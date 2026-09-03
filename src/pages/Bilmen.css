@@ -27,17 +27,9 @@
   font-size: var(--fs-xs);
 }
 
-.bilmen-title-btn {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  color: var(--color-primary);
-  cursor: pointer;
-  text-align: left;
-}
-
-.bilmen-title-btn:hover { text-decoration: underline; }
+/* 予定一覧は行のどこをクリックしても詳細モーダルが開く（作業マスタ一覧と同じ
+   .is-clickable。2026-09-03。以前は作業名だけがリンクだったのを行全体に広げた） */
+.bilmen-title-text { display: block; }
 
 .bilmen-title-note,
 .bilmen-row-sub,
@@ -84,7 +76,19 @@
 
 .bilmen-time-cell .ui-input { width: 5.5em; text-align: center; }
 
+/* PCでは編集用（開始〜終了）を出し、モバイルでは開始時刻だけの読み取り表示に
+   切り替える（.bilmen-time-display は下の狭幅メディアクエリで表示に変える） */
+.bilmen-time-display { display: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
 .bilmen-check-cell { text-align: center; }
+
+/* 入室・報知は誤クリック防止のため一覧では表示のみにした（編集は詳細モーダルで行う。
+   2026-09-03）。チェックボックスではなく読み取り専用のチェックマークにする */
+.bilmen-check-display {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--color-brand);
+}
 
 /* 「予定通り ➡」。予定日を過ぎたのに実績が空の行だけオレンジで催促する（2-1） */
 .bilmen-copy-btn {
@@ -108,14 +112,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.bilmen-group-count {
-  margin-left: var(--space-3);
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-/* 月グループの中の「未確定」小見出し（集計見出しより一段控えめにして階層を作る） */
+/* 「未確定」小見出し（月グループ見出しは2026-09-03に廃止したため、これが一覧の
+   唯一の見出し行になる） */
 .bilmen-subgroup-head {
   background: var(--color-warn-surface);
   color: var(--color-warn-ink);
@@ -123,11 +121,9 @@
   font-weight: 700;
 }
 
-.bilmen-more {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-4) 0;
-}
+/* ヘッダの掲示PDF・報知ボタンは通常の .btn-plain（IconDocument/IconMail + .btn-plain-label）。
+   .btn-plain-label は共通CSSの規則でiPhone幅（480px以下）で自動的にアイコンのみへ縮む
+   （src/styles/ui.css 参照）。 */
 
 /* ---- モーダル（予定詳細・作業マスタ・自動作成） ---- */
 
@@ -202,6 +198,13 @@
   gap: var(--space-2);
 }
 
+/* テナントへ報知モーダルの「メールを作成」（<a>タグは:disabled が使えないため
+   aria-disabled と組み合わせたクラスで見た目を合わせる） */
+a.btn-primary.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .bilmen-generate-list {
   list-style: none;
   margin: 0;
@@ -227,44 +230,70 @@
 
 .bilmen-generate-title { display: block; }
 
-/* ---- 狭幅（768px以下）: 表を2段組みのカードに落とす ---- */
-
+/* 狭幅（768px以下）: 予定一覧（.bilmen-table）は項目を極限まで減らし、
+   日付・開始時刻・作業の3つだけを1行で見せる（2026-09-03の依頼）。担当・入室・報知・
+   実績・報告書確認はここでは表示せず、行をタップすると開く詳細モーダルで確認・編集する。
+   作業マスタ一覧（.ui-table）は対象外＝従来どおりの2段組みカード表示のまま。
+   非表示にする列（.bilmen-col-xxx）は「.bilmen-table tr.bilmen-row td」（2クラス+2要素）と
+   同格以上の詳細度にしないと、そちらの display:block に負けて隠れないため、
+   必ず `.bilmen-table tr.bilmen-row td.bilmen-col-xxx` の形で書くこと */
 @media (max-width: 768px) {
   .bilmen-detail-cols { grid-template-columns: 1fr; }
 
-  /* 列見出しは読み上げ用にも不要（各セルが data-label を持つ）ため隠す */
   .bilmen-table thead { display: none; }
 
   .bilmen-table,
-  .bilmen-table tbody,
-  .bilmen-table tr,
-  .bilmen-table td { display: block; width: 100%; }
+  .bilmen-table tbody { display: block; width: 100%; }
 
   .bilmen-table tr.bilmen-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
-    margin-bottom: var(--space-3);
-    padding: var(--space-2);
+    margin-bottom: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     background: var(--bg-surface);
   }
 
   .bilmen-table tr.bilmen-row td {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
+    display: block;
+    padding: 0;
     border-bottom: none;
-    padding: var(--space-1) var(--space-2);
   }
 
-  /* セルの左側に列名を出す（表の列見出しの代わり） */
-  .bilmen-table tr.bilmen-row td::before {
-    content: attr(data-label);
-    flex: 0 0 5.5rem;
-    font-size: var(--fs-xs);
-    color: var(--text-muted);
+  /* 3列だけなので列見出しの代わりのラベル（data-label）は出さない */
+  .bilmen-table tr.bilmen-row td::before { content: none; }
+
+  .bilmen-table tr.bilmen-row td.bilmen-col-vendor,
+  .bilmen-table tr.bilmen-row td.bilmen-col-enter,
+  .bilmen-table tr.bilmen-row td.bilmen-col-notify,
+  .bilmen-table tr.bilmen-row td.bilmen-col-actual,
+  .bilmen-table tr.bilmen-row td.bilmen-col-report { display: none; }
+
+  /* 「未確定」見出し行は colSpan=8 の横長帯のため3列レイアウトでは表示しない。
+     未確定であること自体は各行の「作業ID未入力」バッジ（.bilmen-undecided）で
+     行ごとに分かるため、情報が完全に失われるわけではない */
+  .bilmen-table tr:has(> .bilmen-subgroup-head) { display: none; }
+
+  .bilmen-table tr.bilmen-row td.bilmen-col-date,
+  .bilmen-table tr.bilmen-row td.bilmen-col-time { flex: 0 0 auto; white-space: nowrap; }
+
+  .bilmen-table tr.bilmen-row td.bilmen-col-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
   }
 
-  .bilmen-table tr.bilmen-row td.bilmen-check-cell { justify-content: flex-start; }
+  .bilmen-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 開始時刻だけの読み取り表示に切り替える（編集は詳細モーダルで行う） */
+  .bilmen-time-edit { display: none; }
+  .bilmen-time-display { display: inline-block; }
 
   .bilmen-month-grid { grid-template-columns: repeat(4, 1fr); }
 }

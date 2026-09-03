@@ -273,12 +273,12 @@ export default function AppHeader({
     ) : null
   } else if (section === 'bilmen') {
     // ビルメンセクション（2026-09-02〜）。owner には閲覧できるものだけを出す
-    // （メール設定は社員のみ。Phase 4 で /bilmen/mail を足したらここに追加する。
-    // docs/bilmen-plan.md 5-0・10章）
+    // （メール設定は「外部に出る操作」の一部のため社員のみ。docs/bilmen-plan.md 5-0・10章・13-14）
     businessMenuItems = (
       <>
         <button onClick={() => goTo('/bilmen')}>メンテナンス予定</button>
         <button onClick={() => goTo('/bilmen/masters')}>作業マスタ</button>
+        {!isOwner && <button onClick={() => goTo('/bilmen/mail')}>メール設定</button>}
       </>
     )
   } else if (section === 'equipment') {

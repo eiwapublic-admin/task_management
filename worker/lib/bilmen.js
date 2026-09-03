@@ -12,6 +12,16 @@
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 
+// メール設定・宛先は「外部に出る操作」の一部として、owner・備品出庫限定ロールには
+// 一切見せない（10章・13-14）。canWrite() と同じ判定だが、GET も含めて塞ぐ意図を
+// 名前で明示するために別関数にしている
+async function requireMailAccess(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return { error: json({ error: '認証が必要です' }, 401) }
+  if (!canWrite(auth)) return { error: json({ error: 'この操作を行う権限がありません' }, 403) }
+  return { auth }
+}
+
 const MASTER_COLUMNS =
   'id, master_no, title, title_note, content, notice, place, enter_room, notify, jurisdiction, ' +
   'vendor_code, vendor_name, worker_name, prep_note, plan_start, plan_end, months, day_pattern, ' +
@@ -636,5 +646,182 @@ export async function handleBilmenScheduleGenerate(req) {
   } catch (err) {
     console.error('bilmen-schedule-generate 失敗:', err)
     return json({ error: '予定の自動作成に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// メール設定（文面・宛先）。Phase 4 の一部を先行実装（2026-09-03〜）。
+// 現行は雛形が1本（MAINT）のみのため、複数テンプレート管理はせず単一設定行にした
+// （bilmen_mail_settings.id='default' 固定）。送信は当面 mailto:（方式B）のみで、
+// Gmail下書き作成（方式A。PDF自動添付）は別途 gmail.compose 書き込みの実装が
+// 要るため未着手（docs/bilmen-plan.md 3-5・7-3）。
+// ============================================================
+
+const MAIL_SETTINGS_ID = 'default'
+const MAIL_RECIPIENT_COLUMNS = 'id, name, email, note, disabled, sort_order, created_at, updated_at'
+
+// GET /api/bilmen/mail/settings — 件名・本文の雛形
+export async function handleBilmenMailSettingsGet(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_mail_settings')
+      .select('id, subject, body, updated_at')
+      .eq('id', MAIL_SETTINGS_ID)
+      .maybeSingle()
+    if (err) {
+      console.error('bilmen-mail-settings-get:', err.message)
+      return json({ error: 'メール設定の取得に失敗しました' }, 500)
+    }
+    return json({ settings: data || { id: MAIL_SETTINGS_ID, subject: '', body: '' } })
+  } catch (err) {
+    console.error('bilmen-mail-settings-get 失敗:', err)
+    return json({ error: 'メール設定の取得に失敗しました' }, 500)
+  }
+}
+
+// PUT /api/bilmen/mail/settings — 件名・本文の雛形を保存
+export async function handleBilmenMailSettingsUpdate(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const subject = trimOrNull(payload?.subject, 200)
+    const body = typeof payload?.body === 'string' ? payload.body.slice(0, 5000) : ''
+    if (!subject) return json({ error: '件名は必須です' }, 400)
+    if (!body.trim()) return json({ error: '本文は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_mail_settings')
+      .upsert({ id: MAIL_SETTINGS_ID, subject, body }, { onConflict: 'id' })
+      .select('id, subject, body, updated_at')
+      .single()
+    if (err) {
+      console.error('bilmen-mail-settings-update:', err.message)
+      return json({ error: 'メール設定の保存に失敗しました' }, 500)
+    }
+    return json({ settings: data })
+  } catch (err) {
+    console.error('bilmen-mail-settings-update 失敗:', err)
+    return json({ error: 'メール設定の保存に失敗しました' }, 500)
+  }
+}
+
+// GET /api/bilmen/mail/recipients — 宛先一覧（有効→無効、表示順）
+export async function handleBilmenMailRecipientList(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_mail_recipients')
+      .select(MAIL_RECIPIENT_COLUMNS)
+      .order('disabled', { ascending: true })
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+    if (err) {
+      console.error('bilmen-mail-recipient-list:', err.message)
+      return json({ error: '宛先の取得に失敗しました' }, 500)
+    }
+    return json({ recipients: data || [] })
+  } catch (err) {
+    console.error('bilmen-mail-recipient-list 失敗:', err)
+    return json({ error: '宛先の取得に失敗しました' }, 500)
+  }
+}
+
+function buildMailRecipientRow(payload) {
+  const name = trimOrNull(payload?.name, 200)
+  if (!name) return { error: '宛先名は必須です' }
+  const email = trimOrNull(payload?.email, 200)
+  if (!email || !email.includes('@')) return { error: 'メールアドレスの形式が正しくありません' }
+  return {
+    row: {
+      name,
+      email: email.toLowerCase(),
+      note: trimOrNull(payload?.note, 500),
+      disabled: boolOr(payload?.disabled),
+      sort_order: Number.isFinite(Number(payload?.sort_order)) ? Number(payload.sort_order) : 999,
+    },
+  }
+}
+
+// POST /api/bilmen/mail/recipients — 宛先を追加
+export async function handleBilmenMailRecipientCreate(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const { row, error: buildErr } = buildMailRecipientRow(payload)
+    if (buildErr) return json({ error: buildErr }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_mail_recipients')
+      .insert(row)
+      .select(MAIL_RECIPIENT_COLUMNS)
+      .single()
+    if (err) {
+      console.error('bilmen-mail-recipient-create:', err.message)
+      const dup = err.code === '23505'
+      return json({ error: dup ? 'このメールアドレスは既に登録されています' : '宛先の登録に失敗しました' }, dup ? 409 : 500)
+    }
+    return json({ recipient: data }, 201)
+  } catch (err) {
+    console.error('bilmen-mail-recipient-create 失敗:', err)
+    return json({ error: '宛先の登録に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/bilmen/mail/recipients — 宛先を更新
+export async function handleBilmenMailRecipientUpdate(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = typeof payload?.id === 'string' ? payload.id : ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const { row, error: buildErr } = buildMailRecipientRow(payload)
+    if (buildErr) return json({ error: buildErr }, 400)
+
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_mail_recipients')
+      .update(row)
+      .eq('id', id)
+      .select(MAIL_RECIPIENT_COLUMNS)
+      .single()
+    if (err) {
+      console.error('bilmen-mail-recipient-update:', err.message)
+      const dup = err.code === '23505'
+      return json({ error: dup ? 'このメールアドレスは既に登録されています' : '宛先の更新に失敗しました' }, dup ? 409 : 500)
+    }
+    return json({ recipient: data })
+  } catch (err) {
+    console.error('bilmen-mail-recipient-update 失敗:', err)
+    return json({ error: '宛先の更新に失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/bilmen/mail/recipients?id=… — 宛先を削除
+export async function handleBilmenMailRecipientDelete(req) {
+  const { error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const supabase = getAdminClient()
+    const { error: err } = await supabase.from('bilmen_mail_recipients').delete().eq('id', id)
+    if (err) {
+      console.error('bilmen-mail-recipient-delete:', err.message)
+      return json({ error: '宛先の削除に失敗しました' }, 500)
+    }
+    return json({ ok: true })
+  } catch (err) {
+    console.error('bilmen-mail-recipient-delete 失敗:', err)
+    return json({ error: '宛先の削除に失敗しました' }, 500)
   }
 }

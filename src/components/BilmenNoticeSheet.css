@@ -1,0 +1,112 @@
+/* ビルメン：作業予定連絡票（EV掲示・投函・メール添付用）のPDF用シート。A4縦。
+   件数が多い月は複数ページに分割される（フック側で items をチャンクに分けて
+   複数枚描画し、jsPDF 側で addPage する）。 */
+
+.bno-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .bno-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 12mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.bno-sheet * {
+  box-sizing: border-box;
+}
+
+.bno-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10pt;
+}
+
+.bno-heading {
+  margin: 4mm 0 6mm;
+  text-align: center;
+  font-size: 15pt;
+  font-weight: 700;
+}
+
+.bno-list {
+  margin: 0;
+  padding: 0;
+}
+
+.bno-item {
+  margin-bottom: 4mm;
+  padding-bottom: 3mm;
+  border-bottom: 0.15mm solid #999;
+  font-size: 9.5pt;
+}
+
+.bno-item-title {
+  font-weight: 700;
+  font-size: 11pt;
+}
+
+.bno-item-no {
+  display: inline-block;
+  min-width: 6mm;
+}
+
+.bno-item-note {
+  margin-left: 2mm;
+  font-weight: 400;
+  font-size: 9pt;
+  color: #06c;
+}
+
+.bno-item-content {
+  margin: 1mm 0;
+  font-size: 9pt;
+  color: #06c;
+}
+
+.bno-item-rows {
+  margin: 1.5mm 0 0;
+}
+
+.bno-item-row {
+  display: flex;
+  gap: 2mm;
+  margin-bottom: 0.8mm;
+}
+
+.bno-item-row dt {
+  flex: 0 0 26mm;
+  font-weight: 400;
+}
+
+.bno-item-row dd {
+  margin: 0;
+  flex: 1;
+}
+
+.bno-date {
+  color: #06c;
+  font-weight: 700;
+}
+
+.bno-item-notice {
+  white-space: pre-wrap;
+}
+
+.bno-footer {
+  position: absolute;
+  bottom: 12mm;
+  right: 12mm;
+  font-size: 10pt;
+}
