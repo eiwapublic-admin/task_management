@@ -158,7 +158,7 @@ export default function BilmenMail() {
             <section className="bilmen-fieldset">
               <h2 className="ui-page-title">宛先</h2>
               <div className="ui-table-wrap">
-                <table className="ui-table">
+                <table className="ui-table bilmen-mail-recipients-table">
                   <thead>
                     <tr>
                       <th>宛先名</th>
@@ -246,8 +246,8 @@ export default function BilmenMail() {
                       </td>
                       <td />
                       <td>
-                        <button type="button" className="btn-plain" onClick={handleAddRecipient} disabled={adding}>
-                          {adding ? '追加中…' : '＋追加'}
+                        <button type="button" className="btn-primary" onClick={handleAddRecipient} disabled={adding}>
+                          {adding ? '追加中…' : '←追加'}
                         </button>
                       </td>
                     </tr>
