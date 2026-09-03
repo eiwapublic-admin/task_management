@@ -184,6 +184,7 @@
 .portal-card.is-equipment { --card-accent: var(--status-done); }
 .portal-card.is-parking { --card-accent: var(--color-danger); }
 .portal-card.is-chlorine { --card-accent: var(--color-primary); }
+.portal-card.is-waste { --card-accent: var(--status-todo); }
 
 /* --- その他の画面への導線（統計を出すほどではないもの）--- */
 .portal-links-section {

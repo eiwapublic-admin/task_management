@@ -11,6 +11,9 @@ export const RESIZE_PRESETS = {
   work: { maxEdge: 720, quality: 0.8, thumb: false },
   parking: { maxEdge: 1280, quality: 0.8, thumb: true },
   chlorine: { maxEdge: 720, quality: 0.8, thumb: false },
+  // 廃棄物実測集計表は1枚に日×7階の細かい手書き数字が密集するため、他の用途より
+  // 高い解像度を確保する（読み取り精度を優先。枚数が少なく容量への影響は軽微）
+  waste: { maxEdge: 2000, quality: 0.85, thumb: false },
 }
 
 // 一覧に写真が並ぶ用途だけサムネイルを作る

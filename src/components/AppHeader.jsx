@@ -42,6 +42,7 @@ const FEATURE_TITLES = [
   { path: '/reports/inspections', title: '自主検査表' },
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
+  { path: '/waste', title: '廃棄物実測値管理' },
   { path: '/equipment/items', title: '備品マスタ', exact: true },
   { path: '/equipment/tenants', title: 'テナントマスタ', exact: true },
   { path: '/equipment', title: '備品' },
@@ -386,6 +387,9 @@ export default function AppHeader({
                   ビルメンを業務メニューに入れる代わり。全画面から1タップで開けるよう、
                   業務別メニューではなく共通領域に置く。docs/bilmen-plan.md 5-0） */}
               {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
+              {/* 廃棄物実測値管理（2026-09-03〜）。owner（小泉産業様）も閲覧できるため
+                  他の共通メニュー項目と違い isOwner では隠さない（docs/waste-plan.md 7章） */}
+              <button onClick={() => goTo('/waste')}>廃棄物</button>
               {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}
               {!isOwner && <button onClick={() => goTo('/logs')}>処理ログ</button>}
               {pushStatus !== 'unsupported' && (

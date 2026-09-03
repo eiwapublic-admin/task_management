@@ -14,12 +14,14 @@ import {
   IconHome,
   IconKanban,
   IconList,
+  IconScale,
   IconYen,
 } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
 import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
+import { fetchWasteRecords } from '../lib/waste'
 import {
   CHLORINE_STANDARD_MIN,
   currentMonthJST,
@@ -110,16 +112,18 @@ export default function Portal() {
         // ビルメン（2026-09-02）。当月を起点に3ヶ月分だけ引く（カードに出すのは当月の件数と
         // 未確定件数のみで、全期間を読む必要がないため）
         fetchBilmenSchedules({ month, months: 3 }),
+        // 廃棄物実測値（2026-09-03）。カードに出すのは当月分の合計・未確認件数のみ
+        fetchWasteRecords({ month }),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, closedDays, bilmen] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, closedDays, bilmen, waste] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, month, year })
       setLoading(false)
     }
 
@@ -178,6 +182,11 @@ export default function Portal() {
     const bilmen = stats?.bilmen
     const monthBilmen = bilmen?.filter((s) => s.target_month === month)
     const bilmenUnsettled = monthBilmen?.filter(isUnsettled).length
+
+    // --- 廃棄物：当月の実測合計（kg）と、スキャン取込のまま未確認の件数（2026-09-03） ---
+    const waste = stats?.waste
+    const wasteTotal = waste?.reduce((sum, r) => sum + Number(r.weight_kg), 0)
+    const wasteUnconfirmed = waste?.filter((r) => !r.is_confirmed).length
 
     const monthLabel = `${Number(month.slice(5, 7))}月`
 
@@ -286,6 +295,22 @@ export default function Portal() {
               ariaLabel: '残留塩素の測定を新規記録',
               onClick: () => navigate('/reports/chlorine', { state: { openNew: true } }),
             },
+      },
+      {
+        key: 'waste',
+        label: '廃棄物',
+        icon: <IconScale size={24} />,
+        path: '/waste',
+        value: wasteTotal != null ? Math.round(wasteTotal * 10) / 10 : undefined,
+        unit: 'kg',
+        caption: `${monthLabel}の合計`,
+        sub:
+          waste == null
+            ? '取得できませんでした'
+            : wasteUnconfirmed > 0
+              ? `未確認 ${wasteUnconfirmed} 件（スキャン取込の確認待ち）`
+              : '確認済み',
+        alert: wasteUnconfirmed > 0,
       },
     ]
 

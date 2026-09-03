@@ -98,6 +98,14 @@ import {
   handleBilmenMailRecipientUpdate,
   handleBilmenMailRecipientDelete,
 } from './lib/bilmen.js'
+import {
+  handleWasteRecordList,
+  handleWasteRecordUpsert,
+  handleWasteRecordDelete,
+  handleWasteRecordConfirmMonth,
+  handleWasteScanUpload,
+  handleWasteScanRecognize,
+} from './lib/waste.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1137,6 +1145,25 @@ async function route(req, env) {
     if (req.method === 'POST') return handleBilmenMailRecipientCreate(req)
     if (req.method === 'PATCH') return handleBilmenMailRecipientUpdate(req)
     if (req.method === 'DELETE') return handleBilmenMailRecipientDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 廃棄物実測値管理（docs/waste-plan.md）
+  if (pathname === '/api/waste/records') {
+    if (req.method === 'GET') return handleWasteRecordList(req)
+    if (req.method === 'PUT') return handleWasteRecordUpsert(req)
+    if (req.method === 'DELETE') return handleWasteRecordDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/waste/records/confirm-month') {
+    if (req.method === 'POST') return handleWasteRecordConfirmMonth(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/waste/scans') {
+    if (req.method === 'POST') return handleWasteScanUpload(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/waste/scans/recognize') {
+    if (req.method === 'POST') return handleWasteScanRecognize(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
 

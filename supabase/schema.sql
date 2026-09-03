@@ -100,6 +100,8 @@ on conflict (key) do nothing;
 -- 単価を分けて試算できるよう、メール/フォームとFAXの利用量を分けて集計する。
 -- parking_calls（2026-08-05 add_parking_usage_breakdown）: 違反車両写真のAI読み取り
 -- （recognizeVehicle）呼び出し件数。同じ考え方でメール/FAXとは別の内訳として集計する。
+-- waste_calls（2026-09-03 add_waste_tracking）: 廃棄物実測集計表のスキャン読み取り
+-- （recognizeWasteSheet）呼び出し件数。同じ考え方で内訳として集計する。
 create table if not exists api_usage (
   month             text primary key,          -- 'YYYY-MM'（JST基準）
   input_tokens      bigint not null default 0,
@@ -109,6 +111,7 @@ create table if not exists api_usage (
   fax_input_tokens  bigint not null default 0,
   fax_output_tokens bigint not null default 0,
   parking_calls     integer not null default 0,
+  waste_calls       integer not null default 0,
   updated_at        timestamptz not null default now()
 );
 
@@ -121,15 +124,16 @@ create or replace function add_api_usage(
   p_fax_calls integer default 0,
   p_fax_input bigint default 0,
   p_fax_output bigint default 0,
-  p_parking_calls integer default 0
+  p_parking_calls integer default 0,
+  p_waste_calls integer default 0
 )
 returns void
 language sql
 security definer
 set search_path = public
 as $$
-  insert into api_usage(month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, updated_at)
-  values (p_month, p_input, p_output, p_calls, p_fax_calls, p_fax_input, p_fax_output, p_parking_calls, now())
+  insert into api_usage(month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, waste_calls, updated_at)
+  values (p_month, p_input, p_output, p_calls, p_fax_calls, p_fax_input, p_fax_output, p_parking_calls, p_waste_calls, now())
   on conflict (month) do update set
     input_tokens      = api_usage.input_tokens      + excluded.input_tokens,
     output_tokens     = api_usage.output_tokens     + excluded.output_tokens,
@@ -138,6 +142,7 @@ as $$
     fax_input_tokens  = api_usage.fax_input_tokens  + excluded.fax_input_tokens,
     fax_output_tokens = api_usage.fax_output_tokens + excluded.fax_output_tokens,
     parking_calls     = api_usage.parking_calls     + excluded.parking_calls,
+    waste_calls       = api_usage.waste_calls       + excluded.waste_calls,
     updated_at        = now();
 $$;
 
@@ -232,8 +237,8 @@ revoke all on api_usage          from anon, authenticated;
 revoke all on activity_logs      from anon, authenticated;
 revoke all on push_subscriptions from anon, authenticated;
 
-revoke all on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint, integer) from public, anon, authenticated;
-grant execute on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint, integer) to service_role;
+revoke all on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint, integer, integer) from public, anon, authenticated;
+grant execute on function add_api_usage(text, bigint, bigint, integer, integer, bigint, bigint, integer, integer) to service_role;
 
 -- users テーブルには anon 向けポリシーを一切作成しない（service role key のみが操作可能。従来どおり）
 
@@ -807,3 +812,46 @@ alter table bilmen_masters   enable row level security;
 alter table bilmen_schedules enable row level security;
 revoke all on bilmen_masters   from anon, authenticated;
 revoke all on bilmen_schedules from anon, authenticated;
+
+-- ============================================================
+-- 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜。docs/waste-plan.md）
+-- ============================================================
+
+create table if not exists waste_scans (
+  id           uuid primary key default gen_random_uuid(),
+  target_month text not null,             -- 'YYYY-MM'（読み取り対象の月）
+  storage_key  text not null,             -- アップロードした画像（report-photos バケット）
+  mime         text not null default 'image/jpeg',
+  status       text not null default 'pending' check (status in ('pending', 'reviewed')),
+  raw_result   jsonb,                     -- Claude の生の読み取り結果（監査用）
+  reviewed_by  text,
+  reviewed_at  timestamptz,
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists waste_records (
+  id           uuid primary key default gen_random_uuid(),
+  record_date  date not null,
+  floor        text not null,             -- '1'〜'7'
+  weight_kg    numeric(6,2) not null,
+  source       text not null default 'manual' check (source in ('manual', 'ocr')),
+  is_confirmed boolean not null default true,  -- OCR取込直後だけ false。手入力は常に true
+  scan_id      uuid references waste_scans(id) on delete set null,
+  note         text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (record_date, floor)
+);
+
+create index if not exists idx_waste_records_date on waste_records (record_date);
+create index if not exists idx_waste_scans_month on waste_scans (target_month);
+
+drop trigger if exists trg_waste_records_updated_at on waste_records;
+create trigger trg_waste_records_updated_at
+  before update on waste_records
+  for each row execute function set_updated_at();
+
+alter table waste_records enable row level security;
+alter table waste_scans enable row level security;
+revoke all on waste_records from anon, authenticated;
+revoke all on waste_scans from anon, authenticated;
