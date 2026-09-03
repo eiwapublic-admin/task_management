@@ -1,16 +1,20 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import TimeInput from '../components/TimeInput'
 import BilmenScheduleForm from '../components/BilmenScheduleForm'
 import BilmenGenerateForm from '../components/BilmenGenerateForm'
-import { IconChevronLeft, IconChevronRight, IconSearch } from '../components/Icons'
+import BilmenNotifyModal from '../components/BilmenNotifyModal'
+import { IconChevronLeft, IconChevronRight, IconSearch, IconDocument, IconMail } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
+import useBilmenSchedulePdfExport from '../hooks/useBilmenSchedulePdfExport'
+import useBilmenNoticePdfExport from '../hooks/useBilmenNoticePdfExport'
 import {
   fetchBilmenSchedules,
   fetchBilmenMasters,
   updateBilmenSchedule,
   formatActual,
+  formatMonthDay,
   isOverdueActual,
   isUnsettled,
   toTimeValue,
@@ -21,24 +25,23 @@ import './Bilmen.css'
 
 // メンテナンス予定一覧（docs/bilmen-plan.md 2-1・5-1）。ビルメンセクションのホーム。
 //
-// 月ごとのグルーピングで新しい月が上。各月グループの先頭には、予定日付か作業IDが
-// 未入力の行を「未確定」としてまとめる（確定作業が残っていることを明示するため。5-3）。
-// 予定時刻・入室・報知・実績日時は一覧の上でそのまま直せる（その場編集）。
+// ヘッダーの年月選択で対象月を1つ選び、その月だけを表示する（2026-09-03の依頼で
+// 12ヶ月まとめ表示・月グループ見出し・「もっと見る」を廃止した。年月はヘッダで
+// 選べるため月見出し行が冗長で、他の月の明細も同時に見せる必要が無いという指摘）。
+// 未確定（予定日付・作業IDが未入力）の行だけは月内の先頭にまとめて出す（5-3）。
+//
+// 入室・報知は一覧上では表示のみ（誤クリック防止。編集は詳細モーダルで行う）。
+// 予定時刻・実績日時・報告書確認は引き続き一覧上でその場編集できる（PCのみ。
+// モバイルは日付・開始時刻・作業のみを表示し、行のどこをタップしても詳細モーダルが開く）。
 //
 // owner（小泉産業様）は閲覧のみ（10章）。書き込みの正はサーバー側にある。
-//
-// 掲示PDF・案内メール・今月の注釈（Phase 2・4）とカレンダー反映（Phase 3）は
-// 月見出し・詳細モーダルにボタンが増える形で後から入る。
-
-// 一度に読み込む月数。既定は直近12ヶ月で、「もっと見る」で12ヶ月ずつ遡る（11章）
-const MONTHS_STEP = 12
-
+// 掲示PDF（日程表・連絡票）・テナントへの報知は2026-09-03〜。カレンダー反映（Phase 3）は
+// 詳細モーダルにボタンが増える形で後から入る。
 export default function Bilmen() {
   const readOnly = isLimitedRole(getCurrentUser())
   const today = todayJST()
 
   const [month, setMonth] = useState(currentMonthJST)
-  const [months, setMonths] = useState(MONTHS_STEP)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [schedules, setSchedules] = useState([])
@@ -49,6 +52,10 @@ export default function Bilmen() {
   const [info, setInfo] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | schedule
   const [generating, setGenerating] = useState(false)
+  const [notifying, setNotifying] = useState(false)
+
+  const scheduleExport = useBilmenSchedulePdfExport()
+  const noticeExport = useBilmenNoticePdfExport()
 
   // 検索中は月の範囲を無視して全期間から探す（サーバー側も同じ扱い）
   const searching = query.trim().length > 0
@@ -58,7 +65,7 @@ export default function Bilmen() {
     setError('')
     try {
       const [scheduleRows, masterRows] = await Promise.all([
-        fetchBilmenSchedules(searching ? { q: query.trim() } : { month, months }),
+        fetchBilmenSchedules(searching ? { q: query.trim() } : { month, months: 1 }),
         fetchBilmenMasters(),
       ])
       setSchedules(scheduleRows)
@@ -68,7 +75,7 @@ export default function Bilmen() {
     } finally {
       setLoading(false)
     }
-  }, [month, months, query, searching])
+  }, [month, query, searching])
 
   useEffect(() => {
     load()
@@ -88,16 +95,15 @@ export default function Bilmen() {
     return [...seen]
   }, [masters, schedules])
 
-  // 対象月でグルーピングし、各月の中を「未確定」と「確定済み」に分ける。
-  // API が target_month の降順・予定日付の昇順で返すので、その並びをそのまま保つ
-  const groups = useMemo(() => {
-    const map = new Map()
-    for (const s of schedules) {
-      if (!map.has(s.target_month)) map.set(s.target_month, { month: s.target_month, unsettled: [], settled: [] })
-      map.get(s.target_month)[isUnsettled(s) ? 'unsettled' : 'settled'].push(s)
-    }
-    return [...map.values()]
-  }, [schedules])
+  // 未確定（予定日付・作業IDが未入力）を先頭にまとめ、それ以外は元の並び（API が
+  // 予定日付の昇順で返す）のまま。検索時は月をまたぐため未確定/確定済みの区別はしない
+  const { unsettled, settled } = useMemo(() => {
+    if (searching) return { unsettled: [], settled: schedules }
+    const unsettled = []
+    const settled = []
+    for (const s of schedules) (isUnsettled(s) ? unsettled : settled).push(s)
+    return { unsettled, settled }
+  }, [schedules, searching])
 
   // その場編集。失敗したら画面の値を戻さず（サーバー値で再読込せず）エラーだけ出すと
   // 表示と実体がずれるため、成功した行だけを差し替える形にする
@@ -150,7 +156,7 @@ export default function Bilmen() {
     const { label, className, holidayName } = weekdayInfo(date, holidays)
     return (
       <span className={`bilmen-date ${className}`}>
-        {date.replaceAll('-', '/')} ({label})
+        {formatMonthDay(date)} ({label})
         {holidayName && <span className="bilmen-holiday-name">{holidayName}</span>}
       </span>
     )
@@ -159,30 +165,33 @@ export default function Bilmen() {
   function renderRow(s) {
     const overdue = isOverdueActual(s, today)
     return (
-      <tr key={s.id} className={`bilmen-row${s.canceled ? ' is-canceled' : ''}`}>
-        <td data-label="予定日付">{renderDate(s.plan_date)}</td>
-        <td data-label="予定時刻" className="bilmen-time-cell">
-          <TimeInput
-            className="ui-input is-compact"
-            value={toTimeValue(s.plan_start)}
-            disabled={readOnly}
-            onChange={(v) => patchSchedule(s.id, { plan_start: v })}
-            aria-label="予定開始時刻"
-          />
-          <span aria-hidden="true">〜</span>
-          <TimeInput
-            className="ui-input is-compact"
-            value={toTimeValue(s.plan_end)}
-            disabled={readOnly}
-            onChange={(v) => patchSchedule(s.id, { plan_end: v })}
-            aria-label="予定終了時刻"
-          />
+      <tr key={s.id} className={`bilmen-row is-clickable${s.canceled ? ' is-canceled' : ''}`} onClick={() => setEditing(s)}>
+        <td data-label="予定日付" className="bilmen-col-date">
+          {renderDate(s.plan_date)}
         </td>
-        <td data-label="作業">
+        <td data-label="予定時刻" className="bilmen-col-time bilmen-time-cell">
+          <span className="bilmen-time-display">{toTimeValue(s.plan_start) || '—'}</span>
+          <span className="bilmen-time-edit" onClick={(e) => e.stopPropagation()}>
+            <TimeInput
+              className="ui-input is-compact"
+              value={toTimeValue(s.plan_start)}
+              disabled={readOnly}
+              onChange={(v) => patchSchedule(s.id, { plan_start: v })}
+              aria-label="予定開始時刻"
+            />
+            <span aria-hidden="true">〜</span>
+            <TimeInput
+              className="ui-input is-compact"
+              value={toTimeValue(s.plan_end)}
+              disabled={readOnly}
+              onChange={(v) => patchSchedule(s.id, { plan_end: v })}
+              aria-label="予定終了時刻"
+            />
+          </span>
+        </td>
+        <td data-label="作業" className="bilmen-col-title">
           <span className="bilmen-cell-stack">
-            <button type="button" className="bilmen-title-btn" onClick={() => setEditing(s)}>
-              {s.title}
-            </button>
+            <span className="bilmen-title-text">{s.title}</span>
             {s.title_note && <span className="bilmen-title-note">{s.title_note}</span>}
             <span className="bilmen-row-sub">
               {s.work_no ? (
@@ -195,52 +204,44 @@ export default function Bilmen() {
             </span>
           </span>
         </td>
-        <td data-label="担当">
+        <td data-label="担当" className="bilmen-col-vendor">
           <span className="bilmen-cell-stack">
             <span className="bilmen-sub">{s.jurisdiction || ''}</span>
             <span className="bilmen-main">{s.vendor_name || ''}</span>
           </span>
         </td>
-        <td data-label="入室" className="bilmen-check-cell">
-          <input
-            type="checkbox"
-            checked={s.enter_room}
-            disabled={readOnly}
-            onChange={(e) => patchSchedule(s.id, { enter_room: e.target.checked })}
-            aria-label={`${s.title} は入室作業`}
-          />
+        <td data-label="入室" className="bilmen-col-enter bilmen-check-cell">
+          <span className="bilmen-check-display">{s.enter_room ? '✓' : ''}</span>
         </td>
-        <td data-label="報知" className="bilmen-check-cell">
-          <input
-            type="checkbox"
-            checked={s.notify}
-            disabled={readOnly}
-            onChange={(e) => patchSchedule(s.id, { notify: e.target.checked })}
-            aria-label={`${s.title} を掲示・案内メールに載せる`}
-          />
+        <td data-label="報知" className="bilmen-col-notify bilmen-check-cell">
+          <span className="bilmen-check-display">{s.notify ? '✓' : ''}</span>
         </td>
-        <td data-label="実績">
+        <td data-label="実績" className="bilmen-col-actual">
           <span className="bilmen-cell-stack">
-          {!readOnly && (
-            <button
-              type="button"
-              className={`bilmen-copy-btn${overdue ? ' is-overdue' : ''}`}
-              onClick={() => handleCopyPlan(s)}
-              disabled={!s.plan_date}
-              title={s.plan_date ? '予定日時をそのまま実績へ写す' : '予定日付が未入力のため写せません'}
-            >
-              予定通り ➡
-            </button>
-          )}
-          <span className="bilmen-actual">{formatActual(s.actual_date, s.actual_start) || '—'}</span>
+            {!readOnly && (
+              <button
+                type="button"
+                className={`bilmen-copy-btn${overdue ? ' is-overdue' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCopyPlan(s)
+                }}
+                disabled={!s.plan_date}
+                title={s.plan_date ? '予定日時をそのまま実績へ写す' : '予定日付が未入力のため写せません'}
+              >
+                予定通り ➡
+              </button>
+            )}
+            <span className="bilmen-actual">{formatActual(s.actual_date, s.actual_start) || '—'}</span>
           </span>
         </td>
-        <td data-label="報告書確認">
+        <td data-label="報告書確認" className="bilmen-col-report">
           <input
             type="date"
             className="ui-input is-compact"
             value={s.report_confirmed_on || ''}
             disabled={readOnly}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => patchSchedule(s.id, { report_confirmed_on: e.target.value })}
             aria-label="報告書確認日付"
           />
@@ -291,11 +292,39 @@ export default function Bilmen() {
             </>
           }
           actions={
-            readOnly ? null : (
-              <>
+            <>
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={() => scheduleExport.download(month, schedules, holidays)}
+                disabled={scheduleExport.busy}
+                title="1階掲示用の日程表PDFを出力"
+              >
+                <IconDocument size={16} />
+                <span className="btn-plain-label">日程表</span>
+              </button>
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={() => noticeExport.download(month, schedules)}
+                disabled={noticeExport.busy}
+                title="EV掲示・投函・メール添付用の連絡票PDFを出力"
+              >
+                <IconDocument size={16} />
+                <span className="btn-plain-label">連絡票</span>
+              </button>
+              {!readOnly && (
+                <button type="button" className="btn-plain" onClick={() => setNotifying(true)}>
+                  <IconMail size={16} />
+                  <span className="btn-plain-label">テナントへ報知</span>
+                </button>
+              )}
+              {!readOnly && (
                 <button type="button" className="btn-primary" onClick={() => setGenerating(true)}>
                   予定の自動作成
                 </button>
+              )}
+              {!readOnly && (
                 <button
                   type="button"
                   className="icon-btn-add"
@@ -305,8 +334,8 @@ export default function Bilmen() {
                 >
                   ＋
                 </button>
-              </>
-            )
+              )}
+            </>
           }
         >
           {(searchOpen || searching) && (
@@ -339,15 +368,25 @@ export default function Bilmen() {
             {error}
           </p>
         )}
+        {scheduleExport.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {scheduleExport.error}
+          </p>
+        )}
+        {noticeExport.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {noticeExport.error}
+          </p>
+        )}
         {info && <p className="dashboard-banner">{info}</p>}
 
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
-        ) : groups.length === 0 ? (
+        ) : schedules.length === 0 ? (
           <p className="ui-empty">
             {searching
               ? '該当する予定が見つかりません。'
-              : 'この期間の予定がまだありません。「予定の自動作成」から翌月分を作成できます。'}
+              : 'この月の予定がまだありません。「予定の自動作成」から作成できます。'}
           </p>
         ) : (
           <div className="ui-table-wrap">
@@ -365,38 +404,17 @@ export default function Bilmen() {
                 </tr>
               </thead>
               <tbody>
-                {groups.map((g) => (
-                  <Fragment key={g.month}>
-                    <tr>
-                      <td colSpan={8} className="ui-table-group-head">
-                        {g.month.replace('-', '年')}月
-                        <span className="bilmen-group-count">
-                          {g.settled.length + g.unsettled.length}件
-                          {g.unsettled.length > 0 && ` ／ 未確定 ${g.unsettled.length}件`}
-                        </span>
-                      </td>
-                    </tr>
-                    {g.unsettled.length > 0 && (
-                      <tr>
-                        <td colSpan={8} className="bilmen-subgroup-head">
-                          未確定（予定日付・作業IDが未入力）
-                        </td>
-                      </tr>
-                    )}
-                    {g.unsettled.map(renderRow)}
-                    {g.settled.map(renderRow)}
-                  </Fragment>
-                ))}
+                {unsettled.length > 0 && (
+                  <tr>
+                    <td colSpan={8} className="bilmen-subgroup-head">
+                      未確定（予定日付・作業IDが未入力）
+                    </td>
+                  </tr>
+                )}
+                {unsettled.map(renderRow)}
+                {settled.map(renderRow)}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {!loading && !searching && groups.length > 0 && (
-          <div className="bilmen-more">
-            <button type="button" className="btn-plain" onClick={() => setMonths((m) => m + MONTHS_STEP)}>
-              もっと見る（さらに{MONTHS_STEP}ヶ月前まで）
-            </button>
           </div>
         )}
       </div>
@@ -421,6 +439,22 @@ export default function Bilmen() {
           onGenerated={handleGenerated}
         />
       )}
+
+      {notifying && (
+        <BilmenNotifyModal
+          month={month}
+          schedules={schedules}
+          onDownloadNotice={(m, s) => noticeExport.download(m, s)}
+          onClose={() => setNotifying(false)}
+        />
+      )}
+
+      {scheduleExport.sheetsPortal}
+      {scheduleExport.previewModal}
+      {scheduleExport.busyOverlay}
+      {noticeExport.sheetsPortal}
+      {noticeExport.previewModal}
+      {noticeExport.busyOverlay}
     </div>
   )
 }

@@ -1059,9 +1059,9 @@ FileMaker の FMPXMLRESULT 形式で4本を受領し、全件を機械検証し�
 | Phase | 内容 | 目安 | 前提 |
 |---|---|---|---|
 | **1** ✅**実装済み（2026-09-02）** | DBスキーマ ／ `worker/lib/bilmen.js` ／ 作業マスタ画面 ／ 予定一覧・詳細 ／ 予定の自動作成 ／ 実績入力 | 3〜4日 | なし |
-| **2** | 掲示PDF 2種 ／ 今月の注釈 | 2日 | Phase 1 |
-| **3** | Google カレンダー反映 | 1〜2日 | **7-1 の `calendar.events` 追加が完了していること** |
-| **4** | メール設定（文面・宛先）／ 送信プレビュー ／ **方式B（`mailto:`）** | 2日 | なし（スコープ不要） |
+| **2** ✅**実装済み（2026-09-03）** | 掲示PDF 2種（日程表・作業予定連絡票） | 2日 | Phase 1 |
+| **3** | Google カレンダー反映 ／ 今月の注釈 | 1〜2日 | **7-1 の `calendar.events` 追加が完了していること** |
+| **4** ✅**方式Bのみ実装済み（2026-09-03）** | メール設定（文面・宛先）／ 送信プレビュー ／ **方式B（`mailto:`）** | 2日 | なし（スコープ不要） |
 | **4'** | 案内メール **方式A（Gmail下書き作成・PDF自動添付）** | 0.5〜1日 | 7-1 の `gmail.compose` 追加 |
 | **5** | 実施報告書ファイル ／ CSV移行 ／ 実機フィードバック反映 | 2日＋α | Phase 1〜4 |
 
@@ -1106,6 +1106,45 @@ FileMaker の FMPXMLRESULT 形式で4本を受領し、全件を機械検証し�
 - **Phase 1・2・4 はスコープ拡張なしで完遂できる**（一覧・マスタ・掲示PDF・メール作成まで）
 - スコープ拡張を待つのは **Phase 3（カレンダー）と Phase 4'（PDF自動添付）だけ**
 - したがって 13-1 の回答を待たずに着手して差し支えない
+
+### Phase 2・4（方式Bのみ）の実装内容（2026-09-03）
+
+一覧画面の修正依頼と同時に実装した。
+
+| 追加・変更したもの | 内容 |
+|---|---|
+| `supabase`（本番へ直接適用） | `bilmen_mail_settings`（文面。`id='default'` の単一行）／ `bilmen_mail_recipients`（宛先）を追加 |
+| `worker/lib/bilmen.js` | メール設定・宛先の CRUD。`requireMailAccess`（`canWrite` のみ許可＝owner を除外） |
+| `worker/index.js` | `/api/bilmen/mail/settings`・`/api/bilmen/mail/recipients` をルーティング |
+| `worker/lib/reports.js` | `VALID_PDF_KINDS` に `bilmen-schedule`・`bilmen-notice` を追加（掲示PDFのプレビュー保存用） |
+| `src/lib/bilmen.js` | メール設定・宛先のAPI呼び出し、`notifyTargets`（報知対象の判定）、`expandMailVariables`、`buildBilmenNoticeMailto`（方式Bの `mailto:` 組み立て）、`formatMonthDay` |
+| `src/components/BilmenScheduleSheet.jsx`・`.css` | 日程表（1階掲示用）のA4シート |
+| `src/components/BilmenNoticeSheet.jsx`・`.css` | 作業予定連絡票（EV掲示・投函・メール添付用）のA4シート。1ページ5件で自動改ページ |
+| `src/hooks/useBilmenSchedulePdfExport.jsx`・`useBilmenNoticePdfExport.jsx` | 既存の帳票フック（`useInspectionPdfExport.jsx` 等）と同じ構成のPDF出力フック |
+| `src/components/BilmenNotifyModal.jsx` | テナントへの報知モーダル（①連絡票PDFを作成／②`mailto:` でメールを作成の2段階） |
+| `src/pages/BilmenMail.jsx` | メール設定画面 `/bilmen/mail`（文面・宛先の編集）。ハンバーガーメニューのビルメン項目に追加（owner には出さない） |
+| `src/App.jsx`（`RequireStaff`）・`src/components/AppHeader.jsx` | `/bilmen/mail` のルーティングとメニュー追加 |
+| `src/pages/Bilmen.jsx`・`.css` | 一覧の修正依頼対応（後述） |
+
+**あわせて反映した一覧画面の修正依頼（2026-09-03）**:
+
+- モバイル: 表示項目を「予定日付（`mm/dd (曜)`）・開始時刻・作業」の3列だけに削減。管轄／担当会社・入室・報知・実績・報告書確認は詳細モーダルでのみ確認・編集する
+- PC: 入室・報知は誤クリック防止のため一覧では読み取り専用のチェックマーク表示にし、編集は詳細モーダルへ寄せた
+- 月グループ見出し行と「もっと見る」を廃止し、ヘッダの年月選択で選んだ1か月だけを表示する形にした（他の月の明細も同時に表示しない）
+- 日付表示は年を省いた `mm/dd (曜日)` 表記に統一（一覧・PDFの両方）
+- 行のどこをクリックしても詳細モーダルが開くようにした（以前は「作業」欄のリンクのみ）
+
+**計画から縮小・変更した点（要ご確認）**:
+
+- **テナントへの報知は方式B（`mailto:`）のみを実装した**。方式A（Gmail下書きの自動作成・PDF自動添付）は
+  `gmail.compose` の書き込みAPI実装が別途必要なため未着手（7-1・12章のとおりスコープ拡張待ち）。
+  そのため `mailto:` で開いたメール作成画面へ、先に保存した連絡票PDFを**手動で添付**する運用になる
+- **メール文面は複数テンプレート管理をせず、単一の設定行（`bilmen_mail_settings`）にした**。
+  4-1 で想定していた `bilmen_mail_templates`（雛形コード方式）は、現行運用でも雛形が1本のみのため見送った
+- **13-19 の折衷案（`bilmen_mail_recipients.tenant_id` で `equipment_tenants` に任意リンク）は未実装**。
+  宛先は名前・メールアドレス・備考・有効フラグのみを持つ独立テーブルとした。
+  「在館なのに宛先未登録」等の警告表示が必要になった時点で追加する
+- **建物名（`備後町コイズミビル`）は設定テーブルではなく `src/lib/bilmen.js` の定数にした**（13-4で1棟のみと確定済みのため）
 
 ---
 

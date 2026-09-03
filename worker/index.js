@@ -91,6 +91,12 @@ import {
   handleBilmenScheduleDelete,
   handleBilmenGenerateCandidates,
   handleBilmenScheduleGenerate,
+  handleBilmenMailSettingsGet,
+  handleBilmenMailSettingsUpdate,
+  handleBilmenMailRecipientList,
+  handleBilmenMailRecipientCreate,
+  handleBilmenMailRecipientUpdate,
+  handleBilmenMailRecipientDelete,
 } from './lib/bilmen.js'
 
 // Cloudflare Worker 本体。
@@ -1117,6 +1123,20 @@ async function route(req, env) {
   if (pathname === '/api/bilmen/schedules/generate') {
     if (req.method === 'GET') return handleBilmenGenerateCandidates(req)
     if (req.method === 'POST') return handleBilmenScheduleGenerate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // メール設定（文面・宛先）。owner・equipment_out_staff には GET も含めて一切見せない
+  // （worker/lib/bilmen.js の requireMailAccess で判定。10章・13-14）
+  if (pathname === '/api/bilmen/mail/settings') {
+    if (req.method === 'GET') return handleBilmenMailSettingsGet(req)
+    if (req.method === 'PUT') return handleBilmenMailSettingsUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/bilmen/mail/recipients') {
+    if (req.method === 'GET') return handleBilmenMailRecipientList(req)
+    if (req.method === 'POST') return handleBilmenMailRecipientCreate(req)
+    if (req.method === 'PATCH') return handleBilmenMailRecipientUpdate(req)
+    if (req.method === 'DELETE') return handleBilmenMailRecipientDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
 

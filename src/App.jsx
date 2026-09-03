@@ -17,6 +17,7 @@ import EquipmentItems from './pages/EquipmentItems'
 import EquipmentTenants from './pages/EquipmentTenants'
 import Bilmen from './pages/Bilmen'
 import BilmenMasters from './pages/BilmenMasters'
+import BilmenMail from './pages/BilmenMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
@@ -196,9 +197,9 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* ビルメンテナンス管理（Phase 1。2026-09-02〜）。owner（小泉産業様）は閲覧のみ
-            のため RequireAuth（書き込み・カレンダー反映・メール送信はサーバー側で拒否。
-            docs/bilmen-plan.md 10章）。メール設定（/bilmen/mail）は Phase 4 で追加する */}
+        {/* ビルメンテナンス管理（Phase 1・2026-09-02〜。掲示PDF・報知は2026-09-03〜）。
+            owner（小泉産業様）は閲覧のみのため RequireAuth（書き込み・カレンダー反映・
+            メール送信はサーバー側で拒否。docs/bilmen-plan.md 10章） */}
         <Route
           path="/bilmen"
           element={
@@ -213,6 +214,17 @@ function App() {
             <RequireAuth>
               <BilmenMasters />
             </RequireAuth>
+          }
+        />
+        {/* メール設定（文面・宛先）。外部に出る操作の一部のため owner・備品出庫限定ロールには
+            画面ごと見せない（10章・13-14。API側も worker/lib/bilmen.js の requireMailAccess で
+            同じ判定を持つ） */}
+        <Route
+          path="/bilmen/mail"
+          element={
+            <RequireStaff>
+              <BilmenMail />
+            </RequireStaff>
           }
         />
         {/* 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜）。owner・備品出庫限定

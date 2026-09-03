@@ -1,0 +1,116 @@
+/* ビルメン：日程表（1階掲示用）のPDF用シート。A4縦1枚。
+   InspectionSheet.css と同じ方式（手書きの hex 色・mm 指定。html2canvas は oklch 等の
+   新しい色関数を解釈できないため、ここに生値以外の色関数を持ち込まない）。 */
+
+.bsch-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .bsch-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 10mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.bsch-sheet * {
+  box-sizing: border-box;
+}
+
+.bsch-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  height: 12mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.5mm solid #000;
+}
+
+.bsch-heading {
+  font-size: 14pt;
+  font-weight: 700;
+}
+
+.bsch-output-date {
+  font-size: 9pt;
+  color: #333;
+}
+
+.bsch-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.bsch-col-date { width: 22mm; }
+.bsch-col-time { width: 24mm; }
+.bsch-col-title { width: 40mm; }
+.bsch-col-vendor { width: 26mm; }
+.bsch-col-enter { width: 14mm; }
+.bsch-col-notice { width: 64mm; }
+
+.bsch-table th,
+.bsch-table td {
+  border: 0.15mm solid #666;
+  padding: 0.5mm 1.5mm;
+  font-size: 7.5pt;
+  line-height: 1.15;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.bsch-row-head th {
+  height: 8mm;
+  background: #eee;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bsch-day-row td {
+  height: var(--bsch-row-h, 6mm);
+}
+
+.bsch-date-cell {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bsch-holiday-name {
+  display: block;
+  color: #c00;
+  font-size: 6pt;
+  font-weight: 400;
+}
+
+.bsch-day-row.is-saturday td { background: #eaf4fb; }
+.bsch-day-row.is-holiday td { background: #fbeaf0; }
+.bsch-day-row.is-holiday .bsch-date-cell { color: #c00; }
+.bsch-day-row.is-saturday .bsch-date-cell { color: #06c; }
+
+.bsch-time-cell { white-space: nowrap; text-align: center; }
+
+.bsch-title-note {
+  color: #333;
+  font-size: 6.5pt;
+}
+
+.bsch-mark {
+  text-align: center;
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+.bsch-footnote {
+  margin: 2mm 0 0;
+  font-size: 7.5pt;
+  color: #333;
+}
