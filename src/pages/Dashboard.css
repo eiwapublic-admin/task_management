@@ -667,18 +667,14 @@
 /* 日ごとのグループ見出し行（トグルの開閉ボタンを兼ねる）。日の区切り線の代わりに
    この行自体で日の境界が分かるようにした（2026-08-17。以前は logs-day-boundary の
    太線区切りで日を分けていたが、グルーピング＋トグルを導入したため不要になった）。
-   背景は当初 var(--bg-subtle)（ほぼ白）だったが、日の区切りが見つけにくいとの指摘を
-   受け、従量課金画面の見出しバーと同じ濃いグレー var(--text-faint) に変更した
-   （2026-08-29。文字サイズも大きくして視認性を上げた） */
+   背景・フォントは残留塩素の年月グループ見出し（.chlorine-month-head/-label）と
+   統一した（2026-09-03の依頼） */
 .logs-table tbody tr.logs-day-head {
   cursor: pointer;
-  background: var(--text-faint);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
 }
 .logs-table tbody tr.logs-day-head td {
   padding: var(--space-2) var(--space-3);
-}
-.logs-table tbody tr.logs-day-head:hover td {
-  background: color-mix(in srgb, var(--text-faint) 85%, #000);
 }
 
 .logs-day-head-inner {
@@ -689,13 +685,13 @@
 
 .logs-day-toggle-icon {
   flex-shrink: 0;
-  color: var(--text-strong);
+  color: var(--text-muted);
   transition: transform var(--transition);
 }
 .logs-day-toggle-icon.is-open { transform: rotate(90deg); }
 
 .logs-day-label {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text-strong);
   white-space: nowrap;
@@ -2120,8 +2116,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
    ＋トグルと同じ見せ方を年月単位で流用する） */
 .parking-groups { display: flex; flex-direction: column; gap: var(--space-3); }
 
-/* 背景色が薄く年月バナーだと分かりにくいとの指摘（2026-08-25）を受け、
-   .parking-card・.entry-row と同じ「濃いめのグレー背景＋枠線」に揃えた */
+/* 背景・フォントは残留塩素の年月グループ見出し（.chlorine-month-head/-label）と
+   統一した（2026-09-03の依頼。以前は .parking-card・.entry-row と同じ濃いめの
+   グレー背景＋枠線だった） */
 .parking-month-head {
   display: flex;
   align-items: center;
@@ -2130,12 +2127,11 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--bg-muted);
+  background: color-mix(in srgb, var(--status-done) 12%, var(--bg-muted));
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 }
-.parking-month-head:hover { background: color-mix(in srgb, var(--bg-muted) 70%, var(--border-strong)); }
 
 .parking-month-toggle-icon {
   flex-shrink: 0;
@@ -2145,7 +2141,7 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .parking-month-toggle-icon.is-open { transform: rotate(90deg); }
 
 /* カード内の日付（.parking-list-date）と同程度の大きさに揃える（2026-08-25） */
-.parking-month-label { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.parking-month-label { font-size: var(--fs-xl); font-weight: 700; color: var(--text-strong); white-space: nowrap; }
 .parking-month-count { color: var(--text-muted); font-size: var(--fs-sm); }
 
 .parking-month-group .parking-list { margin-top: var(--space-3); }
