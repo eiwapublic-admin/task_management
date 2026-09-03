@@ -10,6 +10,20 @@
 .bilmen-row.is-clickable { cursor: pointer; }
 .ui-table tbody tr.bilmen-row.is-clickable:hover { background: var(--bg-subtle); }
 
+/* 予定一覧（PC幅）：見出し行を既定の .ui-table th（ごく薄いグレー）より濃くし、
+   明細行を縞模様にして行の追いやすさを上げる（2026-09-03の依頼）。モバイルの
+   カード表示（狭幅メディアクエリ側）は行同士がカードの枠線で十分区別できるため対象外 */
+.bilmen-table thead th {
+  background: var(--border-strong);
+  color: var(--text-strong);
+}
+
+@media (min-width: 769px) {
+  .bilmen-table tbody tr.bilmen-row:nth-child(even) {
+    background: var(--bg-app);
+  }
+}
+
 /* 予定日付。日曜・祝日は赤、土曜は青（既存の weekdayInfo() の className に合わせる） */
 .bilmen-date { white-space: nowrap; }
 .bilmen-date.is-saturday { color: var(--color-primary-hover); }
@@ -124,6 +138,14 @@
 /* ヘッダの掲示PDF・報知ボタンは通常の .btn-plain（IconDocument/IconMail + .btn-plain-label）。
    .btn-plain-label は共通CSSの規則でiPhone幅（480px以下）で自動的にアイコンのみへ縮む
    （src/styles/ui.css 参照）。 */
+
+/* ---- メール設定（/bilmen/mail） ---- */
+
+/* 宛先一覧の明細行を縞模様にする（2026-09-03の依頼。末尾の新規追加行にも掛かるが
+   実害はない） */
+.bilmen-mail-recipients-table tbody tr:nth-child(even) {
+  background: var(--bg-app);
+}
 
 /* ---- モーダル（予定詳細・作業マスタ・自動作成） ---- */
 

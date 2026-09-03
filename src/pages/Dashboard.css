@@ -623,6 +623,12 @@
   border-bottom: none;
 }
 
+/* 明細行を縞模様にする（2026-09-03の依頼）。日ごとの見出し行（.logs-day-head。
+   下の方で背景色を別途指定）は対象から除く */
+.logs-table tbody tr:not(.logs-day-head):nth-child(even) {
+  background: var(--bg-app);
+}
+
 .logs-time,
 .logs-actor {
   white-space: nowrap;
