@@ -10,18 +10,19 @@ function currentMonthJST() {
 
 // 月別の行から表示用の集計値を作る。該当行が無い月は 0 件として扱う。
 function summarize(rows) {
-  const total = { calls: 0, faxCalls: 0, parkingCalls: 0, input: 0, output: 0 }
+  const total = { calls: 0, faxCalls: 0, parkingCalls: 0, wasteCalls: 0, input: 0, output: 0 }
   for (const r of rows) {
     total.calls += r.calls || 0
     total.faxCalls += r.fax_calls || 0
     total.parkingCalls += r.parking_calls || 0
+    total.wasteCalls += r.waste_calls || 0
     total.input += r.input_tokens || 0
     total.output += r.output_tokens || 0
   }
   return {
     ...total,
-    // 「分類したメール」はFAX・車両画像を除いた件数（単価・読み取り対象が異なるため内訳を分ける）
-    mailCalls: Math.max(total.calls - total.faxCalls - total.parkingCalls, 0),
+    // 「分類したメール」はFAX・車両画像・廃棄物スキャンを除いた件数（単価・読み取り対象が異なるため内訳を分ける）
+    mailCalls: Math.max(total.calls - total.faxCalls - total.parkingCalls - total.wasteCalls, 0),
     costUSD: estimateCostUSD(total.input, total.output),
   }
 }
@@ -76,6 +77,7 @@ export default function UsagePanel() {
                   <th className="num">メール</th>
                   <th className="num">FAX</th>
                   <th className="num">車両画像</th>
+                  <th className="num">廃棄物</th>
                   <th className="num">入力トークン</th>
                   <th className="num">出力トークン</th>
                   <th className="num">推定コスト</th>
@@ -92,6 +94,7 @@ export default function UsagePanel() {
                     <td className="num">{r.mailCalls.toLocaleString('ja-JP')}</td>
                     <td className="num">{r.faxCalls.toLocaleString('ja-JP')}</td>
                     <td className="num">{r.parkingCalls.toLocaleString('ja-JP')}</td>
+                    <td className="num">{r.wasteCalls.toLocaleString('ja-JP')}</td>
                     <td className="num">{r.input.toLocaleString('ja-JP')}</td>
                     <td className="num">{r.output.toLocaleString('ja-JP')}</td>
                     <td className="num">{formatUSD(r.costUSD)}</td>
@@ -105,6 +108,7 @@ export default function UsagePanel() {
                   <td className="num">{grand.mailCalls.toLocaleString('ja-JP')}</td>
                   <td className="num">{grand.faxCalls.toLocaleString('ja-JP')}</td>
                   <td className="num">{grand.parkingCalls.toLocaleString('ja-JP')}</td>
+                  <td className="num">{grand.wasteCalls.toLocaleString('ja-JP')}</td>
                   <td className="num">{grand.input.toLocaleString('ja-JP')}</td>
                   <td className="num">{grand.output.toLocaleString('ja-JP')}</td>
                   <td className="num">{formatUSD(grand.costUSD)}</td>

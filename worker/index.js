@@ -339,7 +339,7 @@ async function handleUsage(req) {
     const month = new URL(req.url).searchParams.get('month') || ''
     const supabase = getAdminClient()
     const columns =
-      'month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, updated_at'
+      'month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, waste_calls, updated_at'
     // month 未指定なら全期間の月別データを新しい順で返す（今月・先月・累計の
     // 表示に使う。2026-08-03）。件数は月単位のため増え方が緩やかで、全件返しても軽い。
     if (!month) {
