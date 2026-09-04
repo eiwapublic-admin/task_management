@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import WasteScanModal from '../components/WasteScanModal'
+import useWasteSheetPdfExport from '../hooks/useWasteSheetPdfExport'
 import { IconChevronLeft, IconChevronRight, IconDocument } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
@@ -37,6 +38,7 @@ export default function Waste() {
   const [info, setInfo] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const sheetExport = useWasteSheetPdfExport()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -195,18 +197,29 @@ export default function Waste() {
             </>
           }
           actions={
-            !readOnly &&
             viewMode === 'month' && (
               <>
-                {unconfirmedCount > 0 && (
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => sheetExport.download(month, holidays)}
+                  disabled={sheetExport.busy}
+                  title="記入用の空欄シートをPDF出力（印刷して手書きの入力用紙として配布）"
+                >
+                  <IconDocument size={16} />
+                  <span className="btn-plain-label">入力シートを印刷</span>
+                </button>
+                {!readOnly && unconfirmedCount > 0 && (
                   <button type="button" className="btn-plain" onClick={handleConfirmMonth} disabled={confirming}>
                     {confirming ? '確認中…' : `この月を確認済みにする（${unconfirmedCount}）`}
                   </button>
                 )}
-                <button type="button" className="btn-plain" onClick={() => setScanOpen(true)}>
-                  <IconDocument size={16} />
-                  <span className="btn-plain-label">スキャン取込</span>
-                </button>
+                {!readOnly && (
+                  <button type="button" className="btn-plain" onClick={() => setScanOpen(true)}>
+                    <IconDocument size={16} />
+                    <span className="btn-plain-label">スキャン取込</span>
+                  </button>
+                )}
               </>
             )
           }
@@ -215,6 +228,11 @@ export default function Waste() {
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
             {error}
+          </p>
+        )}
+        {sheetExport.error && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {sheetExport.error}
           </p>
         )}
         {info && <p className="dashboard-banner">{info}</p>}
@@ -245,6 +263,10 @@ export default function Waste() {
       {scanOpen && (
         <WasteScanModal defaultMonth={month} onClose={() => setScanOpen(false)} onDone={handleScanDone} />
       )}
+
+      {sheetExport.sheetsPortal}
+      {sheetExport.previewModal}
+      {sheetExport.busyOverlay}
     </div>
   )
 }

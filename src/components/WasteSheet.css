@@ -1,0 +1,95 @@
+/* 廃棄物実測集計表（記入用の空欄シート）のPDF用シート。A4縦1枚。
+   BilmenScheduleSheet.css と同じ方式（手書きの hex 色・mm 指定。html2canvas は oklch 等の
+   新しい色関数を解釈できないため、ここに生値以外の色関数を持ち込まない）。 */
+
+.waste-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .waste-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 10mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.waste-sheet * {
+  box-sizing: border-box;
+}
+
+.waste-sheet-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  height: 10mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.5mm solid #000;
+}
+
+.waste-sheet-heading {
+  font-size: 15pt;
+  font-weight: 700;
+}
+
+.waste-sheet-unit {
+  font-size: 10pt;
+  color: #333;
+}
+
+.waste-sheet-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.wsh-col-date { width: 14mm; }
+.wsh-col-weekday { width: 16mm; }
+.wsh-col-total { width: 20mm; }
+
+.waste-sheet-table th,
+.waste-sheet-table td {
+  border: 0.15mm solid #666;
+  text-align: center;
+  font-size: 10pt;
+}
+
+.waste-sheet-table thead th {
+  height: 7mm;
+  background: #eee;
+  font-weight: 700;
+}
+
+.waste-sheet-table tbody tr:not(.waste-sheet-spacer) td {
+  height: var(--wsh-row-h, 6mm);
+}
+
+.wsh-date-cell { font-weight: 700; }
+
+tr.is-holiday { background: #fbdce0; }
+tr.is-holiday .wsh-date-cell { color: #c00; }
+
+.waste-sheet-spacer td {
+  height: 3mm;
+  border-left: none;
+  border-right: none;
+  background: #ccc;
+}
+
+.waste-sheet-total-row td {
+  font-weight: 700;
+  background: #f5f5f5;
+}
+
+.waste-sheet-total-row td:first-child {
+  text-align: left;
+  padding-left: 2mm;
+}
