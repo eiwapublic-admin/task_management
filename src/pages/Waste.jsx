@@ -325,7 +325,7 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
 
   return (
     <div className="ui-table-wrap">
-      <table className="ui-table waste-table">
+      <table className="ui-table waste-table waste-month-table">
         <thead>
           <tr>
             <th>日</th>
