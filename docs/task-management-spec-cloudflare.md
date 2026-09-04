@@ -1012,12 +1012,15 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 | calls | integer | 当日の呼び出し回数 |
 | updated_at | timestamptz | |
 
-`settings.daily_api_cost_limit_usd`（既定 0.50・設定画面「AI利用の1日あたり上限」で変更可）で
+`settings.daily_api_cost_limit_usd`（既定 0.50・**従量課金事項の画面（`/usage`）**の
+「AI利用の1日あたり上限」で変更可。2026-09-04にタスク設定から移設）で
 指定した金額に、当日の推定利用額が達すると**その日のAI処理を自動停止する**。判定・加算は
 `worker/lib/usageLimit.js`（`checkDailyLimit` / `addTodayUsage`）に集約し、メール分類・違反車両・
 廃棄物スキャンの3経路すべてで**Claudeを呼ぶ直前に**判定する。メール分類は1件ごとに加算して
 都度判定するため、1回の実行の中で暴走しても上限で止まる。停止時は `settings.api_limit_alert`
 に記録し、ダッシュボードにバナーを出す（日付が変われば自動的に解除・再開）。
+なお、メール取得の処理ログは `summary.errors` が1件でもあれば `log_type: 'error'`（赤いバッジ・
+「メール取得エラー」表記）で記録する（2026-09-04。失敗が平常時と同じ見た目で流れて気づけなかったため）。
 単価は `worker/lib/usageLimit.js` にも持っており、**`src/lib/pricing.js` と同じ値に保つこと**。
 
 ### processed_messages（業務外と判定したメールの記録。2026-09-04）

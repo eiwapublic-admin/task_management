@@ -267,6 +267,32 @@
   font-size: var(--fs-sm);
 }
 
+/* AI利用の1日あたり上限（2026-09-04。従量課金事項の画面内） */
+/* .usage-panel 自体が padding を持つため、ここでは付けない（二重の余白になる） */
+.usage-limit-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.usage-limit-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.usage-limit-input {
+  width: 8em;
+}
+
+.usage-limit-status {
+  font-size: var(--fs-sm);
+  color: var(--color-brand);
+}
+
 .usage-cost {
   font-weight: 600;
   color: var(--text-strong);

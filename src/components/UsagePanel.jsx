@@ -1,8 +1,88 @@
 import { useEffect, useMemo, useState } from 'react'
-import { fetchUsageMonths } from '../lib/tasks'
+import { fetchUsageMonths, fetchSettings } from '../lib/tasks'
+import { saveSettings } from '../lib/api'
 import { fetchStorageUsage } from '../lib/reports'
 import { estimateCostUSD, formatUSD, formatJPY, BILLING_URL } from '../lib/pricing'
 import { formatBytes } from '../lib/imageResize'
+
+// AI利用の1日あたり上限（USD）の既定値。worker/lib/usageLimit.js と同じ値を保つこと
+const DEFAULT_DAILY_LIMIT_USD = 0.5
+
+// 1日あたり上限の設定（2026-09-04。当初はタスク設定に置いたが、金額の設定は課金実績と
+// 同じ画面で見られる方が分かりやすいため、依頼によりこの画面へ移設した）
+function DailyLimitSection() {
+  const [limit, setLimit] = useState(null)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchSettings()
+      .then((s) => {
+        const n = Number(s.daily_api_cost_limit_usd)
+        setLimit(Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_LIMIT_USD)
+      })
+      .catch((err) => setError(err.message))
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    setStatus('')
+    setError('')
+    try {
+      const n = Number(limit)
+      const safe = Number.isFinite(n) && n > 0 ? Math.min(50, Math.max(0.05, n)) : DEFAULT_DAILY_LIMIT_USD
+      setLimit(safe)
+      await saveSettings({ daily_api_cost_limit_usd: String(safe) })
+      setStatus('保存しました')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (limit === null && !error) return null
+
+  return (
+    <section className="usage-panel">
+      <div className="usage-panel-title">
+        <h2>AI利用の1日あたり上限</h2>
+      </div>
+      {error && (
+        <p className="dashboard-error dashboard-banner" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="usage-limit-row">
+        <label className="usage-limit-label">
+          上限（ドル／日）
+          <input
+            className="ui-input usage-limit-input"
+            type="number"
+            inputMode="decimal"
+            min={0.05}
+            max={50}
+            step={0.05}
+            value={limit ?? ''}
+            onChange={(e) => setLimit(e.target.value)}
+          />
+        </label>
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? '保存中…' : '保存'}
+        </button>
+        {status && <span className="usage-limit-status">{status}</span>}
+      </div>
+      <p className="settings-hint usage-note">
+        メールの自動分類・FAX や写真の読み取りに使うAI（Claude）の利用額が、1日でこの金額に達すると
+        <strong>その日のAI処理を自動的に停止します</strong>
+        （不具合などで想定外に使い続けてしまった場合の歯止めです）。
+        日付が変われば自動的に再開します。停止中も、タスク管理・日報などAI以外の機能は通常どおり使えます。
+        通常の利用実績は1日あたり0.06〜0.08ドル程度のため、初期値の0.50ドルなら通常の運用で止まることはありません。
+      </p>
+    </section>
+  )
+}
 
 function currentMonthJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)
@@ -123,6 +203,8 @@ export default function UsagePanel() {
           実際の請求額は Anthropic の確定値が正となります。
         </p>
       </section>
+
+      <DailyLimitSection />
 
       {storage && (
         <section className="usage-panel">
