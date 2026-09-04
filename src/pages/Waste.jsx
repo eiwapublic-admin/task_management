@@ -3,7 +3,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import WasteScanModal from '../components/WasteScanModal'
 import useWasteSheetPdfExport from '../hooks/useWasteSheetPdfExport'
-import { IconChevronLeft, IconChevronRight, IconDocument } from '../components/Icons'
+import { IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import {
   WASTE_FLOORS,
@@ -206,8 +206,7 @@ export default function Waste() {
                   disabled={sheetExport.busy}
                   title="記入用の空欄シートをPDF出力（印刷して手書きの入力用紙として配布）"
                 >
-                  <IconDocument size={16} />
-                  <span className="btn-plain-label">入力シートを印刷</span>
+                  入力用フォーム
                 </button>
                 {!readOnly && unconfirmedCount > 0 && (
                   <button type="button" className="btn-plain" onClick={handleConfirmMonth} disabled={confirming}>
@@ -215,9 +214,8 @@ export default function Waste() {
                   </button>
                 )}
                 {!readOnly && (
-                  <button type="button" className="btn-plain" onClick={() => setScanOpen(true)}>
-                    <IconDocument size={16} />
-                    <span className="btn-plain-label">スキャン取込</span>
+                  <button type="button" className="btn-plain" onClick={() => setScanOpen(true)} title="スキャン取込">
+                    スキャン
                   </button>
                 )}
               </>
@@ -382,63 +380,47 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
 
 function YearTable({ fiscalYear, records }) {
   const months = fiscalYearMonths(fiscalYear)
-  const sums = useMemo(() => {
-    const map = new Map() // 'YYYY-MM|floor' -> total
+  const monthTotals = useMemo(() => {
+    const map = new Map() // 'YYYY-MM' -> total
     for (const r of records) {
-      const key = `${r.record_date.slice(0, 7)}|${r.floor}`
+      const key = r.record_date.slice(0, 7)
       map.set(key, (map.get(key) || 0) + Number(r.weight_kg))
     }
     return map
   }, [records])
 
-  const colTotals = WASTE_FLOORS.map((floor) =>
-    months.reduce((sum, m) => sum + (sums.get(`${m}|${floor}`) || 0), 0)
-  )
-  const grandTotal = colTotals.reduce((a, b) => a + b, 0)
+  const grandTotal = months.reduce((sum, m) => sum + (monthTotals.get(m) || 0), 0)
 
   return (
-    <div className="ui-table-wrap">
-      <table className="ui-table waste-table">
-        <thead>
-          <tr>
-            <th>月</th>
-            {WASTE_FLOORS.map((f) => (
-              <th key={f} className="is-numeric">
-                {f}階
-              </th>
-            ))}
-            <th className="is-numeric">合計</th>
-          </tr>
-        </thead>
-        <tbody>
-          {months.map((m) => {
-            const rowTotal = WASTE_FLOORS.reduce((sum, f) => sum + (sums.get(`${m}|${f}`) || 0), 0)
-            return (
-              <tr key={m}>
-                <td>{Number(m.slice(5, 7))}月</td>
-                {WASTE_FLOORS.map((f) => {
-                  const v = sums.get(`${m}|${f}`) || 0
-                  return (
-                    <td key={f} className="is-numeric">
-                      {v > 0 ? v.toFixed(1) : ''}
-                    </td>
-                  )
-                })}
-                <td className="is-numeric waste-row-total">{rowTotal > 0 ? rowTotal.toFixed(1) : ''}</td>
-              </tr>
-            )
-          })}
-          <tr className="waste-total-row">
-            <td>{fiscalYear}年度 合計</td>
-            {colTotals.map((total, i) => (
-              <td key={WASTE_FLOORS[i]} className="is-numeric">
-                {total > 0 ? total.toFixed(1) : ''}
-              </td>
-            ))}
-            <td className="is-numeric">{grandTotal > 0 ? grandTotal.toFixed(1) : ''}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <>
+      <p className="waste-year-total">
+        <span className="waste-year-total-label">{fiscalYear}年度 合計</span>
+        <span className="waste-year-total-value">
+          {grandTotal > 0 ? grandTotal.toFixed(1) : '0.0'}
+          <span className="waste-year-total-unit"> kg</span>
+        </span>
+      </p>
+      <div className="ui-table-wrap">
+        <table className="ui-table waste-table">
+          <thead>
+            <tr>
+              <th>月</th>
+              <th className="is-numeric">合計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((m) => {
+              const total = monthTotals.get(m) || 0
+              return (
+                <tr key={m}>
+                  <td>{Number(m.slice(5, 7))}月</td>
+                  <td className="is-numeric waste-row-total">{total > 0 ? total.toFixed(1) : ''}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
