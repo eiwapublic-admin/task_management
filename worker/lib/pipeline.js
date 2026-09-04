@@ -240,6 +240,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   const intervalMin = Math.max(1, Number(settings.fetch_interval_minutes) || 30)
   const lastFetchAt = settings.last_fetch_at ? new Date(settings.last_fetch_at) : null
+  // 更新間隔ゲート専用の時刻（2026-09-04）。last_fetch_at とは役割が違うので混同しないこと。
+  //   last_fetch_at … 取得クエリの窓（after:）。**最後まで完走したときだけ**前進させる。
+  //                    途中で落ちた実行で前進させると、そのメールを永久に取りこぼす
+  //                    （anthropic.js 冒頭の 2026-07-27 の事例を参照）。
+  //   last_run_at   … 実行間隔の抑制のみに使う。**Claude を呼ぶ前に必ず記録する**ので、
+  //                    実行が途中で落ちても次の cron 刻みはゲートで止まる。
+  // 両者を分けた経緯は 9/3 の課金事故（docs/ai-cost-and-alternatives.md 9章「原因B」）。
+  // 当時はゲートも last_fetch_at を見ていたため、手順7に到達できない実行が続くと
+  // 経過時間が常に間隔を超え、ゲートが素通りして cron の 5 分間隔がそのまま実行間隔に
+  // なっていた（1日19回 → 約120回）。
+  const lastRunAt = settings.last_run_at ? new Date(settings.last_run_at) : null
   const assignees = parseAssignees(settings.assignees)
   const orgContext = settings.org_context || ''
   const businessKeywords = settings.business_keywords || ''
@@ -274,16 +285,74 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     }
   }
 
-  // 更新間隔ゲート（スケジュール実行時のコスト抑制）
-  if (!force && lastFetchAt) {
-    const elapsedMin = (Date.now() - lastFetchAt.getTime()) / 60000
+  // 更新間隔ゲート（スケジュール実行時のコスト抑制）。
+  // 判定は last_run_at（実行を開始した時刻）で行う。last_fetch_at で判定すると、
+  // 完走できない実行が続いたときにゲートごと外れてしまうため（上のコメント参照）。
+  // last_run_at がまだ無い場合だけ last_fetch_at にフォールバックする。
+  const gateBase = lastRunAt || lastFetchAt
+  if (!force && gateBase && Number.isFinite(gateBase.getTime())) {
+    const elapsedMin = (Date.now() - gateBase.getTime()) / 60000
     if (elapsedMin < intervalMin) {
-      return { skipped: true, reason: `前回取得から${Math.round(elapsedMin)}分（間隔${intervalMin}分）`, created: 0 }
+      return { skipped: true, reason: `前回実行から${Math.round(elapsedMin)}分（間隔${intervalMin}分）`, created: 0 }
+    }
+  }
+
+  // ゲートを通過したらすぐ last_run_at を記録する。**Claude 呼び出しより前**に置くこと。
+  // ここから先で実行が落ちても、次の cron 刻みは上のゲートで止まる（暴走の上限を
+  // 「間隔あたり1回」に固定する）。記録に失敗したときは抑制が効かなくなるため、
+  // 安全側に倒してこの回の実行自体を見送る。
+  {
+    const { error: runMarkError } = await supabase
+      .from('settings')
+      .upsert({ key: 'last_run_at', value: new Date().toISOString() }, { onConflict: 'key' })
+    if (runMarkError) {
+      console.error('last_run_at の記録に失敗:', runMarkError.message)
+      return { skipped: true, reason: `last_run_at の記録に失敗: ${runMarkError.message}`, created: 0 }
     }
   }
 
   const summary = { fetched: 0, created: 0, replied: 0, updated: 0, nonBusiness: 0, errors: [], creditAlert: null }
   const logRows = []
+
+  // 取得窓の凍結検知（2026-09-04）。
+  // last_run_at（実行を開始した時刻・Claude呼び出し前に必ず記録）と
+  // last_fetch_at（最後まで完走したときだけ前進）を突き合わせる。前者が後者より
+  // 大きく先行していたら「実行は来ているのに完走していない」＝どこかで落ち続けて
+  // いる、と稼働時間に依存せず判定できる（稼働時間外の空白では両方が同じだけ
+  // 古くなるので、差は開かない）。
+  //
+  // 放置すると取得窓が固定されたまま新着が溜まり続け（MAX_MESSAGES で頭打ちになり
+  // 取りこぼす）、業務外メールの判定漏れのようなバグがあれば同じメールへの
+  // Claude呼び出しを繰り返す。9/3の課金事故はこれに丸一日気づけなかったことで
+  // 被害が広がったので、赤字の error ログで画面に出す。
+  //
+  // ログは logRows に積まずに**その場で書く**。logRows の挿入は手順6にあり、
+  // ここで検知したいのは「手順6・7まで到達できていない」状態そのものなので、
+  // 末尾にまとめて書く方式では肝心のときに残らない。
+  // 連続実行のたびに赤い行が増えるのを避けるため、通知は1日1回に絞る
+  // （クレジット不足・上限到達の通知と同じ考え方）。
+  if (
+    lastRunAt &&
+    lastFetchAt &&
+    Number.isFinite(lastRunAt.getTime()) &&
+    Number.isFinite(lastFetchAt.getTime())
+  ) {
+    const behindMin = (lastRunAt.getTime() - lastFetchAt.getTime()) / 60000
+    if (behindMin >= intervalMin * 2) {
+      const message =
+        `メール取得が最後まで完了していません（実行は${Math.round(behindMin)}分ぶん進んでいるのに、` +
+        `取得の進捗が更新されていません）。同じメールの再取得・再分類が繰り返されている可能性が` +
+        `あるため、Cloudflare Workers のログを確認してください。`
+      summary.errors.push(message)
+      const today = todayJST()
+      if (settings.fetch_stall_alert_on !== today) {
+        await supabase.from('activity_logs').insert({ log_type: 'error', actor, message })
+        await supabase
+          .from('settings')
+          .upsert({ key: 'fetch_stall_alert_on', value: today }, { onConflict: 'key' })
+      }
+    }
+  }
 
   // Claude 利用量の集計とクレジット不足の検知
   let usageInput = 0

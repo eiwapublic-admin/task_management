@@ -91,7 +91,14 @@ insert into settings (key, value) values
   ('calendar_name', '栄和共通'),      -- 取得対象の Google カレンダー名 または カレンダーID（@を含む場合はID直接指定）
   ('archive_after_days', '30'),  -- 「完了」からこの日数を超えたタスクをアーカイブに移行（0 で無効）
   ('api_credit_alert', ''),      -- クレジット不足アラート（pipeline が設定/解除）
-  ('last_fetch_at', null)
+  -- last_fetch_at と last_run_at は役割が違うので混同しないこと（2026-09-04）。
+  --   last_fetch_at … 取得クエリの窓（after:）。取得処理が最後まで完走したときだけ前進する
+  --   last_run_at   … 更新間隔ゲート専用。Claude を呼ぶ前に必ず記録するため、
+  --                    実行が途中で落ちても次の cron 刻みは間隔ゲートで止まる
+  --                    （9/3の課金事故の再発防止。docs/ai-cost-and-alternatives.md 9章）
+  ('last_fetch_at', null),
+  ('last_run_at', null),
+  ('fetch_stall_alert_on', '')   -- 取得窓の凍結を通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
 on conflict (key) do nothing;
 
 -- api_usage: Claude API の月次利用量（推定コスト表示用）
