@@ -245,7 +245,16 @@ export async function handleWasteScanRecognize(req) {
       p_parking_calls: 0,
       p_waste_calls: 1,
     })
-    if (usageErr) console.error('waste-recognize(usage):', usageErr.message)
+    // 記録に失敗すると、実際には課金されているのに従量課金事項の画面に出ない状態になる。
+    // console.error だけでは画面から気づけないため、処理ログにも残す（2026-09-04）。
+    if (usageErr) {
+      console.error('waste-recognize(usage):', usageErr.message)
+      await supabase.from('activity_logs').insert({
+        log_type: 'error',
+        actor: 'システム（自動）',
+        message: `廃棄物スキャンのAI読み取りの利用量記録に失敗しました（${usageErr.message}）。実際のAPI利用は発生しているため、従量課金事項の表示が実額より少なくなります。`,
+      })
+    }
 
     // 読み取れたマスだけを upsert 候補にする（null は既存値を消さないよう対象外）
     const rows = []

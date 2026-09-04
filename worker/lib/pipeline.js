@@ -345,6 +345,13 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   const processedThreads = new Set()
   const processedMessages = new Set()
 
+  // 業務外と判定済みのメッセージ（2026-09-04）。タスクを作らないメールは tasks に
+  // gmail_message_id が残らないため、これが無いと取得クエリに入り続ける限り毎回
+  // 再分類され、添付PDF/画像を毎回 Claude へ再送信してAPIクレジットを浪費する
+  // （実際に9/3-9/4で平常の約20倍のコストが発生した。docs/HANDOFF.md 219番）。
+  const { data: judgedRows } = await supabase.from('processed_messages').select('gmail_message_id')
+  const judgedMessages = new Set((judgedRows || []).map((r) => r.gmail_message_id))
+
   const context = { assignees, orgContext, businessKeywords, today: todayJST() }
 
   // 未処理タスクの一覧（件名ベースの返信検知用）。
@@ -586,6 +593,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 無いスレッドは対象外）に限定しており、完了済みタスクの陰に別件が隠れて取りこぼされる
       // のを防ぐ（2026-08-17。上記 existingThreads の構築箇所のコメント参照）。
       if (existingMessages.has(email.id) || processedMessages.has(email.id)) continue
+      // 過去に業務外と判定済みのメールは、添付の取得も分類（Claude呼び出し）も行わずに
+      // 打ち切る。**この判定は必ず collectClassifierDocuments / classifyEmail より前に
+      // 置くこと**（後ろに置くと課金が発生してしまい、この修正の意味が無くなる）。
+      if (judgedMessages.has(email.id)) continue
       processedMessages.add(email.id)
       if (!isFaxGatewayEmail(email)) {
         if (existingThreads.has(email.threadId) || processedThreads.has(email.threadId)) continue
@@ -647,6 +658,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
       if (!isFax && !isJitsumoriReport && !result.is_business_task) {
         summary.nonBusiness += 1
+        // タスクを作らないため、ここで判定済みとして記録しないと次の巡回でまた
+        // Claude に送られてしまう（2026-09-04のAPIクレジット浪費の原因）。
+        judgedMessages.add(email.id)
+        const { error: judgedErr } = await supabase
+          .from('processed_messages')
+          .upsert(
+            { gmail_message_id: email.id, reason: 'non_business', subject: email.subject || null },
+            { onConflict: 'gmail_message_id' }
+          )
+        // 記録に失敗すると再分類による課金が続くため、ログに出して気づけるようにする
+        if (judgedErr) summary.errors.push(`processed_messages: ${judgedErr.message}`)
         continue
       }
 
@@ -1073,6 +1095,13 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     .from('activity_logs')
     .delete()
     .lt('created_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
+
+  // 業務外判定の記録も同じ保持期間で掃除する。取得クエリは last_fetch_at 以降しか
+  // 見ないため、古い記録を残し続ける必要はない（残すと照合対象が無限に増える）。
+  await supabase
+    .from('processed_messages')
+    .delete()
+    .lt('judged_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
 
   // 7) last_fetch_at を更新
   await supabase

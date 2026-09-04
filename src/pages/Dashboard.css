@@ -658,6 +658,12 @@
   color: var(--color-warn);
 }
 
+/* エラー種別（2026-09-04）。見落とすと課金に直結するため危険色で示す */
+.logs-type-error {
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
 .logs-note {
   margin-top: var(--space-3);
   font-size: var(--fs-xs);

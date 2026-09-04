@@ -10,6 +10,7 @@ const TYPE_LABELS = {
   fetch: 'メール取得',
   status_change: 'ステータス変更',
   backup: 'バックアップ',
+  error: 'エラー',
 }
 
 // タイムスタンプを JST の 'YYYY-MM-DD' にする（日ごとのグルーピング用）

@@ -158,7 +158,24 @@ create table if not exists activity_logs (
 
 -- log_type に 'backup' を追加（マイグレーション allow_backup_activity_log_type 適用済み。2026-08-27）
 alter table activity_logs drop constraint if exists activity_logs_log_type_check;
-alter table activity_logs add constraint activity_logs_log_type_check check (log_type in ('fetch', 'status_change', 'backup'));
+alter table activity_logs add constraint activity_logs_log_type_check check (log_type in ('fetch', 'status_change', 'backup', 'error'));
+
+-- log_type に 'error' を追加（マイグレーション allow_error_activity_log_type 適用済み。2026-09-04）
+-- 違反車両・廃棄物のAI読み取りの利用量記録が失敗しても画面から気づけなかったため。
+
+-- processed_messages: 業務外（スパム含む）と判定したメールの記録
+-- （マイグレーション add_processed_messages 適用済み。2026-09-04）
+-- タスクを作らないメールは tasks に gmail_message_id が残らないため、これが無いと
+-- 巡回のたびに再取得・再分類され、添付PDF/画像を毎回 Claude へ再送信してしまう。
+create table if not exists processed_messages (
+  gmail_message_id text primary key,
+  reason           text not null default 'non_business',
+  subject          text,
+  judged_at        timestamptz not null default now()
+);
+create index if not exists processed_messages_judged_at_idx on processed_messages (judged_at);
+alter table processed_messages enable row level security;
+revoke all on processed_messages from anon, authenticated;
 
 create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
 
