@@ -16,6 +16,43 @@
 .waste-day.is-saturday { color: var(--color-primary-hover); }
 .waste-day.is-holiday { color: var(--color-danger); }
 
+/* 月別一覧（.waste-month-table）：床数(7)+合計+日+曜日で列数が多く、モバイルでは
+   横スクロールが前提になる。日・曜日の2列だけ左端に固定し（frozen columns。
+   Equipment.css の入出庫明細表と同じ考え方）、スクロールしても日付が追えるようにする
+   （2026-09-04）。合計行の先頭セルは colSpan=2（「合計」ラベル）のため、2列目の
+   固定はそれ以外の行だけに絞る（そうしないと実際は1階列である2番目のtdが
+   ずれて固定されてしまう）。年間集計表（.waste-table だが .waste-month-table
+   ではない）は列数が少なく対象外 */
+.waste-month-table th:nth-child(1),
+.waste-month-table td:nth-child(1) { width: 2.5em; }
+.waste-month-table th:nth-child(2),
+.waste-month-table tbody tr:not(.waste-total-row) td:nth-child(2) { width: 3em; }
+
+.waste-month-table th:nth-child(1),
+.waste-month-table th:nth-child(2),
+.waste-month-table td:nth-child(1),
+.waste-month-table tbody tr:not(.waste-total-row) td:nth-child(2) {
+  position: sticky;
+  z-index: 1;
+}
+.waste-month-table th:nth-child(1),
+.waste-month-table td:nth-child(1) { left: 0; }
+.waste-month-table th:nth-child(2),
+.waste-month-table tbody tr:not(.waste-total-row) td:nth-child(2) {
+  left: 2.5em;
+  border-right: 1px solid var(--border);
+}
+
+/* 固定列は下の行がスクロールで透けないよう、各行の状態に合わせた不透明な背景を
+   個別に持たせる必要がある（tr の背景は td 自体には効かないため） */
+.waste-month-table th:nth-child(1),
+.waste-month-table th:nth-child(2) { background: var(--border-strong); }
+.waste-month-table td:nth-child(1),
+.waste-month-table tbody tr:not(.waste-total-row) td:nth-child(2) { background: var(--bg-surface); }
+.waste-month-table tbody tr:nth-child(even) td:nth-child(1),
+.waste-month-table tbody tr:nth-child(even):not(.waste-total-row) td:nth-child(2) { background: var(--bg-app); }
+.waste-month-table .waste-total-row td:nth-child(1) { background: var(--bg-muted); }
+
 .waste-col-cell { padding: var(--space-1) !important; }
 
 .waste-cell-input {

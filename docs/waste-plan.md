@@ -228,3 +228,17 @@ create table waste_scans (
 | `src/hooks/useWasteSheetPdfExport.jsx` | PDF出力フック。月と祝日だけを渡す単純な1ページ出力（値を扱わないため他の帳票フックより単純） |
 | `worker/lib/reports.js` | `VALID_PDF_KINDS` に `waste-sheet` を追加（プレビュー保存の許可リスト） |
 | `src/pages/Waste.jsx` | ヘッダーに「入力シートを印刷」ボタンを追加。**readOnly（owner・備品出庫限定ロール）でも使える**（値を含まない出力のため、スキャン取込・確認済みにするボタンとは異なり制限しない） |
+
+### 10-2. 月別一覧表：日・曜日列を横スクロールでも固定（2026-09-04）
+
+「モバイル画面で見やすいように」との依頼で、月別一覧（`MonthTable`）の日・曜日の2列を
+横スクロールしても常に見える frozen column にした。床数(7)+合計+日+曜日で列数が多く、
+iPhone幅では横スクロールが前提になるため、日付を見失わないようにする。
+
+| 変更したもの | 内容 |
+|---|---|
+| `src/pages/Waste.jsx` | `MonthTable` の `<table>` に `waste-month-table` クラスを追加（年間集計表と区別するため。年間集計表は列数が少なく対象外） |
+| `src/pages/Waste.css` | `.waste-month-table` の日・曜日列（1・2列目）に `position: sticky` を適用（`Equipment.css` の入出庫明細表の frozen column と同じ考え方）。固定列は下の行がスクロールで透けないよう、縞模様・合計行それぞれの背景色を個別に持たせた。合計行の先頭セルは `colSpan={2}`（「合計」ラベル）のため、2列目の固定はそれ以外の行に限定（さもないと実際は1階列である2番目の`td`がずれて固定されてしまう） |
+
+実機確認は未実施（このAI環境はブラウザ操作ができずlint・buildの確認までのため、iPhone幅での
+表示・スクロール時の見た目を実機で確認してほしい）。
