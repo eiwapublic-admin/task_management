@@ -996,13 +996,30 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 | 列 | 型 | 備考 |
 |---|---|---|
 | id | uuid PK | |
-| log_type | text | `fetch`（メール取得の実行結果） / `status_change`（ステータス変更） |
+| log_type | text | `fetch`（メール取得の実行結果） / `status_change`（ステータス変更） / `backup`（日次バックアップ） / `error`（放置すると課金・データに影響する失敗。2026-09-04追加） |
 | actor | text | 実行者。担当者の表示名、または「システム（自動）」 |
 | message | text | 画面表示用の内容 |
 | detail | jsonb | 取得サマリー等の生データ |
 | created_at | timestamptz | |
 
 書き込み元: パイプライン（取得結果 + 返信検知の自動ステータス変更）、Worker の `PATCH /api/tasks`（担当者の手動ステータス変更時にサーバー側で記録）。いずれも service role 経由。60日より古いログはパイプライン実行時に自動削除。画面 `/logs`（操作ログ）で直近200件を参照。
+
+### processed_messages（業務外と判定したメールの記録。2026-09-04）
+| 列 | 型 | 備考 |
+|---|---|---|
+| gmail_message_id | text PK | Gmail のメッセージID |
+| reason | text | 判定理由（現状は `non_business` のみ） |
+| subject | text | 追跡用の件名 |
+| judged_at | timestamptz | 判定日時。60日より古い行はパイプライン実行時に自動削除 |
+
+**このテーブルが無いと、業務外と判定したメールは巡回のたびに何度でも Claude へ再送信される。**
+業務外判定のメールはタスクを作らないため `tasks.gmail_message_id` に記録が残らず、重複判定
+（`existingMessages`）をすり抜けるため。分類前に添付PDF・画像を毎回ダウンロードして
+Claude に渡す実装のため、営業FAX・チラシPDFが多い日ほど費用が跳ね上がる。実際に
+2026-09-03〜04 に平常の約20倍（$0.07/日 → $1.27・$1.37/日）のAPI課金が発生し、$5の
+クレジットを枯渇させた（HANDOFF 219番）。**`pipeline.js` の重複判定にこの照合を追加する際は、
+必ず `collectClassifierDocuments`・`classifyEmail` より前に置くこと**（後ろに置くと課金が
+発生してしまい対策の意味が無い）。
 
 ### RLS / 権限設計（2026-07-16 に全面変更）
 **anon・authenticated ロールには tasks・settings・activity_logs・api_usage への GRANT を一切与えていない**（RLSは有効のままポリシーも一切無し＝匿名は読み書き共に不可）。以前は「フロントは anon キーで直接読み取り、書き込みは status 列のみ anon 許可」としていたが、anon(publishable) キーは公開値であり、これは**認証なしで全顧客データが読める・改ざんできる致命的な脆弱性**だった（2026-07-15 セキュリティ審査で指摘・是正）。
