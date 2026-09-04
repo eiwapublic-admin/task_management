@@ -5,6 +5,7 @@ import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject } from './storage.js'
 import { recognizeWasteSheet } from './anthropic.js'
+import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 
 export const WASTE_FLOORS = ['1', '2', '3', '4', '5', '6', '7']
 
@@ -223,6 +224,19 @@ export async function handleWasteScanRecognize(req) {
       .maybeSingle()
     if (!scan) return json({ error: '取込画像が見つかりません' }, 404)
 
+    // サーキットブレーカー（2026-09-04）。本日のAI利用が上限に達していたら読み取らない。
+    // **Claudeを呼ぶ前に判定すること**（呼んだ後では課金が発生してしまう）。
+    const { data: limitSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'daily_api_cost_limit_usd')
+      .maybeSingle()
+    const limitState = await checkDailyLimit(supabase, limitSetting?.value)
+    if (limitState.exceeded) {
+      await setLimitAlert(supabase, limitState.message)
+      return json({ error: limitState.message }, 429)
+    }
+
     const res = await getObject(scan.storage_key)
     if (!res.ok) return json({ error: '画像の取得に失敗しました' }, 500)
     const buf = await res.arrayBuffer()
@@ -232,6 +246,8 @@ export async function handleWasteScanRecognize(req) {
       month: scan.target_month,
       floors: WASTE_FLOORS,
     })
+
+    await addTodayUsage(supabase, { input: usage.input_tokens, output: usage.output_tokens, calls: 1 })
 
     const month = new Date().toISOString().slice(0, 7)
     const { error: usageErr } = await supabase.rpc('add_api_usage', {

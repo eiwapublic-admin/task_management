@@ -177,6 +177,48 @@ create index if not exists processed_messages_judged_at_idx on processed_message
 alter table processed_messages enable row level security;
 revoke all on processed_messages from anon, authenticated;
 
+-- api_usage_daily: 1日あたりのClaude利用量（マイグレーション add_api_usage_daily 適用済み。2026-09-04）
+-- サーキットブレーカー（settings.daily_api_cost_limit_usd で指定した金額に達したらAI処理を停止）
+-- の判定に使う。api_usage は月次集計のため日単位の判定ができず、別に持っている。
+create table if not exists api_usage_daily (
+  day           date primary key,
+  input_tokens  bigint not null default 0,
+  output_tokens bigint not null default 0,
+  calls         integer not null default 0,
+  updated_at    timestamptz not null default now()
+);
+alter table api_usage_daily enable row level security;
+revoke all on api_usage_daily from anon, authenticated;
+
+-- 加算して加算後の値を返す（呼び出し側が1件ごとに上限到達を判定できるようにするため）
+create or replace function add_api_usage_daily(
+  p_day    date,
+  p_input  bigint  default 0,
+  p_output bigint  default 0,
+  p_calls  integer default 0
+)
+returns api_usage_daily
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  result api_usage_daily;
+begin
+  insert into api_usage_daily(day, input_tokens, output_tokens, calls, updated_at)
+  values (p_day, p_input, p_output, p_calls, now())
+  on conflict (day) do update set
+    input_tokens  = api_usage_daily.input_tokens  + excluded.input_tokens,
+    output_tokens = api_usage_daily.output_tokens + excluded.output_tokens,
+    calls         = api_usage_daily.calls         + excluded.calls,
+    updated_at    = now()
+  returning * into result;
+  return result;
+end;
+$$;
+revoke all on function add_api_usage_daily(date, bigint, bigint, integer) from public, anon, authenticated;
+grant execute on function add_api_usage_daily(date, bigint, bigint, integer) to service_role;
+
 create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
 
 -- users: 認証用（カスタム認証。パスワードはbcryptハッシュ）

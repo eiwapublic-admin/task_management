@@ -8,6 +8,7 @@ import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { fetchHolidays } from './holidays.js'
 import { recognizeVehicle } from './anthropic.js'
+import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 import { signJwt, verifyJwt } from './jwt.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
@@ -1299,12 +1300,27 @@ export async function handleParkingRecognize(req) {
     if (!photo) return json({ error: '写真が見つかりません' }, 404)
     if (photo.category !== 'parking') return json({ error: '違反車両の写真ではありません' }, 400)
 
+    // サーキットブレーカー（2026-09-04）。本日のAI利用が上限に達していたら読み取らない。
+    // **Claudeを呼ぶ前に判定すること**（呼んだ後では課金が発生してしまう）。
+    const { data: limitSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'daily_api_cost_limit_usd')
+      .maybeSingle()
+    const limitState = await checkDailyLimit(supabase, limitSetting?.value)
+    if (limitState.exceeded) {
+      await setLimitAlert(supabase, limitState.message)
+      return json({ error: limitState.message }, 429)
+    }
+
     const res = await getObject(photo.storage_key)
     if (!res.ok) return json({ error: '写真の取得に失敗しました' }, 500)
     const buf = await res.arrayBuffer()
     const base64 = Buffer.from(buf).toString('base64')
 
     const { result, usage } = await recognizeVehicle(base64, photo.mime || 'image/jpeg')
+
+    await addTodayUsage(supabase, { input: usage.input_tokens, output: usage.output_tokens, calls: 1 })
 
     const month = new Date().toISOString().slice(0, 7)
     const { error: usageErr } = await supabase.rpc('add_api_usage', {
