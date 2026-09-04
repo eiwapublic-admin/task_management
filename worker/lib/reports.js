@@ -942,6 +942,7 @@ const VALID_PDF_KINDS = new Set([
   'meeting-room',
   'bilmen-schedule',
   'bilmen-notice',
+  'waste-sheet',
 ])
 
 function pdfPreviewKey(userId, kind) {
