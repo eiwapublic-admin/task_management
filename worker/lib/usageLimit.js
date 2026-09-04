@@ -8,6 +8,8 @@
 // 判定はコスト（USD）で行う。件数ではなく金額にしているのは、添付PDF・画像の有無で
 // 1件あたりのトークン数が2桁変わるため、件数上限では歯止めにならないから。
 
+import { notifyApiAlert } from './push.js'
+
 // 100万トークンあたりの単価（USD）。**src/lib/pricing.js と同じ値を保つこと**
 // （フロントは画面表示用、ここは停止判定用。Workerからsrc/を参照できないため重複している）
 const PRICING_USD_PER_MTOK = { input: 1.0, output: 5.0 }
@@ -89,12 +91,33 @@ export async function checkDailyLimit(supabase, limitRaw) {
   }
 }
 
-// 上限到達の記録（画面のバナー表示用）。日付を持たせて、翌日になったら自動的に消えるようにする
+// 上限到達の記録（画面のバナー表示用）。日付を持たせて、翌日になったら自動的に消えるようにする。
+// あわせて端末へプッシュ通知する（2026-09-04。依頼）。ただし**その日の最初の1回だけ**送る
+// （巡回のたび・手動読み取りのたびに鳴り続けるのを防ぐ。記録済みの day が本日なら送らない）。
 export async function setLimitAlert(supabase, message) {
+  const day = todayJSTDate()
+
+  let notifiedToday = false
+  const { data } = await supabase.from('settings').select('value').eq('key', 'api_limit_alert').maybeSingle()
+  try {
+    const prev = JSON.parse(data?.value || 'null')
+    notifiedToday = prev?.day === day
+  } catch {
+    notifiedToday = false
+  }
+
   await supabase.from('settings').upsert(
-    { key: 'api_limit_alert', value: JSON.stringify({ message, day: todayJSTDate(), at: new Date().toISOString() }) },
+    { key: 'api_limit_alert', value: JSON.stringify({ message, day, at: new Date().toISOString() }) },
     { onConflict: 'key' }
   )
+
+  if (!notifiedToday) {
+    await notifyApiAlert({
+      title: 'AI利用が1日の上限に達しました',
+      body: `${message} 業務メールの自動分類も停止しています。`,
+      url: '/usage',
+    })
+  }
 }
 
 export async function clearLimitAlert(supabase) {
