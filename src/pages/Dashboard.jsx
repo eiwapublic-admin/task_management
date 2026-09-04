@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import KanbanBoard from '../components/KanbanBoard'
 import AppHeader from '../components/AppHeader'
 import { fetchTasks, fetchSettings, updateTaskStatus, setTaskSpam } from '../lib/tasks'
@@ -24,6 +24,20 @@ function parseCreditAlert(raw) {
   }
 }
 
+// settings.api_limit_alert（JSON文字列 or 空）を解釈する。1日あたり上限に達して
+// AI処理を停止したときだけ立つ（2026-09-04）。日付が変わった記録は表示しない。
+function parseLimitAlert(raw) {
+  if (!raw) return null
+  try {
+    const obj = JSON.parse(raw)
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+    if (obj.day && obj.day !== today) return null
+    return obj.message || '本日のAI利用が上限に達したため、AI処理を停止しています。'
+  } catch {
+    return String(raw)
+  }
+}
+
 const DEFAULT_ASSIGNEES = ['橋口', '西川', '岡田']
 
 function parseAssignees(raw) {
@@ -43,6 +57,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creditAlert, setCreditAlert] = useState(null)
+  // 1日あたり上限に達してAI処理を停止した旨の通知（2026-09-04）
+  const [limitAlert, setLimitAlert] = useState(null)
   const [sharedGmail, setSharedGmail] = useState('')
   const navigate = useNavigate()
   // 楽観的更新中のステータス書き込み件数。0 より大きい間は自動更新をスキップし、
@@ -58,6 +74,7 @@ export default function Dashboard() {
       setAssignees(parseAssignees(settings.assignees))
       setLastFetchAt(settings.last_fetch_at || null)
       setCreditAlert(parseCreditAlert(settings.api_credit_alert))
+      setLimitAlert(parseLimitAlert(settings.api_limit_alert))
       setSharedGmail(settings.shared_gmail || '')
     } catch (err) {
       if (!silent) setError(err.message)
@@ -171,6 +188,14 @@ export default function Dashboard() {
             >
               APIクレジットをチャージ
             </a>
+          </div>
+        )}
+        {limitAlert && (
+          <div className="dashboard-banner dashboard-credit-alert" role="alert">
+            <span>⚠️ {limitAlert}</span>
+            <Link className="dashboard-credit-button" to="/settings">
+              上限を変更
+            </Link>
           </div>
         )}
         {error && (

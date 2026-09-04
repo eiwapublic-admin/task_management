@@ -37,6 +37,11 @@ export default function Settings() {
           archive_after_days: Number.isFinite(Number(s.archive_after_days))
             ? Number(s.archive_after_days)
             : 30,
+          // AI利用の1日あたり上限（USD）。未設定・不正値は既定の0.5に倒す
+          daily_api_cost_limit_usd:
+            Number.isFinite(Number(s.daily_api_cost_limit_usd)) && Number(s.daily_api_cost_limit_usd) > 0
+              ? Number(s.daily_api_cost_limit_usd)
+              : 0.5,
           assignees: parseAssignees(s.assignees),
           business_keywords: s.business_keywords || '',
           org_context: s.org_context || '',

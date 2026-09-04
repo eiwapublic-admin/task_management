@@ -1004,6 +1004,22 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 
 書き込み元: パイプライン（取得結果 + 返信検知の自動ステータス変更）、Worker の `PATCH /api/tasks`（担当者の手動ステータス変更時にサーバー側で記録）。いずれも service role 経由。60日より古いログはパイプライン実行時に自動削除。画面 `/logs`（操作ログ）で直近200件を参照。
 
+### api_usage_daily（1日あたりのClaude利用量。サーキットブレーカー用。2026-09-04）
+| 列 | 型 | 備考 |
+|---|---|---|
+| day | date PK | JST基準の日付 |
+| input_tokens / output_tokens | bigint | 当日の累計トークン |
+| calls | integer | 当日の呼び出し回数 |
+| updated_at | timestamptz | |
+
+`settings.daily_api_cost_limit_usd`（既定 0.50・設定画面「AI利用の1日あたり上限」で変更可）で
+指定した金額に、当日の推定利用額が達すると**その日のAI処理を自動停止する**。判定・加算は
+`worker/lib/usageLimit.js`（`checkDailyLimit` / `addTodayUsage`）に集約し、メール分類・違反車両・
+廃棄物スキャンの3経路すべてで**Claudeを呼ぶ直前に**判定する。メール分類は1件ごとに加算して
+都度判定するため、1回の実行の中で暴走しても上限で止まる。停止時は `settings.api_limit_alert`
+に記録し、ダッシュボードにバナーを出す（日付が変われば自動的に解除・再開）。
+単価は `worker/lib/usageLimit.js` にも持っており、**`src/lib/pricing.js` と同じ値に保つこと**。
+
 ### processed_messages（業務外と判定したメールの記録。2026-09-04）
 | 列 | 型 | 備考 |
 |---|---|---|

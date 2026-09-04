@@ -378,6 +378,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'company_domains',
   'calendar_name',
   'archive_after_days',
+  // AI利用の1日あたり上限（USD）。サーキットブレーカーの閾値（2026-09-04）
+  'daily_api_cost_limit_usd',
 ])
 
 async function handleSettings(req) {

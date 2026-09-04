@@ -3,6 +3,7 @@ import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttac
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 import { notifyNewTask } from './push.js'
+import { checkDailyLimit, addTodayUsage, setLimitAlert, clearLimitAlert } from './usageLimit.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
 const MAX_MESSAGES = 40
@@ -294,6 +295,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   let faxUsageOutput = 0
   let classifyFaxCalls = 0
   let billingError = null
+
+  // サーキットブレーカー（2026-09-04）。本日のAI利用額が上限に達していたら、
+  // メールの取得自体は行うが分類（Claude呼び出し）は一切行わない。
+  // 上限は設定画面の「AI利用の1日あたり上限」で変更できる。
+  let limitState = await checkDailyLimit(supabase, settings.daily_api_cost_limit_usd)
+  if (limitState.exceeded) {
+    summary.errors.push(limitState.message)
+    await setLimitAlert(supabase, limitState.message)
+  }
 
   const accessToken = await getAccessToken()
 
@@ -603,6 +613,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         processedThreads.add(email.threadId)
       }
 
+      // 本日の上限に達していたら、ここから先（添付の取得・Claudeでの分類）は行わない。
+      // **添付の取得より前に置くこと**（後ろに置くと課金は止まってもGmailの通信は続く）。
+      // 取得済みメールは判定済みとして記録しないため、上限が解除された翌日以降に
+      // 改めて分類される（取りこぼしにはならない）。
+      if (limitState.exceeded) continue
+
       // 添付（PDF/画像）があれば分類器に読ませる。FAX 転送メールや見積書等に対応。
       let documents = []
       try {
@@ -615,6 +631,23 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       usageInput += usage.input_tokens
       usageOutput += usage.output_tokens
       classifyCalls += 1
+
+      // 1件ごとに日次利用量へ加算し、加算後の合計で上限を判定する（2026-09-04）。
+      // 実行の最後にまとめて記録する方式だと、1回の実行の中で暴走したときに歯止めが
+      // 効かないため、ここで都度チェックして超えた時点で以降の分類を止める。
+      const dailyTotal = await addTodayUsage(supabase, {
+        input: usage.input_tokens,
+        output: usage.output_tokens,
+        calls: 1,
+      })
+      if (dailyTotal && dailyTotal.costUSD >= limitState.limitUSD) {
+        limitState = { ...limitState, exceeded: true, usage: dailyTotal }
+        const message =
+          `本日のAI利用が上限（$${limitState.limitUSD.toFixed(2)}）に達したため、以降のAI処理を停止しました` +
+          `（本日の推定利用額 $${dailyTotal.costUSD.toFixed(2)}）。設定画面の「AI利用の1日あたり上限」で変更できます。`
+        summary.errors.push(message)
+        await setLimitAlert(supabase, message)
+      }
       if (result.channel === 'fax') {
         faxUsageInput += usage.input_tokens
         faxUsageOutput += usage.output_tokens
@@ -1034,6 +1067,9 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     })
     if (usageError) summary.errors.push(`usage: ${usageError.message}`)
   }
+
+  // 4-2) 上限アラートの解除（2026-09-04）。日付が変わって上限内に戻れば自動で消す
+  if (!limitState.exceeded) await clearLimitAlert(supabase)
 
   // 5) クレジット不足アラートの設定／解除
   if (billingError) {
