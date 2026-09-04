@@ -16,6 +16,30 @@
 .waste-day.is-saturday { color: var(--color-primary-hover); }
 .waste-day.is-holiday { color: var(--color-danger); }
 
+/* 年度集計：月別合計だけの表にし、年度合計は表の上に独立してカードで大きく表示する
+   （2026-09-04。月ごとの1〜7階の内訳は不要との依頼）。数字の大きさはポータルの
+   統計値と同じ --fs-4xl を使う */
+.waste-year-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.waste-year-total-label { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
+.waste-year-total-value {
+  font-size: var(--fs-4xl);
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.waste-year-total-unit { font-size: var(--fs-md); font-weight: 400; color: var(--text-muted); }
+
 /* 月別一覧（.waste-month-table）：床数(7)+合計+日+曜日で列数が多く、モバイルでは
    横スクロールが前提になる。日・曜日の2列だけ左端に固定し（frozen columns。
    Equipment.css の入出庫明細表と同じ考え方）、スクロールしても日付が追えるようにする
