@@ -2,7 +2,7 @@ import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
-import { notifyNewTask } from './push.js'
+import { notifyNewTask, notifyApiAlert } from './push.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert, clearLimitAlert } from './usageLimit.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
@@ -1078,6 +1078,16 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       { key: 'api_credit_alert', value: JSON.stringify({ message: billingError, at: new Date().toISOString() }) },
       { onConflict: 'key' }
     )
+    // 端末へ通知する（2026-09-04。依頼）。**アラートが立っていなかった時だけ**送る
+    // ＝残高が尽きた最初の1回のみ。巡回のたびに鳴り続けるのを防ぐため、
+    // 実行開始時に読み込んだ settings の値（＝今回の書き込み前の状態）で判定する。
+    if (!settings.api_credit_alert) {
+      await notifyApiAlert({
+        title: 'APIクレジットが不足しています',
+        body: 'メールの自動分類が停止しています。チャージ後、ハンバーガーメニューの「今すぐ取得」で再開できます。',
+        url: '/usage',
+      })
+    }
   } else if (classifyCalls > 0) {
     // 正常に分類できたのでアラートを解除
     await supabase.from('settings').upsert(
