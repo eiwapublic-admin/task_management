@@ -8,6 +8,14 @@ import { formatBytes } from '../lib/imageResize'
 // AI利用の1日あたり上限（USD）の既定値。worker/lib/usageLimit.js と同じ値を保つこと
 const DEFAULT_DAILY_LIMIT_USD = 0.5
 
+// この金額を下回る上限は「平常運転でも到達してしまう」危険水域として警告する。
+// 平常時の実績は0.06〜0.08ドル/日（docs/ai-cost-and-alternatives.md 1章）。
+// 2026-09-04、本番の設定値が 0.05 になっているのを発見したため追加した（既定 0.50 の
+// 打ち間違いと思われる）。0.05 では平常の利用でほぼ毎日サーキットブレーカーが作動し、
+// メールの自動分類が静かに止まり続ける状態だった。入力欄の下限・刻みが 0.05 のため、
+// 矢印キーの操作だけでも到達してしまう。
+const LOW_LIMIT_WARN_USD = 0.1
+
 // 1日あたり上限の設定（2026-09-04。当初はタスク設定に置いたが、金額の設定は課金実績と
 // 同じ画面で見られる方が分かりやすいため、依頼によりこの画面へ移設した）
 function DailyLimitSection() {
@@ -44,6 +52,9 @@ function DailyLimitSection() {
 
   if (limit === null && !error) return null
 
+  const limitNum = Number(limit)
+  const tooLow = Number.isFinite(limitNum) && limitNum > 0 && limitNum < LOW_LIMIT_WARN_USD
+
   return (
     <section className="usage-panel">
       <div className="usage-panel-title">
@@ -73,6 +84,13 @@ function DailyLimitSection() {
         </button>
         {status && <span className="usage-limit-status">{status}</span>}
       </div>
+      {tooLow && (
+        <p className="usage-limit-warning" role="alert">
+          この上限は通常の利用実績（1日あたり0.06〜0.08ドル）を下回っています。このままでは
+          ほぼ毎日上限に達して、メールの自動分類が止まったままになります。
+          特に理由がなければ {DEFAULT_DAILY_LIMIT_USD.toFixed(2)} ドルに戻してください。
+        </p>
+      )}
       <p className="settings-hint usage-note">
         メールの自動分類・FAX や写真の読み取りに使うAI（Claude）の利用額が、1日でこの金額に達すると
         <strong>その日のAI処理を自動的に停止します</strong>
