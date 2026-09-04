@@ -6,8 +6,6 @@ export default function SettingsPanel({ settings, onSave }) {
   const [activeStart, setActiveStart] = useState(settings.active_hours_start ?? 8)
   const [activeEnd, setActiveEnd] = useState(settings.active_hours_end ?? 18)
   const [archiveAfterDays, setArchiveAfterDays] = useState(settings.archive_after_days ?? 30)
-  // AI利用の1日あたり上限（USD）。2026-09-04のクレジット浪費（HANDOFF 219番）を受けた歯止め
-  const [dailyCostLimit, setDailyCostLimit] = useState(settings.daily_api_cost_limit_usd ?? 0.5)
   // 担当者は DB では JSON 配列で保持するが、画面ではエリア節約のため
   // 改行区切りの1つのテキストエリアで編集する（保存時に配列へ戻す）。
   const [assigneesText, setAssigneesText] = useState((settings.assignees || []).join('\n'))
@@ -30,7 +28,6 @@ export default function SettingsPanel({ settings, onSave }) {
       active_hours_start: Number(activeStart),
       active_hours_end: Number(activeEnd),
       archive_after_days: Number(archiveAfterDays),
-      daily_api_cost_limit_usd: String(dailyCostLimit),
       assignees,
       business_keywords: businessKeywords,
       org_context: orgContext,
@@ -111,31 +108,8 @@ export default function SettingsPanel({ settings, onSave }) {
           </label>
         </section>
 
-        <section>
-          <h2>AI利用の1日あたり上限</h2>
-          <label>
-            上限（ドル／日）
-            <input
-              type="number"
-              min={0.05}
-              max={50}
-              step={0.05}
-              value={dailyCostLimit}
-              onChange={(e) => setDailyCostLimit(e.target.value)}
-              onBlur={(e) => {
-                const n = Number(e.target.value)
-                setDailyCostLimit(Number.isFinite(n) && n > 0 ? Math.min(50, Math.max(0.05, n)) : 0.5)
-              }}
-            />
-          </label>
-          <p className="settings-hint">
-            メールの自動分類・FAX や写真の読み取りに使うAI（Claude）の利用額が、1日でこの金額に達すると
-            <strong>その日のAI処理を自動的に停止します</strong>（不具合などで想定外に使い続けてしまった場合の歯止めです。
-            2026-09-04に実際に発生したため追加しました）。日付が変われば自動的に再開します。
-            停止中はタスク管理・日報など、AI以外の機能は通常どおり使えます。
-            通常の利用実績は1日あたり0.06〜0.08ドル程度のため、初期値の0.50ドルなら通常運用で止まることはありません。
-          </p>
-        </section>
+        {/* AI利用の1日あたり上限は「従量課金事項」画面（/usage）へ移した（2026-09-04。依頼）。
+            金額に関する設定は課金の実績と同じ画面で見られる方が分かりやすいため */}
 
         <section>
           <h2>担当者名</h2>

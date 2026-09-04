@@ -1119,12 +1119,16 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   }
 
   // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
+  // エラーが1件でもあれば 'error' 種別（画面では赤いバッジ）にする。2026-09-04:
+  // クレジット不足などの失敗が「メール取得」という平常時と同じ見た目で流れてしまい、
+  // 一覧を眺めても異常だと気づけなかったため（依頼）。
+  const hasErrors = summary.errors.length > 0
   const fetchMessage =
-    `メール取得: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
+    `${hasErrors ? 'メール取得エラー' : 'メール取得'}: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
     `返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
     `カレンダー登録 ${summary.calendarCreated} 件 / アーカイブ ${summary.archived} 件` +
-    (summary.errors.length > 0 ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
-  logRows.unshift({ log_type: 'fetch', actor, message: fetchMessage, detail: summary })
+    (hasErrors ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
+  logRows.unshift({ log_type: hasErrors ? 'error' : 'fetch', actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)
   if (logError) console.error('操作ログの書き込みに失敗:', logError.message)
   await supabase
