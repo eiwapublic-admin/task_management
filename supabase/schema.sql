@@ -98,7 +98,13 @@ insert into settings (key, value) values
   --                    （9/3の課金事故の再発防止。docs/ai-cost-and-alternatives.md 9章）
   ('last_fetch_at', null),
   ('last_run_at', null),
-  ('fetch_stall_alert_on', '')   -- 取得窓の凍結を通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
+  ('fetch_stall_alert_on', ''),  -- 取得窓の凍結を通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
+  -- Cloudflare Workers の「1回の呼び出しあたりの外部リクエスト数」上限（2026-09-04）。
+  -- 無料プラン50・Workers Paid 1000。この値を超えないよう、pipeline が重い処理
+  -- （メール処理・返信検知・カレンダー）を打ち切って次の巡回へ回す。
+  -- プランを上げたときはここを増やす（画面からは変更しない運用向けのキー）。
+  ('subrequest_limit', '50'),
+  ('reply_check_cursor', '0')    -- 返信済みタスクの返信検知をどこまで見たか（task_no。一周したら0に戻る）
 on conflict (key) do nothing;
 
 -- api_usage: Claude API の月次利用量（推定コスト表示用）

@@ -110,12 +110,20 @@ docs/                   本書・引き継ぎ書・旧設計書・UI標準・機
 
 Cron（5分ごと）または「今すぐ取得」（force=true）で起動し、以下を順に実行する。
 
+> **サブリクエスト予算（2026-09-05。`worker/lib/subrequests.js`）**: Cloudflare Workers には
+> 「1回の呼び出しで出せる外部リクエスト数」の上限がある（無料プラン50・Workers Paid 1000）。
+> 超えると**それ以降のすべての外部通信が失敗**し、返信検知・カレンダー・アーカイブ・
+> 利用量の記録・操作ログの書き込み・手順7の `last_fetch_at` 更新まで巻き添えになる
+> （2026-09-03の課金事故の真因。`docs/ai-cost-and-alternatives.md` 9章）。そのため
+> パイプラインは使用数を数えながら、**末尾の記録処理ぶん（12回）を必ず残して**重い処理を
+> 打ち切り、残りを次の巡回へ繰り越す。上限値は `settings.subrequest_limit`（既定50）。
+
 1. **稼働時間帯ゲート**（force 時はスキップ）: JST の現在時刻が `active_hours_start`〜`active_hours_end`（既定 8〜18時）の範囲外なら処理をスキップ
 2. **更新間隔ゲート**（force 時はスキップ）: `last_run_at`（前回**実行を開始**した時刻）から `fetch_interval_minutes`（既定30分）未満ならスキップ。通過したら**Claude を呼ぶ前に** `last_run_at` を記録する（記録できなければ抑制が効かなくなるため、この回の実行自体を見送る）
    - **`last_fetch_at` ではなく `last_run_at` で判定するのが要点**（2026-09-04）。ゲートを `last_fetch_at`（最後まで完走したときだけ前進する）で判定していた頃は、手順7に到達できない実行が続くと経過時間が常に間隔を超えてゲートごと外れ、cron の5分間隔がそのまま実行間隔になっていた（1日19回 → 約120回）。これが9/3の課金事故の引き金である（`docs/ai-cost-and-alternatives.md` 9章「原因B」）
    - あわせて**取得窓の凍結検知**: `last_run_at` が `last_fetch_at` より間隔の2倍以上先行していたら「実行は来ているのに完走していない」とみなし、処理ログへ `error` 種別（赤）で記録する（1日1回。`fetch_stall_alert_on` で抑止）
 3. Gmail から新着メールを取得（初回は直近1日分、以降は `last_fetch_at` 以降。1回の上限 40 通）
-4. 既に tasks に存在するスレッド、および `processed_messages` に判定済みとして記録されたメールはスキップ。あわせて**本日のAI利用額が上限（`daily_api_cost_limit_usd`）に達している場合は、添付のダウンロードも Claude 呼び出しも行わずスキップ**する（サーキットブレーカー。詳細は 6章の `api_usage_daily` 参照）。残った新規メールを Claude API で分類:
+4. 既に tasks に存在するスレッド、および `processed_messages` に判定済みとして記録されたメールはスキップ（**メッセージ単位の判定は本文を取得する前**に行い、Gmailへの通信自体を節約する）。あわせて**本日のAI利用額が上限（`daily_api_cost_limit_usd`）に達している場合は、添付のダウンロードも Claude 呼び出しも行わずスキップ**する（サーキットブレーカー。詳細は 6章の `api_usage_daily` 参照）。残った新規メールを Claude API で分類:
    - `is_business_task`: 業務メールか否か（広告・通知・営業は false）
    - `assignee`: 担当者（settings の3名から。不明・範囲外は「（担当未設定）」にして画面でオレンジ警告）
    - `due_date`: 期限（「来週末」等の相対表現も JST 基準で YYYY-MM-DD に変換）
@@ -129,7 +137,11 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
    - **添付（PDF・画像）の読み取り**: 対応形式（PDF・PNG・JPEG・GIF・WebP、1ファイル10MB・合計12MB・最大5件まで）の添付があれば、本文と一緒に Claude へ渡して読み取らせる。FAX転送メール（件名「Attached Image」等・本文ほぼ無し）はこれが無いと内容を判定できないため必須。詳細は 4-7 参照
 5. 業務メールのみ tasks に INSERT（ステータス「未処理」）。**業務外と判定したメールは tasks に残らず dedup の手掛かりが無くなるため、`processed_messages` に「判定済み」として記録する**（この記録が無いと、同じメールが巡回のたびに添付付きで再分類され続けてAPI課金が暴走する。2026-09-04の課金事故の原因。HANDOFF 219番）。`document_summary` があれば `body_preview` に反映（本文が薄いFAXは要約がそのまま本文に、通常メールは本文の後ろに追記）
 5.5. **取り込み順序**: 取得したメッセージは**古い順に処理**する（Gmail APIは新しい順に返すため `messageRefs.reverse()`）。同一スレッドの元メールと返信が同じ取得サイクルに入った場合、新しい方（＝返信）が先にタスク化されると、後続の元メールが「同一スレッド処理済み」でdedupされ、送信者が自社担当者・件名が「Re: 〜」のタスクができてしまう（2026-08-03に判明・修正。経緯72番）。古い順なら顧客の元メールがタスクになり、後続の自社発は返信として正しく扱える
-6. **返信検知**（3方式。「未処理」タスクに加えて「返信済み」タスクも対象にする）:
+6. **返信検知**（3方式。「未処理」タスクに加えて「返信済み」タスクも対象にする）。
+   **1巡回あたりの対象はスレッド方式で12件まで**（`REPLY_CHECK_MAX_TASKS`。2026-09-05）。
+   タスク1件につきGmailスレッドを1回読むため、進行中タスクの件数がそのままサブリクエスト数になり、
+   上限超過の主因になっていた。「未処理」は対応漏れに直結するので毎回全件を見て、「返信済み」は
+   余った枠を `settings.reply_check_cursor`（最後に見た `task_no`）で前回の続きから順に割り当てる:
    - **件名ベース**: 受信メールの件名（Re: 等を除去して正規化）が対象タスクと一致し、差出人が自社側（共有アドレス or `company_domains` のドメイン）かつ宛先が元の顧客（counterpart）なら返信とみなす（Claude 分類はスキップ＝コスト節約）。担当者が自分のメーラーから返信し CC の社内 ML 経由で共有アドレスに配信されたケースを拾う
    - **スレッドベース**: タスクのスレッドを読み、**タスク登録の元メール以外で最も新しい関連メッセージ**を探し、差出人で処理を分岐する（2026-07-29に分岐を追加。それ以前は自社発のみを対象にしていた）。
      - **自社発の場合**（従来の挙動）: それを自社の返信とみなす。顧客が受領返信を最後に送っていても、担当者（自社）の最新の更新返信を採用できる。宛先(To/Cc)に顧客(counterpart)を含むメッセージだけを対象にし、同一件名で複数顧客が1スレッドにまとまった場合の混線を防ぐ。未処理→返信済み、既に返信済みなら本文のみ上書き
@@ -955,7 +967,9 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
 > 添付ファイルは DB に保持しない（詳細画面を開くたびに Gmail から取得。4-5 参照）。手動登録タスクは `source='manual'`、`gmail_thread_id`/`gmail_message_id` が `manual:<uuid>`。
 
 ### settings（key/value）
-`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`
+`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`, `last_run_at`(実行開始時刻。更新間隔ゲート専用), `fetch_stall_alert_on`(取得窓の凍結を通知した日), `daily_api_cost_limit_usd`(0.50。AI利用の1日あたり上限), `api_limit_alert`(上限到達の記録), `subrequest_limit`(50。Workerの1回あたり外部リクエスト上限。Workers Paid へ移行したら1000へ), `reply_check_cursor`(返信済みタスクの返信検知をどこまで見たか。task_no)
+
+画面から変更できるのは 4-4 の許可キーのみ。`subrequest_limit` などの運用向けキーはDBを直接編集する。
 
 ### users
 id / username(unique) / password_hash(bcrypt) / display_name / **token_version**(既定0) / **role**(既定'staff'。`staff`/`owner`/`admin`。2026-08-04追加) / created_at。**anon からは一切アクセス不可（service role のみ）**
