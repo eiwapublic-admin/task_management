@@ -293,6 +293,19 @@
   color: var(--color-brand);
 }
 
+/* 上限が平常時の利用実績を下回っているときの警告（2026-09-04）。
+   .chlorine-warning と同じ危険色の様式に揃える */
+.usage-limit-warning {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
 .usage-cost {
   font-weight: 600;
   color: var(--text-strong);

@@ -4,9 +4,18 @@ import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 import { notifyNewTask, notifyApiAlert } from './push.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert, clearLimitAlert } from './usageLimit.js'
+import { createSubrequestBudget } from './subrequests.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
 const MAX_MESSAGES = 40
+
+// 1回の巡回で返信検知（スレッド読み取り）を行う進行中タスクの上限（2026-09-04）。
+// 返信検知は「未処理・返信済み」のタスク1件につきGmailスレッドを1回読むため、
+// タスクが増えるほどサブリクエストを食い、上限超過で後続の処理を巻き添えにする
+// （9/3の事故。docs/HANDOFF.md 223番）。1回では全件を見ずに、前回の続きから
+// 順に見ていく（settings.reply_check_cursor に進捗を残す）。数巡すれば全件を回るので、
+// 検知が遅れるのは最大で「タスク件数 ÷ この値」巡ぶん。
+const REPLY_CHECK_MAX_TASKS = 12
 
 // タスク本文（body_preview）に保存する最大文字数。引用された過去のやり取り
 // （初回発信メールまで）も含めて全文を残せるよう十分大きく取る。暴走メール対策の上限。
@@ -240,6 +249,17 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   const intervalMin = Math.max(1, Number(settings.fetch_interval_minutes) || 30)
   const lastFetchAt = settings.last_fetch_at ? new Date(settings.last_fetch_at) : null
+  // 更新間隔ゲート専用の時刻（2026-09-04）。last_fetch_at とは役割が違うので混同しないこと。
+  //   last_fetch_at … 取得クエリの窓（after:）。**最後まで完走したときだけ**前進させる。
+  //                    途中で落ちた実行で前進させると、そのメールを永久に取りこぼす
+  //                    （anthropic.js 冒頭の 2026-07-27 の事例を参照）。
+  //   last_run_at   … 実行間隔の抑制のみに使う。**Claude を呼ぶ前に必ず記録する**ので、
+  //                    実行が途中で落ちても次の cron 刻みはゲートで止まる。
+  // 両者を分けた経緯は 9/3 の課金事故（docs/ai-cost-and-alternatives.md 9章「原因B」）。
+  // 当時はゲートも last_fetch_at を見ていたため、手順7に到達できない実行が続くと
+  // 経過時間が常に間隔を超え、ゲートが素通りして cron の 5 分間隔がそのまま実行間隔に
+  // なっていた（1日19回 → 約120回）。
+  const lastRunAt = settings.last_run_at ? new Date(settings.last_run_at) : null
   const assignees = parseAssignees(settings.assignees)
   const orgContext = settings.org_context || ''
   const businessKeywords = settings.business_keywords || ''
@@ -274,16 +294,86 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     }
   }
 
-  // 更新間隔ゲート（スケジュール実行時のコスト抑制）
-  if (!force && lastFetchAt) {
-    const elapsedMin = (Date.now() - lastFetchAt.getTime()) / 60000
+  // 更新間隔ゲート（スケジュール実行時のコスト抑制）。
+  // 判定は last_run_at（実行を開始した時刻）で行う。last_fetch_at で判定すると、
+  // 完走できない実行が続いたときにゲートごと外れてしまうため（上のコメント参照）。
+  // last_run_at がまだ無い場合だけ last_fetch_at にフォールバックする。
+  const gateBase = lastRunAt || lastFetchAt
+  if (!force && gateBase && Number.isFinite(gateBase.getTime())) {
+    const elapsedMin = (Date.now() - gateBase.getTime()) / 60000
     if (elapsedMin < intervalMin) {
-      return { skipped: true, reason: `前回取得から${Math.round(elapsedMin)}分（間隔${intervalMin}分）`, created: 0 }
+      return { skipped: true, reason: `前回実行から${Math.round(elapsedMin)}分（間隔${intervalMin}分）`, created: 0 }
+    }
+  }
+
+  // ゲートを通過したらすぐ last_run_at を記録する。**Claude 呼び出しより前**に置くこと。
+  // ここから先で実行が落ちても、次の cron 刻みは上のゲートで止まる（暴走の上限を
+  // 「間隔あたり1回」に固定する）。記録に失敗したときは抑制が効かなくなるため、
+  // 安全側に倒してこの回の実行自体を見送る。
+  {
+    const { error: runMarkError } = await supabase
+      .from('settings')
+      .upsert({ key: 'last_run_at', value: new Date().toISOString() }, { onConflict: 'key' })
+    if (runMarkError) {
+      console.error('last_run_at の記録に失敗:', runMarkError.message)
+      return { skipped: true, reason: `last_run_at の記録に失敗: ${runMarkError.message}`, created: 0 }
     }
   }
 
   const summary = { fetched: 0, created: 0, replied: 0, updated: 0, nonBusiness: 0, errors: [], creditAlert: null }
   const logRows = []
+
+  // サブリクエスト（1回のWorker呼び出しで出せる外部リクエスト）の予算（2026-09-04）。
+  // 上限に当たってから個別のエラーを拾うのではなく、残りが尽きる前に重い処理を
+  // 打ち切って、末尾の記録処理（利用量・操作ログ・last_fetch_at）を必ず通す。
+  // 経緯は worker/lib/subrequests.js の冒頭を参照。
+  const budget = createSubrequestBudget(settings.subrequest_limit)
+  // ここまでで使ったぶん（settings取得・last_run_at記録・停止判定の読み取り）と、
+  // この直後に出す固定の呼び出し（アクセストークン・一覧取得・tasks/processed_messages
+  // の読み取り）を概算で計上しておく。
+  budget.use(8)
+  // 予算切れで積み残した処理（画面・ログに出して気づけるようにする）
+  const deferred = { mail: 0, replyCheck: 0, calendar: false }
+
+  // 取得窓の凍結検知（2026-09-04）。
+  // last_run_at（実行を開始した時刻・Claude呼び出し前に必ず記録）と
+  // last_fetch_at（最後まで完走したときだけ前進）を突き合わせる。前者が後者より
+  // 大きく先行していたら「実行は来ているのに完走していない」＝どこかで落ち続けて
+  // いる、と稼働時間に依存せず判定できる（稼働時間外の空白では両方が同じだけ
+  // 古くなるので、差は開かない）。
+  //
+  // 放置すると取得窓が固定されたまま新着が溜まり続け（MAX_MESSAGES で頭打ちになり
+  // 取りこぼす）、業務外メールの判定漏れのようなバグがあれば同じメールへの
+  // Claude呼び出しを繰り返す。9/3の課金事故はこれに丸一日気づけなかったことで
+  // 被害が広がったので、赤字の error ログで画面に出す。
+  //
+  // ログは logRows に積まずに**その場で書く**。logRows の挿入は手順6にあり、
+  // ここで検知したいのは「手順6・7まで到達できていない」状態そのものなので、
+  // 末尾にまとめて書く方式では肝心のときに残らない。
+  // 連続実行のたびに赤い行が増えるのを避けるため、通知は1日1回に絞る
+  // （クレジット不足・上限到達の通知と同じ考え方）。
+  if (
+    lastRunAt &&
+    lastFetchAt &&
+    Number.isFinite(lastRunAt.getTime()) &&
+    Number.isFinite(lastFetchAt.getTime())
+  ) {
+    const behindMin = (lastRunAt.getTime() - lastFetchAt.getTime()) / 60000
+    if (behindMin >= intervalMin * 2) {
+      const message =
+        `メール取得が最後まで完了していません（実行は${Math.round(behindMin)}分ぶん進んでいるのに、` +
+        `取得の進捗が更新されていません）。同じメールの再取得・再分類が繰り返されている可能性が` +
+        `あるため、Cloudflare Workers のログを確認してください。`
+      summary.errors.push(message)
+      const today = todayJST()
+      if (settings.fetch_stall_alert_on !== today) {
+        await supabase.from('activity_logs').insert({ log_type: 'error', actor, message })
+        await supabase
+          .from('settings')
+          .upsert({ key: 'fetch_stall_alert_on', value: today }, { onConflict: 'key' })
+      }
+    }
+  }
 
   // Claude 利用量の集計とクレジット不足の検知
   let usageInput = 0
@@ -540,9 +630,34 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   }
 
   // 2) 新規メッセージを分類してタスク化
-  for (const ref of messageRefs) {
+  let mailTruncated = false
+  // 処理を終えた最後のメールの受信時刻。予算切れで途中打ち切りになったとき、
+  // 取得窓（last_fetch_at）をここまで進めて残りを次の巡回に回す（手順7）。
+  let lastProcessedReceivedAt = null
+  for (const [refIndex, ref] of messageRefs.entries()) {
     try {
+      // 既にタスク化済み・業務外と判定済みのメッセージは、**本文を取りに行く前に**
+      // 打ち切る（2026-09-04）。従来は getMessage の後に判定していたため、取得窓に
+      // 残っている処理済みメールのぶんだけ毎回Gmailを叩き、サブリクエストを浪費して
+      // いた（40通あれば40回。上限50の大半をここで使い切る）。判定材料は
+      // メッセージIDだけなので、取得前に判定できる。
+      if (existingMessages.has(ref.id) || judgedMessages.has(ref.id)) continue
+
+      // 予算の残りが少なければ、ここで打ち切って残りは次の巡回に回す。
+      // 1通あたり「本文取得＋添付＋分類＋DB書き込み」で概ね5回ぶん使う。
+      if (!budget.has(5)) {
+        mailTruncated = true
+        deferred.mail = messageRefs
+          .slice(refIndex)
+          .filter((r) => !existingMessages.has(r.id) && !judgedMessages.has(r.id)).length
+        break
+      }
+
       const email = await getMessage(accessToken, ref.id)
+      budget.use(1)
+      // 取得できた時点で「このメールまでは見た」と記録する。メッセージは古い順に
+      // 処理するので、この値は単調に進む。
+      if (email.receivedAt) lastProcessedReceivedAt = email.receivedAt
       if (!email.threadId) continue
 
       // 件名ベースの返信検知: 未処理タスクと同じ件名（Re: 等を除く）のメールが
@@ -623,11 +738,14 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       let documents = []
       try {
         documents = await collectClassifierDocuments(accessToken, email)
+        budget.use(documents.length)
       } catch (err) {
         summary.errors.push(`attachment: ${String(err.message || err)}`)
       }
 
       const { classification: result, usage } = await classifyEmail(email, context, documents)
+      // Claude呼び出し1回＋この後のDB書き込み（利用量の加算・タスク登録 or 判定済み記録）ぶん
+      budget.use(3)
       usageInput += usage.input_tokens
       usageOutput += usage.output_tokens
       classifyCalls += 1
@@ -898,13 +1016,56 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     const { data: openTasks } = await supabase
       .from('tasks')
       .select(
-        'id, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
+        'id, task_no, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
       )
       .in('status', ['未処理', '返信済み'])
       .eq('source', 'email')
-    for (const task of openTasks || []) {
+    budget.use(1)
+
+    // 1巡回あたりの対象を REPLY_CHECK_MAX_TASKS 件に絞る（2026-09-04）。全件を毎回見ると
+    // タスク数に比例してサブリクエストを消費し、上限超過で後続の処理（利用量の記録・
+    // 操作ログ）まで巻き添えになるため（9/3は進行中30件＝スレッド読み取り30回で
+    // 上限50をほぼ使い切っていた）。
+    //
+    // 優先順位を付ける:
+    //   - 「未処理」… 初回の返信検知。対応漏れに直結し件数も少ないので**毎回全件**見る
+    //   - 「返信済み」… さらなる返信の取り込み。件数が多く緊急度も低いので、
+    //     余った枠を前回の続きから順に割り当てる（settings.reply_check_cursor に進捗を
+    //     残し、一周したら先頭へ戻る）。全件を回るのに数巡かかるぶん検知は遅れるが、
+    //     取りこぼしはしない。
+    const sortedTasks = (openTasks || []).slice().sort((a, b) => Number(a.task_no) - Number(b.task_no))
+    const pendingTasks = sortedTasks.filter((t) => t.status === '未処理')
+    const repliedTasks = sortedTasks.filter((t) => t.status !== '未処理')
+    const targets = pendingTasks.slice(0, REPLY_CHECK_MAX_TASKS)
+
+    const cursor = Number(settings.reply_check_cursor) || 0
+    const slots = Math.max(REPLY_CHECK_MAX_TASKS - targets.length, 0)
+    const rotated = []
+    if (repliedTasks.length > 0 && slots > 0) {
+      let startIndex = repliedTasks.findIndex((t) => Number(t.task_no) > cursor)
+      if (startIndex < 0) startIndex = 0
+      for (let k = 0; k < repliedTasks.length && rotated.length < slots; k += 1) {
+        rotated.push(repliedTasks[(startIndex + k) % repliedTasks.length])
+      }
+      targets.push(...rotated)
+    }
+    // 一周し切ったか（＝返信済みを全件見たか）で次回の開始位置を決める
+    const repliedRemaining = Math.max(repliedTasks.length - rotated.length, 0)
+    deferred.replyCheck =
+      Math.max(pendingTasks.length - Math.min(pendingTasks.length, REPLY_CHECK_MAX_TASKS), 0) + repliedRemaining
+    let lastCheckedNo = cursor
+
+    for (const task of targets) {
+      // 予算切れなら残りは次の巡回へ。cursor を進めていないので取りこぼしにはならない
+      if (!budget.has(4)) {
+        deferred.replyCheck += 1
+        continue
+      }
       try {
         const messages = await getThreadMessages(accessToken, task.gmail_thread_id)
+        budget.use(1)
+        // 巡回位置は「返信済み」タスクにだけ意味がある（未処理は毎回全件見るため）
+        if (task.status !== '未処理') lastCheckedNo = Number(task.task_no) || lastCheckedNo
         if (messages.length === 0) continue
         const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
         // 顧客(counterpart)のアドレスを特定する。
@@ -968,6 +1129,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         if (reply.id === task.last_reply_message_id) continue
         // 返信の本文でタスク詳細を更新するため、対象メッセージ全体を取得する
         const replyEmail = await getMessage(accessToken, reply.id)
+        budget.use(2)
         if (replyIsFromCustomer) {
           await incorporateCustomerReply(task, 'スレッドで顧客からの返信を検知', replyEmail)
         } else {
@@ -977,12 +1139,28 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         summary.errors.push(`reply-check: ${String(err.message || err)}`)
       }
     }
+
+    // 次回の開始位置（返信済みタスクの巡回位置）を記録する。
+    // 一周し切った＝残りが無いときは先頭へ戻す。値が変わらないなら書き込まない。
+    if (rotated.length > 0) {
+      const nextCursor = repliedRemaining > 0 ? lastCheckedNo : 0
+      if (nextCursor !== cursor) {
+        await supabase
+          .from('settings')
+          .upsert({ key: 'reply_check_cursor', value: String(nextCursor) }, { onConflict: 'key' })
+        budget.use(1)
+      }
+    }
   }
 
   // 3.5) Google カレンダー「栄和共通」の当日イベントをタスク化（未処理に登録）
   summary.calendarCreated = 0
   const calendarName = (settings.calendar_name || '栄和共通').trim()
-  if (calendarName) {
+  // 予算が残っていないときは今回は見送る（次の巡回で拾う。当日のイベントを
+  // 対象にしているので、5〜30分後の巡回で取り込めれば実用上は問題ない）
+  if (calendarName && !budget.has(6)) {
+    deferred.calendar = true
+  } else if (calendarName) {
     try {
       // calendar_name に '@' が含まれる場合はカレンダーID直接指定とみなす
       // （calendarList に出ないカレンダーでも、公開カレンダーなら ID で読める）。
@@ -1004,6 +1182,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         )
       } else {
         const events = await listTodayEvents(accessToken, calendarId)
+        budget.use(2)
         for (const ev of events) {
           const key = `cal:${ev.id}`
           // カレンダーイベントの重複判定はタスクの状態を問わない（メッセージ単位のexistingMessagesを
@@ -1096,6 +1275,18 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     )
   }
 
+  // 積み残し・サブリクエストの使用状況を残す（処理ログの詳細から追えるようにする）
+  if (mailTruncated) {
+    // 取りこぼし防止のため、この回は last_fetch_at を進めない（手順7参照）。
+    // 「取得はしたが処理していないメールがある」ことを画面に赤字で出したいので errors に積む。
+    summary.errors.push(
+      `メールを ${deferred.mail} 件、次回の巡回に繰り越しました（Workerの外部リクエスト上限の保護）。` +
+        '取得位置は処理済みの位置までしか進めていないため、取りこぼしにはなりません。'
+    )
+  }
+  summary.deferred = deferred
+  summary.subrequests = budget.snapshot()
+
   summary.usage = {
     input_tokens: usageInput,
     output_tokens: usageOutput,
@@ -1132,11 +1323,27 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // エラーが1件でもあれば 'error' 種別（画面では赤いバッジ）にする。2026-09-04:
   // クレジット不足などの失敗が「メール取得」という平常時と同じ見た目で流れてしまい、
   // 一覧を眺めても異常だと気づけなかったため（依頼）。
+  // サブリクエスト上限に当たったエラーは原因が分かりにくいので、平易な説明を添える
+  // （2026-09-04。9/3の事故ではこの英語のメッセージだけがCloudflareのログに出ていて、
+  // 画面側には何も残っていなかった）。
+  if (summary.errors.some((e) => /Too many subrequests/i.test(String(e)))) {
+    summary.errors.unshift(
+      'Cloudflare Workers の1回あたりの外部リクエスト上限に達しました' +
+        `（上限 ${budget.limit} 回 / 概算 ${budget.used} 回使用）。` +
+        '返信検知・カレンダー登録・利用量の記録などが一部実行できていません。'
+    )
+  }
   const hasErrors = summary.errors.length > 0
+  // 予算切れで次回に回した処理（エラーではないが、気づけるようにログ本文に出す）
+  const deferredParts = []
+  if (deferred.mail > 0) deferredParts.push(`メール ${deferred.mail} 件`)
+  if (deferred.replyCheck > 0) deferredParts.push(`返信検知 ${deferred.replyCheck} 件`)
+  if (deferred.calendar) deferredParts.push('カレンダー')
   const fetchMessage =
     `${hasErrors ? 'メール取得エラー' : 'メール取得'}: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
     `返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
     `カレンダー登録 ${summary.calendarCreated} 件 / アーカイブ ${summary.archived} 件` +
+    (deferredParts.length ? ` / 次回へ繰り越し（${deferredParts.join('・')}）` : '') +
     (hasErrors ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
   logRows.unshift({ log_type: hasErrors ? 'error' : 'fetch', actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)
@@ -1154,10 +1361,29 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     .lt('judged_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
 
   // 7) last_fetch_at を更新
-  await supabase
-    .from('settings')
-    .update({ value: new Date().toISOString() })
-    .eq('key', 'last_fetch_at')
+  // **予算切れでメールを積み残した回は前進させない**（2026-09-04）。取得窓を進めると、
+  // まだ本文も見ていないメールが次回の対象から外れて永久に取りこぼされるため。
+  // 積み残しがある間は同じ窓を再取得することになるが、処理済み・業務外判定済みの
+  // メッセージは本文取得より前にスキップするので、Claude課金もGmailの通信も増えない。
+  if (mailTruncated) {
+    // 予算切れで積み残した回は「現在時刻」まで進めてはいけない（まだ本文も見ていない
+    // メールが次回の対象から外れ、永久に取りこぼす）。処理を終えた最後のメールの
+    // 受信時刻まで進め、残りは次の巡回で続きから拾う。同じ秒に届いた別のメールを
+    // 落とさないよう1秒戻す（重複は既存の重複判定で弾かれるだけなので害はない）。
+    // 受信時刻が1件も取れていない（＝1通も処理できなかった）ときは進めない。
+    const base = lastProcessedReceivedAt ? new Date(lastProcessedReceivedAt).getTime() : NaN
+    if (Number.isFinite(base)) {
+      await supabase
+        .from('settings')
+        .update({ value: new Date(base - 1000).toISOString() })
+        .eq('key', 'last_fetch_at')
+    }
+  } else {
+    await supabase
+      .from('settings')
+      .update({ value: new Date().toISOString() })
+      .eq('key', 'last_fetch_at')
+  }
 
   return summary
 }
