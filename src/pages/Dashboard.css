@@ -2762,3 +2762,68 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 @keyframes pdf-busy-spin {
   to { transform: rotate(360deg); }
 }
+
+/* 運用上の留意事項・設定要領（2026-09-05。従量課金事項の画面の最下段）。
+   .usage-panel の中に入るため、外側の余白は付けない（二重の余白になる）。 */
+.usage-guide-head {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--fs-md);
+  color: var(--text-strong);
+}
+
+.usage-guide-head:first-of-type {
+  margin-top: 0;
+}
+
+.usage-guide-lead {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.usage-guide-list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+  line-height: 1.7;
+}
+
+/* 狭い画面では表がはみ出すため、この枠の中だけを横スクロールさせる
+   （docs/ui-standard.md の「広い表はラッパーで横スクロール」に従う） */
+.usage-guide-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.usage-guide-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.usage-guide-table th,
+.usage-guide-table td {
+  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+}
+
+.usage-guide-table thead th {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 1列目（症状）は行見出し。太字にせず、幅を決めて読みやすくする */
+.usage-guide-table tbody th {
+  font-weight: 600;
+  color: var(--text-strong);
+  width: 34%;
+}
