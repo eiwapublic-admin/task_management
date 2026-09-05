@@ -4,7 +4,7 @@
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject } from './storage.js'
-import { recognizeWasteSheet } from './anthropic.js'
+import { recognizeWasteSheet, resolveProvider, estimateCostUSD } from './ai/index.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 
 export const WASTE_FLOORS = ['1', '2', '3', '4', '5', '6', '7']
@@ -226,12 +226,13 @@ export async function handleWasteScanRecognize(req) {
 
     // サーキットブレーカー（2026-09-04）。本日のAI利用が上限に達していたら読み取らない。
     // **Claudeを呼ぶ前に判定すること**（呼んだ後では課金が発生してしまう）。
-    const { data: limitSetting } = await supabase
+    const { data: aiSettings } = await supabase
       .from('settings')
-      .select('value')
-      .eq('key', 'daily_api_cost_limit_usd')
-      .maybeSingle()
-    const limitState = await checkDailyLimit(supabase, limitSetting?.value)
+      .select('key, value')
+      .in('key', ['daily_api_cost_limit_usd', 'ai_provider'])
+    const settingOf = (key) => (aiSettings || []).find((r) => r.key === key)?.value
+    const aiProvider = resolveProvider(settingOf('ai_provider'))
+    const limitState = await checkDailyLimit(supabase, settingOf('daily_api_cost_limit_usd'))
     if (limitState.exceeded) {
       await setLimitAlert(supabase, limitState.message)
       return json({ error: limitState.message }, 429)
@@ -242,12 +243,19 @@ export async function handleWasteScanRecognize(req) {
     const buf = await res.arrayBuffer()
     const base64 = Buffer.from(buf).toString('base64')
 
-    const { days, usage } = await recognizeWasteSheet(base64, scan.mime || 'image/jpeg', {
-      month: scan.target_month,
-      floors: WASTE_FLOORS,
-    })
+    const { days, usage } = await recognizeWasteSheet(
+      base64,
+      scan.mime || 'image/jpeg',
+      { month: scan.target_month, floors: WASTE_FLOORS },
+      aiProvider
+    )
 
-    await addTodayUsage(supabase, { input: usage.input_tokens, output: usage.output_tokens, calls: 1 })
+    await addTodayUsage(supabase, {
+      input: usage.input_tokens,
+      output: usage.output_tokens,
+      calls: 1,
+      provider: aiProvider,
+    })
 
     const month = new Date().toISOString().slice(0, 7)
     const { error: usageErr } = await supabase.rpc('add_api_usage', {
@@ -260,6 +268,7 @@ export async function handleWasteScanRecognize(req) {
       p_fax_output: 0,
       p_parking_calls: 0,
       p_waste_calls: 1,
+      p_cost: estimateCostUSD(aiProvider, usage.input_tokens, usage.output_tokens),
     })
     // 記録に失敗すると、実際には課金されているのに従量課金事項の画面に出ない状態になる。
     // console.error だけでは画面から気づけないため、処理ログにも残す（2026-09-04）。

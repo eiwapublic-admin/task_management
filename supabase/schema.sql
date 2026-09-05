@@ -108,7 +108,11 @@ insert into settings (key, value) values
   ('reply_scan_days', '3'),      -- 「直近に動きのあったスレッド」を探すGmail検索の日数（返信検知の対象を絞る）
   ('subrequest_warn_on', ''),    -- サブリクエストが上限の8割に達したと通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
   ('cleanup_done_on', ''),       -- 古いログ・判定記録の掃除を実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
-  ('calendar_id_cache', '')      -- カレンダー名→IDの解決結果のキャッシュ（{"name":..,"id":..}）。calendarListの呼び出しを省くため
+  ('calendar_id_cache', ''),     -- カレンダー名→IDの解決結果のキャッシュ（{"name":..,"id":..}）。calendarListの呼び出しを省くため
+  -- AI提供元（2026-09-05）。'anthropic'（既定）/ 将来 'gemini'。未実装・未知の値は
+  -- 既定へフォールバックするので、設定ミスでAI処理が止まることはない。
+  -- docs/ai-cost-and-alternatives.md 11章
+  ('ai_provider', 'anthropic')
 on conflict (key) do nothing;
 
 -- api_usage: Claude API の月次利用量（推定コスト表示用）
@@ -129,6 +133,9 @@ create table if not exists api_usage (
   fax_output_tokens bigint not null default 0,
   parking_calls     integer not null default 0,
   waste_calls       integer not null default 0,
+  -- 加算した時点の単価で確定させた金額（USD）。2026-09-05 add_cost_usd_to_api_usage。
+  -- 画面はこの値を使い、持っていない古い行だけトークン数から試算する（src/lib/pricing.js の rowCostUSD）
+  cost_usd          numeric not null default 0,
   updated_at        timestamptz not null default now()
 );
 
@@ -142,15 +149,16 @@ create or replace function add_api_usage(
   p_fax_input bigint default 0,
   p_fax_output bigint default 0,
   p_parking_calls integer default 0,
-  p_waste_calls integer default 0
+  p_waste_calls integer default 0,
+  p_cost numeric default 0   -- 加算時に確定させた金額（USD）。2026-09-05 add_cost_usd_to_api_usage
 )
 returns void
 language sql
 security definer
 set search_path = public
 as $$
-  insert into api_usage(month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, waste_calls, updated_at)
-  values (p_month, p_input, p_output, p_calls, p_fax_calls, p_fax_input, p_fax_output, p_parking_calls, p_waste_calls, now())
+  insert into api_usage(month, input_tokens, output_tokens, calls, fax_calls, fax_input_tokens, fax_output_tokens, parking_calls, waste_calls, cost_usd, updated_at)
+  values (p_month, p_input, p_output, p_calls, p_fax_calls, p_fax_input, p_fax_output, p_parking_calls, p_waste_calls, p_cost, now())
   on conflict (month) do update set
     input_tokens      = api_usage.input_tokens      + excluded.input_tokens,
     output_tokens     = api_usage.output_tokens     + excluded.output_tokens,
@@ -159,6 +167,7 @@ as $$
     fax_input_tokens  = api_usage.fax_input_tokens  + excluded.fax_input_tokens,
     fax_output_tokens = api_usage.fax_output_tokens + excluded.fax_output_tokens,
     parking_calls     = api_usage.parking_calls     + excluded.parking_calls,
+    cost_usd          = api_usage.cost_usd          + excluded.cost_usd,
     waste_calls       = api_usage.waste_calls       + excluded.waste_calls,
     updated_at        = now();
 $$;
@@ -202,6 +211,10 @@ create table if not exists api_usage_daily (
   input_tokens  bigint not null default 0,
   output_tokens bigint not null default 0,
   calls         integer not null default 0,
+  -- 加算した時点の単価で確定させた金額（USD）。2026-09-05 add_cost_usd_to_api_usage。
+  -- トークン数から都度計算する方式だと、AI提供元を切り替えた日・混在した日の金額が
+  -- 出せない（提供元ごとに単価が1桁違う）。docs/ai-cost-and-alternatives.md 11-4
+  cost_usd      numeric not null default 0,
   updated_at    timestamptz not null default now()
 );
 alter table api_usage_daily enable row level security;
@@ -212,7 +225,8 @@ create or replace function add_api_usage_daily(
   p_day    date,
   p_input  bigint  default 0,
   p_output bigint  default 0,
-  p_calls  integer default 0
+  p_calls  integer default 0,
+  p_cost   numeric default 0
 )
 returns api_usage_daily
 language plpgsql
@@ -222,12 +236,13 @@ as $$
 declare
   result api_usage_daily;
 begin
-  insert into api_usage_daily(day, input_tokens, output_tokens, calls, updated_at)
-  values (p_day, p_input, p_output, p_calls, now())
+  insert into api_usage_daily(day, input_tokens, output_tokens, calls, cost_usd, updated_at)
+  values (p_day, p_input, p_output, p_calls, p_cost, now())
   on conflict (day) do update set
     input_tokens  = api_usage_daily.input_tokens  + excluded.input_tokens,
     output_tokens = api_usage_daily.output_tokens + excluded.output_tokens,
     calls         = api_usage_daily.calls         + excluded.calls,
+    cost_usd      = api_usage_daily.cost_usd      + excluded.cost_usd,
     updated_at    = now()
   returning * into result;
   return result;

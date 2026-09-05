@@ -758,6 +758,7 @@ worker/lib/ai/
 |---|---|---|---|
 | 0 | 公式ページでモデル・単価・利用規約の裏取り（10章の外部情報は未裏取り）、APIキー取得、支払い設定 | 0.5日 | 無し |
 | 1 | プロバイダ抽象化のリファクタ（`worker/lib/ai/`）＋ `cost_usd` 列の追加。**この時点では Claude のみ・挙動は完全に同じ** | 0.5日 | 無し（挙動不変） |
+| — | **→ Phase 1 は 2026-09-05 に完了・本番反映済み（11-10）** | — | — |
 | 2 | Gemini 実装（`gemini.js`）＋ 設定画面の切り替えUI | 1日 | 無し（既定は anthropic） |
 | 3 | オフライン再分類と突き合わせレポート | 1日 | 無し |
 | 4 | （任意）シャドー運用 1〜2週間 | — | 分類結果は変わらない |
@@ -952,3 +953,37 @@ thinking を最小またはオフにする必要がある**。ここを忘れる
   アプリ側は**429が短時間に連続したら、リトライせず停止してクレジット不足と同じ扱いにする**
   （バナー＋Push通知）方針にする。取りこぼしより「静かに回り続けて費用が出る」方が危険なため
 - Spend cap は**月次**、アプリ側の上限は**日次**なので役割が重複しない。両方入れる
+
+### 11-10. Phase 1 の実施記録（2026-09-05 完了・本番反映済み）
+
+社長との調整が週明けになるため、**判断を待たずに入れられる Phase 1 だけを先行実施した**
+（挙動が変わらないためリスクが無く、後で切り替えを決めたときに残りが1〜2日で済むようになる）。
+
+**やったこと**
+
+| 対象 | 内容 |
+|---|---|
+| `worker/lib/ai/prompts.js`（新） | 3つのシステムプロンプトを提供元非依存の場所へ集約。**文面は1文字も変えていない** |
+| `worker/lib/ai/json.js`（新） | `extractJson()` を切り出し（提供元非依存） |
+| `worker/lib/ai/anthropic.js` | `worker/lib/anthropic.js` から移設。**API呼び出しのロジックは一切変更なし**（差分はヘッダーコメントと2つのimport、`const system = …` の置き換えのみ） |
+| `worker/lib/ai/pricing.js`（新） | 提供元→モデル→単価の表、`resolveProvider()`、`estimateCostUSD(provider, …)` |
+| `worker/lib/ai/index.js`（新） | 切り替え口。`settings.ai_provider` で提供元を選ぶ。**未実装・未知の値は既定（anthropic）へ倒れる**ので設定ミスで業務は止まらない |
+| `pipeline.js` / `reports.js` / `waste.js` | import 先を `./ai/index.js` に変更し、`ai_provider` を読んで渡すだけ。**判定ロジックには一切触れていない** |
+| DB（`add_cost_usd_to_api_usage`） | `api_usage` / `api_usage_daily` に `cost_usd` を追加。RPC に `p_cost` を追加。**既存行は Claude 単価でバックフィル済み** |
+| DB（`drop_obsolete_api_usage_overloads`） | 列を足すたびに積み上がっていた `add_api_usage` の旧オーバーロード3つを削除（`function is not unique` の潜在的な事故要因だった） |
+| `usageLimit.js` | 金額を `cost_usd` から読むように変更。単価の重複定義を `ai/pricing.js` に一本化 |
+| `src/lib/pricing.js` / `UsagePanel.jsx` | 画面の金額も記録済みの `cost_usd` を使う（`rowCostUSD()`。持っていない古い行だけ従来どおりトークンから試算） |
+
+**確認したこと**
+
+- **移設前後で3つのシステムプロンプトが1文字も違わないことを機械的に照合**（旧ファイルを
+  git から取り出して文字列比較。classifyEmail 3,740文字 / recognizeVehicle 521文字 /
+  recognizeWasteSheet 579文字がすべて完全一致）
+- `rowCostUSD()` の4パターン（記録あり / 記録なし / 0 / 空行）が期待どおり
+- 旧シグネチャ（`p_cost` 無し）での RPC 呼び出しも一意に解決できる
+  ＝ **デプロイ前の旧Workerが動いている間も利用量の記録は壊れない**
+- lint・build・`wrangler deploy --dry-run` を通過
+
+**この時点でできるようになったこと**: `settings.ai_provider` を `gemini` にすれば提供元が切り替わる
+（実装は Phase 2 で追加。現時点では既定へフォールバックするだけ）。**戻すときは設定値を
+`anthropic` に戻すだけで、デプロイは不要。**

@@ -9,19 +9,15 @@
 // 1件あたりのトークン数が2桁変わるため、件数上限では歯止めにならないから。
 
 import { notifyApiAlert } from './push.js'
-
-// 100万トークンあたりの単価（USD）。**src/lib/pricing.js と同じ値を保つこと**
-// （フロントは画面表示用、ここは停止判定用。Workerからsrc/を参照できないため重複している）
-const PRICING_USD_PER_MTOK = { input: 1.0, output: 5.0 }
+import { estimateCostUSD as estimateProviderCostUSD, DEFAULT_PROVIDER } from './ai/pricing.js'
 
 // 上限の既定値。実績は平常0.06〜0.08ドル/日のため、通常運用では絶対に当たらない値にしてある
 export const DEFAULT_DAILY_COST_LIMIT_USD = 0.5
 
-export function estimateCostUSD(inputTokens, outputTokens) {
-  return (
-    (Number(inputTokens || 0) / 1_000_000) * PRICING_USD_PER_MTOK.input +
-    (Number(outputTokens || 0) / 1_000_000) * PRICING_USD_PER_MTOK.output
-  )
+// トークン数からの推定（2026-09-05以降は原則使わない。下記 fetchTodayUsage 参照）。
+// 提供元を明示しない呼び出しは既定（Anthropic）の単価で計算する。
+export function estimateCostUSD(inputTokens, outputTokens, provider = DEFAULT_PROVIDER) {
+  return estimateProviderCostUSD(provider, inputTokens, outputTokens)
 }
 
 // 上限値の解釈。0以下・数値でない値は「上限なし」ではなく既定値に倒す
@@ -37,12 +33,15 @@ export function todayJSTDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
-// 本日の利用量を取得する。行が無ければ 0 とみなす
+// 本日の利用量を取得する。行が無ければ 0 とみなす。
+// 金額は **加算時に確定させて保存した cost_usd** を読む（2026-09-05）。
+// トークン数から都度計算する方式だと、AI提供元を切り替えた日・混在した日の金額が
+// 出せない（提供元ごとに単価が1桁違う）。docs/ai-cost-and-alternatives.md 11-4。
 export async function fetchTodayUsage(supabase) {
   const day = todayJSTDate()
   const { data, error } = await supabase
     .from('api_usage_daily')
-    .select('input_tokens, output_tokens, calls')
+    .select('input_tokens, output_tokens, calls, cost_usd')
     .eq('day', day)
     .maybeSingle()
   if (error) {
@@ -54,16 +53,20 @@ export async function fetchTodayUsage(supabase) {
   }
   const input = Number(data?.input_tokens || 0)
   const output = Number(data?.output_tokens || 0)
-  return { input, output, calls: Number(data?.calls || 0), costUSD: estimateCostUSD(input, output), unknown: false }
+  return { input, output, calls: Number(data?.calls || 0), costUSD: Number(data?.cost_usd || 0), unknown: false }
 }
 
-// 本日分に加算し、加算後の合計を返す（呼び出し側が即座に上限判定できるようにする）
-export async function addTodayUsage(supabase, { input = 0, output = 0, calls = 0 }) {
+// 本日分に加算し、加算後の合計を返す（呼び出し側が即座に上限判定できるようにする）。
+// costUSD を渡さなかった場合は、その場で provider の単価から計算して記録する
+// （金額は必ず「加算した時点の単価」で確定させる。2026-09-05）。
+export async function addTodayUsage(supabase, { input = 0, output = 0, calls = 0, costUSD = null, provider = DEFAULT_PROVIDER }) {
+  const cost = costUSD === null ? estimateProviderCostUSD(provider, input, output) : Number(costUSD) || 0
   const { data, error } = await supabase.rpc('add_api_usage_daily', {
     p_day: todayJSTDate(),
     p_input: input,
     p_output: output,
     p_calls: calls,
+    p_cost: cost,
   })
   if (error) {
     console.error('add_api_usage_daily に失敗:', error.message)
@@ -73,7 +76,12 @@ export async function addTodayUsage(supabase, { input = 0, output = 0, calls = 0
   if (!row) return null
   const totalInput = Number(row.input_tokens || 0)
   const totalOutput = Number(row.output_tokens || 0)
-  return { input: totalInput, output: totalOutput, calls: Number(row.calls || 0), costUSD: estimateCostUSD(totalInput, totalOutput) }
+  return {
+    input: totalInput,
+    output: totalOutput,
+    calls: Number(row.calls || 0),
+    costUSD: Number(row.cost_usd || 0),
+  }
 }
 
 // 本日の上限に達しているか。達している場合はメッセージも返す

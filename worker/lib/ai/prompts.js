@@ -1,37 +1,12 @@
-// Claude API（Anthropic Messages API）でメールを分類する。
-// 追加依存を避けるため fetch で直接叩く。
-// コスト最適化のため既定モデルは claude-haiku-4-5（環境変数 CLAUDE_MODEL で上書き可）。
-
-const API_ENDPOINT = 'https://api.anthropic.com/v1/messages'
-const DEFAULT_MODEL = 'claude-haiku-4-5'
-
-// 一時的なエラー（過負荷・レート制限・単発の拒否等）とみなして再試行するステータス。
-// 401/404等の設定不備や、402/クレジット不足は再試行しても無意味なため対象外
-// （クレジット不足は下の isBillingError 判定で別途扱う）。
-// 2026-07-27、単発の 403「Request not allowed」でFAX1件の分類が失敗し、その後
-// last_fetch_at が前進したことで永久に再取得の機会を失う事象が発生した。同じ実行内の
-// 他のメッセージは正常処理できていたため、アカウント/権限レベルの恒久的な問題ではなく
-// 単発の一時的な現象と判断し、再試行の対象に加えた。
-const RETRYABLE_STATUS = new Set([403, 408, 409, 429, 500, 502, 503, 504, 529])
-const MAX_ATTEMPTS = 3
-const RETRY_DELAY_MS = [800, 2000]
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-// 応答テキストから最初の JSON オブジェクトを頑健に取り出す。
-export function extractJson(text) {
-  if (!text) return null
-  // ```json ... ``` で囲まれている場合を先に剥がす
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const candidate = fenced ? fenced[1] : text
-  const start = candidate.indexOf('{')
-  const end = candidate.lastIndexOf('}')
-  if (start === -1 || end === -1 || end < start) return null
-  try {
-    return JSON.parse(candidate.slice(start, end + 1))
-  } catch {
-    return null
-  }
-}
+// AIへ渡すプロンプト（システム指示）。**提供元（Anthropic / Gemini 等）に依存しない**。
+//
+// 2026-09-05、worker/lib/anthropic.js から切り出した。プロンプトの文面は1年かけて
+// 調整してきた資産（業務外判定の定義・担当者の決め方の優先順位・FAXの読み取り方・
+// ハルシネーション対策・出力JSONの形式）であり、提供元を替えてもそのまま使う。
+// **文面を変えるときは、提供元にかかわらずここだけを直す**（各プロバイダ実装に
+// 文面をコピーしないこと。必ず食い違う）。
+//
+// 経緯: docs/ai-cost-and-alternatives.md 11章
 
 function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
   const names = assignees.join('、')
@@ -91,182 +66,31 @@ function buildSystemPrompt({ assignees, orgContext, businessKeywords, today }) {
   ].join('\n')
 }
 
-// documents: 添付の PDF/画像を Claude に渡すためのブロック配列。
-//   { type: 'pdf', data }（data はパディング済み標準 base64）
-//   { type: 'image', mediaType, data }
-// 省略時（[]）は従来どおりテキストのみで分類する。
-export async function classifyEmail(email, context, documents = []) {
-  const { ANTHROPIC_API_KEY } = process.env
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY が設定されていません')
-  }
-  const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
+export { buildSystemPrompt }
 
-  const system = buildSystemPrompt(context)
-  const attachmentNote =
-    email.attachments && email.attachments.length
-      ? email.attachments.map((a) => `${a.filename || '(名称なし)'}（${a.mimeType}）`).join('、')
-      : 'なし'
-  const userText = [
-    `差出人(From): ${email.from}`,
-    `宛先(To): ${email.to}`,
-    `件名(Subject): ${email.subject}`,
-    `受信日時: ${email.date}`,
-    `添付ファイル: ${attachmentNote}`,
-    '本文:',
-    (email.body || '').slice(0, 4000),
-  ].join('\n')
+// 違反車両の写真からナンバープレート・車種を読み取らせる指示（2026-08-05〜）
+export const VEHICLE_SYSTEM_PROMPT = [
+  'あなたは駐車違反車両の記録を補助するアシスタントです。',
+  '与えられた車両の写真を見て、ナンバープレートと車種を読み取り、指定のJSON形式のみで回答してください。説明文やコードフェンスは不要です。',
+  '',
+  '【重要: 読み取れないときに創作しないこと】',
+  '文字が不鮮明・低解像度・撮影角度・被写体が写っていない等で自信を持って読み取れない項目は、推測や創作をせず必ず null にしてください。',
+  '誤った情報を記録すると実害があるため、確実に判読できた項目だけを埋めてください。',
+  '',
+  '【出力JSONの形式】',
+  '{',
+  '  "plate_region": "ナンバープレート上部の地名（例: 広島、なにわ、品川）。読み取れなければ null",',
+  '  "plate_number": "ナンバープレート下段の一連指定番号を「-」なしの数字のみで（例: 1234）。分類番号やひらがな部分は含めない。読み取れなければ null",',
+  '  "maker": "車両メーカー名（例: トヨタ、ホンダ、日産）。判別できなければ null",',
+  '  "model": "車種名（例: プリウス、フィット）。判別できなければ null"',
+  '}',
+  '',
+  '必ず有効なJSONのみを返してください。',
+].join('\n')
 
-  // ドキュメントブロック（PDF/画像）はテキストブロックより前に置く。
-  const content = []
-  for (const doc of documents || []) {
-    if (doc && doc.type === 'pdf' && doc.data) {
-      content.push({
-        type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: doc.data },
-      })
-    } else if (doc && doc.type === 'image' && doc.data && doc.mediaType) {
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type: doc.mediaType, data: doc.data },
-      })
-    }
-  }
-  content.push({ type: 'text', text: userText })
-  // 添付を読ませる場合は要約分の出力トークンを多めに確保する。
-  const hasDocs = content.length > 1
-
-  let res
-  let lastErr
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-    res = await fetch(API_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: hasDocs ? 1500 : 400,
-        system,
-        messages: [{ role: 'user', content }],
-      }),
-    })
-    if (res.ok) break
-
-    const text = await res.text()
-    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
-    // クレジット残高不足の検知（残高ゼロ時は 400 で "credit balance is too low" 等が返る）
-    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
-      err.isBillingError = true
-      throw err
-    }
-    lastErr = err
-    const isLastAttempt = attempt === MAX_ATTEMPTS - 1
-    if (!RETRYABLE_STATUS.has(res.status) || isLastAttempt) throw err
-    await sleep(RETRY_DELAY_MS[attempt] || RETRY_DELAY_MS[RETRY_DELAY_MS.length - 1])
-  }
-  if (!res.ok) throw lastErr
-
-  const data = await res.json()
-  const text = (data.content || []).map((b) => b.text || '').join('')
-  const parsed = extractJson(text)
-  if (!parsed) {
-    throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
-  }
-  const usage = {
-    input_tokens: data.usage?.input_tokens || 0,
-    output_tokens: data.usage?.output_tokens || 0,
-  }
-  return { classification: parsed, usage }
-}
-
-// 違反車両の写真からナンバープレート・車種を読み取る（2026-08-05〜。手動トリガー式）。
-// FAX読み取りと同じ考え方で、判読できない項目は推測せず null を返させる。
-export async function recognizeVehicle(imageBase64, mediaType) {
-  const { ANTHROPIC_API_KEY } = process.env
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY が設定されていません')
-  }
-  const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
-
-  const system = [
-    'あなたは駐車違反車両の記録を補助するアシスタントです。',
-    '与えられた車両の写真を見て、ナンバープレートと車種を読み取り、指定のJSON形式のみで回答してください。説明文やコードフェンスは不要です。',
-    '',
-    '【重要: 読み取れないときに創作しないこと】',
-    '文字が不鮮明・低解像度・撮影角度・被写体が写っていない等で自信を持って読み取れない項目は、推測や創作をせず必ず null にしてください。',
-    '誤った情報を記録すると実害があるため、確実に判読できた項目だけを埋めてください。',
-    '',
-    '【出力JSONの形式】',
-    '{',
-    '  "plate_region": "ナンバープレート上部の地名（例: 広島、なにわ、品川）。読み取れなければ null",',
-    '  "plate_number": "ナンバープレート下段の一連指定番号を「-」なしの数字のみで（例: 1234）。分類番号やひらがな部分は含めない。読み取れなければ null",',
-    '  "maker": "車両メーカー名（例: トヨタ、ホンダ、日産）。判別できなければ null",',
-    '  "model": "車種名（例: プリウス、フィット）。判別できなければ null"',
-    '}',
-    '',
-    '必ず有効なJSONのみを返してください。',
-  ].join('\n')
-
-  const res = await fetch(API_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 300,
-      system,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-            { type: 'text', text: '添付の写真からナンバープレートと車種を読み取ってください。' },
-          ],
-        },
-      ],
-    }),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
-    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
-      err.isBillingError = true
-    }
-    throw err
-  }
-
-  const data = await res.json()
-  const text = (data.content || []).map((b) => b.text || '').join('')
-  const parsed = extractJson(text)
-  if (!parsed) {
-    throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
-  }
-  const usage = {
-    input_tokens: data.usage?.input_tokens || 0,
-    output_tokens: data.usage?.output_tokens || 0,
-  }
-  return { result: parsed, usage }
-}
-
-// 廃棄物実測集計表（手書き。1ヶ月分・1〜7階×日次のマス目）の写真から実測値を読み取る
-// （2026-09-03〜。手動トリガー式。docs/waste-plan.md）。ナンバープレート読み取りと同じ
-// 「判読できないマスは推測せず null」という考え方。「合計」列・「合計」行は転記済みの
-// 集計値であり実測値そのものではないため読み取らせない（アプリ側で日次値から計算する）。
-export async function recognizeWasteSheet(imageBase64, mediaType, { month, floors }) {
-  const { ANTHROPIC_API_KEY } = process.env
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY が設定されていません')
-  }
-  const model = process.env.CLAUDE_MODEL || DEFAULT_MODEL
-  const floorList = floors.join('・')
-
-  const system = [
+// 廃棄物実測集計表（手書き・1ヶ月分）の読み取り指示（2026-09-03〜。docs/waste-plan.md）
+export function buildWasteSystemPrompt({ month, floorList }) {
+  return [
     'あなたは廃棄物の実測集計表（手書き）の読み取りを補助するアシスタントです。',
     `与えられた写真は${month.replace('-', '年')}月分の「廃棄物実測集計表」です。`,
     `表は日付（1日〜月末）を行に、${floorList}階を列に持ち、各マスに手書きで実測重量（kg）が記入されています。`,
@@ -291,47 +115,4 @@ export async function recognizeWasteSheet(imageBase64, mediaType, { month, floor
     '',
     '必ず有効なJSONのみを返してください。',
   ].join('\n')
-
-  const res = await fetch(API_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-            { type: 'text', text: '添付の写真から、日ごと・階ごとの実測重量（kg）を読み取ってください。' },
-          ],
-        },
-      ],
-    }),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
-    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
-      err.isBillingError = true
-    }
-    throw err
-  }
-
-  const data = await res.json()
-  const text = (data.content || []).map((b) => b.text || '').join('')
-  const parsed = extractJson(text)
-  if (!parsed || typeof parsed.days !== 'object' || parsed.days === null) {
-    throw new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
-  }
-  const usage = {
-    input_tokens: data.usage?.input_tokens || 0,
-    output_tokens: data.usage?.output_tokens || 0,
-  }
-  return { days: parsed.days, usage }
 }
