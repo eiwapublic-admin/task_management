@@ -60,7 +60,15 @@ worker/
     ├── gmail.js        Gmail API 軽量クライアント（fetch 直叩き・依存なし。スレッド取得・添付一覧/取得を含む）
     ├── mail-utils.js   アドレス判定・顧客(counterpart)特定の共通ロジック（返信検知と添付集約で共有）
     ├── calendar.js     Google カレンダー API クライアント（当日イベント取得）
-    ├── anthropic.js    Claude API クライアント（分類プロンプト・JSON抽出・課金エラー検知）
+    ├── ai/             AI提供元の切り替え層（2026-09-05。ai-cost-and-alternatives.md 11章）
+    │   ├── index.js    切り替え口。**呼び出し側はここだけを import する**
+    │   │               （settings.ai_provider で提供元を選ぶ。未知の値は既定へフォールバック）
+    │   ├── prompts.js  システムプロンプト本文（**提供元に依存しない**。文面を直すときはここだけ）
+    │   ├── pricing.js  提供元→モデル→単価の表・resolveProvider・estimateCostUSD
+    │   ├── json.js     応答テキストからのJSON抽出（extractJson）
+    │   └── anthropic.js  Claude API クライアント（課金エラー検知・リトライ。旧 lib/anthropic.js）
+    ├── usageLimit.js   AI利用の1日あたり上限（サーキットブレーカー）と利用量の加算
+    ├── subrequests.js  Workerの外部リクエスト数の予算管理（2026-09-05）
     ├── supabase-admin.js  service role クライアント（URL不正時はフォールバック）
     ├── jwt.js          HS256 JWT の署名・検証（Web Crypto）
     └── http.js         JSONレスポンス・Bearer トークン検証（token_version失効チェック込み）・
@@ -117,6 +125,14 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 > （2026-09-03の課金事故の真因。`docs/ai-cost-and-alternatives.md` 9章）。そのため
 > パイプラインは使用数を数えながら、**末尾の記録処理ぶん（12回）を必ず残して**重い処理を
 > 打ち切り、残りを次の巡回へ繰り越す。上限値は `settings.subrequest_limit`（既定50）。
+>
+> **AI提供元の切り替え（2026-09-05。`worker/lib/ai/`）**: AIの呼び出しは
+> `worker/lib/ai/index.js` に一本化してあり、`settings.ai_provider`（既定 `anthropic`）で
+> 提供元を差し替えられる。**プロンプトの文面は `worker/lib/ai/prompts.js` に集約**されており、
+> 提供元を替えても同じ文面を使う（文面を直すときは提供元にかかわらずここだけを直す）。
+> 未実装・未知の値は既定へフォールバックするため、設定ミスでAI処理が止まることはない。
+> 2026-09-05時点で実装済みの提供元は Anthropic のみ（Gemini対応の検討は
+> `docs/ai-cost-and-alternatives.md` 10〜11章）。
 >
 > あわせて**そもそも呼ぶ回数を減らす**工夫を入れている（2026-09-05）:
 > ①返信検知は「直近に動きのあったスレッド」だけを読む（下記手順6）、
@@ -435,7 +451,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 複合機からのFAX転送メール（本文がほぼ無く、内容がPDF/画像）や、注文書・見積書・請求書などのPDF添付を、通常メールと同等に処理対象にする機能。
 
 - **`worker/lib/gmail.js`**: `getMessage` の戻り値に `attachments`（filename / mimeType / size / attachmentId）を追加。`format=full` で取得済みの payload から抽出するため追加のAPI呼び出しは無い。
-- **`worker/lib/anthropic.js`**: `classifyEmail(email, context, documents)` の第3引数 `documents` に、対応形式の添付をPDFは `document` ブロック（`{type:'document', source:{type:'base64', media_type:'application/pdf', data}}`）、画像は `image` ブロックとして渡す。システムプロンプトに添付読取の指示と出力項目 `document_summary` を追加。添付ありのときは `max_tokens` を引き上げる（400→1500）。
+- **`worker/lib/ai/anthropic.js`**（2026-09-05に `worker/lib/anthropic.js` から移設）: `classifyEmail(email, context, documents)` の第3引数 `documents` に、対応形式の添付をPDFは `document` ブロック（`{type:'document', source:{type:'base64', media_type:'application/pdf', data}}`）、画像は `image` ブロックとして渡す。システムプロンプトに添付読取の指示と出力項目 `document_summary` を追加。添付ありのときは `max_tokens` を引き上げる（400→1500）。
 - **`worker/lib/pipeline.js`**: `collectClassifierDocuments()` が対応形式（PDF・PNG・JPEG・GIF・WebP。TIFFは非対応）の添付を、サイズ上限（1ファイル10MB・合計12MB）・件数上限（5件）でフィルタしつつ `getAttachmentData` で取得し、base64url→標準base64に変換して分類器へ渡す。
 - **非対応形式**: TIFF（Claude非対応）。複合機のFAXが `mimi@eiwa-up.com` 宛にTIFF形式で転送される運用が残っている場合、その添付は読み取れない（PDF転送であれば読み取れる）。
 - **取り込みの前提条件（重要）**: システムはGmail APIで共有アカウント（`eiwa.public@gmail.com`）のメールを取得する。**メーリングリスト/Googleグループ宛に届いたメールはGmail APIの検索・取得対象に入らない**（Web画面には見えるがAPI経由では取得できない）。従来、複合機からのFAX転送はメーリングリスト形式のエイリアス `if@eiwa-up.jp` 経由で届いており、この制限に該当してタスク化されない／複数FAXが混線する原因になっていた（4-5・下記参照）。
@@ -454,10 +470,10 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
     - 担当者は「（担当未設定）」にして画面でオレンジ警告表示し、人が気づいて添付を直接確認できるようにする
     - `is_business_task` の判定自体も読み取り失敗時は信頼できないため、判定結果によらず**必ずタスク化**する（添付ファイルは通常どおりタスク詳細から参照・ダウンロード可能。4-5参照。新規の添付保存機構は不要）
   - この対策はハルシネーションの完全な防止ではなく、AIの自己申告（読み取れたかどうかの明示的な自己評価）に基づく緩和策である点に留意。実運用で効果を検証しつつ、FAX読み取りのみ上位モデル（Sonnet等）へ切り替えるかどうかは別途検討中（トークン単価が上がるため保留。従量課金事項画面のFAX内訳4-3・9章参照）
-- **Claude API呼び出しの一時エラーに対するリトライ（2026-07-28）**: 分類（`classifyEmail`）中にClaude APIが一時的なエラーを返すと、そのメッセージは即座に諦められリトライされない。その後 `last_fetch_at` は実行完了時に前進するため、**このメッセージだけが二度と取得窓に入らず永久に失われる**という設計上の欠陥があった（実例: 2026-07-28、単発の403「Request not allowed」でFAX1件のみ分類失敗。同じ実行内の他のメッセージは正常処理されており、恒久的な権限問題ではなく単発の一時的な現象と判断）。対策として、`worker/lib/anthropic.js` のAPI呼び出しに、一時的とみなせるステータス（403/408/409/429/500/502/503/504/529）で最大3回まで短い間隔（0.8秒→2秒）でリトライする仕組みを追加した。クレジット不足（402、または400で残高不足を示すメッセージ）は再試行しても無意味なため従来通り即時throw。※このリトライは1メッセージあたりの一時的なAPIエラーを吸収するもので、FAXのスレッド束ねに起因する一連の取りこぼし（本セクション上記）とは別種の問題への対策。
-- **担当者(assignee)の割り当てに優先順位を明示（2026-08-06）**: `org_context`には元々「宛名に特定の担当者名が明示されていればその担当者を主担当にする」というルールがあったが、その後に続く個別の製品カテゴリルール（「リニューアルプレート」等）に内容が一致しないことをAIが理由に、宛先優先ルールより先にnullを選んでしまう事例が発生した（FAXの宛先欄に担当者名が明記されているのに担当者未設定になった）。`buildSystemPrompt`（`worker/lib/anthropic.js`）に【担当者(assignee)の決め方（優先順位）】を新設し、①宛先・宛名の担当者名（個別ルールに一致するかは問わない）→②個別ルール→③既定担当→④業務外のときのみnull、の順序をコード側で明示。`settings.org_context`側の【振り分けルール】も同じ優先順で並び替え、宛先優先ルールを先頭に移動した（プロンプトと運用データの双方に同じ優先順位を持たせる）。
+- **Claude API呼び出しの一時エラーに対するリトライ（2026-07-28）**: 分類（`classifyEmail`）中にClaude APIが一時的なエラーを返すと、そのメッセージは即座に諦められリトライされない。その後 `last_fetch_at` は実行完了時に前進するため、**このメッセージだけが二度と取得窓に入らず永久に失われる**という設計上の欠陥があった（実例: 2026-07-28、単発の403「Request not allowed」でFAX1件のみ分類失敗。同じ実行内の他のメッセージは正常処理されており、恒久的な権限問題ではなく単発の一時的な現象と判断）。対策として、`worker/lib/ai/anthropic.js`（当時は `worker/lib/anthropic.js`）のAPI呼び出しに、一時的とみなせるステータス（403/408/409/429/500/502/503/504/529）で最大3回まで短い間隔（0.8秒→2秒）でリトライする仕組みを追加した。クレジット不足（402、または400で残高不足を示すメッセージ）は再試行しても無意味なため従来通り即時throw。※このリトライは1メッセージあたりの一時的なAPIエラーを吸収するもので、FAXのスレッド束ねに起因する一連の取りこぼし（本セクション上記）とは別種の問題への対策。
+- **担当者(assignee)の割り当てに優先順位を明示（2026-08-06）**: `org_context`には元々「宛名に特定の担当者名が明示されていればその担当者を主担当にする」というルールがあったが、その後に続く個別の製品カテゴリルール（「リニューアルプレート」等）に内容が一致しないことをAIが理由に、宛先優先ルールより先にnullを選んでしまう事例が発生した（FAXの宛先欄に担当者名が明記されているのに担当者未設定になった）。`buildSystemPrompt`（現 `worker/lib/ai/prompts.js`。当時は `worker/lib/anthropic.js`）に【担当者(assignee)の決め方（優先順位）】を新設し、①宛先・宛名の担当者名（個別ルールに一致するかは問わない）→②個別ルール→③既定担当→④業務外のときのみnull、の順序をコード側で明示。`settings.org_context`側の【振り分けルール】も同じ優先順で並び替え、宛先優先ルールを先頭に移動した（プロンプトと運用データの双方に同じ優先順位を持たせる）。
 - **`is_business_task=false`誤判定によるFAXの見落とし対策（2026-07-22）**: 読み取り自体（`document_readable`）は成功しているのに、`is_business_task`（業務判定）がfalseと誤判定され、タスクにも操作ログにも一切痕跡を残さず静かに破棄されるFAXが実際に発生した（通常メールの業務外判定と異なり、FAXは件数が少なく誤検知の実害＝無関係なタスクが1件増える程度が小さい一方、見落としの実害＝顧客対応漏れが大きい）。このため`channel='fax'`のタスクは`is_business_task`の判定によらず**必ずタスク化**するよう変更（`worker/lib/pipeline.js`の`isFaxNonBusinessOverride`）。業務外と判定された場合はその旨を留意事項（`classification_note`）に記載し、担当者が内容を確認して不要なら完了にできるようにする。**現状の運用方針（2026-07-22時点）**: 業務判定の精度検証と読み取り内容の観察を優先するため、当面はFAX全件をタスク化する。明らかにプロモーション/広告と分かるものはユーザー側が実例を確認しながら判定基準（キーワード等）を今後提示する予定で、それを踏まえて自動除外や表示上の区別（色分け等）を検討する（現時点は未実装）。
-- **FAX等でtitleが元の件名のままになる問題の修正（2026-07-22）**: 上記の動作確認中、`is_business_task=false`と判定されたFAX（実例: 仕入れ先モノタロウからの15%OFFキャンペーン案内）で、`document_summary`は正しく内容を読み取れているのに`title`が空のままとなり、結果としてタイトルが元のメール件名（FAX共通の定型件名「Attached Image」）にフォールバックしてしまう問題が判明。①分類プロンプト（`worker/lib/anthropic.js`）に「`is_business_task`がfalseでも、内容が読み取れているならtitleは必ず具体的に埋める（元の件名をそのまま使い回さない）」旨を明記、②保険として`worker/lib/pipeline.js`にコード側フォールバックを追加（Claudeのtitleが空なら`document_summary`の最初の文（句点/改行区切り、30字超は省略）から代替タイトルを自動生成。それも無ければ従来どおり`email.subject`にフォールバック）。
+- **FAX等でtitleが元の件名のままになる問題の修正（2026-07-22）**: 上記の動作確認中、`is_business_task=false`と判定されたFAX（実例: 仕入れ先モノタロウからの15%OFFキャンペーン案内）で、`document_summary`は正しく内容を読み取れているのに`title`が空のままとなり、結果としてタイトルが元のメール件名（FAX共通の定型件名「Attached Image」）にフォールバックしてしまう問題が判明。①分類プロンプト（現 `worker/lib/ai/prompts.js`）に「`is_business_task`がfalseでも、内容が読み取れているならtitleは必ず具体的に埋める（元の件名をそのまま使い回さない）」旨を明記、②保険として`worker/lib/pipeline.js`にコード側フォールバックを追加（Claudeのtitleが空なら`document_summary`の最初の文（句点/改行区切り、30字超は省略）から代替タイトルを自動生成。それも無ければ従来どおり`email.subject`にフォールバック）。
 - **FAX本文のノイズ除去（2026-07-22）**: FAXゲートウェイの本文は`FROM=/TO=/DATE=/TIME=/TIMEZONE=/FCODE=/RJOBNUM=`という受信情報のみで業務内容を含まない。このうち**RJOBNUM（受信ジョブ番号。複合機側で受信書類の特定に使う）だけは残す価値がある**ため、FAXタスクの`body_preview`はFROM/TO/DATE/TIME/TIMEZONE/FCODEの行を表示せず、RJOBNUMの行＋添付の自動読取要約（`document_summary`）だけを表示する（`worker/lib/pipeline.js`の`faxJobNumberLine`）。
 - **既知の定期取引先メールの業務判定を確実にする（2026-07-22）**: `org_context`に「實守紙業の数量報告は西川が担当」という明示ルールがある定期報告メールが、`is_business_task=false`と誤判定されてタスク化されず見落とされる事象が発生（本文がほぼ定型文のみのメールで、この明示ルールがあってもClaudeの業務判定が安定しないケースがあると判明）。問い合わせフォーム判定（`isFormSubmission`）と同じ考え方で、送信元に`jitsumori.co.jp`を含み件名に「数量報告」を含むメールは`is_business_task`の判定によらず確実にタスク化するようにした（`isJitsumoriQuantityReport`）。担当者もClaudeが正しく割り当てられなかった場合は西川にフォールバックする。同様の「org_contextに明記された既知の定期取引先パターンなのに業務判定が不安定」な事例が他に見つかれば、同じ方式（送信元・件名パターンでの決定的な判定）で個別対応する想定。
 - **取得クエリの検索窓自体からメールが漏れる新パターン（2026-08-06。原因未確定）**: 上記とは別に、實守紙業「数量報告」メールが**分類器に渡る前の取得段階**で漏れる事象を1件確認した。`isJitsumoriQuantityReport`は分類結果を上書きする仕組みのため、そもそもメッセージが `listMessageIds(query='in:inbox after:<last_fetch_at>')` の検索結果に含まれなければ効かない。当該取得回では、対象時間内に届いていたはずのこのメールだけが検索結果から漏れ、直後に届いた別メールは同じ回で正常に取得・タスク化されていた（取得処理自体・重複判定・分類ロジックはいずれも正常動作）。Gmail検索インデックスの反映遅延が有力候補だが未検証・未確定であり、**コード側の対応はまだ行っていない**。復旧は既存の手順（`settings.last_fetch_at`を対象メール到着直前へ巻き戻して再取得。上記2026-07-23の「FAXの取り込み重複判定」の項を参照）で行い、`gmail_message_id`のUNIQUE制約により巻き戻しに伴う再取得でも重複タスクは作成されないことを実運用で確認した。再発する場合の対策候補: ①取得クエリの`after:`に数分程度のオーバーラップを持たせて同じ時間帯を2回検索する、②`gmail_message_id`のUNIQUE制約に頼って直近数分を毎回再検索する方式に変更する。
@@ -922,9 +938,9 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
 - **管理項目**: 会社名（必須）・業務分類（自由入力＋既存値からの候補選択。まだ運用が固まっていないため選択式には強制していない）・顧客担当者名・当社の主担当者（`settings.assignees`を選択肢にした`<select>`）・会社電話番号・携帯電話番号・メールTO・メールCC（連絡の際に定例で付く先。カンマ区切りで複数可）・ホームページアドレス
 - **新テーブル`contacts`**: `document_templates`と同じ形（uuid PK・`set_updated_at()`トリガー・RLS有効化＋`anon`/`authenticated`からの権限剥奪）。`email_to`（小文字化した値）に部分ユニークインデックスを張り、自動作成での重複登録を防いでいる。`created_via`列で`manual`（画面からの手動登録・編集）／`auto`（自動作成）を区別する
 - **タスク・メール実績からの自動作成**: 一覧画面の「連絡帳を自動作成」ボタン（`POST /api/contacts/sync`）から、スタッフが任意のタイミングで実行する。Gmail取得のたびにリアルタイムで作る方式ではない。`tasks`テーブルのうちスパム除外・`sender_email`が入っているものをメールアドレス単位（大小文字を無視）で名寄せし、まだ連絡帳に無いアドレスだけ新規作成する。**既存の連絡先は上書きしない**（手動編集した内容を後から壊さないため）。当社の主担当者（`staff_name`）には、対象タスクの`assignee`（未設定`（担当未設定）`は除く）をそのまま反映する
-- **会社名・担当者名の抽出元は`contact_company`/`contact_person`（`sender_display`/`contact`ではない）**: 初期実装では`sender_display`（「送信元の会社名・氏名」）を会社名の情報源にしていたが、自社発信メールでは自社スタッフ自身の名前になってしまう（実際に西川・岡田・橋口が「顧客」として誤登録される事故が発生）ことが実機確認で判明し、設計を変更した。`contact`列（往信・返信どちらでも常に「先方＝顧客」を指す）をClaudeの抽出段階で`contact_company`（会社名のみ）・`contact_person`（氏名のみ）に構造化し、これを情報源にしている（`worker/lib/anthropic.js`・`tasks.contact_company`/`contact_person`列。マイグレーション`add_tasks_contact_company_person`）。会社名の初期値は`contact_company`→`contact_person`→`contact`の結合文字列→メールアドレスの順でフォールバックする
+- **会社名・担当者名の抽出元は`contact_company`/`contact_person`（`sender_display`/`contact`ではない）**: 初期実装では`sender_display`（「送信元の会社名・氏名」）を会社名の情報源にしていたが、自社発信メールでは自社スタッフ自身の名前になってしまう（実際に西川・岡田・橋口が「顧客」として誤登録される事故が発生）ことが実機確認で判明し、設計を変更した。`contact`列（往信・返信どちらでも常に「先方＝顧客」を指す）をClaudeの抽出段階で`contact_company`（会社名のみ）・`contact_person`（氏名のみ）に構造化し、これを情報源にしている（`worker/lib/ai/prompts.js`・`tasks.contact_company`/`contact_person`列。マイグレーション`add_tasks_contact_company_person`）。会社名の初期値は`contact_company`→`contact_person`→`contact`の結合文字列→メールアドレスの順でフォールバックする
 - **自動作成の対象外**: ①`channel = 'fax'`のタスク（FAX転送メールは複合機の固定送信アドレス`mimi@eiwa-up.com`から届くため、送信元の異なる多数のFAXが1件の連絡先に集約されてしまう）、②`settings.company_domains`/`shared_gmail`に一致する自社アドレス（Claudeが先方のアドレスを特定できずFromへフォールバックした結果である可能性が高く、自社スタッフ自身を「顧客」として登録する事故になるため）
-- **`contact`列自体の抽出精度に起因する残る限界**: 上記の構造化はあくまで`contact`列の値を会社名・氏名に正しく分けるだけの改善であり、`contact`列自体の抽出（返信すべき相手＝差出人か宛先かの判定）がまれに誤ることがある（本文中に、実際の差出人とは別の第三者への敬称（「◯◯様」）が書かれているメールで、Claudeがその第三者を返信先と誤認するケースを実際に1件確認・修正した）。`anthropic.js`のプロンプトに「問い合わせフォーム経由を除き、原則として受信メールなら差出人本人・送信メールなら宛先を指すこと。本文中の第三者への敬称に惑わされないこと」という明示的なルールを追加して再発を減らしているが、完全には保証できない。**連絡帳の同期は「まだ登録の無いアドレスだけ新規作成」する設計のため、誤ったタイミング（該当タスクのデータを修正する前）に自動作成を実行すると誤った内容のまま連絡先が作られ、後からタスク側だけ直しても自動では上書きされない**（手動編集や直接のDB補正が必要）。実運用で誤登録に気づいた場合は、連絡帳の編集画面から会社名・担当者名を直接修正すればよい
+- **`contact`列自体の抽出精度に起因する残る限界**: 上記の構造化はあくまで`contact`列の値を会社名・氏名に正しく分けるだけの改善であり、`contact`列自体の抽出（返信すべき相手＝差出人か宛先かの判定）がまれに誤ることがある（本文中に、実際の差出人とは別の第三者への敬称（「◯◯様」）が書かれているメールで、Claudeがその第三者を返信先と誤認するケースを実際に1件確認・修正した）。`worker/lib/ai/prompts.js` のプロンプトに「問い合わせフォーム経由を除き、原則として受信メールなら差出人本人・送信メールなら宛先を指すこと。本文中の第三者への敬称に惑わされないこと」という明示的なルールを追加して再発を減らしているが、完全には保証できない。**連絡帳の同期は「まだ登録の無いアドレスだけ新規作成」する設計のため、誤ったタイミング（該当タスクのデータを修正する前）に自動作成を実行すると誤った内容のまま連絡先が作られ、後からタスク側だけ直しても自動では上書きされない**（手動編集や直接のDB補正が必要）。実運用で誤登録に気づいた場合は、連絡帳の編集画面から会社名・担当者名を直接修正すればよい
 - **既存タスクの洗い替え**: 2026-09-01時点で登録済みだった148件のタスクについても、`contact`（無ければ`sender_display`）の文字列を会社名・氏名に分割し`contact_company`/`contact_person`を一括投入済み。自社スタッフ自身や社内メモ的な宛先（先方＝顧客が存在しない）は意図的に両方nullのままにしている
 - **メールCCの自動取得のため`tasks.sender_cc`列を追加**: `worker/lib/gmail.js`はメールのCcヘッダを取得済みだったが、従来`tasks`テーブルには保存しておらず連絡帳のメールCC欄を自動で埋められなかった。`tasks.sender_cc`（自社アドレスを除いた先方Cc。カンマ区切り）を追加し、`worker/lib/pipeline.js`のタスク新規作成時（`isCompanyAddress()`で自社分を除外）に保存するようにした。**このため既存タスクのCCは連絡帳の自動作成では拾えず、2026-09-01以降に取り込まれるメールから対象になる**
 - **mailto:／tel:リンク**: 一覧の各行に会社電話・携帯電話（登録があるものだけ）・メール・ホームページのアイコンボタンを表示する。メールは`src/lib/contacts.js`の`buildContactMailto()`が`mailto:{email_to}?cc={email_cc}`を組み立て、新規メール作成画面を開くと同時に登録済みのCCを自動付与する（返信ではなく新規作成のため件名・本文は入れない）。電話は`tel:{番号}`のリンクで、モバイルではダイヤラーが起動する
@@ -987,7 +1003,7 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
 > 添付ファイルは DB に保持しない（詳細画面を開くたびに Gmail から取得。4-5 参照）。手動登録タスクは `source='manual'`、`gmail_thread_id`/`gmail_message_id` が `manual:<uuid>`。
 
 ### settings（key/value）
-`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`, `last_run_at`(実行開始時刻。更新間隔ゲート専用), `fetch_stall_alert_on`(取得窓の凍結を通知した日), `daily_api_cost_limit_usd`(0.50。AI利用の1日あたり上限), `api_limit_alert`(上限到達の記録), `subrequest_limit`(50。Workerの1回あたり外部リクエスト上限。Workers Paid へ移行したら1000へ), `reply_check_cursor`(返信検知の背景スイープをどこまで見たか。task_no), `reply_scan_days`(3。動きのあったスレッドを探す日数), `subrequest_warn_on`(8割警告を出した日), `cleanup_done_on`(古い記録の掃除を実行した日), `calendar_id_cache`(カレンダー名→IDの解決結果)
+`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`, `last_run_at`(実行開始時刻。更新間隔ゲート専用), `fetch_stall_alert_on`(取得窓の凍結を通知した日), `daily_api_cost_limit_usd`(0.50。AI利用の1日あたり上限), `api_limit_alert`(上限到達の記録), `subrequest_limit`(50。Workerの1回あたり外部リクエスト上限。Workers Paid へ移行したら1000へ), `reply_check_cursor`(返信検知の背景スイープをどこまで見たか。task_no), `reply_scan_days`(3。動きのあったスレッドを探す日数), `subrequest_warn_on`(8割警告を出した日), `cleanup_done_on`(古い記録の掃除を実行した日), `calendar_id_cache`(カレンダー名→IDの解決結果), `ai_provider`(anthropic。AI提供元。11章)
 
 画面から変更できるのは 4-4 の許可キーのみ。`subrequest_limit` などの運用向けキーはDBを直接編集する。
 
@@ -1014,8 +1030,9 @@ id / username(unique) / password_hash(bcrypt) / display_name / **token_version**
 | chlorine_tests | id / report_id(FK cascade) / building / location / tested_at / concentration(numeric(4,2)) / color_ok / turbidity_ok / odor_ok / taste_ok / inspector / note | 残留塩素等検査（2026-08-10追加。マイグレーション `add_chlorine_tests_phase5`）。日を跨って一覧するため独立した行として持つが、写真が日報に属する設計のため測定日の日報に紐付ける（無ければAPI側で作成）。判定4項目は `true`=OK / `false`=NG / `null`=未選択（4-14参照） |
 
 ### api_usage
-month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / **parking_calls**（違反車両写真AI読み取り分の内訳。マイグレーション `add_parking_usage_breakdown`。2026-08-05） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）・違反車両写真のAI読み取りは通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「メール」「FAX」「車両画像」の件数を分けて表示）
+month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_input_tokens / fax_output_tokens**（FAX分の内訳。マイグレーション `add_fax_usage_breakdown`。2026-07-18） / **parking_calls**（違反車両写真AI読み取り分の内訳。マイグレーション `add_parking_usage_breakdown`。2026-08-05） / **cost_usd**（加算した時点の単価で確定させた金額。マイグレーション `add_cost_usd_to_api_usage`。2026-09-05） / updated_at。`add_api_usage()` 関数（service role 専用）で原子的に加算。FAX（添付PDF/画像の読取を伴う分類）・違反車両写真のAI読み取りは通常メールより入出力トークンが多く、将来的に上位モデル（Sonnet等）へ切り替える場合に単価を分けて試算できるよう内訳を分離して集計している（実際の切り替えは未実施。従量課金事項画面では「メール」「FAX」「車両画像」の件数を分けて表示）
 > **是正済みの実装ミス（2026-07-18）**: `add_fax_usage_breakdown` で `add_api_usage()` を新しい引数構成（7個）で `create or replace` したところ、PostgreSQLは関数を名前＋引数シグネチャ単位で識別するため、既存の4引数版を置き換えず**別オーバーロードとして追加**されてしまった。新オーバーロードにはデフォルトのPUBLIC権限が付いたままで、`anon`/`authenticated` からも実行可能な状態になっていた（本システムの「anon/authenticatedは一切アクセス不可」という方針＝8章のC1是正に反する）。`get_advisors` 相当の確認で発覚し、旧4引数版を削除・新版の権限を `service_role` 限定に是正済み（`fix_add_api_usage_overload_grants`）。**教訓**: PL/pgSQL関数の引数を増減させる変更は `create or replace` だけでは既存関数を置き換えられないことがあるため、変更後は必ず `pg_proc`（`proacl`）で権限を確認する。**`add_parking_usage_breakdown`（2026-08-05）ではこの教訓を踏まえ、`drop function if exists`（旧7引数版）→ `create function`（新8引数版）で単一シグネチャに保ち、`revoke`/`grant`も新シグネチャに対して明示的にやり直している**。
+> **2026-09-05に再点検して是正**: その後の `add_waste_tracking`（9引数版）と `add_cost_usd_to_api_usage`（10引数版）でまた `create or replace` を使っていたため、`add_api_usage` が**3つのオーバーロードで共存**していた（`add_api_usage_daily` も2つ）。呼び出し側が名前付き引数で呼ぶ限り最新版に解決されるが、引数の組み合わせ次第で `function is not unique` になり得るため、`drop_obsolete_api_usage_overloads` で旧版をすべて削除し単一シグネチャに戻した。**引数を増やす変更のあとは必ず `pg_proc` でシグネチャの重複を確認すること**（権限だけでなく重複も見る）。
 
 ### push_subscriptions（2026-07-21。Web Push通知の購読情報）
 | 列 | 型 | 備考 |
@@ -1046,7 +1063,16 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 | day | date PK | JST基準の日付 |
 | input_tokens / output_tokens | bigint | 当日の累計トークン |
 | calls | integer | 当日の呼び出し回数 |
+| cost_usd | numeric | **加算した時点の単価で確定させた金額（USD）**。2026-09-05 `add_cost_usd_to_api_usage` |
 | updated_at | timestamptz | |
+
+> **金額をトークン数から都度計算せず、加算時に確定させて保存する理由（2026-09-05）**:
+> AI提供元ごとに単価が1桁違うため、提供元を切り替えた日・混在した日の金額が
+> 「トークン合計 × 単価」では出せない（サーキットブレーカーの判定も同じ問題を持つ）。
+> Worker はそのとき使った提供元の単価で金額を計算して `p_cost` として渡し、画面と停止判定は
+> `cost_usd` を読むだけにしている。既存行は移行時に Claude 単価でバックフィル済み。
+> 画面は `src/lib/pricing.js` の `rowCostUSD()` を使い、`cost_usd` を持たない古い行だけ
+> 従来どおりトークン数から試算する。
 
 `settings.daily_api_cost_limit_usd`（既定 0.50・**従量課金事項の画面（`/usage`）**の
 「AI利用の1日あたり上限」で変更可。2026-09-04にタスク設定から移設）で
