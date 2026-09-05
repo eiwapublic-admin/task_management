@@ -48,6 +48,27 @@ export async function listMessageIds(accessToken, query, maxResults = 50) {
   return data.messages || []
 }
 
+// 直近に動きのあったスレッドIDの集合を**1回のリクエストで**取得する（2026-09-05）。
+//
+// 返信検知はタスク1件ごとにスレッドを読むため、進行中タスクの件数がそのまま
+// サブリクエスト数になり、Cloudflare Workers の1呼び出しあたりの上限（無料プラン50）を
+// 押し上げていた。実際には大半のスレッドは前回から何も動いていないので、
+// 「最近メッセージが増えたスレッド」だけに絞れば読む対象は数件で済む。
+//
+// messages.list の応答は各メッセージの id と threadId を返すので、本文を取らずに
+// スレッドIDだけを集められる（fields で threadId のみに絞って転送量も減らす）。
+// maxResults は Gmail API の上限が500。ページングはしない（1回に収めることが目的で、
+// 収まらないほど動きがある日は、この関数が返した範囲＋巡回ごとの背景スイープで拾う）。
+export async function listActiveThreadIds(accessToken, query, maxResults = 500) {
+  const params = new URLSearchParams({
+    q: query,
+    maxResults: String(maxResults),
+    fields: 'messages/threadId',
+  })
+  const data = await apiGet(accessToken, `/messages?${params}`)
+  return new Set((data.messages || []).map((m) => m.threadId).filter(Boolean))
+}
+
 // Base64URL → UTF-8 文字列
 function decodeBody(data) {
   if (!data) return ''

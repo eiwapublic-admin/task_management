@@ -104,7 +104,11 @@ insert into settings (key, value) values
   -- （メール処理・返信検知・カレンダー）を打ち切って次の巡回へ回す。
   -- プランを上げたときはここを増やす（画面からは変更しない運用向けのキー）。
   ('subrequest_limit', '50'),
-  ('reply_check_cursor', '0')    -- 返信済みタスクの返信検知をどこまで見たか（task_no。一周したら0に戻る）
+  ('reply_check_cursor', '0'),   -- 返信検知の背景スイープをどこまで見たか（task_no。一周したら0に戻る）
+  ('reply_scan_days', '3'),      -- 「直近に動きのあったスレッド」を探すGmail検索の日数（返信検知の対象を絞る）
+  ('subrequest_warn_on', ''),    -- サブリクエストが上限の8割に達したと通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
+  ('cleanup_done_on', ''),       -- 古いログ・判定記録の掃除を実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
+  ('calendar_id_cache', '')      -- カレンダー名→IDの解決結果のキャッシュ（{"name":..,"id":..}）。calendarListの呼び出しを省くため
 on conflict (key) do nothing;
 
 -- api_usage: Claude API の月次利用量（推定コスト表示用）

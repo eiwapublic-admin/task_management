@@ -1,5 +1,12 @@
 import { getAdminClient } from './supabase-admin.js'
-import { getAccessToken, listMessageIds, getMessage, getThreadMessages, getAttachmentData } from './gmail.js'
+import {
+  getAccessToken,
+  listMessageIds,
+  listActiveThreadIds,
+  getMessage,
+  getThreadMessages,
+  getAttachmentData,
+} from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
 import { classifyEmail } from './anthropic.js'
 import { notifyNewTask, notifyApiAlert } from './push.js'
@@ -12,10 +19,22 @@ const MAX_MESSAGES = 40
 // 1回の巡回で返信検知（スレッド読み取り）を行う進行中タスクの上限（2026-09-04）。
 // 返信検知は「未処理・返信済み」のタスク1件につきGmailスレッドを1回読むため、
 // タスクが増えるほどサブリクエストを食い、上限超過で後続の処理を巻き添えにする
-// （9/3の事故。docs/HANDOFF.md 223番）。1回では全件を見ずに、前回の続きから
-// 順に見ていく（settings.reply_check_cursor に進捗を残す）。数巡すれば全件を回るので、
-// 検知が遅れるのは最大で「タスク件数 ÷ この値」巡ぶん。
+// （9/3の事故。docs/HANDOFF.md 223番）。
+//
+// 2026-09-05: そもそも読む対象を減らすため、**直近に動きのあったスレッドだけ**を
+// 対象にするようにした（listActiveThreadIds。1リクエストでスレッドIDの集合が取れる）。
+// 通常は0〜数件に収まるので、この上限に当たること自体がまれになる。
 const REPLY_CHECK_MAX_TASKS = 12
+
+// 動きが無かったスレッドからも毎回この件数だけ様子を見る（背景スイープ）。
+// 「直近に動きがあったか」の判定はGmailの検索窓（reply_scan_days 日）に依存するため、
+// 窓の外で起きた見落とし・検索の取りこぼしを、時間をかけて拾い直すための保険。
+// settings.reply_check_cursor で前回の続きから順に回る。
+const REPLY_CHECK_SWEEP_TASKS = 3
+
+// 「直近に動きのあったスレッド」を探す日数（settings.reply_scan_days で変更可）。
+// 巡回間隔（既定30分）よりずっと長く取ってあるので、1〜2回巡回が飛んでも取りこぼさない。
+const DEFAULT_REPLY_SCAN_DAYS = 3
 
 // タスク本文（body_preview）に保存する最大文字数。引用された過去のやり取り
 // （初回発信メールまで）も含めて全文を残せるよう十分大きく取る。暴走メール対策の上限。
@@ -1022,37 +1041,52 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       .eq('source', 'email')
     budget.use(1)
 
-    // 1巡回あたりの対象を REPLY_CHECK_MAX_TASKS 件に絞る（2026-09-04）。全件を毎回見ると
-    // タスク数に比例してサブリクエストを消費し、上限超過で後続の処理（利用量の記録・
-    // 操作ログ）まで巻き添えになるため（9/3は進行中30件＝スレッド読み取り30回で
-    // 上限50をほぼ使い切っていた）。
-    //
-    // 優先順位を付ける:
-    //   - 「未処理」… 初回の返信検知。対応漏れに直結し件数も少ないので**毎回全件**見る
-    //   - 「返信済み」… さらなる返信の取り込み。件数が多く緊急度も低いので、
-    //     余った枠を前回の続きから順に割り当てる（settings.reply_check_cursor に進捗を
-    //     残し、一周したら先頭へ戻る）。全件を回るのに数巡かかるぶん検知は遅れるが、
-    //     取りこぼしはしない。
     const sortedTasks = (openTasks || []).slice().sort((a, b) => Number(a.task_no) - Number(b.task_no))
-    const pendingTasks = sortedTasks.filter((t) => t.status === '未処理')
-    const repliedTasks = sortedTasks.filter((t) => t.status !== '未処理')
-    const targets = pendingTasks.slice(0, REPLY_CHECK_MAX_TASKS)
 
-    const cursor = Number(settings.reply_check_cursor) || 0
-    const slots = Math.max(REPLY_CHECK_MAX_TASKS - targets.length, 0)
-    const rotated = []
-    if (repliedTasks.length > 0 && slots > 0) {
-      let startIndex = repliedTasks.findIndex((t) => Number(t.task_no) > cursor)
-      if (startIndex < 0) startIndex = 0
-      for (let k = 0; k < repliedTasks.length && rotated.length < slots; k += 1) {
-        rotated.push(repliedTasks[(startIndex + k) % repliedTasks.length])
+    // 読む対象を「直近に動きのあったスレッド」に絞る（2026-09-05）。
+    // 従来は進行中タスク全件（30件）のスレッドを毎回読んでいたが、その大半は前回から
+    // 何も届いていない。messages.list を1回叩けば、最近メッセージが増えたスレッドIDの
+    // 集合が本文を取らずに手に入るので、それに含まれるタスクだけを読めば足りる。
+    // これで通常の巡回はスレッド読み取り0〜数回に収まり、上限50に近づかなくなる。
+    //
+    // 取得に失敗したときは activeThreadIds を null にして**従来どおり全件を候補にする**
+    // （絞り込みに失敗したせいで返信検知そのものが止まる、という悪い倒れ方を避ける。
+    //  件数の歯止めは下の REPLY_CHECK_MAX_TASKS と予算チェックが担う）。
+    const replyScanDays = Math.max(1, Number(settings.reply_scan_days) || DEFAULT_REPLY_SCAN_DAYS)
+    let activeThreadIds = null
+    if (sortedTasks.length > 0) {
+      try {
+        activeThreadIds = await listActiveThreadIds(accessToken, `newer_than:${replyScanDays}d`)
+        budget.use(1)
+      } catch (err) {
+        summary.errors.push(`reply-scan: ${String(err.message || err)}`)
       }
-      targets.push(...rotated)
     }
-    // 一周し切ったか（＝返信済みを全件見たか）で次回の開始位置を決める
-    const repliedRemaining = Math.max(repliedTasks.length - rotated.length, 0)
-    deferred.replyCheck =
-      Math.max(pendingTasks.length - Math.min(pendingTasks.length, REPLY_CHECK_MAX_TASKS), 0) + repliedRemaining
+    const isActive = (t) => !activeThreadIds || activeThreadIds.has(t.gmail_thread_id)
+
+    // 動きのあったタスク。未処理（初回の返信検知＝対応漏れに直結）を先に見る
+    const activeTasks = sortedTasks.filter(isActive)
+    const targets = [
+      ...activeTasks.filter((t) => t.status === '未処理'),
+      ...activeTasks.filter((t) => t.status !== '未処理'),
+    ].slice(0, REPLY_CHECK_MAX_TASKS)
+    // 動きのあった中で今回見きれなかったぶんだけを「繰り越し」として数える
+    // （動きの無いタスクは見なくて当然なので繰り越しには含めない）
+    deferred.replyCheck = Math.max(activeTasks.length - targets.length, 0)
+
+    // 背景スイープ: 動きが無かったタスクからも毎回少しだけ見る（取りこぼしの保険）。
+    // 進捗は settings.reply_check_cursor（最後に見た task_no）に残し、一周したら先頭へ戻る。
+    const cursor = Number(settings.reply_check_cursor) || 0
+    const idleTasks = sortedTasks.filter((t) => !targets.includes(t))
+    const swept = []
+    if (idleTasks.length > 0) {
+      let startIndex = idleTasks.findIndex((t) => Number(t.task_no) > cursor)
+      if (startIndex < 0) startIndex = 0
+      for (let k = 0; k < idleTasks.length && swept.length < REPLY_CHECK_SWEEP_TASKS; k += 1) {
+        swept.push(idleTasks[(startIndex + k) % idleTasks.length])
+      }
+      targets.push(...swept)
+    }
     let lastCheckedNo = cursor
 
     for (const task of targets) {
@@ -1064,8 +1098,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       try {
         const messages = await getThreadMessages(accessToken, task.gmail_thread_id)
         budget.use(1)
-        // 巡回位置は「返信済み」タスクにだけ意味がある（未処理は毎回全件見るため）
-        if (task.status !== '未処理') lastCheckedNo = Number(task.task_no) || lastCheckedNo
+        // 巡回位置は背景スイープで見たタスクにだけ意味がある
+        if (swept.includes(task)) lastCheckedNo = Number(task.task_no) || lastCheckedNo
         if (messages.length === 0) continue
         const originalFrom = (extractEmail(task.sender) || '').toLowerCase()
         // 顧客(counterpart)のアドレスを特定する。
@@ -1140,10 +1174,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       }
     }
 
-    // 次回の開始位置（返信済みタスクの巡回位置）を記録する。
-    // 一周し切った＝残りが無いときは先頭へ戻す。値が変わらないなら書き込まない。
-    if (rotated.length > 0) {
-      const nextCursor = repliedRemaining > 0 ? lastCheckedNo : 0
+    // 背景スイープの次回開始位置を記録する。一周し切ったら先頭へ戻す。
+    // 値が変わらないなら書き込まない（無駄なサブリクエストを出さない）。
+    if (swept.length > 0) {
+      const nextCursor = swept.length < idleTasks.length ? lastCheckedNo : 0
       if (nextCursor !== cursor) {
         await supabase
           .from('settings')
@@ -1156,6 +1190,15 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 3.5) Google カレンダー「栄和共通」の当日イベントをタスク化（未処理に登録）
   summary.calendarCreated = 0
   const calendarName = (settings.calendar_name || '栄和共通').trim()
+  // カレンダー名 → ID の解決結果のキャッシュ（settings.calendar_id_cache）。
+  // 名前が変わっていたら使わない（＝再解決させる）。
+  let cachedCalendarId = null
+  try {
+    const cached = JSON.parse(settings.calendar_id_cache || 'null')
+    if (cached && cached.name === calendarName && cached.id) cachedCalendarId = cached.id
+  } catch {
+    cachedCalendarId = null
+  }
   // 予算が残っていないときは今回は見送る（次の巡回で拾う。当日のイベントを
   // 対象にしているので、5〜30分後の巡回で取り込めれば実用上は問題ない）
   if (calendarName && !budget.has(6)) {
@@ -1169,10 +1212,22 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       let available = []
       if (calendarName.includes('@')) {
         calendarId = calendarName
+      } else if (cachedCalendarId) {
+        // 前回解決した結果を使い、calendarList の呼び出しを省く（2026-09-05。
+        // 毎回1回ぶんのサブリクエストになるため。カレンダー名を変えるとキャッシュの
+        // 名前が一致しなくなるので自動的に再解決される）
+        calendarId = cachedCalendarId
       } else {
         const resolved = await resolveCalendar(accessToken, calendarName)
+        budget.use(1)
         calendarId = resolved.id
         available = resolved.available
+        if (calendarId) {
+          await supabase.from('settings').upsert(
+            { key: 'calendar_id_cache', value: JSON.stringify({ name: calendarName, id: calendarId }) },
+            { onConflict: 'key' }
+          )
+        }
       }
       if (!calendarId) {
         summary.errors.push(
@@ -1182,7 +1237,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         )
       } else {
         const events = await listTodayEvents(accessToken, calendarId)
-        budget.use(2)
+        budget.use(1)
         for (const ev of events) {
           const key = `cal:${ev.id}`
           // カレンダーイベントの重複判定はタスクの状態を問わない（メッセージ単位のexistingMessagesを
@@ -1229,6 +1284,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         ? `calendar: カレンダー参照の権限がありません（OAuth トークンに calendar スコープの再付与が必要）: ${err.message}`
         : `calendar: ${String(err.message || err)}`
       summary.errors.push(msg)
+      // 解決結果のキャッシュが古い（カレンダーが消えた・共有が外れた等）可能性があるので、
+      // 失敗したらキャッシュを捨てて次回は名前から引き直す
+      if (cachedCalendarId) {
+        await supabase.from('settings').upsert({ key: 'calendar_id_cache', value: '' }, { onConflict: 'key' })
+      }
     }
   }
 
@@ -1247,8 +1307,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     if (usageError) summary.errors.push(`usage: ${usageError.message}`)
   }
 
-  // 4-2) 上限アラートの解除（2026-09-04）。日付が変わって上限内に戻れば自動で消す
-  if (!limitState.exceeded) await clearLimitAlert(supabase)
+  // 4-2) 上限アラートの解除（2026-09-04）。日付が変わって上限内に戻れば自動で消す。
+  // **実際に立っているときだけ**書き込む（毎回upsertすると巡回1回につき1回ぶんの
+  // サブリクエストを無駄にする。2026-09-05）
+  if (!limitState.exceeded && settings.api_limit_alert) await clearLimitAlert(supabase)
 
   // 5) クレジット不足アラートの設定／解除
   if (billingError) {
@@ -1267,8 +1329,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         url: '/usage',
       })
     }
-  } else if (classifyCalls > 0) {
-    // 正常に分類できたのでアラートを解除
+  } else if (classifyCalls > 0 && settings.api_credit_alert) {
+    // 正常に分類できたのでアラートを解除（立っているときだけ書き込む。2026-09-05）
     await supabase.from('settings').upsert(
       { key: 'api_credit_alert', value: '' },
       { onConflict: 'key' }
@@ -1286,6 +1348,25 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   }
   summary.deferred = deferred
   summary.subrequests = budget.snapshot()
+
+  // 上限に当たる前に気づけるようにする早期警告（2026-09-05）。
+  // 使用数が上限の8割を超えた日は、処理ログに赤い error として1回だけ残す
+  // （毎回出すとログが警告で埋まるため、fetch_stall_alert_on と同じく1日1回に絞る）。
+  // これが出たら、進行中タスクの整理・REPLY_CHECK_* の見直し・
+  // settings.subrequest_limit の引き上げ（＝Workers Paidへの移行）を検討する。
+  if (budget.used >= budget.limit * 0.8) {
+    const warnDay = todayJST()
+    if (settings.subrequest_warn_on !== warnDay) {
+      summary.errors.push(
+        `1回の巡回で使う外部リクエストが上限に近づいています（${budget.used}/${budget.limit}回）。` +
+          '進行中（未処理・返信済み）のタスクを整理すると減ります。慢性的に出る場合は' +
+          'Workers の有料プランへの移行を検討してください。'
+      )
+      await supabase
+        .from('settings')
+        .upsert({ key: 'subrequest_warn_on', value: warnDay }, { onConflict: 'key' })
+    }
+  }
 
   summary.usage = {
     input_tokens: usageInput,
@@ -1348,17 +1429,21 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   logRows.unshift({ log_type: hasErrors ? 'error' : 'fetch', actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)
   if (logError) console.error('操作ログの書き込みに失敗:', logError.message)
-  await supabase
-    .from('activity_logs')
-    .delete()
-    .lt('created_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
-
-  // 業務外判定の記録も同じ保持期間で掃除する。取得クエリは last_fetch_at 以降しか
-  // 見ないため、古い記録を残し続ける必要はない（残すと照合対象が無限に増える）。
-  await supabase
-    .from('processed_messages')
-    .delete()
-    .lt('judged_at', new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString())
+  // 古い記録の掃除は**1日1回だけ**行う（2026-09-05）。
+  // 巡回のたびに delete を2回出すと、それだけで1日100回ぶんのサブリクエストになる。
+  // 保持期間は日単位なので、実行が1日1回でも結果は変わらない。
+  //   - activity_logs … 処理ログ
+  //   - processed_messages … 業務外判定の記録。取得クエリは last_fetch_at 以降しか
+  //     見ないため、古い記録を残し続ける必要はない（残すと照合対象が無限に増える）
+  const cleanupDay = todayJST()
+  if (settings.cleanup_done_on !== cleanupDay) {
+    const retentionCutoff = new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString()
+    await supabase.from('activity_logs').delete().lt('created_at', retentionCutoff)
+    await supabase.from('processed_messages').delete().lt('judged_at', retentionCutoff)
+    await supabase
+      .from('settings')
+      .upsert({ key: 'cleanup_done_on', value: cleanupDay }, { onConflict: 'key' })
+  }
 
   // 7) last_fetch_at を更新
   // **予算切れでメールを積み残した回は前進させない**（2026-09-04）。取得窓を進めると、
