@@ -910,7 +910,7 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - いずれもログイン必須（JWT）。共有アカウントの認証情報（既存の `gmail.readonly` スコープ）で取得するため、担当者が Gmail に未ログインでも落とせる。
 - アドレス判定・顧客(counterpart)特定のロジックは `worker/lib/mail-utils.js` に集約（返信検知パイプラインと共有）。
 
-### 日報機能 API（Worker。`worker/lib/reports.js` / `worker/lib/holidays.js` / `worker/lib/anthropic.js`）
+### 日報機能 API（Worker。`worker/lib/reports.js` / `worker/lib/holidays.js` / `worker/lib/ai/`）
 タスク管理系と同じくログイン必須（JWT）。owner ロールは書き込み系（POST/PATCH/DELETE）が403で拒否される。
 API・DBの詳細な仕様は設計書4-4章（APIエンドポイント表）・4-10〜4-13章・5章を参照。概要:
 - 日報ヘッダ・作業記録: `/api/reports`（一覧） / `/api/report`（1件の取得・作成・更新） / `/api/report/entries`（明細の追加・更新・削除）
@@ -983,6 +983,20 @@ id はクエリ/ボディ」方式にしてある（計画6章のパスパラメ
 
 ## 6. 残タスク・改善候補
 
+- [ ] **【要確認】Gemini移行 Phase 1 の稼働確認（232番。2026-09-05）**: プロバイダ抽象化と
+  `cost_usd` 方式へのリファクタを本番反映済み。**挙動は変えていない**が、実際の分類を伴う
+  巡回は翌営業日の8時以降にしか動かない（実施が18時以降だったため）。
+  **翌朝の処理ログで、①赤いエラーが増えていないこと、②新規タスクが従来どおり作られること、
+  ③従量課金事項の画面の金額がそれまでと同じ水準で表示されること**を確認してほしい。
+  クレジット不足のエラーはチャージするまで残る（これはこの変更とは無関係）。
+  異常があれば `git revert` で1コミット戻すだけで元に戻せる（DBの `cost_usd` 列は
+  残っていても旧コードの動作に影響しない）
+- [ ] **Gemini移行 Phase 2 以降（229〜232番。着手は社長との調整後）**: Phase 1（抽象化）まで完了。
+  残りは②Gemini実装（`worker/lib/ai/gemini.js`＋切り替えUI。1日）、③過去データでの精度検証（1日）、
+  ④任意のシャドー運用、⑤切り替え。**判断材料は `docs/ai-cost-and-alternatives.md` 10〜11章に集約済み**
+  （費用は年約1,540円→約405〜550円、前払い方式はAnthropicと同形、有料枠は学習に使われない、
+  移行しても判定ロジックは組み直しにならない）。**実装時の必須条件として、Geminiは出力課金に
+  思考トークンが含まれるため thinking を明示的に最小/オフにすること**（11-9）
 - [ ] **【要確認】サブリクエスト上限対策の効果確認（225番。2026-09-05）**: Cloudflareのログで
   `Too many subrequests by single Worker invocation` が9/3の巡回で毎回出ており、返信検知・カレンダー
   登録・アーカイブ・**利用量の記録**・操作ログの書き込み・`last_fetch_at`の更新が失敗していた
