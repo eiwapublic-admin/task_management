@@ -483,7 +483,17 @@
 
 /* アーカイブ。狭幅ではアイコンのみ、PC幅（769px以上）では文字ラベルも表示する
    （2026-08-14。「アーカイブ」の文字を付けてほしいとの依頼）。ラベルの表示切替だけの
-   ためアイコンボタンの共通骨格（幅=高さ固定）とは別に、このボタンだけ幅を可変にする */
+   ためアイコンボタンの共通骨格（幅=高さ固定）とは別に、このボタンだけ幅を可変にする。
+   他のアイコンボタンより一回り大きく、常時塗り＋枠線で目立たせる
+   （2026-09-05。「もう少し大きく目立つように」との依頼） */
+.icon-btn-archive {
+  width: calc(var(--icon-btn) + 8px);
+  height: calc(var(--icon-btn) + 8px);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .icon-btn-archive-label { display: none; }
 
 @media (min-width: 769px) {
@@ -495,11 +505,15 @@
   .icon-btn-archive-label {
     display: inline;
     font-size: var(--fs-sm);
-    font-weight: 600;
+    font-weight: 700;
   }
 }
 
-.icon-btn-archive:hover:not(:disabled) { color: var(--color-primary); }
+.icon-btn-archive:hover:not(:disabled) {
+  background: var(--color-primary-weak);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-hover);
+}
 
 /* 自主点検（日報詳細ヘッダ。2026-08-18）。狭幅ではアイコンのみ、PC幅では
    「自主点検」の文字ラベルも表示する。アーカイブボタンと全く同じ骨格を使う */

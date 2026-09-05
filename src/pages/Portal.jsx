@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import {
-  IconArchive,
   IconAddressBook,
   IconBox,
   IconBuildingWrench,
@@ -317,20 +316,44 @@ export default function Portal() {
     return all.filter((c) => !(isOwner && c.staffOnly))
   }, [stats, isOwner, navigate])
 
-  // 統計を出すほどではない画面への導線。押すとその画面へ移動する
-  const links = [
-    { label: 'アーカイブタスク', icon: <IconArchive size={20} />, path: '/archive', staffOnly: true },
-    { label: '処理ログ', icon: <IconList size={20} />, path: '/logs', staffOnly: true },
-    // 作業マスタは owner（小泉産業様）も閲覧できる（docs/bilmen-plan.md 10章）
-    { label: '作業マスタ', icon: <IconBuildingWrench size={20} />, path: '/bilmen/masters' },
-    { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
-    { label: 'テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
-    { label: '作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
-    { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
-    { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
-    { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
-    { label: 'タスク設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
-  ].filter((l) => !(isOwner && l.staffOnly))
+  // 統計を出すほどではない画面への導線。押すとその画面へ移動する。
+  // 「その他機能」「マスタ」「管理」の3グループに分けて並べる（2026-09-05。
+  // アーカイブへのリンクはここからは削除し、KanbanBoard側の導線のみに一本化した）
+  const filterLinks = (list) => list.filter((l) => !(isOwner && l.staffOnly))
+
+  const linkGroups = [
+    {
+      key: 'other',
+      title: 'その他機能',
+      sub: '記録の参照',
+      links: filterLinks([
+        { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
+        { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
+      ]),
+    },
+    {
+      key: 'master',
+      title: 'マスタ',
+      sub: '各種マスタの管理',
+      links: filterLinks([
+        { label: '日報用作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
+        { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
+        { label: '備品用テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
+        // ビルメン作業マスタは owner（小泉産業様）も閲覧できる（docs/bilmen-plan.md 10章）
+        { label: 'ビルメン作業マスタ', icon: <IconBuildingWrench size={20} />, path: '/bilmen/masters' },
+      ]),
+    },
+    {
+      key: 'admin',
+      title: '管理',
+      sub: '設定・運用管理',
+      links: filterLinks([
+        { label: '処理ログ', icon: <IconList size={20} />, path: '/logs', staffOnly: true },
+        { label: 'タスク設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
+        { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
+      ]),
+    },
+  ].filter((g) => g.links.length > 0)
 
   return (
     <div className="ui-page">
@@ -394,14 +417,14 @@ export default function Portal() {
           ))}
         </div>
 
-        {links.length > 0 && (
-          <section className="portal-links-section">
+        {linkGroups.map((group) => (
+          <section key={group.key} className="portal-links-section">
             <h2 className="ui-group-head">
-              その他
-              <span className="ui-group-head-sub">記録の参照・設定</span>
+              {group.title}
+              <span className="ui-group-head-sub">{group.sub}</span>
             </h2>
             <div className="portal-links">
-              {links.map((link) => (
+              {group.links.map((link) => (
                 <button
                   key={link.path}
                   type="button"
@@ -416,7 +439,7 @@ export default function Portal() {
               ))}
             </div>
           </section>
-        )}
+        ))}
       </div>
     </div>
   )
