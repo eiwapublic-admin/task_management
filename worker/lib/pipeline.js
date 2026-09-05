@@ -8,7 +8,7 @@ import {
   getAttachmentData,
 } from './gmail.js'
 import { resolveCalendar, listTodayEvents } from './calendar.js'
-import { classifyEmail } from './anthropic.js'
+import { classifyEmail, resolveProvider, estimateCostUSD } from './ai/index.js'
 import { notifyNewTask, notifyApiAlert } from './push.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert, clearLimitAlert } from './usageLimit.js'
 import { createSubrequestBudget } from './subrequests.js'
@@ -408,6 +408,10 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // サーキットブレーカー（2026-09-04）。本日のAI利用額が上限に達していたら、
   // メールの取得自体は行うが分類（Claude呼び出し）は一切行わない。
   // 上限は設定画面の「AI利用の1日あたり上限」で変更できる。
+  // AI提供元（2026-09-05）。設定 `ai_provider` で切り替える。未設定・未実装の値は
+  // 既定（anthropic）へ倒れるので、設定ミスで分類が止まることはない。
+  const aiProvider = resolveProvider(settings.ai_provider)
+
   let limitState = await checkDailyLimit(supabase, settings.daily_api_cost_limit_usd)
   if (limitState.exceeded) {
     summary.errors.push(limitState.message)
@@ -762,7 +766,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         summary.errors.push(`attachment: ${String(err.message || err)}`)
       }
 
-      const { classification: result, usage } = await classifyEmail(email, context, documents)
+      const { classification: result, usage } = await classifyEmail(email, context, documents, aiProvider)
       // Claude呼び出し1回＋この後のDB書き込み（利用量の加算・タスク登録 or 判定済み記録）ぶん
       budget.use(3)
       usageInput += usage.input_tokens
@@ -776,6 +780,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         input: usage.input_tokens,
         output: usage.output_tokens,
         calls: 1,
+        provider: aiProvider,
       })
       if (dailyTotal && dailyTotal.costUSD >= limitState.limitUSD) {
         limitState = { ...limitState, exceeded: true, usage: dailyTotal }
@@ -1303,6 +1308,8 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       p_fax_calls: classifyFaxCalls,
       p_fax_input: faxUsageInput,
       p_fax_output: faxUsageOutput,
+      // 金額は**この実行で使った提供元の単価**で確定させて記録する（2026-09-05。11-4）
+      p_cost: estimateCostUSD(aiProvider, usageInput, usageOutput),
     })
     if (usageError) summary.errors.push(`usage: ${usageError.message}`)
   }

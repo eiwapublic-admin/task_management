@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchUsageMonths, fetchSettings } from '../lib/tasks'
 import { saveSettings } from '../lib/api'
 import { fetchStorageUsage } from '../lib/reports'
-import { estimateCostUSD, formatUSD, formatJPY, BILLING_URL } from '../lib/pricing'
+import { rowCostUSD, formatUSD, formatJPY, BILLING_URL } from '../lib/pricing'
 import { formatBytes } from '../lib/imageResize'
 
 // AI利用の1日あたり上限（USD）の既定値。worker/lib/usageLimit.js と同じ値を保つこと
@@ -218,7 +218,7 @@ function currentMonthJST() {
 
 // 月別の行から表示用の集計値を作る。該当行が無い月は 0 件として扱う。
 function summarize(rows) {
-  const total = { calls: 0, faxCalls: 0, parkingCalls: 0, wasteCalls: 0, input: 0, output: 0 }
+  const total = { calls: 0, faxCalls: 0, parkingCalls: 0, wasteCalls: 0, input: 0, output: 0, costUSD: 0 }
   for (const r of rows) {
     total.calls += r.calls || 0
     total.faxCalls += r.fax_calls || 0
@@ -226,12 +226,14 @@ function summarize(rows) {
     total.wasteCalls += r.waste_calls || 0
     total.input += r.input_tokens || 0
     total.output += r.output_tokens || 0
+    // 金額は行ごとに求めて足す（2026-09-05）。トークン合計から一括で計算すると、
+    // AI提供元が混在した月に単価がずれる。docs/ai-cost-and-alternatives.md 11-4
+    total.costUSD += rowCostUSD(r)
   }
   return {
     ...total,
     // 「分類したメール」はFAX・車両画像・廃棄物スキャンを除いた件数（単価・読み取り対象が異なるため内訳を分ける）
     mailCalls: Math.max(total.calls - total.faxCalls - total.parkingCalls - total.wasteCalls, 0),
-    costUSD: estimateCostUSD(total.input, total.output),
   }
 }
 
