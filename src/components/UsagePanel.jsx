@@ -102,6 +102,116 @@ function DailyLimitSection() {
   )
 }
 
+// 運用上の留意事項・設定要領（2026-09-05。依頼）。
+// 2026-09-03の課金事故（HANDOFF 219〜226番・docs/ai-cost-and-alternatives.md 9章）で
+// 得た知見のうち、**運用する人が知っておく必要があること**だけを画面に出す。
+// 設計の詳細・経緯はドキュメント側に置き、ここは「平常値」「止まったときの見分け方」
+// 「触ってよい設定と、その目安」に絞る。
+function OperationGuide() {
+  return (
+    <section className="usage-panel">
+      <div className="usage-panel-title">
+        <h2>運用上の留意事項・設定要領</h2>
+      </div>
+
+      <h3 className="usage-guide-head">1. 平常時の目安</h3>
+      <ul className="usage-guide-list">
+        <li>
+          AIの利用額は<strong>1日あたり0.06〜0.08ドル（月2〜3ドル程度）</strong>が平常値です。
+          上の表の月次コストがこの範囲なら正常です。
+        </li>
+        <li>
+          <strong>1日0.2ドルを超える日が続いたら異常</strong>を疑ってください。
+          同じメールを繰り返しAIに送ってしまう不具合が実際に起きたことがあります（2026-09-03）。
+        </li>
+        <li>
+          この画面の金額は当システムが数えたトークンからの試算です。
+          <strong>確定額はAnthropicの請求が正</strong>なので、大きく食い違うときはコンソール側を確認してください。
+        </li>
+      </ul>
+
+      <h3 className="usage-guide-head">2. AIが止まったときの見分け方</h3>
+      <p className="usage-guide-lead">
+        AIが止まっても、タスク管理・日報・備品などAI以外の機能は通常どおり使えます。
+        止まる理由は3つで、画面の出方で区別できます。
+      </p>
+      <div className="usage-guide-table-wrap">
+        <table className="usage-guide-table">
+          <thead>
+            <tr>
+              <th>画面に出るもの</th>
+              <th>意味</th>
+              <th>対処</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">ダッシュボードの赤いバナー「APIクレジットが不足しています」＋端末への通知</th>
+              <td>Anthropicの残高切れ。新しいメールの自動分類が止まっています</td>
+              <td>
+                上の「Anthropic API 支払設定」からチャージし、
+                ハンバーガーメニューの<strong>「今すぐ取得」</strong>で再開
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">「AI利用が1日の上限に達しました」のバナー＋通知</th>
+              <td>上の「AI利用の1日あたり上限」に達して自動停止した状態</td>
+              <td>
+                日付が変われば自動的に再開します。すぐ再開したいときは上限を上げる
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">処理ログの赤い「メール取得エラー」</th>
+              <td>取得・分類のどこかで失敗しています</td>
+              <td>
+                ログ本文の末尾にエラー内容が出ます。意味が分からない場合はそのまま開発側へ連絡
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="usage-guide-head">3. 設定の要領</h3>
+      <ul className="usage-guide-list">
+        <li>
+          <strong>1日あたり上限（この画面）</strong>: 初期値0.50ドル。平常値の6倍以上あるので、
+          通常の運用で止まることはありません。
+          <strong>0.10ドルを下回る値にしないでください</strong>（平常の利用でほぼ毎日止まります。
+          入力すると赤い警告が出ます）。
+          動作を試したいときだけ一時的に0.05ドルにし、<strong>確認後は必ず0.50に戻してください</strong>。
+        </li>
+        <li>
+          <strong>Anthropic側（コンソール）</strong>: 自動リチャージは<strong>オフ</strong>にし、
+          コンソール側の上限も設定しておくと、アプリ側の上限と合わせて二重の歯止めになります。
+        </li>
+        <li>
+          <strong>「今すぐ取得」の連打は避けてください</strong>。1回押すごとに新着メールをAIに
+          読ませるため、その分だけ費用がかかります（通常は30分ごとに自動で取得しています）。
+        </li>
+      </ul>
+
+      <h3 className="usage-guide-head">4. 処理ログに出る「繰り越し」について</h3>
+      <ul className="usage-guide-list">
+        <li>
+          <strong>「次回へ繰り越し（…）」</strong>: 1回の処理で扱える通信量の上限に近づいたため、
+          残りを次の巡回（30分後）に回した、という意味です。<strong>取りこぼしではありません</strong>。
+          たまに出るぶんには対処不要です。
+        </li>
+        <li>
+          <strong>赤い「外部リクエストが上限に近づいています」</strong>: 1日1回だけ出る事前警告です。
+          出るようになったら、まず<strong>進行中（未処理・返信済み）のタスクを整理して「完了」に</strong>
+          してください。これがいちばん効きます。それでも続く場合は開発側で設定を調整します。
+        </li>
+        <li>
+          この警告を放置すると、返信検知・カレンダー登録・利用量の記録などが
+          <strong>静かに失敗する</strong>状態になります（2026-09-03の事故の原因）。
+          警告が出たら早めに手を打ってください。
+        </li>
+      </ul>
+    </section>
+  )
+}
+
 function currentMonthJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)
 }
@@ -223,6 +333,8 @@ export default function UsagePanel() {
       </section>
 
       <DailyLimitSection />
+
+      <OperationGuide />
 
       {storage && (
         <section className="usage-panel">
