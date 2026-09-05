@@ -131,7 +131,7 @@ export default function KanbanBoard({
                   aria-label="アーカイブ"
                   title="アーカイブ"
                 >
-                  <IconArchive size={20} />
+                  <IconArchive size={24} />
                   {/* PC幅だけ文字ラベルも出す（2026-08-14。狭幅はアイコンのみのまま） */}
                   <span className="icon-btn-archive-label">アーカイブ</span>
                 </button>
