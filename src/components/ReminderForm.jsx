@@ -2,7 +2,7 @@ import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import { createReminder, updateReminder, deleteReminder } from '../lib/reminders'
-import { weekdayLabel } from '../lib/format'
+import { formatDateWithWeekday } from '../lib/format'
 
 // 通知時刻の既定値（2026-09-07。依頼）
 const DEFAULT_NOTIFY_TIME = '10:00'
@@ -18,6 +18,27 @@ function suggestNotifyDates(dueDateStr) {
     return d.toISOString().slice(0, 10)
   }
   return { notify1: toDate(7), notify2: toDate(1) }
+}
+
+// 日付＋曜日をまとめて「yyyy/mm/dd（曜）」で表示する日付欄（2026-09-07）。ネイティブの
+// <input type="date">はブラウザ・ロケール依存の表示になり曜日も出せないため、実際の
+// 操作（タップでピッカーを開く・キーボード入力）は透明化した<input type="date">に任せ、
+// 見た目は自前で組み立てた文字列を上に重ねる（カスタム日付欄の一般的な実装手法）
+function DateField({ value, onChange, label }) {
+  return (
+    <div className="reminder-date-field">
+      <input
+        type="date"
+        className="reminder-date-native"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+      />
+      <div className={`ui-input reminder-date-display${value ? '' : ' is-empty'}`}>
+        {value ? formatDateWithWeekday(value) : '日付を選択'}
+      </div>
+    </div>
+  )
 }
 
 // リマインダーの追加・編集モーダル（2026-09-07〜）。ContactForm と同じ ui-overlay/ui-modal の
@@ -114,29 +135,13 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
 
           <label className="ui-field">
             <span>期限日付</span>
-            <div className="reminder-date-input-row">
-              <input
-                type="date"
-                className="ui-input"
-                value={dueDate}
-                onChange={(e) => handleDueDateChange(e.target.value)}
-              />
-              {dueDate && <span className="reminder-weekday">{weekdayLabel(dueDate)}</span>}
-            </div>
+            <DateField value={dueDate} onChange={handleDueDateChange} label="期限日付" />
           </label>
 
           <div className="report-fields is-halves reminder-notify-fields">
             <label className="ui-field">
               <span>通知タイミング（1回目）</span>
-              <div className="reminder-notify-input-row">
-                <input
-                  type="date"
-                  className="ui-input reminder-notify-date-input"
-                  value={notify1}
-                  onChange={(e) => setNotify1(e.target.value)}
-                />
-                {notify1 && <span className="reminder-weekday">{weekdayLabel(notify1)}</span>}
-              </div>
+              <DateField value={notify1} onChange={setNotify1} label="通知タイミング（1回目）の日付" />
               <input
                 type="time"
                 className="ui-input reminder-notify-time-input"
@@ -146,15 +151,7 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
             </label>
             <label className="ui-field">
               <span>通知タイミング（2回目・任意）</span>
-              <div className="reminder-notify-input-row">
-                <input
-                  type="date"
-                  className="ui-input reminder-notify-date-input"
-                  value={notify2}
-                  onChange={(e) => setNotify2(e.target.value)}
-                />
-                {notify2 && <span className="reminder-weekday">{weekdayLabel(notify2)}</span>}
-              </div>
+              <DateField value={notify2} onChange={setNotify2} label="通知タイミング（2回目）の日付" />
               <input
                 type="time"
                 className="ui-input reminder-notify-time-input"
