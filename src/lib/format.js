@@ -5,25 +5,20 @@ export function formatDate(value) {
   return new Date(value).toLocaleDateString('ja-JP')
 }
 
-// 日付＋曜日表示（'YYYY-MM-DD' → 'YYYY/MM/DD(曜)'）。equipment.js の formatEquipmentDate と
-// 同じ考え方（ja-JPロケールに weekday を含めると自動でこの形式になる）
+// 日付＋曜日表示（'YYYY-MM-DD' → 'YYYY/MM/DD (曜)'）。日付部分と曜日部分を別々に
+// 組み立てて連結する（ロケールの組み合わせ表示に任せると環境によって区切り方が
+// 揺れるため、常にこの形式で固定する。依頼により2026-09-07にスペース区切りへ変更）
 export function formatDateWithWeekday(value) {
   if (!value) return ''
-  return new Date(value).toLocaleDateString('ja-JP', {
+  const d = new Date(value)
+  const datePart = d.toLocaleDateString('ja-JP', {
     timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    weekday: 'short',
   })
-}
-
-// 曜日だけを「（月）」の形で返す。ネイティブの<input type="date">は曜日を表示できないため、
-// 隣に添えるバッジ表示用（2026-09-07）
-export function weekdayLabel(value) {
-  if (!value) return ''
-  const w = new Date(value).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' })
-  return `（${w}）`
+  const weekdayPart = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' })
+  return `${datePart} (${weekdayPart})`
 }
 
 export function formatDateTime(value) {

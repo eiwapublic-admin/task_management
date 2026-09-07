@@ -193,7 +193,7 @@ export default function Dashboard() {
         {limitAlert && (
           <div className="dashboard-banner dashboard-credit-alert" role="alert">
             <span>⚠️ {limitAlert}</span>
-            <Link className="dashboard-credit-button" to="/settings">
+            <Link className="dashboard-credit-button" to="/usage">
               上限を変更
             </Link>
           </div>
