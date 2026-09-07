@@ -417,29 +417,37 @@ export default function Portal() {
           ))}
         </div>
 
-        {linkGroups.map((group) => (
-          <section key={group.key} className="portal-links-section">
-            <h2 className="ui-group-head">
-              {group.title}
-              <span className="ui-group-head-sub">{group.sub}</span>
-            </h2>
-            <div className="portal-links">
-              {group.links.map((link) => (
-                <button
-                  key={link.path}
-                  type="button"
-                  className="portal-link"
-                  onClick={() => navigate(link.path)}
-                >
-                  <span className="portal-link-icon" aria-hidden="true">
-                    {link.icon}
-                  </span>
-                  {link.label}
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
+        {linkGroups.length > 0 && (
+          // グループを横に並べ、各グループの中でリンクを縦に積む（2026-09-05。依頼）。
+          // 従来は「グループごとに横1行、リンクは横に折り返し」だったのを転置した。
+          // 上のメインカードと同じグリッド（auto-fit + 同じ gap）を使うことで、
+          // 幅が3列に収まる画面ではメインカードの列位置とおおむね揃う。
+          <div className="portal-link-groups">
+            {linkGroups.map((group) => (
+              <section key={group.key} className="portal-links-section">
+                <h2 className="ui-group-head">
+                  {group.title}
+                  <span className="ui-group-head-sub">{group.sub}</span>
+                </h2>
+                <div className="portal-links">
+                  {group.links.map((link) => (
+                    <button
+                      key={link.path}
+                      type="button"
+                      className="portal-link"
+                      onClick={() => navigate(link.path)}
+                    >
+                      <span className="portal-link-icon" aria-hidden="true">
+                        {link.icon}
+                      </span>
+                      {link.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
