@@ -186,26 +186,39 @@
 .portal-card.is-chlorine { --card-accent: var(--color-primary); }
 .portal-card.is-waste { --card-accent: var(--status-todo); }
 
-/* --- その他の画面への導線（統計を出すほどではないもの）--- */
-.portal-links-section {
+/* --- その他の画面への導線（統計を出すほどではないもの）---
+   2026-09-05: 「グループを横に並べ、各グループ内はリンクを縦に積む」形へ転置した
+   （依頼。従来は逆＝グループが縦、リンクは横並びで折り返していた）。
+   上のメインカード（.portal-grid）と同じ auto-fit + 同じ gap を使うことで、
+   3列に収まる幅ではメインカードの列位置とおおむね揃う。 */
+.portal-link-groups {
   margin-top: var(--space-6);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.portal-links-section {
+  min-width: 0;
 }
 
 .portal-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
 
 .portal-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   height: var(--control-h);
   padding: 0 var(--space-4);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   font-family: inherit;
   font-size: var(--fs-sm);
@@ -259,4 +272,12 @@
 
   /* 見出しの大きい方（日付側。2026-09-02の入れ替え後はこちらが大きい要素） */
   .portal-hero-date { font-size: var(--fs-2xl); }
+
+  /* この幅で3グループを横に並べると1列あたりが狭すぎて文字が折り返すため、
+     メインカードと違いここは1列に戻す（グループは縦に積み、各グループ内は
+     引き続きリンクを縦に並べる） */
+  .portal-link-groups {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
 }
