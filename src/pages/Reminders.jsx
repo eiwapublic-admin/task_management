@@ -5,7 +5,7 @@ import FeatureHeader from '../components/FeatureHeader'
 import ReminderForm from '../components/ReminderForm'
 import { IconBell } from '../components/Icons'
 import { fetchReminders, fetchReminder, setReminderDone } from '../lib/reminders'
-import { dueStatus } from '../lib/format'
+import { dueStatus, formatDateWithWeekday } from '../lib/format'
 import './Dashboard.css'
 import './Reminders.css'
 
@@ -14,10 +14,10 @@ import './Reminders.css'
 // タイミングでWeb Pushが届き、通知をタップするとこの画面の該当行が直接開く
 // （ルート /reminders/:id。ReportList.jsx の /reports/:date と同じ考え方）。
 
-// 一覧表示用。時刻は 'HH:MM:SS' で来るので 'HH:MM' に切り詰める
+// 一覧表示用。日付は曜日付きにし、時刻は 'HH:MM:SS' で来るので 'HH:MM' に切り詰める
 function formatNotify(date, time) {
   if (!date) return ''
-  return `${date} ${(time || '').slice(0, 5)}`
+  return `${formatDateWithWeekday(date)} ${(time || '').slice(0, 5)}`
 }
 export default function Reminders() {
   const navigate = useNavigate()
@@ -157,8 +157,8 @@ export default function Reminders() {
                             <IconBell size={16} />
                             {r.title}
                           </td>
-                          <td>
-                            {r.due_date}
+                          <td className="reminder-due-cell">
+                            {formatDateWithWeekday(r.due_date)}
                             {due?.label && <span className={`reminder-due-flag due-${due.level}`}>{due.label}</span>}
                           </td>
                           <td className="reminder-notify-cell">
