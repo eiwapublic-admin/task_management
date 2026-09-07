@@ -1211,28 +1211,14 @@ async function route(req, env) {
   return assetRes
 }
 
-// リマインダーの通知チェックを1日1回だけ行う（2026-09-07）。cronは5分おきに来るが、
-// メールの稼働時間帯（active_hours_start〜end）とは独立に、朝一（active_hours_startと
-// 同じ時刻を流用。設定が無ければ8時）以降の最初の1回だけ実行する。9章の
-// cleanup_done_on と同じ「設定に実行済み日付を記録して以後は素通り」という考え方。
-async function runReminderCheckOnce() {
-  const supabase = getAdminClient()
+// リマインダーの通知チェック（2026-09-07。cronの5分刻みで毎回呼ぶ）。
+// 通知タイミングに時刻を指定できるようにしたため、日付単位で「1日1回だけ」に間引く
+// 方式（旧 reminder_check_done_on）は廃止し、毎回チェックして「指定日時を過ぎていて
+// 未送信のものだけ送る」判定に一本化した（実装は checkReminderNotifications 側）。
+// メール取得の稼働時間帯ゲートとは独立（リマインダーは業務メール以外の運用作業も対象のため）。
+async function runReminderCheck() {
   try {
-    const { data } = await supabase
-      .from('settings')
-      .select('key, value')
-      .in('key', ['reminder_check_done_on', 'active_hours_start'])
-    const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]))
-    const startHour = Number.isFinite(Number(map.active_hours_start)) ? Number(map.active_hours_start) : 8
-    const hourJST = Number(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hour12: false })
-    )
-    if (hourJST < startHour) return
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-    if (map.reminder_check_done_on === today) return
-
-    await checkReminderNotifications(supabase)
-    await supabase.from('settings').upsert({ key: 'reminder_check_done_on', value: today }, { onConflict: 'key' })
+    await checkReminderNotifications(getAdminClient())
   } catch (err) {
     console.error('reminder-check 失敗:', err)
   }
@@ -1252,6 +1238,6 @@ export default {
     )
     // メール取得の稼働時間帯ゲートとは独立（リマインダーは業務メール以外の運用作業も
     // 対象のため、メールの稼働設定に引きずられるべきではない）
-    ctx.waitUntil(runReminderCheckOnce())
+    ctx.waitUntil(runReminderCheck())
   },
 }

@@ -42,6 +42,16 @@
 
 .reminder-toggle-cell { text-align: right; white-space: nowrap; }
 
+/* 通知タイミングの日付＋時刻入力（2026-09-07）。日付を主役に幅を持たせ、時刻は添え物として狭める */
+.reminder-notify-input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.reminder-notify-input-row .ui-input { min-width: 0; }
+.reminder-notify-input-row .ui-input:first-child { flex: 3; }
+.reminder-notify-time-input { flex: 2; }
+
 /* リマインダー編集モーダルの「対応済み」チェック（equipment-checkbox-field と同じ骨格） */
 .reminder-check-field {
   display: flex;

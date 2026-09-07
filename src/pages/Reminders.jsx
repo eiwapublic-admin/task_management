@@ -13,6 +13,12 @@ import './Reminders.css'
 // 年次バックアップ復元ドリル等）を「思い出せる自信がない」件への対応。指定した通知
 // タイミングでWeb Pushが届き、通知をタップするとこの画面の該当行が直接開く
 // （ルート /reminders/:id。ReportList.jsx の /reports/:date と同じ考え方）。
+
+// 一覧表示用。時刻は 'HH:MM:SS' で来るので 'HH:MM' に切り詰める
+function formatNotify(date, time) {
+  if (!date) return ''
+  return `${date} ${(time || '').slice(0, 5)}`
+}
 export default function Reminders() {
   const navigate = useNavigate()
   const { id: openId } = useParams()
@@ -156,8 +162,8 @@ export default function Reminders() {
                             {due?.label && <span className={`reminder-due-flag due-${due.level}`}>{due.label}</span>}
                           </td>
                           <td className="reminder-notify-cell">
-                            {r.notify_date_1}
-                            {r.notify_date_2 ? ` / ${r.notify_date_2}` : ''}
+                            {formatNotify(r.notify_date_1, r.notify_time_1)}
+                            {r.notify_date_2 ? ` / ${formatNotify(r.notify_date_2, r.notify_time_2)}` : ''}
                           </td>
                           <td className="reminder-toggle-cell" onClick={(e) => e.stopPropagation()}>
                             <button type="button" className="btn-plain" onClick={(e) => handleToggleDone(r, e)}>

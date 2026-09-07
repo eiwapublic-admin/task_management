@@ -974,20 +974,26 @@ FileMaker の「残留塩素濃度_TOP／検査一覧／記録／帳票」に相
 従量課金事項・処理ログと同じ並び）とダッシュボードの「管理」グループから`/reminders`へ入る。
 owner・備品出庫限定ロールには関係の無いシステム運用機能のため、連絡帳と同じ`RequireStaff`。
 
-- **管理項目**: タイトル・期限日付・通知タイミング（1回目は必須、2回目は任意）・詳細
-  （何のための作業か）・対応の要領（実際に対応するときの手順のメモ）・対応済みフラグ
+- **管理項目**: タイトル・期限日付・通知タイミング（1回目は必須、2回目は任意。**それぞれ日付＋
+  時刻を持つ**。時刻の既定値は10:00。2026-09-07に時刻を追加）・詳細（何のための作業か）・
+  対応の要領（実際に対応するときの手順のメモ）・対応済みフラグ
 - **新テーブル`reminders`**: `contacts`と同じ形（uuid PK・`set_updated_at()`トリガー・
-  RLS有効化＋`anon`/`authenticated`からの権限剥奪）。`notified_1_at`/`notified_2_at`
-  （各通知タイミングを送信済みかどうか。nullなら未送信）を持つ
+  RLS有効化＋`anon`/`authenticated`からの権限剥奪）。`notify_date_1`/`notify_time_1`
+  （1回目の日付・時刻。`notify_time_1`は既定`10:00:00`）、`notify_date_2`/`notify_time_2`
+  （2回目。両方null可）、`notified_1_at`/`notified_2_at`（各通知タイミングを送信済みかどうか。
+  nullなら未送信）を持つ
 - **通知の送信タイミング**: cronの`scheduled`ハンドラで、メール取得パイプラインとは**独立に**
-  1日1回チェックする（`worker/index.js`の`runReminderCheckOnce()`→`worker/lib/reminders.js`の
-  `checkReminderNotifications()`）。判定は「通知タイミングの日付ちょうど」ではなく
-  **「その日以降でまだ送っていなければ送る」**（`notify_date_1 <= 今日 かつ notified_1_at が null`）。
-  Workerが一時的に落ちていた等で当日に送れなかった場合の取りこぼしを防ぐため（9章のサブリクエスト
-  予算・凍結検知と同じ考え方）。1日1回に絞る仕組みは`settings.reminder_check_done_on`
-  （実行済み日付を記録。9章の`cleanup_done_on`と同じパターン）で、メールの稼働時間帯設定
-  （`active_hours_start`）を実行開始時刻の目安として流用しつつ、業務メールの稼働時間帯ゲート
-  そのものには依存しない（リマインダーは業務メール以外の運用作業も対象のため）
+  **5分刻みで毎回**チェックする（`worker/index.js`の`runReminderCheck()`→
+  `worker/lib/reminders.js`の`checkReminderNotifications()`）。判定は「指定した日時ちょうど」
+  ではなく**「その日時を過ぎていて、まだ送っていなければ送る」**（`notify_date_1 <= 今日`で
+  まず対象を絞り、`notify_date_1`＋`notify_time_1`をJSTのタイムスタンプに変換して`now()`と
+  比較する。JSTのオフセット`+09:00`を文字列に直接埋め込むことでWorkerの実行環境（UTC）に
+  依存せず解釈させる）。Workerが一時的に落ちていた等で送れなかった場合の取りこぼしを防ぐため
+  （9章のサブリクエスト予算・凍結検知と同じ考え方）。
+  **以前は「1日1回だけチェックする」方式（`settings.reminder_check_done_on`）だったが、
+  通知に時刻を指定できるようにしたため日付単位の間引きとは相性が悪く廃止した**
+  （小さなテーブルへの1回のSELECTのみのため、5分刻みでも負荷は無視できる。この設定キー・
+  ゲート関数は2026-09-07に削除済み）
 - **通知からのジャンプ**: Web Push（`worker/lib/push.js`の`notifyReminder()`）のペイロードに
   `url: /reminders/:id`を積む。タップすると該当リマインダーの編集モーダルが開いた状態でこの
   画面が開く（`src/pages/Reminders.jsx`が`useParams()`で`:id`を検知し、一覧に無ければ
@@ -995,8 +1001,9 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
   Service Workerの通知クリック処理は`data.url`を汎用的に開くだけの既存実装（新規タスク通知・
   APIクレジット不足通知と共通）のため変更不要だった
 - **通知タイミングの初期値の自動提案**: 新規登録フォーム（`src/components/ReminderForm.jsx`）で
-  期限日付を入力すると、通知タイミングが空欄の間だけ1回目=30日前・2回目=7日前を自動で埋める
-  （入力の手間を減らすための初期値で、保存前にいつでも変更できる）
+  期限日付を入力すると、通知タイミングが空欄の間だけ**1回目=1週間前・2回目=前日**（いずれも
+  時刻は既定の10:00）を自動で埋める（2026-09-07に30日前/7日前から変更。入力の手間を減らすための
+  初期値で、保存前にいつでも変更できる）
 - **一覧の並び**: 未対応を先に、対応済みをその下にグルーピング表示する（連絡帳の業務分類
   グルーピングと同じ`.ui-table-group-head`方式）。各グループ内は期限日付の近い順。未対応行は
   `dueStatus()`（`src/lib/format.js`。タスクカードと共通）で期限超過・期限間近を赤系の
@@ -1062,7 +1069,7 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
 > 添付ファイルは DB に保持しない（詳細画面を開くたびに Gmail から取得。4-5 参照）。手動登録タスクは `source='manual'`、`gmail_thread_id`/`gmail_message_id` が `manual:<uuid>`。
 
 ### settings（key/value）
-`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`, `last_run_at`(実行開始時刻。更新間隔ゲート専用), `fetch_stall_alert_on`(取得窓の凍結を通知した日), `daily_api_cost_limit_usd`(0.50。AI利用の1日あたり上限), `api_limit_alert`(上限到達の記録), `subrequest_limit`(50。Workerの1回あたり外部リクエスト上限。Workers Paid へ移行したら1000へ), `reply_check_cursor`(返信検知の背景スイープをどこまで見たか。task_no), `reply_scan_days`(3。動きのあったスレッドを探す日数), `subrequest_warn_on`(8割警告を出した日), `cleanup_done_on`(古い記録の掃除を実行した日), `calendar_id_cache`(カレンダー名→IDの解決結果), `ai_provider`(anthropic。AI提供元。11章), `reminder_check_done_on`(リマインダー通知チェックを実行した日。4-17)
+`fetch_interval_minutes`(30), `active_hours_start`(8), `active_hours_end`(18), `assignees`(["橋口","西川","岡田"]), `business_keywords`, `org_context`, `shared_gmail`(eiwa.public@gmail.com), `company_domains`(eiwa-up.jp。自社ドメイン、カンマ区切り), `calendar_name`, `archive_after_days`(30。完了からアーカイブまでの日数。0で無効), `api_credit_alert`, `last_fetch_at`, `last_run_at`(実行開始時刻。更新間隔ゲート専用), `fetch_stall_alert_on`(取得窓の凍結を通知した日), `daily_api_cost_limit_usd`(0.50。AI利用の1日あたり上限), `api_limit_alert`(上限到達の記録), `subrequest_limit`(50。Workerの1回あたり外部リクエスト上限。Workers Paid へ移行したら1000へ), `reply_check_cursor`(返信検知の背景スイープをどこまで見たか。task_no), `reply_scan_days`(3。動きのあったスレッドを探す日数), `subrequest_warn_on`(8割警告を出した日), `cleanup_done_on`(古い記録の掃除を実行した日), `calendar_id_cache`(カレンダー名→IDの解決結果), `ai_provider`(anthropic。AI提供元。11章)
 
 画面から変更できるのは 4-4 の許可キーのみ。`subrequest_limit` などの運用向けキーはDBを直接編集する。
 

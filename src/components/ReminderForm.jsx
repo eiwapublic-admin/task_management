@@ -3,8 +3,11 @@ import useBodyScrollLock from '../lib/useBodyScrollLock'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import { createReminder, updateReminder, deleteReminder } from '../lib/reminders'
 
-// 期限日付から通知タイミングの初期値を自動で提案する（1回目=30日前、2回目=7日前）。
-// あくまで入力の手間を減らすための初期値で、保存前にいつでも変更できる。
+// 通知時刻の既定値（2026-09-07。依頼）
+const DEFAULT_NOTIFY_TIME = '10:00'
+
+// 期限日付から通知タイミングの初期値を自動で提案する（1回目=1週間前、2回目=前日。
+// 2026-09-07に変更。あくまで入力の手間を減らすための初期値で、保存前にいつでも変更できる）。
 function suggestNotifyDates(dueDateStr) {
   const due = new Date(`${dueDateStr}T00:00:00`)
   if (Number.isNaN(due.getTime())) return { notify1: '', notify2: '' }
@@ -13,7 +16,7 @@ function suggestNotifyDates(dueDateStr) {
     d.setDate(d.getDate() - daysBefore)
     return d.toISOString().slice(0, 10)
   }
-  return { notify1: toDate(30), notify2: toDate(7) }
+  return { notify1: toDate(7), notify2: toDate(1) }
 }
 
 // リマインダーの追加・編集モーダル（2026-09-07〜）。ContactForm と同じ ui-overlay/ui-modal の
@@ -24,14 +27,17 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
   const [title, setTitle] = useState(existing?.title || '')
   const [dueDate, setDueDate] = useState(existing?.due_date || '')
   const [notify1, setNotify1] = useState(existing?.notify_date_1 || '')
+  const [notify1Time, setNotify1Time] = useState(existing?.notify_time_1?.slice(0, 5) || DEFAULT_NOTIFY_TIME)
   const [notify2, setNotify2] = useState(existing?.notify_date_2 || '')
+  const [notify2Time, setNotify2Time] = useState(existing?.notify_time_2?.slice(0, 5) || DEFAULT_NOTIFY_TIME)
   const [detail, setDetail] = useState(existing?.detail || '')
   const [howTo, setHowTo] = useState(existing?.how_to || '')
   const [done, setDone] = useState(existing?.done || false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // 期限日付を初めて入力したとき、通知タイミングが空欄なら自動で埋める（新規登録時のみ）
+  // 期限日付を初めて入力したとき、通知タイミングが空欄なら自動で埋める（新規登録時のみ。
+  // 時刻は既定の10:00のまま変えない）
   function handleDueDateChange(value) {
     setDueDate(value)
     if (!existing && !notify1 && !notify2 && value) {
@@ -53,7 +59,9 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
         title: title.trim(),
         due_date: dueDate,
         notify_date_1: notify1,
+        notify_time_1: notify1Time || DEFAULT_NOTIFY_TIME,
         notify_date_2: notify2 || null,
+        notify_time_2: notify2 ? notify2Time || DEFAULT_NOTIFY_TIME : null,
         detail: detail.trim() || null,
         how_to: howTo.trim() || null,
         done,
@@ -116,21 +124,37 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
           <div className="report-fields">
             <label className="ui-field">
               <span>通知タイミング（1回目）</span>
-              <input
-                type="date"
-                className="ui-input"
-                value={notify1}
-                onChange={(e) => setNotify1(e.target.value)}
-              />
+              <div className="reminder-notify-input-row">
+                <input
+                  type="date"
+                  className="ui-input"
+                  value={notify1}
+                  onChange={(e) => setNotify1(e.target.value)}
+                />
+                <input
+                  type="time"
+                  className="ui-input reminder-notify-time-input"
+                  value={notify1Time}
+                  onChange={(e) => setNotify1Time(e.target.value)}
+                />
+              </div>
             </label>
             <label className="ui-field">
               <span>通知タイミング（2回目・任意）</span>
-              <input
-                type="date"
-                className="ui-input"
-                value={notify2}
-                onChange={(e) => setNotify2(e.target.value)}
-              />
+              <div className="reminder-notify-input-row">
+                <input
+                  type="date"
+                  className="ui-input"
+                  value={notify2}
+                  onChange={(e) => setNotify2(e.target.value)}
+                />
+                <input
+                  type="time"
+                  className="ui-input reminder-notify-time-input"
+                  value={notify2Time}
+                  onChange={(e) => setNotify2Time(e.target.value)}
+                />
+              </div>
             </label>
           </div>
 

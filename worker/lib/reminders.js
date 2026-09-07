@@ -15,8 +15,10 @@ import { getAdminClient } from './supabase-admin.js'
 import { notifyReminder } from './push.js'
 
 const REMINDER_COLUMNS =
-  'id, title, due_date, notify_date_1, notify_date_2, detail, how_to, done, done_at, ' +
-  'notified_1_at, notified_2_at, created_at, updated_at'
+  'id, title, due_date, notify_date_1, notify_time_1, notify_date_2, notify_time_2, ' +
+  'detail, how_to, done, done_at, notified_1_at, notified_2_at, created_at, updated_at'
+
+const DEFAULT_NOTIFY_TIME = '10:00'
 
 async function requireAuth(req, { write = false } = {}) {
   const auth = await verifyRequestAuth(req)
@@ -34,9 +36,17 @@ function trimOrNull(value, max = 2000) {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 function parseDateOrError(value, label) {
   if (typeof value !== 'string' || !DATE_RE.test(value)) return { error: `${label}の形式が正しくありません` }
+  return { value }
+}
+
+// 時刻は省略可（省略時は既定の10:00）。'HH:MM' 形式のみ受け付ける
+function parseTimeOrDefault(value, label) {
+  if (!value) return { value: DEFAULT_NOTIFY_TIME }
+  if (typeof value !== 'string' || !TIME_RE.test(value)) return { error: `${label}の形式が正しくありません` }
   return { value }
 }
 
@@ -96,16 +106,22 @@ function buildReminderRow(payload) {
 
   const notify1 = parseDateOrError(payload?.notify_date_1, '通知タイミング（1回目）')
   if (notify1.error) return { error: notify1.error }
+  const notifyTime1 = parseTimeOrDefault(payload?.notify_time_1, '通知タイミング（1回目）の時刻')
+  if (notifyTime1.error) return { error: notifyTime1.error }
 
   if (notify1.value > due.value) return { error: '通知タイミング（1回目）は期限日付より前にしてください' }
 
   let notify2 = null
+  let notifyTime2 = null
   if (payload?.notify_date_2) {
     const n2 = parseDateOrError(payload.notify_date_2, '通知タイミング（2回目）')
     if (n2.error) return { error: n2.error }
     if (n2.value > due.value) return { error: '通知タイミング（2回目）は期限日付より前にしてください' }
     if (n2.value < notify1.value) return { error: '通知タイミング（2回目）は1回目より後にしてください' }
     notify2 = n2.value
+    const t2 = parseTimeOrDefault(payload?.notify_time_2, '通知タイミング（2回目）の時刻')
+    if (t2.error) return { error: t2.error }
+    notifyTime2 = t2.value
   }
 
   return {
@@ -113,7 +129,9 @@ function buildReminderRow(payload) {
       title,
       due_date: due.value,
       notify_date_1: notify1.value,
+      notify_time_1: notifyTime1.value,
       notify_date_2: notify2,
+      notify_time_2: notifyTime2,
       detail: trimOrNull(payload?.detail, 4000),
       how_to: trimOrNull(payload?.how_to, 4000),
     },
@@ -211,15 +229,32 @@ function todayJSTDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
-// 通知タイミングが来ているリマインダーへWeb Pushを送る（cronから1日1回呼ぶ）。
-// 「その日ちょうど」ではなく「その日以降でまだ送っていなければ送る」判定にする
-// （Workerが落ちていた等で当日に送れなかった場合の取りこぼしを防ぐ、9章のサブリクエスト
-// 予算と同じ考え方）。対応済みのリマインダーは対象外。
+// 'YYYY-MM-DD' + 'HH:MM(:SS)'（JST）をUTCのミリ秒に変換する。
+// 通知に時刻を持たせたため（2026-09-07）、日付だけでなく「その日時を過ぎたか」で判定する。
+// タイムゾーンオフセットを文字列に直接埋め込むことで、実行環境（Cloudflare Workers。UTC）に
+// 依存せず正しくJSTとして解釈させる
+function jstDateTimeToEpoch(dateStr, timeStr) {
+  const hhmm = (timeStr || '10:00').slice(0, 5)
+  return new Date(`${dateStr}T${hhmm}:00+09:00`).getTime()
+}
+
+// 通知タイミングが来ているリマインダーへWeb Pushを送る（cronの5分刻みで毎回呼ぶ）。
+// 「ちょうどその時刻」ではなく「その日時を過ぎていて、まだ送っていなければ送る」判定にする
+// （Workerが落ちていた等で送れなかった場合の取りこぼしを防ぐ、9章のサブリクエスト予算と
+// 同じ考え方。5分刻みのcronなので実際の遅延も数分に収まる）。対応済みのリマインダーは対象外。
+//
+// 以前は「1日1回だけチェックする」方式（settings.reminder_check_done_on）だったが、
+// 通知に時刻の指定ができるようになったため日付単位の間引きとは相性が悪く廃止した
+// （毎回のクエリはこの小さなテーブルに対する1回のSELECTのみで、5分間隔でも負荷は無視できる）。
 export async function checkReminderNotifications(supabase) {
   const today = todayJSTDate()
+  const now = Date.now()
   const { data, error } = await supabase
     .from('reminders')
-    .select('id, title, due_date, notify_date_1, notify_date_2, notified_1_at, notified_2_at, done')
+    .select(
+      'id, title, due_date, notify_date_1, notify_time_1, notify_date_2, notify_time_2, ' +
+        'notified_1_at, notified_2_at, done'
+    )
     .eq('done', false)
     .lte('notify_date_1', today)
   if (error) {
@@ -228,10 +263,14 @@ export async function checkReminderNotifications(supabase) {
   }
   for (const r of data || []) {
     try {
-      if (!r.notified_1_at) {
+      if (!r.notified_1_at && jstDateTimeToEpoch(r.notify_date_1, r.notify_time_1) <= now) {
         await notifyReminder({ id: r.id, title: r.title, dueDate: r.due_date })
         await supabase.from('reminders').update({ notified_1_at: new Date().toISOString() }).eq('id', r.id)
-      } else if (r.notify_date_2 && r.notify_date_2 <= today && !r.notified_2_at) {
+      } else if (
+        r.notify_date_2 &&
+        !r.notified_2_at &&
+        jstDateTimeToEpoch(r.notify_date_2, r.notify_time_2) <= now
+      ) {
         await notifyReminder({ id: r.id, title: r.title, dueDate: r.due_date })
         await supabase.from('reminders').update({ notified_2_at: new Date().toISOString() }).eq('id', r.id)
       }
