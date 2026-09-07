@@ -108,7 +108,6 @@ insert into settings (key, value) values
   ('reply_scan_days', '3'),      -- 「直近に動きのあったスレッド」を探すGmail検索の日数（返信検知の対象を絞る）
   ('subrequest_warn_on', ''),    -- サブリクエストが上限の8割に達したと通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
   ('cleanup_done_on', ''),       -- 古いログ・判定記録の掃除を実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
-  ('reminder_check_done_on', ''),-- リマインダー通知チェックを実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
   ('calendar_id_cache', ''),     -- カレンダー名→IDの解決結果のキャッシュ（{"name":..,"id":..}）。calendarListの呼び出しを省くため
   -- AI提供元（2026-09-05）。'anthropic'（既定）/ 将来 'gemini'。未実装・未知の値は
   -- 既定へフォールバックするので、設定ミスでAI処理が止まることはない。
@@ -959,7 +958,9 @@ create table if not exists reminders (
   title         text not null,             -- タイトル
   due_date      date not null,             -- 期限日付
   notify_date_1 date not null,             -- 通知タイミング（1回目）
+  notify_time_1 time not null default '10:00:00',  -- 通知タイミング（1回目）の時刻。既定10:00
   notify_date_2 date,                      -- 通知タイミング（2回目。任意）
+  notify_time_2 time,                      -- 通知タイミング（2回目）の時刻
   detail        text,                      -- 詳細
   how_to        text,                      -- 対応の要領
   done          boolean not null default false,  -- 対応済みフラグ
