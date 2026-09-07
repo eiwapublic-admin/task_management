@@ -1008,6 +1008,15 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
   グルーピングと同じ`.ui-table-group-head`方式）。各グループ内は期限日付の近い順。未対応行は
   `dueStatus()`（`src/lib/format.js`。タスクカードと共通）で期限超過・期限間近を赤系の
   バッジで表示し、対応済み行は取り消し線で薄く表示する
+- **日付の曜日表示（2026-09-07追加）**: 一覧の期限日付・通知タイミングは`formatDateWithWeekday()`
+  （`src/lib/format.js`。`equipment.js`の`formatEquipmentDate()`と同じ、ja-JPロケールに
+  `weekday:'short'`を含めると自動で`yyyy/mm/dd(曜)`になる仕組み）で曜日付き表示にする。
+  編集モーダルの`<input type="date">`自体はネイティブ部品のため曜日を表示できないので、
+  `weekdayLabel()`で「（月）」の形にした曜日バッジを隣に添える。通知タイミングの日付＋
+  時刻入力は、横並びのままだと（特に1回目/2回目を`is-halves`で半分幅にした狭幅画面で）
+  ネイティブ日付部品内部の文字が欠けて表示される不具合があったため、日付＋曜日の行と
+  時刻の行を分けて縦に積み、560px以下ではさらに1回目/2回目自体も縦積みにして
+  幅を確保している（`.reminder-notify-fields`。依頼による修正）
 - **API**: `GET/POST/PATCH/DELETE /api/reminders`（`worker/lib/reminders.js`）。`GET`は
   `?id=`を渡すと単体取得（通知ジャンプ用）、省略すると一覧（期限日付の昇順）。`PATCH`は
   `{id, done}`のみを渡す対応済み切替にも対応し、本文の再入力を不要にしている

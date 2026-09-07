@@ -2,6 +2,7 @@ import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import { createReminder, updateReminder, deleteReminder } from '../lib/reminders'
+import { weekdayLabel } from '../lib/format'
 
 // 通知時刻の既定値（2026-09-07。依頼）
 const DEFAULT_NOTIFY_TIME = '10:00'
@@ -113,48 +114,53 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
 
           <label className="ui-field">
             <span>期限日付</span>
-            <input
-              type="date"
-              className="ui-input"
-              value={dueDate}
-              onChange={(e) => handleDueDateChange(e.target.value)}
-            />
+            <div className="reminder-date-input-row">
+              <input
+                type="date"
+                className="ui-input"
+                value={dueDate}
+                onChange={(e) => handleDueDateChange(e.target.value)}
+              />
+              {dueDate && <span className="reminder-weekday">{weekdayLabel(dueDate)}</span>}
+            </div>
           </label>
 
-          <div className="report-fields">
+          <div className="report-fields is-halves reminder-notify-fields">
             <label className="ui-field">
               <span>通知タイミング（1回目）</span>
               <div className="reminder-notify-input-row">
                 <input
                   type="date"
-                  className="ui-input"
+                  className="ui-input reminder-notify-date-input"
                   value={notify1}
                   onChange={(e) => setNotify1(e.target.value)}
                 />
-                <input
-                  type="time"
-                  className="ui-input reminder-notify-time-input"
-                  value={notify1Time}
-                  onChange={(e) => setNotify1Time(e.target.value)}
-                />
+                {notify1 && <span className="reminder-weekday">{weekdayLabel(notify1)}</span>}
               </div>
+              <input
+                type="time"
+                className="ui-input reminder-notify-time-input"
+                value={notify1Time}
+                onChange={(e) => setNotify1Time(e.target.value)}
+              />
             </label>
             <label className="ui-field">
               <span>通知タイミング（2回目・任意）</span>
               <div className="reminder-notify-input-row">
                 <input
                   type="date"
-                  className="ui-input"
+                  className="ui-input reminder-notify-date-input"
                   value={notify2}
                   onChange={(e) => setNotify2(e.target.value)}
                 />
-                <input
-                  type="time"
-                  className="ui-input reminder-notify-time-input"
-                  value={notify2Time}
-                  onChange={(e) => setNotify2Time(e.target.value)}
-                />
+                {notify2 && <span className="reminder-weekday">{weekdayLabel(notify2)}</span>}
               </div>
+              <input
+                type="time"
+                className="ui-input reminder-notify-time-input"
+                value={notify2Time}
+                onChange={(e) => setNotify2Time(e.target.value)}
+              />
             </label>
           </div>
 

@@ -1471,7 +1471,8 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 /* 2項目を確実に1行で均等幅に並べる（違反車両詳細の地域+ナンバー、メーカー+車種。
    2026-08-19）。既定の .report-fields は中身の内容量で幅が決まるため、素の<input>より
    広い Combobox（.ui-combobox）を入れても2つ目が折り返さないよう明示的に指定する */
-.report-fields.is-halves > .report-field { flex: 1 1 0; min-width: 0; }
+.report-fields.is-halves > .report-field,
+.report-fields.is-halves > .ui-field { flex: 1 1 0; min-width: 0; }
 
 .report-field { display: flex; flex-direction: column; gap: 4px; }
 /* 2026-08-19: 詳細画面全般の読みやすさ向上のため fs-sm(13px) → fs-md(15px) に拡大 */

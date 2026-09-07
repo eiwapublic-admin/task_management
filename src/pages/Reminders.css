@@ -34,23 +34,55 @@
   background: color-mix(in srgb, var(--due-soon) 12%, transparent);
 }
 
+.reminder-due-cell,
+.reminder-notify-cell {
+  white-space: nowrap;
+}
+
 .reminder-notify-cell {
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  white-space: nowrap;
 }
 
 .reminder-toggle-cell { text-align: right; white-space: nowrap; }
 
-/* 通知タイミングの日付＋時刻入力（2026-09-07）。日付を主役に幅を持たせ、時刻は添え物として狭める */
+/* 日付＋曜日バッジ（期限日付・通知タイミング共通。2026-09-07）。ネイティブの
+   <input type="date">自体は曜日を表示できないため、隣に添える */
+.reminder-date-input-row,
 .reminder-notify-input-row {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
-.reminder-notify-input-row .ui-input { min-width: 0; }
-.reminder-notify-input-row .ui-input:first-child { flex: 3; }
-.reminder-notify-time-input { flex: 2; }
+.reminder-date-input-row .ui-input,
+.reminder-notify-input-row .ui-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.reminder-weekday {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 通知タイミングは日付＋曜日の行と時刻の行を分け、それぞれに十分な幅を確保する
+   （日付が横並びの2カラム内で欠けて表示されていた不具合の修正。2026-09-07） */
+.reminder-notify-time-input { margin-top: var(--space-1); }
+
+/* 狭幅では1回目・2回目を横に2分割すると曜日込みの日付がネイティブ<input type="date">の
+   内部で欠けて表示される（is-halvesで幅が半分になるため）。KanbanBoard.css等と同じ
+   560pxのブレークポイントで縦積みにし、各欄にモーダル幅いっぱいを与える（2026-09-07） */
+@media (max-width: 560px) {
+  .reminder-notify-fields {
+    flex-direction: column;
+  }
+  .reminder-notify-fields > .ui-field {
+    flex: 1 1 auto;
+  }
+}
 
 /* リマインダー編集モーダルの「対応済み」チェック（equipment-checkbox-field と同じ骨格） */
 .reminder-check-field {
