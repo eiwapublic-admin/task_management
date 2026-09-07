@@ -9,6 +9,7 @@ import {
   IconClipboard,
   IconDroplet,
   IconFolder,
+  IconBell,
   IconGear,
   IconHome,
   IconKanban,
@@ -351,6 +352,7 @@ export default function Portal() {
         { label: '処理ログ', icon: <IconList size={20} />, path: '/logs', staffOnly: true },
         { label: 'タスク設定', icon: <IconGear size={20} />, path: '/settings', staffOnly: true },
         { label: '従量課金事項', icon: <IconYen size={20} />, path: '/usage', staffOnly: true },
+        { label: 'リマインダー', icon: <IconBell size={20} />, path: '/reminders', staffOnly: true },
       ]),
     },
   ].filter((g) => g.links.length > 0)

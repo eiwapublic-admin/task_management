@@ -37,6 +37,7 @@ const FEATURE_TITLES = [
   { path: '/reports/templates', title: '作業定型文' },
   { path: '/documents', title: '雛形ファイル' },
   { path: '/contacts', title: '連絡帳' },
+  { path: '/reminders', title: 'リマインダー' },
   { path: '/bilmen/masters', title: '作業マスタ', exact: true },
   { path: '/bilmen', title: 'ビルメン' },
   { path: '/reports/inspections', title: '自主検査表' },
@@ -387,6 +388,9 @@ export default function AppHeader({
                   ビルメンを業務メニューに入れる代わり。全画面から1タップで開けるよう、
                   業務別メニューではなく共通領域に置く。docs/bilmen-plan.md 5-0） */}
               {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
+              {/* リマインダー（2026-09-07）: 従量課金事項・処理ログと同じくシステム運用上の
+                  管理機能のため、全画面から1タップで開ける共通領域に置く */}
+              {!isOwner && <button onClick={() => goTo('/reminders')}>リマインダー</button>}
               {/* 廃棄物実測値管理は2026-09-04にこの共通メニューから削除した（依頼）。
                   入口はダッシュボードの廃棄物カード。画面・ルート自体は残置している */}
               {!isOwner && <button onClick={() => goTo('/usage')}>従量課金事項</button>}

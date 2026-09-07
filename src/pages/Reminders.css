@@ -1,0 +1,53 @@
+/* リマインダー画面（2026-09-07〜）。連絡帳（Contacts.css）と同じ表の骨格を使う。 */
+
+.reminder-row { cursor: pointer; }
+.reminder-row:hover { background: var(--bg-subtle); }
+
+.reminder-title-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+
+.reminder-row.is-done .reminder-title-cell {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+.reminder-due-flag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.reminder-due-flag.due-overdue {
+  color: var(--due-overdue);
+  background: color-mix(in srgb, var(--due-overdue) 12%, transparent);
+}
+
+.reminder-due-flag.due-soon {
+  color: var(--due-soon);
+  background: color-mix(in srgb, var(--due-soon) 12%, transparent);
+}
+
+.reminder-notify-cell {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.reminder-toggle-cell { text-align: right; white-space: nowrap; }
+
+/* リマインダー編集モーダルの「対応済み」チェック（equipment-checkbox-field と同じ骨格） */
+.reminder-check-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  color: var(--text-base);
+  cursor: pointer;
+}

@@ -70,3 +70,13 @@ export async function notifyNewTask({ title }) {
 export async function notifyApiAlert({ title, body, url = '/usage' }) {
   await sendPush({ title, body, url })
 }
+
+// リマインダーの通知タイミングが来たときの通知（2026-09-07）。タップするとそのリマインダーへ
+// 直接ジャンプできるよう、url にリマインダーIDを含める（sw.js は data.url を汎用的に開く）
+export async function notifyReminder({ id, title, dueDate }) {
+  await sendPush({
+    title: 'リマインダー',
+    body: `${title}（期限: ${dueDate}）`,
+    url: `/reminders/${id}`,
+  })
+}

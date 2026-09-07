@@ -108,6 +108,7 @@ insert into settings (key, value) values
   ('reply_scan_days', '3'),      -- 「直近に動きのあったスレッド」を探すGmail検索の日数（返信検知の対象を絞る）
   ('subrequest_warn_on', ''),    -- サブリクエストが上限の8割に達したと通知した日（JST・YYYY-MM-DD）。1日1回に絞るため
   ('cleanup_done_on', ''),       -- 古いログ・判定記録の掃除を実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
+  ('reminder_check_done_on', ''),-- リマインダー通知チェックを実行した日（JST・YYYY-MM-DD）。1日1回に絞るため
   ('calendar_id_cache', ''),     -- カレンダー名→IDの解決結果のキャッシュ（{"name":..,"id":..}）。calendarListの呼び出しを省くため
   -- AI提供元（2026-09-05）。'anthropic'（既定）/ 将来 'gemini'。未実装・未知の値は
   -- 既定へフォールバックするので、設定ミスでAI処理が止まることはない。
@@ -946,3 +947,35 @@ alter table waste_records enable row level security;
 alter table waste_scans enable row level security;
 revoke all on waste_records from anon, authenticated;
 revoke all on waste_scans from anon, authenticated;
+
+-- ============================================================
+-- リマインダー機能（2026-09-07）
+-- システム運用上、期限のある作業（APIキー更新・年次バックアップ復元ドリル等）を
+-- 忘れずに思い出して対応できるようにする。指定した通知タイミングでWeb Pushを送り、
+-- 通知からそのリマインダーへ直接ジャンプできるようにする（url: /reminders/:id）。
+-- ============================================================
+create table if not exists reminders (
+  id            uuid primary key default gen_random_uuid(),
+  title         text not null,             -- タイトル
+  due_date      date not null,             -- 期限日付
+  notify_date_1 date not null,             -- 通知タイミング（1回目）
+  notify_date_2 date,                      -- 通知タイミング（2回目。任意）
+  detail        text,                      -- 詳細
+  how_to        text,                      -- 対応の要領
+  done          boolean not null default false,  -- 対応済みフラグ
+  done_at       timestamptz,
+  -- 通知の送信済み管理。日付ちょうどの一致ではなく「その日以降でまだ送っていなければ送る」
+  -- 判定にするため、送信済みかどうかだけを持てば足りる
+  notified_1_at timestamptz,
+  notified_2_at timestamptz,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists reminders_due_date_idx on reminders (due_date);
+
+drop trigger if exists reminders_set_updated_at on reminders;
+create trigger reminders_set_updated_at before update on reminders
+  for each row execute function set_updated_at();
+
+alter table reminders enable row level security;
+revoke all on reminders from anon, authenticated;
