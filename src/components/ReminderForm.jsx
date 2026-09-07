@@ -141,23 +141,27 @@ export default function ReminderForm({ existing, onClose, onSaved, onDeleted }) 
           <div className="report-fields is-halves reminder-notify-fields">
             <label className="ui-field">
               <span>通知タイミング（1回目）</span>
-              <DateField value={notify1} onChange={setNotify1} label="通知タイミング（1回目）の日付" />
-              <input
-                type="time"
-                className="ui-input reminder-notify-time-input"
-                value={notify1Time}
-                onChange={(e) => setNotify1Time(e.target.value)}
-              />
+              <div className="reminder-notify-row">
+                <DateField value={notify1} onChange={setNotify1} label="通知タイミング（1回目）の日付" />
+                <input
+                  type="time"
+                  className="ui-input reminder-notify-time-input"
+                  value={notify1Time}
+                  onChange={(e) => setNotify1Time(e.target.value)}
+                />
+              </div>
             </label>
             <label className="ui-field">
               <span>通知タイミング（2回目・任意）</span>
-              <DateField value={notify2} onChange={setNotify2} label="通知タイミング（2回目）の日付" />
-              <input
-                type="time"
-                className="ui-input reminder-notify-time-input"
-                value={notify2Time}
-                onChange={(e) => setNotify2Time(e.target.value)}
-              />
+              <div className="reminder-notify-row">
+                <DateField value={notify2} onChange={setNotify2} label="通知タイミング（2回目）の日付" />
+                <input
+                  type="time"
+                  className="ui-input reminder-notify-time-input"
+                  value={notify2Time}
+                  onChange={(e) => setNotify2Time(e.target.value)}
+                />
+              </div>
             </label>
           </div>
 

@@ -78,14 +78,31 @@
 
 .reminder-date-display.is-empty { color: var(--text-faint); }
 
-/* 通知タイミングは日付欄と時刻欄を縦に分け、それぞれに十分な幅を確保する
-   （日付が横並びの2カラム内で欠けて表示されていた不具合の修正。2026-09-07） */
-.reminder-notify-time-input { margin-top: var(--space-1); }
+/* 通知タイミングの日付欄＋時刻欄を1行にまとめる（2026-09-07。日付欄はフィールド内に
+   曜日込みの文字列を自前描画する方式に変わり、ネイティブ部品の表示幅に縛られなくなった
+   ため、2行に分けていたのを1行に戻せる。日付を主役に幅を持たせ、時刻欄は「10:00」が
+   収まる最小限の幅に抑える） */
+.reminder-notify-row {
+  display: flex;
+  gap: var(--space-2);
+}
 
-/* 狭幅では1回目・2回目を横に2分割すると日付欄が窮屈になるため、KanbanBoard.css等と
-   同じ560pxのブレークポイントで縦積みにし、各欄にモーダル幅いっぱいを与える
-   （2026-09-07） */
-@media (max-width: 560px) {
+.reminder-notify-row .reminder-date-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.reminder-notify-time-input {
+  flex: 0 0 auto;
+  width: 8.5em;
+}
+
+/* 狭幅では1回目・2回目を横に2分割すると日付欄が窮屈になるため縦積みにし、各欄に
+   モーダル幅いっぱいを与える。モーダル（.ui-modal.is-sm）の最大幅は620pxのため、
+   ビューポート幅がそれよりまだ狭い660px以下では2カラムだと窮屈になる
+   （実測で561〜600px幅の間だけ日付欄の文字が欠ける不具合があったため、560pxから
+   660pxへ拡大。2026-09-07） */
+@media (max-width: 660px) {
   .reminder-notify-fields {
     flex-direction: column;
   }
