@@ -20,6 +20,7 @@ import BilmenMasters from './pages/BilmenMasters'
 import BilmenMail from './pages/BilmenMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
+import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
@@ -256,6 +257,25 @@ function App() {
           element={
             <RequireStaff>
               <Contacts />
+            </RequireStaff>
+          }
+        />
+        {/* リマインダー（システム運用上の期限管理。2026-09-07〜）。owner・備品出庫限定
+            ロールには関係の無い運用管理機能のため RequireStaff。/reminders/:id は
+            通知のジャンプ先（該当行を開いた状態で表示。/reports/:date と同じ考え方） */}
+        <Route
+          path="/reminders"
+          element={
+            <RequireStaff>
+              <Reminders />
+            </RequireStaff>
+          }
+        />
+        <Route
+          path="/reminders/:id"
+          element={
+            <RequireStaff>
+              <Reminders />
             </RequireStaff>
           }
         />
