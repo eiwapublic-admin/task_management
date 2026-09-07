@@ -1983,8 +1983,11 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   outline-offset: -2px;
 }
 
-/* 1行目: 左に日付・ナンバー、右上に分類タグ（2026-08-19。以前は3行に分かれていたが
-   日報へのジャンプボタンを廃止したのに合わせ、分類を1行目の右側へ寄せて2行構成にした） */
+/* 1行目: 日付・ナンバー（＋累計回数バッジ）、2行目: 分類タグ（2026-08-19に導入、
+   2026-09-07に修正）。当初は分類タグを1行目の右側に寄せる2行構成だったが、
+   累計回数バッジが付くと1行目が長くなって分類タグだけ折り返す・折り返さないが
+   記録によってバラつく不具合になっていたため、分類タグは常に2行目に固定した
+   （.parking-list-tagsにflex-basis:100%を指定し、内容量に関わらず必ず折り返す） */
 .parking-list-main { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .parking-list-main-left { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 
@@ -2010,7 +2013,7 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .parking-list-owner { font-weight: 700; color: var(--color-primary); }
 .parking-list-maker, .parking-list-model { font-weight: 400; color: var(--text-strong); }
 
-.parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.parking-list-tags { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
 
 .parking-list-tag {
   padding: 2px 8px;
