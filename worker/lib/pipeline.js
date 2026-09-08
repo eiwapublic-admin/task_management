@@ -987,6 +987,12 @@ export async function runPipeline({ force = false, actor = 'システム（自�
           .filter(Boolean)
           .join('\n') || null
 
+      // FAXの詳細画面上部の判定確認バナー用。Claudeの生の判定（is_business_task）をFAXに限り
+      // 保存し、人が〔業務〕〔スパム〕どちらを選んだか（human_is_business_verdict）と突き合わせて
+      // 判定精度を集計できるようにする（2026-09-08）。読み取り失敗時は他の項目と同様に
+      // is_business_task 自体も信頼できないため null のままにし、バナーを出さない。
+      const aiIsBusinessVerdict = isFax && !isFaxReadFailure ? Boolean(result.is_business_task) : null
+
       const { error: insertError } = await supabase.from('tasks').insert({
         gmail_thread_id: email.threadId,
         gmail_message_id: email.id,
@@ -1006,6 +1012,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
         received_at: email.receivedAt || new Date().toISOString(),
         classification_note: classificationNote,
         channel,
+        ai_is_business_verdict: aiIsBusinessVerdict,
       })
 
       if (insertError) {

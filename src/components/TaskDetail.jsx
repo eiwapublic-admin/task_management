@@ -51,6 +51,10 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
   const [addingToReport, setAddingToReport] = useState(false)
   const [addReportError, setAddReportError] = useState('')
 
+  // FAX判定確認バナー（〔業務〕〔スパム〕）の処理中表示・エラー
+  const [verdictSaving, setVerdictSaving] = useState(false)
+  const [verdictError, setVerdictError] = useState('')
+
   // 添付ファイル（元メールから都度取得）
   const [attachments, setAttachments] = useState([])
   const [attLoading, setAttLoading] = useState(false)
@@ -73,6 +77,7 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
     setSaveError('')
     setSaved(false)
     setAddReportError('')
+    setVerdictError('')
   }, [task])
 
   // メール由来のタスクは、開いたときに元メールの添付ファイル一覧を取得する
@@ -175,6 +180,34 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
   // 防ぐため、アーカイブ済み・スパム済みのタスクには出さない（解除はタイトル横のバッジから）
   const canMarkSpam = Boolean(onSpam) && !task.is_spam && !task.archived_at
   const markingSpam = statusSelection === SPAM_OPTION
+
+  // FAXの判定確認バナー。Claudeの生の判定（ai_is_business_verdict。読み取り失敗時は
+  // null でバナー自体を出さない）が付いていて、まだ人が回答していない（human_verdict_at
+  // が未設定）FAXタスクにのみ表示する。回答結果を業務外／スパムの判定精度の集計に使う。
+  const showFaxVerdict =
+    Boolean(onUpdateTask) &&
+    task.channel === 'fax' &&
+    typeof task.ai_is_business_verdict === 'boolean' &&
+    !task.human_verdict_at
+
+  async function handleFaxVerdict(isBusiness) {
+    if (!onUpdateTask || verdictSaving) return
+    setVerdictSaving(true)
+    setVerdictError('')
+    try {
+      // 〔スパム〕は is_spam も同時に立てて、サーバー側の既存のスパム処理（完了＋
+      // アーカイブへ即移動）に乗せる。〔業務〕は回答を記録するだけでタスクはそのまま。
+      await onUpdateTask(task.id, {
+        human_is_business_verdict: isBusiness,
+        ...(isBusiness ? {} : { is_spam: true }),
+      })
+      if (!isBusiness) onClose()
+    } catch (err) {
+      setVerdictError(err.message || '記録に失敗しました')
+    } finally {
+      setVerdictSaving(false)
+    }
+  }
 
   const baseDirty =
     assignee !== (task.assignee || UNASSIGNED) ||
@@ -342,6 +375,34 @@ export default function TaskDetail({ task, onClose, sharedGmail, assignees = [],
             ×
           </button>
         </div>
+        {/* FAXの判定確認バナー。AIの判定（業務／スパム）を人に確認してもらい、判定精度を
+            集計するための回答UI（2026-09-08）。〔スパム〕は黒地で誤操作を防ぐ */}
+        {showFaxVerdict && (
+          <div className="task-detail-verdict-banner" role="alert">
+            <p className="task-detail-verdict-question">
+              このFAXを「{task.ai_is_business_verdict ? '当社業務' : 'スパム'}」と判定しました。実際はどちらですか？
+            </p>
+            <div className="task-detail-verdict-actions">
+              <button
+                type="button"
+                className="task-detail-verdict-btn"
+                onClick={() => handleFaxVerdict(true)}
+                disabled={verdictSaving}
+              >
+                業務
+              </button>
+              <button
+                type="button"
+                className="task-detail-verdict-btn task-detail-verdict-btn-spam"
+                onClick={() => handleFaxVerdict(false)}
+                disabled={verdictSaving}
+              >
+                スパム
+              </button>
+            </div>
+            {verdictError && <p className="task-detail-save-error">{verdictError}</p>}
+          </div>
+        )}
         {/* 1行目: 担当者・期限・受信日時・ステータスを横並び */}
         <div className="task-detail-toprow">
           <div className="task-detail-topitem">

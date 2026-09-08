@@ -37,6 +37,15 @@ create table if not exists tasks (
   -- スパム（迷惑メール・営業FAX等）と人が判定した目印。カードの「スパム」ボタンで
   -- true にすると同時に完了＋アーカイブへ移る。アーカイブ画面で解除・復帰できる（2026-07-30）。
   is_spam          boolean not null default false,
+  -- FAXの詳細画面上部に「このFAXを"当社業務"／"スパム"と判定しました。実際はどちらですか？」を
+  -- 表示し、人に業務／スパムを選んでもらうための列（2026-09-08追加）。ai_is_business_verdict は
+  -- Claude の生の判定（is_business_task）を FAX に限り保存したもの（読み取り失敗時は判定自体が
+  -- 信頼できないため null のまま＝バナーを出さない）。human_is_business_verdict・human_verdict_at は
+  -- 人が選んだ結果と回答日時で、この2つと ai_is_business_verdict を突き合わせることでAIの判定精度を
+  -- 集計できる（一致率の算出に使う。まだ回答が無いタスクは human_verdict_at が null のままバナーを出し続ける）。
+  ai_is_business_verdict    boolean,
+  human_is_business_verdict boolean,
+  human_verdict_at          timestamptz,
   remarks          text,           -- 留意事項（担当者が詳細画面で自由入力するメモ）
   last_reply_message_id text,       -- 最後に取り込んだ返信メールの Gmail message id（返信検知の冪等化・返信済みへの再返信で本文を上書きするため）
   source           text not null default 'email',  -- 取得元: 'email'（Gmail） / 'calendar'（Googleカレンダー） / 'manual'（手動登録）
@@ -65,10 +74,16 @@ alter table tasks add column if not exists channel text;
 alter table tasks add column if not exists completed_at timestamptz;
 alter table tasks add column if not exists archived_at timestamptz;
 alter table tasks add column if not exists is_spam boolean not null default false;
+alter table tasks add column if not exists ai_is_business_verdict boolean;
+alter table tasks add column if not exists human_is_business_verdict boolean;
+alter table tasks add column if not exists human_verdict_at timestamptz;
 
 create index if not exists idx_tasks_archived_at on tasks (archived_at);
 -- スパムだけを絞り込む用途（アーカイブ画面）。true の行だけの部分インデックス
 create index if not exists idx_tasks_is_spam on tasks (is_spam) where is_spam;
+-- FAXのAI判定精度の集計用（未回答バナーの対象抽出・一致率の算出）。FAX以外は対象外なので部分インデックス
+create index if not exists idx_tasks_fax_verdict on tasks (ai_is_business_verdict, human_is_business_verdict)
+  where channel = 'fax' and ai_is_business_verdict is not null;
 
 create index if not exists idx_tasks_status on tasks (status);
 create index if not exists idx_tasks_assignee on tasks (assignee);
