@@ -22,6 +22,7 @@ import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
+import Paper from './pages/Paper'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
@@ -206,6 +207,16 @@ function App() {
           element={
             <RequireAuth>
               <Waste />
+            </RequireAuth>
+          }
+        />
+        {/* 古紙回収量の記録（備後町コイズミビル。2026-09-08〜）。廃棄物と同じ位置づけの
+            機能のため、権限も同じく RequireAuth（書き込みはサーバー側で拒否）。設計書 4-18 */}
+        <Route
+          path="/paper"
+          element={
+            <RequireAuth>
+              <Paper />
             </RequireAuth>
           }
         />
