@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import { IconChevronLeft, IconChevronRight } from '../components/Icons'
@@ -12,7 +12,7 @@ import {
   paperRowTotal,
   upsertPaperRecord,
 } from '../lib/paper'
-import { fetchHolidays, fetchClosedDays, weekdayInfo } from '../lib/reports'
+import { fetchHolidays, fetchClosedDays, todayJST, weekdayInfo } from '../lib/reports'
 import './Dashboard.css'
 import './Paper.css'
 
@@ -74,6 +74,45 @@ export default function Paper() {
     return [...dates].sort()
   }, [fiscalYear, records])
 
+  // 「本日」の行＝本日、または本日に一番近い過去の回収予定日（回収は週1回なので、
+  // 水曜に開いたときは直前の月曜＝その週の回収日を指す）。今年度を見ているときだけ出す
+  const today = todayJST()
+  const todayDate = useMemo(() => {
+    if (fiscalYear !== currentFiscalYear()) return ''
+    let found = ''
+    for (const date of rows) {
+      if (date > today) break
+      found = date
+    }
+    return found
+  }, [rows, today, fiscalYear])
+
+  // 「本日」ボタン（日報一覧と同じ流儀）。他年度を見ているときは今年度へ切り替えてから
+  // スクロールする必要があるため、切替後の再読み込みの完了を待つ
+  const scrollToTodayRef = useRef(false)
+
+  function scrollToToday() {
+    requestAnimationFrame(() => {
+      document.querySelector('.paper-row.is-today')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  function handleGoToToday() {
+    if (fiscalYear === currentFiscalYear()) {
+      scrollToToday()
+    } else {
+      scrollToTodayRef.current = true
+      setFiscalYear(currentFiscalYear())
+    }
+  }
+
+  useEffect(() => {
+    if (!loading && scrollToTodayRef.current) {
+      scrollToTodayRef.current = false
+      scrollToToday()
+    }
+  }, [loading])
+
   // 月ごとにまとめる（Excelの「年月」列＋右側の月別集計に相当）
   const months = useMemo(() => {
     const map = new Map() // 'YYYY-MM' -> { month, dates[], total }
@@ -123,7 +162,7 @@ export default function Paper() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide app-scroll">
+      <div className="ui-container is-wide app-scroll paper-page">
         <FeatureHeader
           filters={
             <div className="inspection-month">
@@ -146,6 +185,11 @@ export default function Paper() {
               >
                 <IconChevronRight size={28} />
               </button>
+              {/* 押すと今年度へ切り替え、本日（または本日に一番近い過去）の回収日の行まで
+                  スクロールする。年度は52週あり、目当ての週を探すのに毎回スクロールが要るため */}
+              <button type="button" className="btn-plain reports-today-btn" onClick={handleGoToToday}>
+                本日
+              </button>
             </div>
           }
         />
@@ -164,6 +208,7 @@ export default function Paper() {
             <PaperTable
               months={months}
               byDate={byDate}
+              todayDate={todayDate}
               holidays={holidays}
               closedDays={closedDays}
               readOnly={readOnly}
@@ -215,9 +260,12 @@ function PaperSummary({ fiscalYear, summary, months }) {
   )
 }
 
-function PaperTable({ months, byDate, holidays, closedDays, readOnly, onSave }) {
+function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly, onSave }) {
   return (
-    <div className="ui-table-wrap">
+    // 表そのものを縦スクロールコンテナにして、その中で列見出しを固定する。
+    // 横スクロール（overflow-x）を持つ要素はCSSの仕様で縦もスクロールコンテナになるため、
+    // 列見出しの固定はページ基準では効かない（.claude/skills/sticky-header-overflow-trap）
+    <div className="ui-table-wrap paper-table-wrap">
       <table className="ui-table paper-table">
         <thead>
           <tr>
@@ -237,6 +285,7 @@ function PaperTable({ months, byDate, holidays, closedDays, readOnly, onSave }) 
               key={group.month}
               group={group}
               byDate={byDate}
+              todayDate={todayDate}
               holidays={holidays}
               closedDays={closedDays}
               readOnly={readOnly}
@@ -249,7 +298,7 @@ function PaperTable({ months, byDate, holidays, closedDays, readOnly, onSave }) 
   )
 }
 
-function PaperMonthGroup({ group, byDate, holidays, closedDays, readOnly, onSave }) {
+function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readOnly, onSave }) {
   const monthLabel = `${group.month.slice(0, 4)}年${Number(group.month.slice(5, 7))}月`
   return (
     <>
@@ -267,6 +316,7 @@ function PaperMonthGroup({ group, byDate, holidays, closedDays, readOnly, onSave
           key={date}
           date={date}
           record={byDate.get(date) || null}
+          isToday={date === todayDate}
           holidays={holidays}
           closedDays={closedDays}
           readOnly={readOnly}
@@ -277,16 +327,18 @@ function PaperMonthGroup({ group, byDate, holidays, closedDays, readOnly, onSave
   )
 }
 
-function PaperRow({ date, record, holidays, closedDays, readOnly, onSave }) {
+function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSave }) {
   const wd = weekdayInfo(date, holidays)
   const isClosed = closedDays.has(date)
   const skipped = Boolean(record?.skipped)
   const total = paperRowTotal(record)
 
   return (
-    <tr className={`paper-row${skipped ? ' is-skipped' : ''}`}>
+    <tr className={`paper-row${skipped ? ' is-skipped' : ''}${isToday ? ' is-today' : ''}`}>
+      {/* 年は月見出し行が示すので日付からは省く（「9/7（月）」）。固定列の幅を詰めて、
+          狭い画面で計量値の入力欄に幅を回すため */}
       <td className={`paper-date ${wd.className}`}>
-        {date.replace(/-/g, '/')}（{wd.label}）
+        {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
         {wd.holidayName && <span className="paper-date-flag">{wd.holidayName}</span>}
         {!wd.holidayName && isClosed && <span className="paper-date-flag">休館日</span>}
       </td>

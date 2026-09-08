@@ -26,6 +26,7 @@ import {
   INSPECTION_BUILDINGS,
   todayJST,
   formatReportDate,
+  nowHHMMFloor5,
   toHHMM,
   sortEntriesByTime,
   weekdayInfo,
@@ -224,9 +225,10 @@ export default function ReportDetail({ date, onClose }) {
     if (!report || readOnly) return
     setError('')
     try {
-      // 時刻は空欄で追加する（2026-08-04）。後からまとめて入力する運用が中心で、
-      // 記録した時刻（現在時刻）を既定値にすると実際の作業時刻と食い違うため。
-      const entry = await addEntry(report.id, { content })
+      // 時刻は現在時刻を5分単位で切り捨てた値を既定値にする（2026-09-09。当初は空欄で
+      // 追加していたが〈2026-08-04〉、作業のたびにその場で追加する運用のため、
+      // 都度打ち直すより既定値がある方が早いとの依頼。違っていれば上書きすればよい）
+      const entry = await addEntry(report.id, { content, entry_time: nowHHMMFloor5() })
       setEntries((prev) => [...prev, entry])
       markSaved()
     } catch (err) {
