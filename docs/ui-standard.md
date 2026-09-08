@@ -536,6 +536,16 @@ iOS では固定表示（`position: fixed`）要素の実寸と一致しない�
 > 無効化される（`min-height` が常に勝つ）。カンバン列見出しの実装時にこれで
 > 数値を何度直しても変化しない事態にはまったので、狭幅では
 > `.kanban-column { min-height: 0 }` で明示的に解除している
+>
+> **表の列見出しでこれをやる場合は、高さを `calc()` で逆算するより
+> 器を縦の flex にする方が楽（2026-09-09。古紙回収）。** 画面のルート
+> （`.ui-container.app-scroll`）に `display: flex; flex-direction: column` を付け、
+> 表のラッパーを `flex: 1 1 auto; min-height: …; overflow-y: auto` にすると、
+> サマリやグラフの高さが変わっても残りの高さが自動で表に回る（実測値の
+> CSS変数を数える必要がない）。列見出しは `top: 0` でそのラッパーの中に貼り付く。
+> `border-collapse: collapse` の表では貼り付いた `th` の下罫線が描かれないことが
+> あるため、罫線は `box-shadow: inset 0 -1px 0 …` で引く。横（`left: 0`）にも
+> 固定する1列目は、縦横どちらの重なりよりも上に来るよう `z-index` を一段高くする
 
 ### 空状態・注記
 

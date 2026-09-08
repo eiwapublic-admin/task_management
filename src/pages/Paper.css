@@ -1,6 +1,24 @@
 /* 古紙回収量の記録（2026-09-08〜）。廃棄物実測値管理（Waste.css）と同じ表の骨格を使い、
    年度サマリ＋月別の棒グラフ＋週ごとの入力表という3段構成にする。 */
 
+/* ===== 画面の骨格 =====
+   列見出しを縦スクロール中も固定したいが、表のラッパーは横スクロール（overflow-x: auto）を
+   持っており、CSSの仕様上そこは縦のスクロールコンテナにもなる。そのため列見出しの
+   position: sticky はページ基準では効かず、ラッパー基準になる
+   （.claude/skills/sticky-header-overflow-trap に経緯。カンバンの列見出しと同じ罠）。
+   そこで「ページを縦スクロールさせる」のをやめ、器を縦のflexにして表のラッパー自身に
+   残りの高さを与える。表はその中で縦スクロールし、列見出しはその上端に貼り付く。
+   年度サマリ・グラフが常に見えたまま週の行だけが流れるので、入力中も月の進み具合が分かる */
+.paper-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.paper-page > .paper-summary,
+.paper-page > .paper-legend {
+  flex: 0 0 auto;
+}
+
 /* ===== 年度サマリ（合計・月平均）と月別グラフ ===== */
 .paper-summary {
   display: grid;
@@ -85,14 +103,38 @@
 }
 
 /* ===== 週ごとの入力表 ===== */
+/* 器の残りの高さをすべて受け取り、この中だけを縦スクロールさせる。
+   画面が極端に低いときのために min-height を置き、そのときは器の側がスクロールする */
+.paper-table-wrap {
+  flex: 1 1 auto;
+  min-height: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .paper-table th,
 .paper-table td {
   white-space: nowrap;
 }
 
-.paper-date {
+/* 列見出しの固定表示（2026-09-08）。基準は .paper-table-wrap（上記）。
+   border-collapse: collapse の表では、貼り付いた th の下罫線が描かれないことがあるため
+   罫線は内側の影で引く。1列目は横（left）と縦（top）の両方で固定するので重なりが最上位 */
+.paper-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.paper-table thead th:nth-child(1) { z-index: 3; }
+
+.paper-table td.paper-date {
   font-weight: 600;
   color: var(--text-strong);
+  /* 月見出し行の下にぶら下がる形にするため字下げする（2026-09-09）。
+     .ui-table td の padding を上書きするので、詳細度を上げて指定する */
+  padding-left: var(--space-6);
 }
 
 /* 1列目（回収予定日）を左端に固定する（frozen column。Waste.css の月別一覧と同じ考え方）。
@@ -105,13 +147,16 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 11em;
+  min-width: 8em;
   border-right: 1px solid var(--border);
 }
 
 .paper-table th:nth-child(1) { background: var(--border-strong); }
 .paper-table td:nth-child(1) { background: var(--bg-surface); }
 .paper-table .paper-month-row td:nth-child(1) { background: var(--color-brand-soft); }
+/* 本日（＝本日に一番近い過去）の回収日。行の背景は .ui-table tbody tr.is-today が塗るが、
+   固定列は自前で不透明に塗らないと下の行が透ける */
+.paper-table .paper-row.is-today td:nth-child(1) { background: var(--color-brand-softer); }
 
 /* 祝日・休館日の目印（その週は中止になりやすい）。日付の色分けは
    weekdayInfo() の className（is-holiday / is-saturday）に任せる */
@@ -199,8 +244,31 @@
 
 .paper-legend { margin-top: var(--space-4); }
 
-/* 狭幅では左のサマリを上に積む（表自体は .ui-table-wrap の横スクロールに任せる） */
+/* 狭幅では左のサマリを上に積む（表自体は .paper-table-wrap の横スクロールに任せる） */
 @media (max-width: 768px) {
-  .paper-summary { grid-template-columns: 1fr; }
-  .paper-chart { height: 120px; }
+  .paper-summary {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+  /* 合計と月平均は横に並べる（縦に積むと表に残る高さが2行ぶんも減るため） */
+  .paper-summary-figures {
+    flex-direction: row;
+    gap: var(--space-5);
+  }
+  .paper-chart { height: 96px; }
+}
+
+/* 画面が低い端末（iPhone SE 等）では、サマリが場所を取りすぎて入力表に高さが残らない。
+   グラフと余白を詰めて、表（＝主役）に高さを回す */
+@media (max-height: 740px) {
+  .paper-summary {
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .paper-chart { height: 76px; }
+  .paper-legend {
+    margin-top: var(--space-2);
+    font-size: var(--fs-2xs);
+  }
 }

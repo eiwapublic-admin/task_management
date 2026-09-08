@@ -136,9 +136,7 @@ export function toHHMM(value) {
   return m ? `${m[1]}:${m[2]}` : ''
 }
 
-// 現在時刻（JST）を 'HH:MM' で返す。
-// ※ 作業記録の時刻の既定値としては使わない（2026-08-04。後からまとめて入力する運用で
-//    実際の作業時刻と食い違うため空欄にした）。撮影時刻の補完など別用途で使う想定。
+// 現在時刻（JST）を 'HH:MM' で返す
 export function nowHHMM() {
   return new Date().toLocaleTimeString('ja-JP', {
     timeZone: 'Asia/Tokyo',
@@ -146,6 +144,15 @@ export function nowHHMM() {
     minute: '2-digit',
     hour12: false,
   })
+}
+
+// 現在時刻（JST）を5分単位で切り捨てた 'HH:MM'（例: 09:07 → 09:05）。
+// 作業記録を追加したときの時刻の既定値に使う（2026-09-09。当初は空欄で追加していたが、
+// 作業のたびにその場で追加する運用のため、都度打ち直すより既定値がある方が早いとの依頼）。
+// 切り上げ（未来の時刻）にはしない＝まだ終わっていない作業の時刻にならないようにする。
+export function nowHHMMFloor5() {
+  const [h, m] = nowHHMM().split(':').map(Number)
+  return `${String(h).padStart(2, '0')}:${String(Math.floor(m / 5) * 5).padStart(2, '0')}`
 }
 
 // ---- 写真（Phase 2。2026-08-04〜）----
