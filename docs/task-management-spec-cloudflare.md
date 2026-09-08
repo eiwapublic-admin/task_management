@@ -506,6 +506,10 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
   - **カレンダー連携の重複判定を分離**: 上記の`existingThreads`の意味変更に伴い、Googleカレンダーの当日イベント取り込み（`cal:${eventId}`キーで`existingThreads`を流用していた）が「完了済みのカレンダータスクは再登録されない」という前提を失ってしまうため、こちらは`existingMessages`（ステータス不問）を直接見るよう分離した
   - **既知の残課題（今回は対象外）**: 自社の同一担当者が**同じ件名のまま複数の異なる外部宛先へ**送ったメール（例: 「作業日程確認表送付の件」を西尾造園様・吉田様それぞれへ別々に送信）は、いずれも「進行中（未処理）」のタスクを持つスレッドに束ねられるため、上記の対策では引き続き2通目以降が取りこぼされる（今回手動復旧したT-137がこのケース）。これを確実に解消するには、メッセージの送受信者（To/Cc）とタスクの相手方（counterpart）を突き合わせる仕組みが要り、現状のスキーマ（送受信者を保存していない）では追加のGmail API呼び出しが要るため見送った。再発時は同じ手順（DB照会→Gmail確認→手動登録）で個別対応する
   - **検証方法**: 単体テストは無い（Worker側にテストフレームワーク自体が未導入）ため、重複判定のSet操作だけを切り出したNodeスクリプトで、実際に取りこぼした3件・残課題1件・回帰観点2件（進行中スレッドへの普通の返信がスキップされ続けること、同一メッセージの再取得は常にスキップされること）の計6ケースを検証した
+- **FAXの判定確認バナー（2026-09-07。依頼）**: これまでFAXが「業務外」と判定されても、`classification_note`にメモが残るだけで人が確認・訂正する手段が無かった。タスク詳細画面（`TaskDetail.jsx`）の上部に、`channel='fax'`かつAIの生の判定（`ai_is_business_verdict`）が付いていて未回答（`human_verdict_at`が未設定）のときだけ「このFAXを"当社業務"／"スパム"と判定しました。実際はどちらですか？」というバナーを表示し、〔業務〕〔スパム〕（誤操作防止のためスパムは黒地）ボタンで人に回答してもらう。
+  - **DB**: `tasks`に`ai_is_business_verdict`（AIの生の判定。読み取り成功時のみ。`worker/lib/pipeline.js`が`is_business_task`から保存）・`human_is_business_verdict`／`human_verdict_at`（人の回答と回答日時）の3列を追加（マイグレーション`add_fax_verdict_columns`。2026-09-08に本番へ適用）。両者を突き合わせればAIの判定精度（一致率）を集計できる
+  - **回答の反映**: `PATCH /api/tasks`が`human_is_business_verdict`を受け付け、〔スパム〕は同時に`is_spam:true`も送るため、既存のスパム処理（完了＋アーカイブへ即移動）にそのまま乗る。回答はAIの判定と一致したかどうかを含めて`activity_logs`に記録する
+  - **AI向けの学習は見送り**: 判定結果をプロンプトへ自動反映する仕組み（few-shot化・再学習）は、分類のたびに追加トークンを消費して課金額が増えるため今回は実装していない。蓄積したデータ（AIの判定 vs 人の回答）は、将来の精度改善やプロンプト調整の材料として使う想定
 
 ### 4-8. 完了タスクのアーカイブ（2026-07-17）
 
@@ -1092,6 +1096,8 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
 | channel | text | 情報源アイコン表示用の経路種別 `email`/`form`/`fax`/`calendar`/`manual`。source='email' の内訳（通常/フォーム/FAX）を区別。source とは独立（マイグレーション `add_tasks_channel`。旧データは source から補完済み） |
 | subject / body_preview | text | body_preview は先頭 20000字（`MAX_BODY_PREVIEW`。引用履歴を含む全文を保持。改行も保持） |
 | is_spam | boolean | スパム（迷惑メール・営業FAX等）と人が判定した目印。既定 false。カードの「スパム」ボタンで true にすると同時に完了＋アーカイブへ移る（マイグレーション `add_tasks_is_spam`。2026-07-30） |
+| ai_is_business_verdict | boolean | FAX判定確認バナー用。AIの生の業務判定（`is_business_task`）。FAX読み取り成功時のみ保存し、読み取り失敗時はnullのまま（マイグレーション `add_fax_verdict_columns`。2026-09-07追加・2026-09-08本番適用） |
+| human_is_business_verdict / human_verdict_at | boolean / timestamptz | FAX判定確認バナーへの人の回答と回答日時。`ai_is_business_verdict`と突き合わせて判定精度を集計する（マイグレーション `add_fax_verdict_columns`） |
 | remarks | text | 留意事項。詳細画面で手動入力（マイグレーション `add_remarks_to_tasks`） |
 | last_reply_message_id | text | 最後に取り込んだ返信の Gmail message id。返信検知の冪等化用（マイグレーション `add_last_reply_message_id_to_tasks`。NULL 可） |
 | classification_note | text | AI の判定理由 |
