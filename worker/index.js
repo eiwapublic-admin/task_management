@@ -547,6 +547,15 @@ async function handleTaskUpdate(req) {
         fields.archived_at = now
       }
     }
+    // FAX詳細画面上部の判定確認バナー（「このFAXを"当社業務"／"スパム"と判定しました。
+    // 実際はどちらですか？」）への回答。〔スパム〕ボタンは is_spam も同時に true で送るため、
+    // 上のスパム処理（完了＋アーカイブ）もあわせて実行される（2026-09-08）。
+    const humanVerdictRequested =
+      typeof payload.human_is_business_verdict === 'boolean' ? payload.human_is_business_verdict : null
+    if (humanVerdictRequested !== null) {
+      fields.human_is_business_verdict = humanVerdictRequested
+      fields.human_verdict_at = new Date().toISOString()
+    }
     if (Object.keys(fields).length === 0) {
       return json({ error: '更新できる項目がありません' }, 400)
     }
@@ -592,7 +601,22 @@ async function handleTaskUpdate(req) {
           : `「${data.title}」のスパム判定を解除`,
         detail: { task_id: id },
       })
-    } else if (fields.status && prevStatus && prevStatus !== fields.status) {
+    }
+    // FAX判定確認バナーへの回答も、AIの判定精度をあとで追えるよう専用のログを残す
+    // （AIの判定とスパム判定が別ログになっても、task_id で突き合わせれば追跡できる）。
+    if (humanVerdictRequested !== null) {
+      const aiVerdict = typeof data.ai_is_business_verdict === 'boolean' ? data.ai_is_business_verdict : null
+      const match = aiVerdict === null ? '' : aiVerdict === humanVerdictRequested ? '（AIの判定と一致）' : '（AIの判定と不一致）'
+      await supabase.from('activity_logs').insert({
+        log_type: 'status_change',
+        actor: actorName,
+        message:
+          `「${data.title}」のFAX判定を確認: AI「${aiVerdict === false ? 'スパム' : '業務'}」 → ` +
+          `人「${humanVerdictRequested ? '業務' : 'スパム'}」${match}`,
+        detail: { task_id: id },
+      })
+    }
+    if (spamRequested === null && humanVerdictRequested === null && fields.status && prevStatus && prevStatus !== fields.status) {
       await supabase.from('activity_logs').insert({
         log_type: 'status_change',
         actor: actorName,

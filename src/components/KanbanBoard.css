@@ -458,6 +458,64 @@
   color: var(--text-strong);
 }
 
+/* FAXの判定確認バナー（AIの業務／スパム判定を人に確認してもらう。2026-09-08） */
+.task-detail-verdict-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-weak);
+  border: 1px solid var(--color-primary);
+}
+
+.task-detail-verdict-question {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.task-detail-verdict-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.task-detail-verdict-btn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-base);
+  cursor: pointer;
+  transition: filter var(--transition), border-color var(--transition);
+}
+
+.task-detail-verdict-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.task-detail-verdict-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 〔スパム〕は誤操作防止のため黒地にして〔業務〕と見た目で区別する */
+.task-detail-verdict-btn.task-detail-verdict-btn-spam {
+  background: var(--surface-inverse);
+  border-color: var(--surface-inverse);
+  color: var(--ink-on-fill);
+}
+
+.task-detail-verdict-btn.task-detail-verdict-btn-spam:hover {
+  filter: brightness(1.2);
+}
+
 /* 1行目: 担当者・受信日時・期限・ステータスを横並びにする行 */
 /* 1行目（担当者・受信日時・期限・ステータス）。要素が多いので横の余白は控えめにし、
    PC幅では1行に収まるようにする（2026-07-31。従来 gap は var(--space-5)=24px）。
