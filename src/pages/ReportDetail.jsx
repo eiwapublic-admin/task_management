@@ -68,6 +68,11 @@ export default function ReportDetail({ date, onClose }) {
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
 
+  // 追加した明細行にカーソルを移すための一時保持（2026-09-09。依頼）。
+  // 明細には時刻・作業内容の2欄しか無く、時刻は既定値が自動で入るため（2026-09-09）、
+  // 内容を打ち始める前に時刻を直せるよう、追加直後は時刻欄へフォーカスする
+  const focusEntryIdRef = useRef(null)
+
   // Escapeで閉じる。handleClose は毎レンダー作り直されるため、常に最新を参照できるよう
   // refに載せ替えてからリスナに渡す（リスナ自体は登録/解除を繰り返さない）
   const closeRef = useRef(null)
@@ -137,6 +142,16 @@ export default function ReportDetail({ date, onClose }) {
       map.clear()
     }
   }, [])
+
+  // 追加直後の明細行の時刻欄へフォーカスする（一度使ったら消費して二重発火しない）
+  useEffect(() => {
+    if (!focusEntryIdRef.current) return
+    const id = focusEntryIdRef.current
+    focusEntryIdRef.current = null
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-entry-id="${id}"] .entry-time`)?.focus()
+    })
+  }, [entries])
 
   useEffect(() => {
     function onKey(e) {
@@ -230,6 +245,7 @@ export default function ReportDetail({ date, onClose }) {
       // 都度打ち直すより既定値がある方が早いとの依頼。違っていれば上書きすればよい）
       const entry = await addEntry(report.id, { content, entry_time: nowHHMMFloor5() })
       setEntries((prev) => [...prev, entry])
+      focusEntryIdRef.current = entry.id
       markSaved()
     } catch (err) {
       setError(err.message)
@@ -423,7 +439,7 @@ export default function ReportDetail({ date, onClose }) {
 
               <ul className="entry-list">
                 {sortedEntries.map((e) => (
-                  <li className="entry-row" key={e.id}>
+                  <li className="entry-row" key={e.id} data-entry-id={e.id}>
                     <TimeInput
                       className="entry-time"
                       value={toHHMM(e.entry_time)}

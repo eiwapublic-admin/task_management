@@ -137,6 +137,32 @@
   padding-left: var(--space-6);
 }
 
+/* 回収予定日の直接編集（2026-09-09）。ネイティブの<input type="date">を透明にして
+   重ね、見た目は自前の文字列（年を省いた表示・祝日/休館日バッジ込み）を出す
+   （ReminderForm.jsx の .reminder-date-field と同じ技法）。祝日・休館日で日程が
+   ずれた週を、備考への自由記入ではなく実際の日付に直せるようにするための入口 */
+.paper-date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.paper-date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.paper-date-native:disabled { cursor: default; }
+
+.paper-date-display { pointer-events: none; }
+
 /* 1列目（回収予定日）を左端に固定する（frozen column。Waste.css の月別一覧と同じ考え方）。
    区分が4つ＋備考＋合計で列数が多く、モバイルでは横スクロールが前提になるため、
    計量値を入力している間も「どの週の行か」を見失わないようにする（2026-09-08）。

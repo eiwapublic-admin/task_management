@@ -7,7 +7,9 @@ import {
   PAPER_CATEGORIES,
   collectDatesOfFiscalYear,
   currentFiscalYear,
+  deletePaperRecord,
   fetchPaperRecords,
+  fiscalYearOf,
   formatKg,
   paperRowTotal,
   upsertPaperRecord,
@@ -20,7 +22,8 @@ import './Paper.css'
 // 従来のExcel「月別古紙回収量一覧表」（年度ごとのシート・毎週月曜の行・段ボール／
 // シュレッダ／雑誌／その他の4区分）をそのまま画面に移したもの。回収予定日はDBに持たず
 // 年度内の月曜を自動生成し、入力のあった回だけをDBへ保存する（src/lib/paper.js）。
-// 祝日・休館日に当たった週は「中止」にでき、日程がずれた週は備考へ自由記入する。
+// 祝日・休館日に当たった週は「中止」にでき、日程がずれた週は回収予定日そのものを
+// 直接書き換える（2026-09-09。備考欄は自由記入の備考専用）。
 export default function Paper() {
   const user = getCurrentUser()
   // 書き込みは廃棄物・残留塩素と同じ扱い（owner・備品出庫限定ロールは閲覧のみ）
@@ -159,6 +162,41 @@ export default function Paper() {
     }
   }
 
+  // 回収予定日そのものを直接書き換える（2026-09-09。依頼。祝日・休館日で日がずれた週を
+  // 備考への自由記入ではなく、実際にその週の行を目的の日付へ動かす形にした）。
+  // 元の日付に記録（重量・中止・備考）があれば、その内容を新しい日付へ移し、
+  // 元の行は削除する（回収予定日はDBに持たないため、移動元は自動生成の空行に戻る）
+  async function handleDateChange(oldDate, newDate) {
+    if (!newDate || newDate === oldDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return
+    setError('')
+    if (fiscalYearOf(newDate.slice(0, 7)) !== fiscalYear) {
+      setError('表示中の年度をまたぐ日付には変更できません。まずその年度に切り替えてください。')
+      return
+    }
+    const current = byDate.get(oldDate)
+    const target = byDate.get(newDate)
+    if (target && (target.skipped || target.note || PAPER_CATEGORIES.some((c) => target[c.key] != null))) {
+      setError(`${newDate.replace(/-/g, '/')} には既に記録があるため、その日付には変更できません。`)
+      return
+    }
+    const payload = {
+      collect_date: newDate,
+      skipped: current?.skipped || false,
+      note: current?.note || '',
+      ...Object.fromEntries(PAPER_CATEGORIES.map((c) => [c.key, current?.[c.key] ?? ''])),
+    }
+    // 楽観的に反映してから保存する
+    setRecords((prev) => [...prev.filter((r) => r.collect_date !== oldDate), { ...current, ...payload }])
+    try {
+      const saved = await upsertPaperRecord(payload)
+      if (current?.id) await deletePaperRecord(current.id)
+      setRecords((prev) => [...prev.filter((r) => r.collect_date !== oldDate && r.collect_date !== newDate), saved])
+    } catch (err) {
+      setError(err.message)
+      load()
+    }
+  }
+
   return (
     <div className="ui-page">
       <AppHeader />
@@ -213,13 +251,14 @@ export default function Paper() {
               closedDays={closedDays}
               readOnly={readOnly}
               onSave={handleSave}
+              onDateChange={handleDateChange}
             />
           </>
         )}
 
         <p className="settings-hint paper-legend">
           単位: kg／回収は原則毎週月曜。祝日・休館日で回収が無かった週は「中止」にすると、
-          月平均の計算から外れます。日程がずれた週は備考に書いてください（例:「火曜に変更」）。
+          月平均の計算から外れます。日程がずれた週は日付欄を直接書き換えてください。
         </p>
       </div>
     </div>
@@ -260,7 +299,7 @@ function PaperSummary({ fiscalYear, summary, months }) {
   )
 }
 
-function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly, onSave }) {
+function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly, onSave, onDateChange }) {
   return (
     // 表そのものを縦スクロールコンテナにして、その中で列見出しを固定する。
     // 横スクロール（overflow-x）を持つ要素はCSSの仕様で縦もスクロールコンテナになるため、
@@ -270,7 +309,7 @@ function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly,
         <thead>
           <tr>
             <th>回収予定日</th>
-            <th className="paper-note-col">日程変更・備考</th>
+            <th className="paper-note-col">備考</th>
             {PAPER_CATEGORIES.map((c) => (
               <th key={c.key} className="is-numeric">
                 {c.label}
@@ -290,6 +329,7 @@ function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly,
               closedDays={closedDays}
               readOnly={readOnly}
               onSave={onSave}
+              onDateChange={onDateChange}
             />
           ))}
         </tbody>
@@ -298,7 +338,7 @@ function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly,
   )
 }
 
-function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readOnly, onSave }) {
+function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readOnly, onSave, onDateChange }) {
   const monthLabel = `${group.month.slice(0, 4)}年${Number(group.month.slice(5, 7))}月`
   return (
     <>
@@ -321,13 +361,14 @@ function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readO
           closedDays={closedDays}
           readOnly={readOnly}
           onSave={onSave}
+          onDateChange={onDateChange}
         />
       ))}
     </>
   )
 }
 
-function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSave }) {
+function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSave, onDateChange }) {
   const wd = weekdayInfo(date, holidays)
   const isClosed = closedDays.has(date)
   const skipped = Boolean(record?.skipped)
@@ -336,11 +377,25 @@ function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSav
   return (
     <tr className={`paper-row${skipped ? ' is-skipped' : ''}${isToday ? ' is-today' : ''}`}>
       {/* 年は月見出し行が示すので日付からは省く（「9/7（月）」）。固定列の幅を詰めて、
-          狭い画面で計量値の入力欄に幅を回すため */}
+          狭い画面で計量値の入力欄に幅を回すため。日付そのものは透明化したネイティブの
+          <input type="date"> で直接編集できる（祝日・休館日で日がずれた週を、備考への
+          自由記入ではなく実際の日付に直す。src/components/ReminderForm.jsx と同じ技法） */}
       <td className={`paper-date ${wd.className}`}>
-        {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
-        {wd.holidayName && <span className="paper-date-flag">{wd.holidayName}</span>}
-        {!wd.holidayName && isClosed && <span className="paper-date-flag">休館日</span>}
+        <div className="paper-date-field">
+          <input
+            type="date"
+            className="paper-date-native"
+            value={date}
+            disabled={readOnly}
+            aria-label={`回収予定日 ${date}`}
+            onChange={(e) => onDateChange(date, e.target.value)}
+          />
+          <div className="paper-date-display">
+            {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
+            {wd.holidayName && <span className="paper-date-flag">{wd.holidayName}</span>}
+            {!wd.holidayName && isClosed && <span className="paper-date-flag">休館日</span>}
+          </div>
+        </div>
       </td>
       <td className="paper-note-col">
         <div className="paper-note-row">
@@ -433,7 +488,7 @@ function PaperNoteInput({ value, readOnly, onCommit }) {
       className="paper-note-input"
       value={draft}
       disabled={readOnly}
-      aria-label="日程変更・備考"
+      aria-label="備考"
       onFocus={() => setEditing(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
