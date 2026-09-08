@@ -14,6 +14,7 @@ import {
   IconHome,
   IconKanban,
   IconList,
+  IconRecycle,
   IconScale,
   IconYen,
 } from '../components/Icons'
@@ -22,6 +23,7 @@ import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
 import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
 import { fetchWasteRecords } from '../lib/waste'
+import { currentFiscalYear, fetchPaperRecords, paperRowTotal } from '../lib/paper'
 import {
   CHLORINE_STANDARD_MIN,
   currentMonthJST,
@@ -114,16 +116,18 @@ export default function Portal() {
         fetchBilmenSchedules({ month, months: 3 }),
         // 廃棄物実測値（2026-09-03）。カードに出すのは当月分の合計・未確認件数のみ
         fetchWasteRecords({ month }),
+        // 古紙回収（2026-09-08）。年度単位の運用のため、カードにも当年度の合計を出す
+        fetchPaperRecords(currentFiscalYear()),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, closedDays, bilmen, waste] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper, month, year })
       setLoading(false)
     }
 
@@ -187,6 +191,12 @@ export default function Portal() {
     const waste = stats?.waste
     const wasteTotal = waste?.reduce((sum, r) => sum + Number(r.weight_kg), 0)
     const wasteUnconfirmed = waste?.filter((r) => !r.is_confirmed).length
+
+    // --- 古紙回収：当年度の合計（kg）と、実績のある回数（2026-09-08）。
+    // 年度単位（4月〜翌3月）の運用のため、他のカードと違い当月ではなく年度で集計する ---
+    const paper = stats?.paper
+    const paperTotal = paper?.reduce((sum, r) => sum + paperRowTotal(r), 0)
+    const paperCount = paper?.filter((r) => paperRowTotal(r) > 0).length
 
     const monthLabel = `${Number(month.slice(5, 7))}月`
 
@@ -311,6 +321,16 @@ export default function Portal() {
               ? `未確認 ${wasteUnconfirmed} 件（スキャン取込の確認待ち）`
               : '確認済み',
         alert: wasteUnconfirmed > 0,
+      },
+      {
+        key: 'paper',
+        label: '古紙回収',
+        icon: <IconRecycle size={24} />,
+        path: '/paper',
+        value: paperTotal != null ? Math.round(paperTotal) : undefined,
+        unit: 'kg',
+        caption: `${currentFiscalYear()}年度の合計`,
+        sub: paper == null ? '取得できませんでした' : `記録${paperCount}回`,
       },
     ]
 

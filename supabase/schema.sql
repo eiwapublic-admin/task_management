@@ -963,6 +963,35 @@ revoke all on waste_records from anon, authenticated;
 revoke all on waste_scans from anon, authenticated;
 
 -- ============================================================
+-- 古紙回収量の記録（備後町コイズミビル＝BKB。2026-09-08）
+-- 毎週月曜に段ボール・シュレッダ・雑誌・その他を計量して記録する運用を、
+-- 従来のExcel（年度ごとのシート）からそのまま移した。回収予定日は画面側で
+-- 年度内の月曜を自動生成するため、実績のある回（＝1件でも入力した回）だけ行を持つ。
+-- ============================================================
+create table if not exists paper_records (
+  id           uuid primary key default gen_random_uuid(),
+  collect_date date not null unique,   -- 回収予定日（既定は毎週月曜。月別集計の基準）
+  skipped      boolean not null default false,  -- 祝日・休館日等で中止した週
+  cardboard_kg numeric(7,1),           -- 段ボール
+  shredder_kg  numeric(7,1),           -- シュレッダ
+  magazine_kg  numeric(7,1),           -- 雑誌
+  other_kg     numeric(7,1),           -- その他
+  note         text,                   -- 日程変更・備考（「火曜に変更」等の自由記入）
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create index if not exists idx_paper_records_date on paper_records (collect_date);
+
+drop trigger if exists trg_paper_records_updated_at on paper_records;
+create trigger trg_paper_records_updated_at
+  before update on paper_records
+  for each row execute function set_updated_at();
+
+alter table paper_records enable row level security;
+revoke all on paper_records from anon, authenticated;
+
+-- ============================================================
 -- リマインダー機能（2026-09-07）
 -- システム運用上、期限のある作業（APIキー更新・年次バックアップ復元ドリル等）を
 -- 忘れずに思い出して対応できるようにする。指定した通知タイミングでWeb Pushを送り、

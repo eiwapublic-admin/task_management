@@ -1,0 +1,206 @@
+/* 古紙回収量の記録（2026-09-08〜）。廃棄物実測値管理（Waste.css）と同じ表の骨格を使い、
+   年度サマリ＋月別の棒グラフ＋週ごとの入力表という3段構成にする。 */
+
+/* ===== 年度サマリ（合計・月平均）と月別グラフ ===== */
+.paper-summary {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: var(--space-5);
+  align-items: center;
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.paper-summary-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.paper-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.paper-figure-label {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.paper-figure-value {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.paper-figure-unit {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* 月別合計の棒グラフ。専用のグラフ描画ライブラリは入れていないため、
+   違反車両のランキング（RankingBarList）と同じくdiv+CSSで組む */
+.paper-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 140px;
+  min-width: 0;
+}
+
+.paper-chart-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.paper-chart-value {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.paper-chart-bar {
+  width: 100%;
+  max-width: 28px;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
+}
+
+.paper-chart-month {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ===== 週ごとの入力表 ===== */
+.paper-table th,
+.paper-table td {
+  white-space: nowrap;
+}
+
+.paper-date {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* 1列目（回収予定日）を左端に固定する（frozen column。Waste.css の月別一覧と同じ考え方）。
+   区分が4つ＋備考＋合計で列数が多く、モバイルでは横スクロールが前提になるため、
+   計量値を入力している間も「どの週の行か」を見失わないようにする（2026-09-08）。
+   固定列は下の行が透けないよう、行の状態ごとに不透明な背景を持たせる必要がある
+   （tr の背景は td 自体には効かないため） */
+.paper-table th:nth-child(1),
+.paper-table td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 11em;
+  border-right: 1px solid var(--border);
+}
+
+.paper-table th:nth-child(1) { background: var(--border-strong); }
+.paper-table td:nth-child(1) { background: var(--bg-surface); }
+.paper-table .paper-month-row td:nth-child(1) { background: var(--color-brand-soft); }
+
+/* 祝日・休館日の目印（その週は中止になりやすい）。日付の色分けは
+   weekdayInfo() の className（is-holiday / is-saturday）に任せる */
+.paper-date-flag {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  color: var(--due-overdue);
+  background: color-mix(in srgb, var(--due-overdue) 12%, transparent);
+}
+
+.paper-note-col { min-width: 220px; }
+
+.paper-note-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.paper-skip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.paper-note-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--control-h-sm, 32px);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+}
+
+.paper-weight-cell { padding: 2px 4px; }
+
+.paper-weight-input {
+  width: 5.5em;
+  height: var(--control-h-sm, 32px);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  text-align: right;
+  color: var(--text-strong);
+}
+
+.paper-note-input:focus,
+.paper-weight-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-weak);
+}
+
+.paper-note-input:disabled,
+.paper-weight-input:disabled {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.paper-row-total,
+.paper-month-total {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 中止した週は入力欄を伏せて、実績のある週と見分けられるようにする */
+.paper-row.is-skipped .paper-date,
+.paper-row.is-skipped .paper-row-total {
+  color: var(--text-faint);
+}
+
+.paper-legend { margin-top: var(--space-4); }
+
+/* 狭幅では左のサマリを上に積む（表自体は .ui-table-wrap の横スクロールに任せる） */
+@media (max-width: 768px) {
+  .paper-summary { grid-template-columns: 1fr; }
+  .paper-chart { height: 120px; }
+}

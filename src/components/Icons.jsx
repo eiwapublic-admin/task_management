@@ -324,3 +324,18 @@ export function IconBell(props) {
     </Icon>
   )
 }
+
+// 古紙回収（2026-09-08）のリサイクルアイコン。廃棄物（IconScale＝はかり）と
+// 対になる位置づけのため、同じ線幅・サイズ感の3方向の矢印で表す
+export function IconRecycle(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5 14.5 8H9.5z" />
+      <path d="M14.5 8l3 5.2" />
+      <path d="M19.4 16.5 17 20.5h-5" />
+      <path d="M12 20.5l2.6-3" />
+      <path d="M4.6 16.5 7 20.5" />
+      <path d="M6.5 8 3.6 13.2" />
+    </Icon>
+  )
+}

@@ -114,6 +114,11 @@ import {
   handleWasteScanUpload,
   handleWasteScanRecognize,
 } from './lib/waste.js'
+import {
+  handlePaperRecordList,
+  handlePaperRecordUpsert,
+  handlePaperRecordDelete,
+} from './lib/paper.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1209,6 +1214,13 @@ async function route(req, env) {
   }
   if (pathname === '/api/waste/scans/recognize') {
     if (req.method === 'POST') return handleWasteScanRecognize(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 古紙回収量の記録（設計書 4-18。廃棄物と同じ権限で扱う）
+  if (pathname === '/api/paper/records') {
+    if (req.method === 'GET') return handlePaperRecordList(req)
+    if (req.method === 'PUT') return handlePaperRecordUpsert(req)
+    if (req.method === 'DELETE') return handlePaperRecordDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
 

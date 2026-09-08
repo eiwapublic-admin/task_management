@@ -44,6 +44,7 @@ const FEATURE_TITLES = [
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },
   { path: '/waste', title: '廃棄物実測値管理' },
+  { path: '/paper', title: '古紙回収' },
   { path: '/equipment/items', title: '備品マスタ', exact: true },
   { path: '/equipment/tenants', title: 'テナントマスタ', exact: true },
   { path: '/equipment', title: '備品' },
