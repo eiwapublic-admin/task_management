@@ -115,6 +115,17 @@ export function IconDownload(props) {
   )
 }
 
+// IconDownload を上下反転した形（共有・アップロード用。2026-09-09）
+export function IconShare(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 15V3" />
+      <polyline points="7 8 12 3 17 8" />
+      <path d="M4 19h16" />
+    </Icon>
+  )
+}
+
 // 日報一覧の表示切替（リスト型／カレンダー型。2026-08-07）
 export function IconList(props) {
   return (

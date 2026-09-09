@@ -933,11 +933,10 @@ select.task-detail-input.is-unassigned {
   color: var(--text-muted);
 }
 
-/* PDFプレビューの「ダウンロード」「共有」（2026-09-09に分離。src/components/
-   PdfPreviewActions.jsx）。自動で共有シートを出す代わりにユーザーが明示的に
-   タップしたときだけ実行するための操作（元は2026-08-07に1つのボタンとして追加）。
-   ダウンロードは常に見える主操作、共有は対応環境でだけ出る副操作にする。
-   「プリント」（2026-09-09追加。AttachmentPreview.jsx）も同じ見た目を共有する */
+/* PDFプレビューの「共有」「ダウンロード」「プリント」（2026-08-07に1つのボタンとして追加、
+   2026-09-09に共有/ダウンロードの2ボタンへ分離、続けて同日中に共有・ダウンロードを
+   アイコンのみの控えめなボタンへ変更しプリントを追加）。並びは「共有（↑）→
+   ダウンロード（↓）→プリント」に揃え、プリントだけを主張の強い色にする */
 .attachment-preview-actions {
   display: flex;
   align-items: center;
@@ -945,9 +944,36 @@ select.task-detail-input.is-unassigned {
   flex-shrink: 0;
 }
 
-.attachment-preview-download,
-.attachment-preview-share,
+.attachment-preview-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .attachment-preview-print {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 雛形ファイルのプレビュー内「ダウンロード」ボタン（src/pages/DocumentTemplates.jsx）が
+   引き続き使う、文字ラベル付きの控えめなボタンスタイル（PDFプレビューの共有ボタンとは無関係） */
+.attachment-preview-share {
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-strong);
@@ -958,12 +984,6 @@ select.task-detail-input.is-unassigned {
   cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-.attachment-preview-download {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-primary-ink);
 }
 
 .attachment-preview-close {
