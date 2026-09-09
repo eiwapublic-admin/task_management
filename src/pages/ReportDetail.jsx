@@ -143,13 +143,19 @@ export default function ReportDetail({ date, onClose }) {
     }
   }, [])
 
-  // 追加直後の明細行の時刻欄へフォーカスする（一度使ったら消費して二重発火しない）
+  // 追加直後の明細行の時刻欄へフォーカスする（一度使ったら消費して二重発火しない）。
+  // focus() だけだとブラウザ任せの自動スクロールになり、実機では効かない・
+  // キーボード表示後にずれるといったことがあるため、preventScroll で自動スクロールを
+  // 止めたうえで scrollIntoView を明示的に呼び、行を中央へ運んでから文字入力状態にする
   useEffect(() => {
     if (!focusEntryIdRef.current) return
     const id = focusEntryIdRef.current
     focusEntryIdRef.current = null
     requestAnimationFrame(() => {
-      document.querySelector(`[data-entry-id="${id}"] .entry-time`)?.focus()
+      const input = document.querySelector(`[data-entry-id="${id}"] .entry-time`)
+      if (!input) return
+      input.focus({ preventScroll: true })
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
   }, [entries])
 
