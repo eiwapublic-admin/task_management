@@ -51,6 +51,7 @@ export default function Bilmen() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | schedule
+  const [duplicateFrom, setDuplicateFrom] = useState(null) // 複製元（'new' として開く間だけ使う）
   const [generating, setGenerating] = useState(false)
   const [notifying, setNotifying] = useState(false)
 
@@ -136,7 +137,16 @@ export default function Bilmen() {
 
   function handleSaved() {
     setEditing(null)
+    setDuplicateFrom(null)
     load()
+  }
+
+  // 「複製して新規登録」（2026-09-09）。開いている詳細を複製元として保持したまま、
+  // 同じモーダルを新規登録（'new'）として開き直す。key が変わるので
+  // BilmenScheduleForm は複製元の値で初期化された状態でまっさらに再マウントされる
+  function handleDuplicate(schedule) {
+    setDuplicateFrom(schedule)
+    setEditing('new')
   }
 
   function handleGenerated(result, targetMonth) {
@@ -330,7 +340,10 @@ export default function Bilmen() {
                 <button
                   type="button"
                   className="icon-btn-add"
-                  onClick={() => setEditing('new')}
+                  onClick={() => {
+                    setDuplicateFrom(null)
+                    setEditing('new')
+                  }}
                   aria-label="予定を追加"
                   title="予定を追加"
                 >
@@ -425,12 +438,17 @@ export default function Bilmen() {
         <BilmenScheduleForm
           key={editing === 'new' ? 'new' : editing.id}
           existing={editing === 'new' ? null : editing}
+          duplicateFrom={editing === 'new' ? duplicateFrom : null}
           month={month}
           masters={masters}
           vendorOptions={vendorOptions}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null)
+            setDuplicateFrom(null)
+          }}
           onSaved={handleSaved}
           onDeleted={handleSaved}
+          onDuplicate={handleDuplicate}
         />
       )}
 

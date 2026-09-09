@@ -1,6 +1,7 @@
 /* ビルメン：作業予定連絡票（EV掲示・投函・メール添付用）のPDF用シート。A4縦。
-   件数が多い月は複数ページに分割される（フック側で items をチャンクに分けて
-   複数枚描画し、jsPDF 側で addPage する）。 */
+   件数が多い月は複数ページに分割される（フック側で実際の高さを計測してから
+   items をページ単位に分け、複数枚描画して jsPDF 側で addPage する。2026-09-09に
+   固定5件区切りから可変件数に変更。詳しくは useBilmenNoticePdfExport.jsx）。 */
 
 .bno-sheet {
   display: none;
@@ -21,6 +22,30 @@ body.pdf-capture-mode .bno-sheet {
   color: #000;
   font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
 }
+
+/* 実際に何ページに分けるかを決める前の計測用シート（2026-09-09）。全件を高さ無制限で
+   描き、各 .bno-item の実際の高さから1ページに入る件数をフック側で逆算する
+   （useBilmenNoticePdfExport.jsx）。固定件数で区切っていた旧実装は、内容が短い月は
+   余白だらけになり、長い月は5件目までしか入らず6件目以降が次ページへ溢れていた */
+body.pdf-capture-mode .bno-sheet.is-measuring {
+  height: auto;
+  overflow: visible;
+}
+
+/* 1ページに入る高さを実測するための目盛り（2026-09-09）。mm→pxの換算式を自前で
+   持たず、実際にブラウザが割り当てた高さを読むことで、ズーム・DPI設定によらず
+   正確な値にする。.bno-sheet の外に置く（.is-measuring の影響を受けないように） */
+.bno-probe {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+}
+
+.bno-probe .is-total { height: 297mm; }
+.bno-probe .is-bottom-padding { height: 12mm; }
+/* 最終ページの下部に付く .bno-footer 用の余白。どのページが最後になるかは
+   ページ割りを決めるまで分からないため、簡略化してどのページにも一律に見込んでおく */
+.bno-probe .is-footer-reserve { height: 15mm; }
 
 .bno-sheet * {
   box-sizing: border-box;

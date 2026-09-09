@@ -97,10 +97,28 @@ function currentMonthJst() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7)
 }
 
-// 作業ID（work_no）の正規化。前後空白を落とすだけで、体系の妥当性チェックはしない
-// （採番規則は「類似の作業を隣同士に揃える」程度の緩いルールのため。13-5）
-function normalizeWorkNo(value) {
-  return trimOrNull(value, 50)
+// 作業ID（work_no）の自動採番（2026-09-09。13-5「自動採番しない・手入力＋重複チェックのみ」の
+// 方針を転換し、手入力（詳細フォームでの新規作成・未確定行への保存）時は日付＋連番で固定採番する
+// よう依頼元から変更依頼があった）。形式は移行データと見た目を合わせた W{YYMMDD}-{連番}
+// （例: W260909-01）。YYMMDDは作成日（JST）、連番はその日に発行済みの最大値+1で、
+// 一度発行したら編集させない（依頼: 「日付＋連番で固定（編集不可）」）。
+// 同時作成による衝突は極めて起こりにくいうえ、起きても呼び出し側のunique制約違反(23505)で
+// 検知でき、保存し直せば復帰できるため、採番自体に排他制御は設けていない
+function jstTodayCompact() {
+  const d = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }) // 'YYYY-MM-DD'
+  return d.slice(2, 4) + d.slice(5, 7) + d.slice(8, 10) // 'YYMMDD'
+}
+
+async function nextBilmenWorkNo(supabase) {
+  const prefix = `W${jstTodayCompact()}-`
+  const { data, error } = await supabase.from('bilmen_schedules').select('work_no').like('work_no', `${prefix}%`)
+  if (error) throw error
+  let max = 0
+  for (const row of data || []) {
+    const n = Number((row.work_no || '').slice(prefix.length))
+    if (Number.isInteger(n) && n > max) max = n
+  }
+  return `${prefix}${String(max + 1).padStart(2, '0')}`
 }
 
 // 外部に影響する操作・一括操作を操作ログに残す（11章）。既存の log_type 制約
@@ -327,8 +345,14 @@ export async function handleBilmenScheduleList(req) {
       .from('bilmen_schedules')
       .select(SCHEDULE_COLUMNS)
       .order('target_month', { ascending: false })
-      // 日付未定（plan_date が null）の行は月グループの先頭に出す（5-1）
+      // 日付未定（plan_date が null）の行は月グループの先頭に出す（5-1）。
+      // 一覧は常に予定日付・時刻の昇順にする（2026-09-09。依頼）。同じ日付内の並びが
+      // sort_order（移行データの旧並び）任せだと、後から追加した早い時刻の予定が
+      // 先に登録済みの遅い時刻の予定より下に来ることがあったため、plan_start を
+      // sort_order より先に見る。sort_order・created_at は日付・時刻まで一致した
+      // 場合の最終的なタイブレークとしてのみ残す
       .order('plan_date', { ascending: true, nullsFirst: true })
+      .order('plan_start', { ascending: true, nullsFirst: true })
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
 
@@ -372,8 +396,10 @@ function buildScheduleRow(payload) {
   if (canceled && !cancelReason) return { error: '中止にする場合は中止理由を入力してください' }
 
   return {
+    // work_no はここでは組み立てない。自動採番（2026-09-09〜）に一本化し、
+    // クライアントから送られてきた値は無視する（作成時は必ず新規発行、更新時は
+    // 呼び出し側で「まだ無ければ発行」を判断する。nextBilmenWorkNo 参照）
     row: {
-      work_no: normalizeWorkNo(payload?.work_no),
       master_id: typeof payload?.master_id === 'string' && payload.master_id ? payload.master_id : null,
       target_month: targetMonth,
       plan_date: dateOrNull(payload?.plan_date),
@@ -415,14 +441,15 @@ export async function handleBilmenScheduleCreate(req) {
     if (validationError) return json({ error: validationError }, 400)
 
     const supabase = getAdminClient()
+    const workNo = await nextBilmenWorkNo(supabase)
     const { data, error: err } = await supabase
       .from('bilmen_schedules')
-      .insert({ ...row, created_by: auth?.display_name || auth?.username || null })
+      .insert({ ...row, work_no: workNo, created_by: auth?.display_name || auth?.username || null })
       .select(SCHEDULE_COLUMNS)
       .single()
     if (err) {
       console.error('bilmen-schedule-create:', err.message)
-      if (err.code === '23505') return json({ error: 'この作業IDは既に使われています' }, 409)
+      if (err.code === '23505') return json({ error: 'この作業IDは既に使われています。もう一度保存してください' }, 409)
       return json({ error: 'メンテナンス予定の登録に失敗しました' }, 500)
     }
     return json({ schedule: data })
@@ -433,9 +460,9 @@ export async function handleBilmenScheduleCreate(req) {
 }
 
 // 一覧上でのその場編集（時刻・入室・報知・実績日時など）で送られてくる部分更新の許可列。
-// 詳細モーダルからの保存は全項目を送るので buildScheduleRow を通す
+// 詳細モーダルからの保存は全項目を送るので buildScheduleRow を通す。work_no はここに
+// 含めない（自動採番に一本化し、一覧・詳細どちらからも直接は書き換えさせない。2026-09-09）
 const PATCHABLE_COLUMNS = {
-  work_no: normalizeWorkNo,
   plan_date: dateOrNull,
   plan_start: timeOrNull,
   plan_end: timeOrNull,
@@ -474,6 +501,20 @@ export async function handleBilmenScheduleUpdate(req) {
     }
 
     const supabase = getAdminClient()
+    // 詳細フォームからの保存（full）で、まだ作業IDが無い予定（一括自動作成直後の未確定行）
+    // なら、ここで初めて発行する。「手動入力」＝この詳細フォームで保存すること、という
+    // 整理（一括自動作成そのものは引き続き work_no を入れない。5-3・13-5参照）
+    if (payload?.full) {
+      const { data: existingRow } = await supabase
+        .from('bilmen_schedules')
+        .select('work_no')
+        .eq('id', id)
+        .maybeSingle()
+      if (existingRow && !existingRow.work_no) {
+        patch.work_no = await nextBilmenWorkNo(supabase)
+      }
+    }
+
     const { data, error: err } = await supabase
       .from('bilmen_schedules')
       .update(patch)
@@ -482,7 +523,7 @@ export async function handleBilmenScheduleUpdate(req) {
       .maybeSingle()
     if (err) {
       console.error('bilmen-schedule-update:', err.message)
-      if (err.code === '23505') return json({ error: 'この作業IDは既に使われています' }, 409)
+      if (err.code === '23505') return json({ error: 'この作業IDは既に使われています。もう一度保存してください' }, 409)
       return json({ error: 'メンテナンス予定の更新に失敗しました' }, 500)
     }
     if (!data) return json({ error: 'メンテナンス予定が見つかりません' }, 404)

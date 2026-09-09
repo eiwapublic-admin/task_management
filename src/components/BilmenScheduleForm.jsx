@@ -17,33 +17,54 @@ import {
 // 1カラムに縦積みになる（予定 → 実績の順）。
 //
 // 予定はマスタの「コピー」なので、ここで編集した内容はマスタに戻さない（3-2）。
-// 作業ID（work_no）は手入力・空欄可で、保存時にサーバー側の unique 制約で重複を弾く（13-5）。
+// 作業ID（work_no）は日付＋連番で自動採番・固定（編集不可。2026-09-09。13-5の
+// 「手入力＋重複チェックのみ」方針を転換した）。保存時にサーバー側で発行する
+// （worker/lib/bilmen.js の nextBilmenWorkNo）ため、この画面では表示のみ行う。
+//
+// 複製（2026-09-09〜）: 既存の予定を開いた状態で「複製して新規登録」を押すと、
+// duplicateFrom にその予定を渡して呼び出し側が existing=null（＝新規）で
+// 再マウントする。作業ID・実績・報告書確認・中止・カレンダー連携は複製元を
+// 引き継がない（新しい1件として一から積む値のため）。
 //
 // Google カレンダー反映（7-2）は Phase 3 で追加する。反映済みの日時だけは
 // 参照できるよう、値が入っているときに限り表示する。
-export default function BilmenScheduleForm({ existing, month, masters = [], vendorOptions = [], onClose, onSaved, onDeleted }) {
+export default function BilmenScheduleForm({
+  existing,
+  duplicateFrom,
+  month,
+  masters = [],
+  vendorOptions = [],
+  onClose,
+  onSaved,
+  onDeleted,
+  onDuplicate,
+}) {
   useBodyScrollLock()
 
-  const [workNo, setWorkNo] = useState(existing?.work_no || '')
-  const [masterId, setMasterId] = useState(existing?.master_id || '')
-  const [targetMonth, setTargetMonth] = useState(existing?.target_month || month || '')
-  const [planDate, setPlanDate] = useState(existing?.plan_date || '')
-  const [planStart, setPlanStart] = useState(toTimeValue(existing?.plan_start))
-  const [planEnd, setPlanEnd] = useState(toTimeValue(existing?.plan_end))
-  const [title, setTitle] = useState(existing?.title || '')
-  const [titleNote, setTitleNote] = useState(existing?.title_note || '')
-  const [content, setContent] = useState(existing?.content || '')
-  const [notice, setNotice] = useState(existing?.notice || '')
-  const [place, setPlace] = useState(existing?.place || '')
-  const [enterRoom, setEnterRoom] = useState(existing?.enter_room || false)
-  const [notify, setNotify] = useState(existing?.notify || false)
-  const [jurisdiction, setJurisdiction] = useState(existing?.jurisdiction || BILMEN_JURISDICTIONS[0])
-  const [vendorCode, setVendorCode] = useState(existing?.vendor_code || '')
-  const [vendorName, setVendorName] = useState(existing?.vendor_name || '')
-  const [workerName, setWorkerName] = useState(existing?.worker_name || '')
-  const [prepNote, setPrepNote] = useState(existing?.prep_note || '')
-  const [memo, setMemo] = useState(existing?.memo || '')
-  const [remark, setRemark] = useState(existing?.remark || '')
+  // 複製時は duplicateFrom を種にする（existing は null＝新規登録のまま）
+  const seed = existing || duplicateFrom || null
+
+  const [masterId, setMasterId] = useState(seed?.master_id || '')
+  const [targetMonth, setTargetMonth] = useState(seed?.target_month || month || '')
+  const [planDate, setPlanDate] = useState(seed?.plan_date || '')
+  const [planStart, setPlanStart] = useState(toTimeValue(seed?.plan_start))
+  const [planEnd, setPlanEnd] = useState(toTimeValue(seed?.plan_end))
+  const [title, setTitle] = useState(seed?.title || '')
+  const [titleNote, setTitleNote] = useState(seed?.title_note || '')
+  const [content, setContent] = useState(seed?.content || '')
+  const [notice, setNotice] = useState(seed?.notice || '')
+  const [place, setPlace] = useState(seed?.place || '')
+  const [enterRoom, setEnterRoom] = useState(seed?.enter_room || false)
+  const [notify, setNotify] = useState(seed?.notify || false)
+  const [jurisdiction, setJurisdiction] = useState(seed?.jurisdiction || BILMEN_JURISDICTIONS[0])
+  const [vendorCode, setVendorCode] = useState(seed?.vendor_code || '')
+  const [vendorName, setVendorName] = useState(seed?.vendor_name || '')
+  const [workerName, setWorkerName] = useState(seed?.worker_name || '')
+  const [prepNote, setPrepNote] = useState(seed?.prep_note || '')
+  const [memo, setMemo] = useState(seed?.memo || '')
+  const [remark, setRemark] = useState(seed?.remark || '')
+  // 実績・報告書確認・中止は複製元から引き継がない（duplicateFrom の場合は existing が
+  // 無いのでどのみち初期値は空になるが、意図を明示するため existing だけを見る）
   const [actualDate, setActualDate] = useState(existing?.actual_date || '')
   const [actualStart, setActualStart] = useState(toTimeValue(existing?.actual_start))
   const [actualEnd, setActualEnd] = useState(toTimeValue(existing?.actual_end))
@@ -106,7 +127,8 @@ export default function BilmenScheduleForm({ existing, month, masters = [], vend
     try {
       const payload = {
         full: true,
-        work_no: workNo,
+        // work_no は送らない。サーバー側で自動採番するため（無ければ発行、
+        // 既にあれば変更しない。worker/lib/bilmen.js 参照）
         master_id: masterId || null,
         target_month: targetMonth,
         plan_date: planDate,
@@ -172,16 +194,13 @@ export default function BilmenScheduleForm({ existing, month, masters = [], vend
           )}
 
           <div className="bilmen-detail-head">
-            <label className="ui-field">
+            <div className="ui-field">
               <span>作業ID</span>
-              <input
-                type="text"
-                className="ui-input"
-                placeholder="W260901-27（空欄のまま保存し、後から入れられます）"
-                value={workNo}
-                onChange={(e) => setWorkNo(e.target.value)}
-              />
-            </label>
+              {/* 自動採番・固定のため編集欄ではなく表示のみ（2026-09-09） */}
+              <p className="ui-input bilmen-work-no-display">
+                {existing?.work_no || <span className="bilmen-undecided">保存時に自動採番されます</span>}
+              </p>
+            </div>
             <label className="ui-field">
               <span>作業マスタ</span>
               <select className="ui-select" value={masterId} onChange={(e) => applyMaster(e.target.value)}>
@@ -432,6 +451,11 @@ export default function BilmenScheduleForm({ existing, month, masters = [], vend
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
+            {existing && (
+              <button type="button" className="btn-plain" onClick={() => onDuplicate(existing)}>
+                複製して新規登録
+              </button>
+            )}
             {existing && <ConfirmDeleteButton onConfirm={handleDelete} label="この予定を削除" size={22} />}
           </div>
           <div className="ui-modal-foot-end">

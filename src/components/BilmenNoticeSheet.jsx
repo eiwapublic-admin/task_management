@@ -15,11 +15,11 @@ function formatLongDate(date) {
 // 件数が多い月は呼び出し元（フック）でページ分割し、このコンポーネントは
 // 1ページ分（items）だけを受け取って描く。番号は全ページ通しにするため
 // startIndex（0始まり）を受け取る。
-export default function BilmenNoticeSheet({ month, buildingName, items, startIndex, outputDate, isLastPage }) {
+export default function BilmenNoticeSheet({ month, buildingName, items, startIndex, outputDate, isLastPage, measuring }) {
   const [y, m] = month.split('-').map(Number)
 
   return (
-    <div className="bno-sheet">
+    <div className={`bno-sheet${measuring ? ' is-measuring' : ''}`}>
       <div className="bno-header">
         <span className="bno-to">テナント各位</span>
         <span className="bno-output-date">{outputDate}</span>

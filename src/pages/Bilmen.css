@@ -63,6 +63,15 @@
 
 .bilmen-work-no { font-variant-numeric: tabular-nums; }
 
+/* 詳細モーダルの作業ID欄。自動採番・固定のため <p> に .ui-input を流用した表示専用
+   （2026-09-09）。<p> は既定でセンタリングされないため margin/flex を打ち消す */
+.bilmen-work-no-display {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .bilmen-main { display: block; }
 
 /* セルの中身を縦に積む入れ物。狭幅のカード表示（td を flex にする）でも
