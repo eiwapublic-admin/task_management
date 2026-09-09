@@ -113,8 +113,7 @@ import {
   handleWasteRecordUpsert,
   handleWasteRecordDelete,
   handleWasteRecordConfirmMonth,
-  handleWasteScanUpload,
-  handleWasteScanRecognize,
+  handleWasteRecordImport,
 } from './lib/waste.js'
 import {
   handlePaperRecordList,
@@ -1216,12 +1215,8 @@ async function route(req, env) {
     if (req.method === 'POST') return handleWasteRecordConfirmMonth(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
-  if (pathname === '/api/waste/scans') {
-    if (req.method === 'POST') return handleWasteScanUpload(req)
-    return json({ error: 'Method Not Allowed' }, 405)
-  }
-  if (pathname === '/api/waste/scans/recognize') {
-    if (req.method === 'POST') return handleWasteScanRecognize(req)
+  if (pathname === '/api/waste/records/import') {
+    if (req.method === 'POST') return handleWasteRecordImport(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   // 古紙回収量の記録（設計書 4-18。廃棄物と同じ権限で扱う）

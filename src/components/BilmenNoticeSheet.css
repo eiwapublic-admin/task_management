@@ -78,6 +78,9 @@ body.pdf-capture-mode .bno-sheet.is-measuring {
 .bno-list {
   margin: 0;
   padding: 0;
+  /* 1件目の上にも区切り線を入れる（2026-09-09。件目間の border-bottom だけでは
+     見出し・注釈のすぐ下に来る1件目の上に線が無かった） */
+  border-top: 0.15mm solid #999;
 }
 
 /* 行間は2026-09-09にやや詰めた（今月の注釈を冒頭に入れると1ページの余裕が

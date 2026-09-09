@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import BilmenScheduleSheet from '../components/BilmenScheduleSheet'
 import AttachmentPreview from '../components/AttachmentPreview'
+import PdfPreviewActions from '../components/PdfPreviewActions'
 import PdfBusyOverlay from '../components/PdfBusyOverlay'
 import { getReportPdfPreviewUrl, todayJST } from '../lib/reports'
 import { notifyTargets, BILMEN_BUILDING_NAME } from '../lib/bilmen'
@@ -59,27 +60,6 @@ export default function useBilmenSchedulePdfExport() {
     }
   }
 
-  // Web Share APIが使える環境（主にiOS）ではファイル共有シートを、それ以外では通常のダウンロードにする
-  async function sharePdf({ blob, filename }) {
-    const file = new File([blob], filename, { type: 'application/pdf' })
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: filename })
-        return
-      } catch (shareErr) {
-        if (shareErr?.name === 'AbortError') return
-      }
-    }
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
   const sheetsPortal = sheetData
     ? createPortal(
         <div ref={sheetRef}>
@@ -100,11 +80,7 @@ export default function useBilmenSchedulePdfExport() {
       attachment={{ filename: preview.filename, mimeType: 'application/pdf' }}
       url={preview.url}
       onClose={() => setPreview(null)}
-      headerAction={
-        <button type="button" className="attachment-preview-share" onClick={() => sharePdf(preview)}>
-          共有 / 保存
-        </button>
-      }
+      headerAction={<PdfPreviewActions blob={preview.blob} filename={preview.filename} />}
     />
   ) : null
 

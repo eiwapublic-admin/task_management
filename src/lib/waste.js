@@ -1,5 +1,4 @@
 import { authFetch } from './api'
-import { getToken } from './auth'
 
 // 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜）の API 呼び出し・共通ユーティリティ。
 // 詳細は docs/waste-plan.md 参照。
@@ -58,39 +57,9 @@ export async function confirmWasteMonth(month) {
   await authFetch('/api/waste/records/confirm-month', { method: 'POST', body: JSON.stringify({ month }) })
 }
 
-// スキャン画像のアップロード（multipart/form-data。写真アップロードと同じくタイムアウトを設ける）
-export async function uploadWasteScan({ targetMonth, file }) {
-  const form = new FormData()
-  form.append('target_month', targetMonth)
-  form.append('file', file, file.name || 'scan.jpg')
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 45000)
-  let res
-  try {
-    res = await fetch('/api/waste/scans', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
-      body: form,
-      signal: controller.signal,
-    })
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('画像のアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
-    }
-    throw err
-  } finally {
-    clearTimeout(timeoutId)
-  }
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || '画像の保存に失敗しました')
-  return data.scan
-}
-
-export async function recognizeWasteScan(scanId) {
-  const data = await authFetch('/api/waste/scans/recognize', {
-    method: 'POST',
-    body: JSON.stringify({ scan_id: scanId }),
-  })
-  return { records: data.records || [], readCount: data.read_count || 0 }
+// Excel取込（2026-09-09〜。src/lib/wasteExcelImport.js でブラウザ側にパース済みの
+// 行データをまとめて送る。ファイル自体はサーバーへ送らない）
+export async function importWasteRecords(rows) {
+  const data = await authFetch('/api/waste/records/import', { method: 'POST', body: JSON.stringify({ rows }) })
+  return { records: data.records || [], imported: data.imported || 0 }
 }

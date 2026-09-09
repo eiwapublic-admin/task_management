@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
-import WasteScanModal from '../components/WasteScanModal'
+import WasteExcelImportModal from '../components/WasteExcelImportModal'
 import useWasteSheetPdfExport from '../hooks/useWasteSheetPdfExport'
 import { IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
@@ -36,7 +36,7 @@ export default function Waste() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
-  const [scanOpen, setScanOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const sheetExport = useWasteSheetPdfExport()
 
@@ -113,13 +113,9 @@ export default function Waste() {
     }
   }
 
-  function handleScanDone(targetMonth, readCount) {
-    setScanOpen(false)
-    setInfo(
-      readCount > 0
-        ? `${targetMonth.replace('-', '年')}月分を${readCount}件読み取りました。内容を確認してください。`
-        : `${targetMonth.replace('-', '年')}月分は読み取れたマスがありませんでした。画像を確認してください。`
-    )
+  function handleImportDone(targetMonth, importedCount) {
+    setImportOpen(false)
+    setInfo(`${targetMonth.replace('-', '年')}月分を${importedCount}件取り込みました。内容を確認してください。`)
     setViewMode('month')
     setMonth(targetMonth)
   }
@@ -214,8 +210,13 @@ export default function Waste() {
                   </button>
                 )}
                 {!readOnly && (
-                  <button type="button" className="btn-plain" onClick={() => setScanOpen(true)} title="スキャン取込">
-                    スキャン
+                  <button
+                    type="button"
+                    className="btn-plain"
+                    onClick={() => setImportOpen(true)}
+                    title="Excelアップロード"
+                  >
+                    Excelアップロード
                   </button>
                 )}
               </>
@@ -258,8 +259,12 @@ export default function Waste() {
         </p>
       </div>
 
-      {scanOpen && (
-        <WasteScanModal defaultMonth={month} onClose={() => setScanOpen(false)} onDone={handleScanDone} />
+      {importOpen && (
+        <WasteExcelImportModal
+          defaultMonth={month}
+          onClose={() => setImportOpen(false)}
+          onDone={handleImportDone}
+        />
       )}
 
       {sheetExport.sheetsPortal}

@@ -1285,8 +1285,9 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 `settings.daily_api_cost_limit_usd`（既定 0.50・**従量課金事項の画面（`/usage`）**の
 「AI利用の1日あたり上限」で変更可。2026-09-04にタスク設定から移設）で
 指定した金額に、当日の推定利用額が達すると**その日のAI処理を自動停止する**。判定・加算は
-`worker/lib/usageLimit.js`（`checkDailyLimit` / `addTodayUsage`）に集約し、メール分類・違反車両・
-廃棄物スキャンの3経路すべてで**Claudeを呼ぶ直前に**判定する。メール分類は1件ごとに加算して
+`worker/lib/usageLimit.js`（`checkDailyLimit` / `addTodayUsage`）に集約し、メール分類・違反車両の
+2経路で**Claudeを呼ぶ直前に**判定する（廃棄物は2026-09-09にExcel取込方式へ変更しClaudeを
+呼ばなくなったため対象外。14章参照）。メール分類は1件ごとに加算して
 都度判定するため、1回の実行の中で暴走しても上限で止まる。停止時は `settings.api_limit_alert`
 に記録し、ダッシュボードにバナーを出す（日付が変われば自動的に解除・再開）。バナーの
 「上限を変更」リンクは上限の入力欄がある**従量課金事項の画面（`/usage`）**へ飛ぶ

@@ -118,18 +118,25 @@ create table waste_scans (
 既存の残留塩素等検査（`Chlorine.jsx`）と同じ「年月グループ＋トグル開閉」の一覧にする。
 各月グループの中は、添付PDFと同じ形（日×1〜7階の表＋日合計列＋月合計行）。
 
-- ヘッダーに「スキャン取込」ボタン（対象月を選んでアップロード）
+- ヘッダーに「Excelアップロード」ボタン（対象月を選んでアップロード。**2026-09-09にスキャン取込
+  〈Claude Vision〉から変更。10-5章参照**）
 - 一覧上でその場編集も可能（残留塩素と同じ、既存データの微修正用）
 - 異常値（20kg超・50kg以上）は一覧表示でも色分けする
 
-### 5-2. スキャン取込モーダル
+### 5-2. Excel取込モーダル（2026-09-09改訂。旧: スキャン取込モーダル）
 
-1. 対象月を選び、写真（カメラ撮影 or ライブラリ選択。既存の日報等と同じ2択）をアップロード
-2. 「読み取る」を押すと Claude Vision が日×階の値を返す
-3. 結果をその場でプレビュー表示（`waste_records` へ `is_confirmed=false` の下書きとして保存）。
-   読み取れなかったマスは空欄のまま（推測しない）
-4. 異常値は色分けして表示。人が確認し、必要な行は手で訂正
-5. 「確定」を押すと `is_confirmed=true` にして通常の一覧に反映
+> 当初案（Claude Visionによる手書きシートの写真読み取り）は10-5章のとおり実際の筆跡で
+> 読み取り失敗が続いたため、依頼元がExcel化した実測値をそのまま取り込む方式に変更した。
+> 以下は変更後の設計。
+
+1. 対象月を選び、2章の様式（日・曜日・1〜7階・合計の列を持つ）のExcelファイル（.xlsx）を選択
+2. 「取り込む」を押すと、ブラウザ内で直接Excelを読み取り（`src/lib/wasteExcelImport.js`。
+   サーバーへは元ファイルを送らず、パース済みの日×階の値だけを送る）、
+   `waste_records` へ `is_confirmed=false` の下書きとして保存する
+3. 結果は一覧（月別表示）にそのまま反映される。この画面自体には読み取り結果のプレビューは
+   出さない（月別一覧の編集可能グリッドが確認・訂正の場を兼ねる。10章の設計をそのまま踏襲）
+4. 異常値は一覧側で色分けして表示。人が確認し、必要な行は手で訂正
+5. 一覧の「この月を確認済みにする」ボタンで、直していない残りをまとめて `is_confirmed=true` にする
 
 ### 5-3. 年度集計 `/waste`（年度切替）または別画面
 
@@ -144,9 +151,10 @@ create table waste_scans (
 
 - `GET/POST/PATCH/DELETE /api/waste/records`: 実測値のCRUD（平たいパス＋idはクエリ/ボディ）
 - `GET /api/waste/records?fiscal_year=2026`: 年度集計用の全件取得
-- `POST /api/waste/scans`: 画像アップロード（`report_photos` と同じ Storage 保存の考え方）
-- `POST /api/waste/scans/recognize`: Claude Vision 読み取り実行 → `waste_records` を下書き作成
-- `POST /api/waste/scans/:id/confirm`（またはボディに id）: 確認確定
+- `POST /api/waste/records/import`（2026-09-09〜。10-5章）: ブラウザ側で読み取り済みの
+  Excel由来の行データ（`{ rows: [{ record_date, floor, weight_kg }] }`）をまとめて
+  `is_confirmed=false` の下書きとして upsert する。旧`POST /api/waste/scans`・
+  `POST /api/waste/scans/recognize`（画像アップロード・Claude Vision読み取り）は廃止した
 
 ---
 
@@ -266,3 +274,27 @@ iPhone幅では横スクロールが前提になるため、日付を見失わ�
 `input_tokens`/`output_tokens`という共通の集計列を使っているため、この不具合の影響を受けず
 正しかった）。`handleUsage`の取得列に`waste_calls`を追加し、`UsagePanel.jsx`に「廃棄物」列を
 新設して正しく分離した。
+
+### 10-5. スキャン取込（Claude Vision）をExcelアップロードに置き換え（2026-09-09）
+
+依頼元が実際に記入済みの手書きシートでスキャン取込を試したところ「読み取り失敗」となった。
+別途AIチャット等で手書き内容をExcel化したところ正しく変換できたとのことで、**そのExcel
+ファイルをそのまま読み取る方式に変更してほしい**との依頼を受けた（実際のExcelファイルを
+添付いただき、これを新方式の参照フォーマットとした）。
+
+| 変更したもの | 内容 |
+|---|---|
+| `src/lib/wasteExcelImport.js`（新規） | Excel（.xlsx）ファイルをブラウザ内で直接読み取るパーサー。xlsxはOOXML＝ZIP形式のため、本来はライブラリ（SheetJSの`xlsx`等）を使うのが簡単だが、npm公開版の`xlsx`パッケージは未修正の高リスク脆弱性（プロトタイプ汚染・ReDoS）を抱えており、修正版はSheetJS自社CDN配布のみでこの開発環境からは取得できなかった（`exceljs`は依存過多で見送り）。読み取る値が「日×1〜7階の実測値」だけで形式も固定のため、依存追加を避け、ZIP展開（中央ディレクトリ・ローカルヘッダの手動パース＋`DecompressionStream('deflate-raw')`での展開）とシートXMLの数値セル読み取りだけを自前実装した。実際に依頼元から添付されたExcelファイルで読み取り値が原本の列合計と完全一致することを確認済み |
+| `src/components/WasteExcelImportModal.jsx`（新規。`WasteScanModal.jsx`を置き換え） | 対象月選択＋.xlsxファイル選択の2ステップのみのシンプルなモーダル。選んだファイルはブラウザ内でパースし、日×階の値だけをサーバーへ送る（元ファイル自体はアップロードしない） |
+| `worker/lib/waste.js` | `handleWasteScanUpload`・`handleWasteScanRecognize`（画像アップロード・Claude Vision読み取り）を削除し、`handleWasteRecordImport`（`POST /api/waste/records/import`）を新設。パース済みの行を検証し`is_confirmed=false`の下書きとしてupsertするだけの単純な処理になった（Storageへの画像保存・AI呼び出し・利用量記録が丸ごと不要になった） |
+| `worker/lib/ai/`（`index.js`・`anthropic.js`・`prompts.js`） | `recognizeWasteSheet`・`buildWasteSystemPrompt`を削除（廃棄物のAI読み取り自体が無くなったため） |
+| Supabase（本番へ直接適用） | `waste_records.source`のCHECK制約を`('manual','ocr')`から`('manual','excel')`に変更（`ocr`のレコードは0件だったため置き換え。`waste_scans`テーブル自体は履歴として残し削除していない） |
+| `src/lib/imageResize.js` | `waste`プリセット（`WasteScanModal.jsx`専用だった高解像度設定）を削除 |
+| `src/pages/Waste.jsx` | ヘッダーのボタンを「スキャン」→「Excelアップロード」に変更。月別一覧の編集可能グリッド・確認済みにするボタン等、既存のUI・確認フローはそのまま流用（取込元だけが変わった） |
+
+**サーキットブレーカー（3-3・10-4章）の対象からも外れる**: 廃棄物はAIを一切呼ばなくなったため、
+`docs/task-management-spec-cloudflare.md`の日次AI利用上限の説明から廃棄物を除外した。
+
+実機確認はまだ未実施（読み取りロジック自体は依頼元から提供された実際のExcelファイルで
+数値が完全一致することを確認済みだが、モーダルの操作感・実際のアップロード〜一覧反映までの
+一連の流れは依頼元に確認してほしい）。

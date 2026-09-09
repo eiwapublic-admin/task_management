@@ -933,8 +933,18 @@ select.task-detail-input.is-unassigned {
   color: var(--text-muted);
 }
 
-/* 自主検査表PDFプレビューの「共有 / 保存」。自動で共有シートを出す代わりに
-   ユーザーが明示的にタップしたときだけ実行するための操作（2026-08-07） */
+/* PDFプレビューの「ダウンロード」「共有」（2026-09-09に分離。src/components/
+   PdfPreviewActions.jsx）。自動で共有シートを出す代わりにユーザーが明示的に
+   タップしたときだけ実行するための操作（元は2026-08-07に1つのボタンとして追加）。
+   ダウンロードは常に見える主操作、共有は対応環境でだけ出る副操作にする */
+.attachment-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.attachment-preview-download,
 .attachment-preview-share {
   border: 1px solid var(--border);
   background: var(--bg-surface);
@@ -946,6 +956,12 @@ select.task-detail-input.is-unassigned {
   cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.attachment-preview-download {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-ink);
 }
 
 .attachment-preview-close {
