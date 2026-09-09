@@ -59,10 +59,20 @@ body.pdf-capture-mode .bno-sheet.is-measuring {
 }
 
 .bno-heading {
-  margin: 4mm 0 6mm;
+  margin: 3mm 0 4mm;
   text-align: center;
   font-size: 15pt;
   font-weight: 700;
+}
+
+/* 今月の注釈（5-4）。大見出しの直下・作業リストの上に1回だけ出す（8-2） */
+.bno-note {
+  margin: 0 0 4mm;
+  text-align: center;
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: #c00;
+  white-space: pre-wrap;
 }
 
 .bno-list {
@@ -70,9 +80,12 @@ body.pdf-capture-mode .bno-sheet.is-measuring {
   padding: 0;
 }
 
+/* 行間は2026-09-09にやや詰めた（今月の注釈を冒頭に入れると1ページの余裕が
+   減るため。値は決め打ちだが、ページ割り自体は実測ベースなので詰めたぶんは
+   そのまま1ページに入る件数の余裕として跳ね返る） */
 .bno-item {
-  margin-bottom: 4mm;
-  padding-bottom: 3mm;
+  margin-bottom: 3mm;
+  padding-bottom: 2mm;
   border-bottom: 0.15mm solid #999;
   font-size: 9.5pt;
 }
@@ -95,21 +108,21 @@ body.pdf-capture-mode .bno-sheet.is-measuring {
 }
 
 .bno-item-content {
-  margin: 1mm 0;
+  margin: 0.8mm 0;
   padding-left: 8mm;
   font-size: 9pt;
   color: #06c;
 }
 
 .bno-item-rows {
-  margin: 1.5mm 0 0;
+  margin: 1mm 0 0;
   padding-left: 8mm;
 }
 
 .bno-item-row {
   display: flex;
   gap: 2mm;
-  margin-bottom: 0.8mm;
+  margin-bottom: 0.5mm;
 }
 
 .bno-item-row dt {

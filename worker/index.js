@@ -99,6 +99,8 @@ import {
   handleBilmenScheduleDelete,
   handleBilmenGenerateCandidates,
   handleBilmenScheduleGenerate,
+  handleBilmenMonthlyNoteGet,
+  handleBilmenMonthlyNoteUpdate,
   handleBilmenMailSettingsGet,
   handleBilmenMailSettingsUpdate,
   handleBilmenMailRecipientList,
@@ -1181,6 +1183,12 @@ async function route(req, env) {
   if (pathname === '/api/bilmen/schedules/generate') {
     if (req.method === 'GET') return handleBilmenGenerateCandidates(req)
     if (req.method === 'POST') return handleBilmenScheduleGenerate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 今月の注釈（月固有の但し書き。連絡票PDFの大見出し直下に表示する。5-4。2026-09-09〜）
+  if (pathname === '/api/bilmen/notes') {
+    if (req.method === 'GET') return handleBilmenMonthlyNoteGet(req)
+    if (req.method === 'PUT') return handleBilmenMonthlyNoteUpdate(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   // メール設定（文面・宛先）。owner・equipment_out_staff には GET も含めて一切見せない

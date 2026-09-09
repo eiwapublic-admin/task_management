@@ -112,6 +112,22 @@
   overscroll-behavior: contain;
 }
 
+.paper-table {
+  /* 列幅を各 th の width で固定する（2026-09-09）。入力内容やチェック状態で
+     自動計算幅が揺れると、横スクロール位置がそのたびにずれて表全体が
+     左右にぐらついて見えるため、table-layout: auto はやめて固定幅にする。
+     .ui-table の width: 100% を打ち消すのが必須（table-layout: fixed でも
+     table自身の幅が100%のままだと、各列のpx指定は絶対値ではなく比率として
+     扱われ、広い画面ほど列が間延びしてしまう。実機で確認）。
+     さらに width: auto だけだと、狭い画面ではブラウザが逆に全列を比例縮小
+     してしまう（実機で確認）。各 th の width 合計と同じ値を min-width にも
+     指定し、どの画面幅でも縮まないようにする（余った分は
+     .paper-table-wrap の横スクロールに任せる） */
+  table-layout: fixed;
+  width: auto;
+  min-width: 720px;
+}
+
 .paper-table th,
 .paper-table td {
   white-space: nowrap;
@@ -129,22 +145,66 @@
 
 .paper-table thead th:nth-child(1) { z-index: 3; }
 
+/* 1列目（回収予定日）の幅。table-layout: fixed では th の width が列幅そのものになるが、
+   その判定は th 自身が通常の table-cell 表示であることが前提らしく、th に直接
+   display: flex を当てると幅の指定が無視され、他の列と幅が崩れる（実機で確認。
+   2026-09-09）。そのためレイアウトは中の div（.paper-th-date-row）に持たせ、
+   th 自体は幅の指定だけを持つ素の table-cell のままにする */
+.paper-th-date { width: 140px; }
+
+.paper-th-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* 見出し側の「中止」ラベル（明細行はチェックボックスのみでラベルを持たないため、
+   見出しに1回だけ出す。2026-09-09） */
+.paper-th-skip {
+  flex-shrink: 0;
+  font-weight: 400;
+}
+
+/* 段ボール／シュレッダ／雑誌／その他の4列。実測値は3桁が最大のため狭く固定する
+   （2026-09-09）。見出し文言（「シュレッダ」等）がこの幅でも折り返さずに収まるよう、
+   このヘッダーだけ文字サイズと左右余白を削っている */
+.paper-th-weight {
+  width: 90px;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-2xs);
+}
+
+.paper-th-total { width: 60px; }
+
 .paper-table td.paper-date {
   font-weight: 600;
   color: var(--text-strong);
-  /* 月見出し行の下にぶら下がる形にするため字下げする（2026-09-09）。
-     .ui-table td の padding を上書きするので、詳細度を上げて指定する */
-  padding-left: var(--space-6);
 }
 
+/* セル内を「日付欄（左）＋中止チェックボックス（右端）」に分ける（2026-09-09）。
+   中止は備考欄から独立させ、明細行ではラベルを持たずチェックボックスのみ置く
+   （ラベルは見出し側の .paper-th-skip が兼ねる） */
+.paper-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.paper-skip-checkbox { flex-shrink: 0; }
+
 /* 回収予定日の直接編集（2026-09-09）。ネイティブの<input type="date">を透明にして
-   重ね、見た目は自前の文字列（年を省いた表示・祝日/休館日バッジ込み）を出す
+   重ね、見た目は自前の文字列（年を省いた表示）を出す
    （ReminderForm.jsx の .reminder-date-field と同じ技法）。祝日・休館日で日程が
-   ずれた週を、備考への自由記入ではなく実際の日付に直せるようにするための入口 */
+   ずれた週を、備考への自由記入ではなく実際の日付に直せるようにするための入口。
+   日付欄自体は左（セルの先頭）に詰める（2026-09-09。中止チェックボックスを
+   右端に置く関係で、この欄に大きな左余白を持たせる理由が無くなったため） */
 .paper-date-field {
   position: relative;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
 }
 
 .paper-date-native {
@@ -187,16 +247,15 @@
 .paper-table td.paper-date.is-saturday { color: var(--color-primary-hover); }
 
 /* 1列目（回収予定日）を左端に固定する（frozen column。Waste.css の月別一覧と同じ考え方）。
-   区分が4つ＋備考＋合計で列数が多く、モバイルでは横スクロールが前提になるため、
-   計量値を入力している間も「どの週の行か」を見失わないようにする（2026-09-08）。
-   固定列は下の行が透けないよう、行の状態ごとに不透明な背景を持たせる必要がある
-   （tr の背景は td 自体には効かないため） */
+   幅は .paper-th-date の width（table-layout: fixed）で決まる。列数が多く、モバイルでは
+   横スクロールが前提になるため、計量値を入力している間も「どの週の行か」を見失わない
+   ようにする（2026-09-08）。固定列は下の行が透けないよう、行の状態ごとに不透明な背景を
+   持たせる必要がある（tr の背景は td 自体には効かないため） */
 .paper-table th:nth-child(1),
 .paper-table td:nth-child(1) {
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 8em;
   border-right: 1px solid var(--border);
 }
 
@@ -207,39 +266,12 @@
    固定列は自前で不透明に塗らないと下の行が透ける */
 .paper-table .paper-row.is-today td:nth-child(1) { background: var(--color-brand-softer); }
 
-/* 休館日の目印（その週は中止になりやすい）。祝日は上の .is-holiday による
-   日付の赤字だけで示し、名称は表示しない（モバイルでの横幅節約） */
-.paper-date-flag {
-  margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  color: var(--due-overdue);
-  background: color-mix(in srgb, var(--due-overdue) 12%, transparent);
-}
-
-.paper-note-col { min-width: 220px; }
-
-.paper-note-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.paper-skip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  cursor: pointer;
-}
+/* 備考欄は表の右端（2026-09-09。以前は1列目の中止チェックボックスと同じセルにあった）。
+   幅は table-layout: fixed 下では width が列幅そのものになる */
+.paper-note-col { width: 160px; }
 
 .paper-note-input {
-  flex: 1 1 auto;
-  min-width: 0;
+  width: 100%;
   height: var(--control-h-sm, 32px);
   padding: 0 var(--space-2);
   border: 1px solid var(--border-strong);
@@ -252,10 +284,12 @@
 
 .paper-weight-cell { padding: 2px 4px; }
 
+/* 実測値は3桁（〜999kg）が最大のため、幅を3桁ぶんに絞る（2026-09-09。依頼。
+   以前は5.5emあり、3桁の入力に対して余裕がありすぎた） */
 .paper-weight-input {
-  width: 5.5em;
+  width: 100%;
   height: var(--control-h-sm, 32px);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-1);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--bg-surface);

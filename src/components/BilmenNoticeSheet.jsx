@@ -15,8 +15,21 @@ function formatLongDate(date) {
 // 件数が多い月は呼び出し元（フック）でページ分割し、このコンポーネントは
 // 1ページ分（items）だけを受け取って描く。番号は全ページ通しにするため
 // startIndex（0始まり）を受け取る。
-export default function BilmenNoticeSheet({ month, buildingName, items, startIndex, outputDate, isLastPage, measuring }) {
+export default function BilmenNoticeSheet({
+  month,
+  buildingName,
+  items,
+  startIndex,
+  outputDate,
+  isLastPage,
+  note,
+  measuring,
+}) {
   const [y, m] = month.split('-').map(Number)
+  // 今月の注釈（5-4）は大見出しの直下・作業リストの上に1回だけ出す（8-2）。
+  // ページ割りの計測（フック側）は常に startIndex=0 の1枚で行うため、
+  // その計測結果には注釈込みの高さが反映されている
+  const isFirstPage = startIndex === 0
 
   return (
     <div className={`bno-sheet${measuring ? ' is-measuring' : ''}`}>
@@ -27,6 +40,7 @@ export default function BilmenNoticeSheet({ month, buildingName, items, startInd
       <h1 className="bno-heading">
         {y}年{m}月度 {buildingName} メンテナンス・イベントのお知らせ
       </h1>
+      {isFirstPage && note && <p className="bno-note">{note}</p>}
 
       <div className="bno-list">
         {items.map((it, idx) => (

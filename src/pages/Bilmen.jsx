@@ -5,13 +5,15 @@ import TimeInput from '../components/TimeInput'
 import BilmenScheduleForm from '../components/BilmenScheduleForm'
 import BilmenGenerateForm from '../components/BilmenGenerateForm'
 import BilmenNotifyModal from '../components/BilmenNotifyModal'
-import { IconChevronLeft, IconChevronRight, IconSearch, IconDocument, IconMail } from '../components/Icons'
+import BilmenMonthlyNoteModal from '../components/BilmenMonthlyNoteModal'
+import { IconChevronLeft, IconChevronRight, IconSearch, IconDocument, IconMail, IconClipboard } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import useBilmenSchedulePdfExport from '../hooks/useBilmenSchedulePdfExport'
 import useBilmenNoticePdfExport from '../hooks/useBilmenNoticePdfExport'
 import {
   fetchBilmenSchedules,
   fetchBilmenMasters,
+  fetchBilmenMonthlyNote,
   updateBilmenSchedule,
   formatActual,
   formatMonthDay,
@@ -54,6 +56,8 @@ export default function Bilmen() {
   const [duplicateFrom, setDuplicateFrom] = useState(null) // 複製元（'new' として開く間だけ使う）
   const [generating, setGenerating] = useState(false)
   const [notifying, setNotifying] = useState(false)
+  const [monthlyNote, setMonthlyNote] = useState('')
+  const [editingNote, setEditingNote] = useState(false)
 
   const scheduleExport = useBilmenSchedulePdfExport()
   const noticeExport = useBilmenNoticePdfExport()
@@ -88,6 +92,14 @@ export default function Bilmen() {
       .then(setHolidays)
       .catch(() => setHolidays({}))
   }, [])
+
+  // 今月の注釈（5-4）。検索中は対象月が無いため取得しない
+  useEffect(() => {
+    if (searching) return
+    fetchBilmenMonthlyNote(month)
+      .then(setMonthlyNote)
+      .catch(() => setMonthlyNote(''))
+  }, [month, searching])
 
   const vendorOptions = useMemo(() => {
     const seen = new Set()
@@ -318,13 +330,24 @@ export default function Bilmen() {
               <button
                 type="button"
                 className="btn-plain"
-                onClick={() => noticeExport.download(month, schedules)}
+                onClick={() => noticeExport.download(month, schedules, monthlyNote)}
                 disabled={noticeExport.busy}
                 title="EV掲示・投函・メール添付用の連絡票PDFを出力"
               >
                 <IconDocument size={16} />
                 <span className="btn-plain-label">連絡票</span>
               </button>
+              {!searching && !readOnly && (
+                <button
+                  type="button"
+                  className={`btn-plain bilmen-note-btn${monthlyNote ? ' has-note' : ''}`}
+                  onClick={() => setEditingNote(true)}
+                  title="連絡票PDFの見出し直下に載る、月固有の但し書きを編集"
+                >
+                  <IconClipboard size={16} />
+                  <span className="btn-plain-label">今月の注釈</span>
+                </button>
+              )}
               {!readOnly && (
                 <button type="button" className="btn-plain" onClick={() => setNotifying(true)}>
                   <IconMail size={16} />
@@ -464,8 +487,19 @@ export default function Bilmen() {
         <BilmenNotifyModal
           month={month}
           schedules={schedules}
-          onDownloadNotice={(m, s) => noticeExport.download(m, s)}
+          onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote)}
           onClose={() => setNotifying(false)}
+        />
+      )}
+
+      {editingNote && (
+        <BilmenMonthlyNoteModal
+          month={month}
+          onClose={() => setEditingNote(false)}
+          onSaved={(note) => {
+            setMonthlyNote(note)
+            setEditingNote(false)
+          }}
         />
       )}
 
