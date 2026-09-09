@@ -40,3 +40,7 @@ dist-ssr
 
 # PWA: ビルド時に scripts/generate-sw.mjs が生成する
 /public/sw.js
+
+# Python: scripts/ 配下の移行スクリプト実行時に生成される
+__pycache__/
+*.pyc
