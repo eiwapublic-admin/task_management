@@ -72,6 +72,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 「今月の注釈」ボタン。注釈が入っている月は現行のピンクに相当する強調色にする
+   （2026-09-09。5-1）。入っていなければ他のボタンと同じ中立色のまま */
+.bilmen-note-btn.has-note {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
 .bilmen-main { display: block; }
 
 /* セルの中身を縦に積む入れ物。狭幅のカード表示（td を flex にする）でも

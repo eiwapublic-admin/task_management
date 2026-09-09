@@ -48,7 +48,7 @@ export default function useBilmenNoticePdfExport() {
     return pages
   }
 
-  async function download(month, schedules) {
+  async function download(month, schedules, note) {
     setBusy(true)
     setError('')
     document.body.classList.add('pdf-capture-mode')
@@ -60,8 +60,10 @@ export default function useBilmenNoticePdfExport() {
       }
       const outputDate = todayJST().replaceAll('-', '/')
 
-      // --- 1. 計測用シート（高さ無制限・全件）を描き、実際の高さを読む ---
-      setSheetData({ month, mode: 'measure', items, outputDate })
+      // --- 1. 計測用シート（高さ無制限・全件。今月の注釈があれば見出し直下に含める）を
+      //     描き、実際の高さを読む。注釈は1ページ目にしか出さないが、全ページに同じ
+      //     （注釈込みの）budgetPxを使う簡略化のため、ここで一緒に測っておく ---
+      setSheetData({ month, mode: 'measure', items, outputDate, note })
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       const measureRoot = sheetsRef.current
       const sheetEl = measureRoot?.querySelector('.bno-sheet')
@@ -85,7 +87,7 @@ export default function useBilmenNoticePdfExport() {
       const pages = packItemsIntoPages(items, spans, budgetPx)
 
       // --- 2. 実測に基づくページ割りで改めて描画し、1ページずつ撮る ---
-      setSheetData({ month, mode: 'print', pages, outputDate })
+      setSheetData({ month, mode: 'print', pages, outputDate, note })
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       if (!sheetsRef.current) throw new Error('シートの準備に失敗しました')
 
@@ -150,6 +152,7 @@ export default function useBilmenNoticePdfExport() {
                 startIndex={0}
                 outputDate={sheetData.outputDate}
                 isLastPage={false}
+                note={sheetData.note}
                 measuring
               />
               {/* 1ページに使える高さを実測するための目盛り（表示はしない。CSS参照） */}
@@ -169,6 +172,7 @@ export default function useBilmenNoticePdfExport() {
                 startIndex={page.startIndex}
                 outputDate={sheetData.outputDate}
                 isLastPage={i === sheetData.pages.length - 1}
+                note={sheetData.note}
               />
             ))
           )}

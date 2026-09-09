@@ -919,6 +919,16 @@ alter table bilmen_schedules enable row level security;
 revoke all on bilmen_masters   from anon, authenticated;
 revoke all on bilmen_schedules from anon, authenticated;
 
+-- 今月の注釈（月固有の但し書き。連絡票PDFの大見出し直下に表示する。2026-09-09〜）
+create table if not exists bilmen_monthly_notes (
+  target_month text primary key,                 -- 'YYYY-MM'
+  note         text,                             -- 掲示物・メール本文に差し込む月固有の但し書き
+  updated_by   text,
+  updated_at   timestamptz not null default now()
+);
+alter table bilmen_monthly_notes enable row level security;
+revoke all on bilmen_monthly_notes from anon, authenticated;
+
 -- ============================================================
 -- 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜。docs/waste-plan.md）
 -- ============================================================

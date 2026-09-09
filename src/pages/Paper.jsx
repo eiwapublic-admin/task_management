@@ -14,7 +14,7 @@ import {
   paperRowTotal,
   upsertPaperRecord,
 } from '../lib/paper'
-import { fetchHolidays, fetchClosedDays, todayJST, weekdayInfo } from '../lib/reports'
+import { fetchHolidays, todayJST, weekdayInfo } from '../lib/reports'
 import './Dashboard.css'
 import './Paper.css'
 
@@ -32,7 +32,6 @@ export default function Paper() {
   const [fiscalYear, setFiscalYear] = useState(currentFiscalYear())
   const [records, setRecords] = useState([])
   const [holidays, setHolidays] = useState({})
-  const [closedDays, setClosedDays] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -52,15 +51,12 @@ export default function Paper() {
     load()
   }, [load])
 
-  // 祝日・休館日は「その週が中止になりやすい日」の目印として出す（取得できなくても
-  // 一覧自体は表示する。自主検査表・日報一覧と同じ共通データ）
+  // 祝日は「その週が中止になりやすい日」の目印（日付を赤字にする）として使う。
+  // 取得できなくても一覧自体は表示する（自主検査表・日報一覧と同じ共通データ）
   useEffect(() => {
     fetchHolidays()
       .then(setHolidays)
       .catch(() => setHolidays({}))
-    fetchClosedDays()
-      .then((days) => setClosedDays(new Set(days || [])))
-      .catch(() => setClosedDays(new Set()))
   }, [])
 
   const byDate = useMemo(() => {
@@ -248,7 +244,6 @@ export default function Paper() {
               byDate={byDate}
               todayDate={todayDate}
               holidays={holidays}
-              closedDays={closedDays}
               readOnly={readOnly}
               onSave={handleSave}
               onDateChange={handleDateChange}
@@ -299,23 +294,32 @@ function PaperSummary({ fiscalYear, summary, months }) {
   )
 }
 
-function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly, onSave, onDateChange }) {
+function PaperTable({ months, byDate, todayDate, holidays, readOnly, onSave, onDateChange }) {
   return (
     // 表そのものを縦スクロールコンテナにして、その中で列見出しを固定する。
     // 横スクロール（overflow-x）を持つ要素はCSSの仕様で縦もスクロールコンテナになるため、
-    // 列見出しの固定はページ基準では効かない（.claude/skills/sticky-header-overflow-trap）
+    // 列見出しの固定はページ基準では効かない（.claude/skills/sticky-header-overflow-trap）。
+    // table-layout: fixed で列幅を各 th の指定値に固定し、入力内容やバッジの有無で
+    // 表の横幅が揺れる（＝固定した1列目ごと左右にぐらつく）のを防ぐ（2026-09-09）
     <div className="ui-table-wrap paper-table-wrap">
       <table className="ui-table paper-table">
         <thead>
           <tr>
-            <th>回収予定日</th>
-            <th className="paper-note-col">備考</th>
+            {/* 「中止」はこのセルの右端に載せる（明細行も同様。備考欄から独立させた。
+                2026-09-09。見出しはラベルあり、明細はチェックボックスのみ） */}
+            <th className="paper-th-date">
+              <div className="paper-th-date-row">
+                <span>回収予定日</span>
+                <span className="paper-th-skip">中止</span>
+              </div>
+            </th>
             {PAPER_CATEGORIES.map((c) => (
-              <th key={c.key} className="is-numeric">
+              <th key={c.key} className="is-numeric paper-th-weight">
                 {c.label}
               </th>
             ))}
-            <th className="is-numeric">合計</th>
+            <th className="is-numeric paper-th-total">合計</th>
+            <th className="paper-note-col">備考</th>
           </tr>
         </thead>
         <tbody>
@@ -326,7 +330,6 @@ function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly,
               byDate={byDate}
               todayDate={todayDate}
               holidays={holidays}
-              closedDays={closedDays}
               readOnly={readOnly}
               onSave={onSave}
               onDateChange={onDateChange}
@@ -338,18 +341,20 @@ function PaperTable({ months, byDate, todayDate, holidays, closedDays, readOnly,
   )
 }
 
-function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readOnly, onSave, onDateChange }) {
+function PaperMonthGroup({ group, byDate, todayDate, holidays, readOnly, onSave, onDateChange }) {
   const monthLabel = `${group.month.slice(0, 4)}年${Number(group.month.slice(5, 7))}月`
   return (
     <>
       {/* 1列目（回収予定日）は横スクロールしても追えるよう固定するため、月見出し行も
-          1列目だけは他の行と同じ幅の単独セルにしておく（colSpanでまとめない） */}
+          1列目だけは他の行と同じ幅の単独セルにしておく（colSpanでまとめない）。
+          備考は表の右端へ移したので、空セルも右端に付け直す */}
       <tr className="paper-month-row">
         <td className="ui-table-group-head">{monthLabel}</td>
-        <td colSpan={PAPER_CATEGORIES.length + 1} className="ui-table-group-head" />
+        <td colSpan={PAPER_CATEGORIES.length} className="ui-table-group-head" />
         <td className="ui-table-group-head is-numeric paper-month-total">
           {group.total > 0 ? formatKg(group.total) : ''}
         </td>
+        <td className="ui-table-group-head" />
       </tr>
       {group.dates.map((date) => (
         <PaperRow
@@ -358,7 +363,6 @@ function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readO
           record={byDate.get(date) || null}
           isToday={date === todayDate}
           holidays={holidays}
-          closedDays={closedDays}
           readOnly={readOnly}
           onSave={onSave}
           onDateChange={onDateChange}
@@ -368,52 +372,41 @@ function PaperMonthGroup({ group, byDate, todayDate, holidays, closedDays, readO
   )
 }
 
-function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSave, onDateChange }) {
+function PaperRow({ date, record, isToday, holidays, readOnly, onSave, onDateChange }) {
   const wd = weekdayInfo(date, holidays)
-  const isClosed = closedDays.has(date)
   const skipped = Boolean(record?.skipped)
   const total = paperRowTotal(record)
 
   return (
     <tr className={`paper-row${skipped ? ' is-skipped' : ''}${isToday ? ' is-today' : ''}`}>
-      {/* 年は月見出し行が示すので日付からは省く（「9/7（月）」）。固定列の幅を詰めて、
-          狭い画面で計量値の入力欄に幅を回すため。祝日名は表示せず、日付の文字色を
-          赤くするだけにする（モバイルでの横幅節約。土曜は青。weekdayInfo() の
-          className を td に付け、色は子へ継承させる）。日付そのものは透明化した
-          ネイティブの <input type="date"> で直接編集できる（祝日・休館日で日がずれた
-          週を、備考への自由記入ではなく実際の日付に直す。src/components/ReminderForm.jsx
-          と同じ技法）。見た目は他の入力欄と同じ枠付きにして、編集できることを示す */}
+      {/* 年は月見出し行が示すので日付からは省く（「9/7（月）」）。日付そのものは
+          透明化したネイティブの <input type="date"> で直接編集できる（祝日・休館日で
+          日がずれた週を、備考への自由記入ではなく実際の日付に直す。
+          src/components/ReminderForm.jsx と同じ技法）。見た目は他の入力欄と同じ
+          枠付きにして、編集できることを示す。右端の「中止」はラベル無しの
+          チェックボックスのみ（見出し側にラベルがあるため） */}
       <td className={`paper-date ${wd.className}`}>
-        <div className="paper-date-field">
-          <input
-            type="date"
-            className="paper-date-native"
-            value={date}
-            disabled={readOnly}
-            aria-label={`回収予定日 ${date}${wd.holidayName ? `（${wd.holidayName}）` : ''}`}
-            onChange={(e) => onDateChange(date, e.target.value)}
-          />
-          <div className="paper-date-display">
-            {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
-            {isClosed && <span className="paper-date-flag">休館日</span>}
-          </div>
-        </div>
-      </td>
-      <td className="paper-note-col">
-        <div className="paper-note-row">
-          <label className="paper-skip">
+        <div className="paper-date-row">
+          <div className="paper-date-field">
             <input
-              type="checkbox"
-              checked={skipped}
+              type="date"
+              className="paper-date-native"
+              value={date}
               disabled={readOnly}
-              onChange={(e) => onSave(date, { skipped: e.target.checked })}
+              aria-label={`回収予定日 ${date}${wd.holidayName ? `（${wd.holidayName}）` : ''}`}
+              onChange={(e) => onDateChange(date, e.target.value)}
             />
-            中止
-          </label>
-          <PaperNoteInput
-            value={record?.note || ''}
-            readOnly={readOnly}
-            onCommit={(note) => onSave(date, { note })}
+            <div className="paper-date-display">
+              {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            className="paper-skip-checkbox"
+            checked={skipped}
+            disabled={readOnly}
+            aria-label="中止"
+            onChange={(e) => onSave(date, { skipped: e.target.checked })}
           />
         </div>
       </td>
@@ -428,6 +421,9 @@ function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSav
         </td>
       ))}
       <td className="is-numeric paper-row-total">{skipped ? '—' : total > 0 ? formatKg(total) : ''}</td>
+      <td className="paper-note-col">
+        <PaperNoteInput value={record?.note || ''} readOnly={readOnly} onCommit={(note) => onSave(date, { note })} />
+      </td>
     </tr>
   )
 }

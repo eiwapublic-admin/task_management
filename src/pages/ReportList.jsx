@@ -215,10 +215,23 @@ export default function ReportList() {
     })
   }
 
+  // スクロールに加えて本日の詳細も開く（2026-09-09。依頼。それまではスクロールするだけで、
+  // 結局そこから本日の行をもう一度タップする必要があった）。既存の行クリックと同じ判定：
+  // 既に日報があればそれを開き、無ければ（作成できる立場かつ休館日でなければ）新規作成して開く。
+  // owner・休館日で未作成の場合は行クリックでも開けないため、ここでも何もしない
+  function goToToday() {
+    scrollToToday()
+    if (reportsByDate.get(today)) {
+      navigate(`/reports/${today}`)
+    } else if (!isOwner && !closedDays.has(today)) {
+      handleCreateAndOpen(today)
+    }
+  }
+
   function handleGoToToday() {
     const todayMonth = currentMonthJST()
     if (month === todayMonth) {
-      scrollToToday()
+      goToToday()
     } else {
       scrollToTodayRef.current = true
       setMonth(todayMonth)
@@ -228,8 +241,13 @@ export default function ReportList() {
   useEffect(() => {
     if (!loading && scrollToTodayRef.current) {
       scrollToTodayRef.current = false
-      scrollToToday()
+      goToToday()
     }
+    // goToToday はレンダーのたびに作り直される素の関数（handleCreateAndOpen 等、
+    // 他の素の関数を呼ぶだけの通常のイベントハンドラと同じ扱いでよく、useCallback化は
+    // 過剰）。実行自体は scrollToTodayRef のガードで守られており、月切替後の
+    // 初回発火だけを狙っているため、依存配列には loading だけで十分
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
   // 土曜=青、日曜・祝日=赤の色分けに使う。取れなくても一覧自体は表示できるようにする

@@ -555,6 +555,67 @@ export async function handleBilmenScheduleDelete(req) {
   }
 }
 
+// ============================================================
+// 今月の注釈（2026-09-09〜。5-4）
+// ============================================================
+
+// GET /api/bilmen/notes?month=YYYY-MM — 対象月の注釈（未登録なら note: ''）
+export async function handleBilmenMonthlyNoteGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const month = new URL(req.url).searchParams.get('month') || ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: '対象年月は YYYY-MM 形式で指定してください' }, 400)
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('bilmen_monthly_notes')
+      .select('note')
+      .eq('target_month', month)
+      .maybeSingle()
+    if (err) {
+      console.error('bilmen-monthly-note-get:', err.message)
+      return json({ error: '今月の注釈の取得に失敗しました' }, 500)
+    }
+    return json({ note: data?.note || '' })
+  } catch (err) {
+    console.error('bilmen-monthly-note-get 失敗:', err)
+    return json({ error: '今月の注釈の取得に失敗しました' }, 500)
+  }
+}
+
+// PUT /api/bilmen/notes — 対象月の注釈を保存する。空文字なら行ごと削除し、未登録（＝中立色）に戻す
+export async function handleBilmenMonthlyNoteUpdate(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const month = typeof payload?.target_month === 'string' ? payload.target_month : ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: '対象年月は YYYY-MM 形式で指定してください' }, 400)
+    const note = trimOrNull(payload?.note, 2000)
+
+    const supabase = getAdminClient()
+    if (!note) {
+      const { error: err } = await supabase.from('bilmen_monthly_notes').delete().eq('target_month', month)
+      if (err) {
+        console.error('bilmen-monthly-note-delete:', err.message)
+        return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+      }
+      return json({ note: '' })
+    }
+    const { error: err } = await supabase
+      .from('bilmen_monthly_notes')
+      .upsert({ target_month: month, note, updated_by: auth?.display_name || auth?.username || null })
+    if (err) {
+      console.error('bilmen-monthly-note-update:', err.message)
+      return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+    }
+    return json({ note })
+  } catch (err) {
+    console.error('bilmen-monthly-note-update 失敗:', err)
+    return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+  }
+}
+
 // GET /api/bilmen/schedules/generate?month=YYYY-MM
 // 自動作成モーダルを開いたときの候補一覧。対象月を months に含む有効なマスタを返し、
 // 既に同じ月・同じマスタの予定があるものには created:true を立てる（二重作成の防止。5-3）

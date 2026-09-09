@@ -75,6 +75,22 @@ export async function generateBilmenSchedules(month, masterIds) {
   })
 }
 
+// ---- 今月の注釈（5-4。月固有の但し書き。連絡票PDFの大見出し直下に表示する） ----
+
+export async function fetchBilmenMonthlyNote(month) {
+  const data = await authFetch(`/api/bilmen/notes?month=${encodeURIComponent(month)}`)
+  return data.note || ''
+}
+
+// 空文字を渡すと未登録（中立色）に戻る
+export async function saveBilmenMonthlyNote(month, note) {
+  const data = await authFetch('/api/bilmen/notes', {
+    method: 'PUT',
+    body: JSON.stringify({ target_month: month, note }),
+  })
+  return data.note || ''
+}
+
 // ---- メール設定（文面・宛先） ----
 // 画面（/bilmen/mail）自体を owner・備品出庫限定ロールには出さない（AppHeader・App.jsx側）が、
 // API 側でも同じ判定で塞いである（worker/lib/bilmen.js の requireMailAccess）。
