@@ -120,14 +120,3 @@
 .waste-legend { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .waste-legend-high { color: var(--color-warn-ink); font-weight: 700; }
 .waste-legend-extreme { color: var(--color-danger); font-weight: 700; }
-
-/* スキャン取込モーダル */
-.waste-scan-preview {
-  display: block;
-  max-width: 100%;
-  max-height: 40vh;
-  margin: var(--space-2) 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  object-fit: contain;
-}

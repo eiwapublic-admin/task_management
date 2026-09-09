@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import InspectionSheet from '../components/InspectionSheet'
 import AttachmentPreview from '../components/AttachmentPreview'
+import PdfPreviewActions from '../components/PdfPreviewActions'
 import PdfBusyOverlay from '../components/PdfBusyOverlay'
 import {
   fetchInspections,
@@ -109,31 +110,6 @@ export default function useInspectionPdfExport(month, building) {
     }
   }
 
-  // プレビュー内の「共有 / 保存」。ユーザーが明示的にタップしたときだけ実行する
-  // （自動で共有シートを出すと2026-08-07に報告されたPDF閉じた後の白画面と紛らわしいため）。
-  // Web Share APIが使える環境（主にiOS）ではファイル共有シートを、それ以外
-  // （デスクトップ等）では通常のダウンロードとして保存する。
-  async function sharePdf({ blob, filename }) {
-    const file = new File([blob], filename, { type: 'application/pdf' })
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: filename })
-        return
-      } catch (shareErr) {
-        if (shareErr?.name === 'AbortError') return
-        // それ以外の失敗時は下の通常ダウンロードにフォールバックする
-      }
-    }
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
   // PDF用の紙様式シート。通常は何も無く、ダウンロード実行中だけ画面外に描画される。
   // 親のレイアウト（flex/overflow）の影響を受けないよう body 直下に出す。
   const sheetsPortal = sheetsData
@@ -162,11 +138,7 @@ export default function useInspectionPdfExport(month, building) {
       attachment={{ filename: preview.filename, mimeType: 'application/pdf' }}
       url={preview.url}
       onClose={() => setPreview(null)}
-      headerAction={
-        <button type="button" className="attachment-preview-share" onClick={() => sharePdf(preview)}>
-          共有 / 保存
-        </button>
-      }
+      headerAction={<PdfPreviewActions blob={preview.blob} filename={preview.filename} />}
     />
   ) : null
 

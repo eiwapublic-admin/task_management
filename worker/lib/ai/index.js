@@ -38,10 +38,5 @@ export function recognizeVehicle(imageBase64, mediaType, provider = null) {
   return implOf(provider).recognizeVehicle(imageBase64, mediaType)
 }
 
-// 廃棄物実測集計表の写真から日ごと・階ごとの実測値を読み取る。戻り値 { days, usage }
-export function recognizeWasteSheet(imageBase64, mediaType, options, provider = null) {
-  return implOf(provider).recognizeWasteSheet(imageBase64, mediaType, options)
-}
-
 // 提供元まわりのユーティリティ（利用量の記録・画面表示で使う）
 export { resolveProvider, defaultModelOf, estimateCostUSD }

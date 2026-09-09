@@ -950,8 +950,8 @@ create table if not exists waste_records (
   record_date  date not null,
   floor        text not null,             -- '1'〜'7'
   weight_kg    numeric(6,2) not null,
-  source       text not null default 'manual' check (source in ('manual', 'ocr')),
-  is_confirmed boolean not null default true,  -- OCR取込直後だけ false。手入力は常に true
+  source       text not null default 'manual' check (source in ('manual', 'excel')),
+  is_confirmed boolean not null default true,  -- Excel取込直後だけ false。手入力は常に true
   scan_id      uuid references waste_scans(id) on delete set null,
   note         text,
   created_at   timestamptz not null default now(),

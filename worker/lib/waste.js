@@ -3,9 +3,6 @@
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
-import { putObject, getObject } from './storage.js'
-import { recognizeWasteSheet, resolveProvider, estimateCostUSD } from './ai/index.js'
-import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 
 export const WASTE_FLOORS = ['1', '2', '3', '4', '5', '6', '7']
 
@@ -21,8 +18,8 @@ function shiftMonth(month, delta) {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
 }
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-const VALID_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+// Excel取込1回あたりの上限行数（31日×7階=217で足りるが、安全弁として余裕を持たせる）
+const MAX_IMPORT_ROWS = 400
 
 async function requireAuth(req, { write = false } = {}) {
   const auth = await verifyRequestAuth(req)
@@ -163,169 +160,40 @@ export async function handleWasteRecordConfirmMonth(req) {
   }
 }
 
-function extFromMime(mime) {
-  if (mime === 'image/png') return 'png'
-  if (mime === 'image/webp') return 'webp'
-  return 'jpg'
-}
-
-// POST /api/waste/scans — 記入済みシートの写真をアップロードする（multipart/form-data）
-export async function handleWasteScanUpload(req) {
-  const { error } = await requireAuth(req, { write: true })
-  if (error) return error
-  try {
-    const form = await req.formData().catch(() => null)
-    if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
-
-    const targetMonth = String(form.get('target_month') || '')
-    const file = form.get('file')
-    if (!MONTH_PATTERN.test(targetMonth)) return json({ error: 'target_month の形式が不正です' }, 400)
-    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
-    if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'ファイルが大きすぎます（10MBまで）' }, 413)
-    if (!VALID_MIME.has(file.type)) return json({ error: '対応していない形式です（JPEG/PNG/WebP）' }, 415)
-
-    const key = `waste-scans/${targetMonth}/${crypto.randomUUID()}.${extFromMime(file.type)}`
-    await putObject(key, await file.arrayBuffer(), file.type)
-
-    const supabase = getAdminClient()
-    const { data, error: err } = await supabase
-      .from('waste_scans')
-      .insert({ target_month: targetMonth, storage_key: key, mime: file.type })
-      .select('id, target_month, storage_key, status, created_at')
-      .single()
-    if (err) {
-      console.error('waste-scan-upload:', err.message)
-      return json({ error: '画像の保存に失敗しました' }, 500)
-    }
-    return json({ scan: data })
-  } catch (err) {
-    console.error('waste-scan-upload 失敗:', err)
-    return json({ error: '画像の保存に失敗しました' }, 500)
-  }
-}
-
-// POST /api/waste/scans/recognize — アップロード済みの画像をClaude Visionで読み取り、
-// 日×階の実測値を is_confirmed=false の下書きとして waste_records へ反映する。
-// 既に値がある（他の取込・手入力済みの）マスは、OCRがそのマスをnullで返した場合は
-// 上書きしない（読み取れなかった＝既存値を消す理由にはならないため）。
-export async function handleWasteScanRecognize(req) {
+// POST /api/waste/records/import — Excel取込（2026-09-09〜。docs/waste-plan.md 5-2改訂）。
+// 手書きシートの写真をClaude Visionで読み取る方式は実際の筆跡で読み取り失敗が続いたため、
+// 依頼元がAIチャット等でExcel化した実測値をブラウザ側（src/lib/wasteExcelImport.js）で
+// 読み取り、日×階の行データに変換した結果をここへまとめて送ってもらう方式に変更した。
+// OCR取込と同じく is_confirmed=false の下書きとして保存し、Waste.jsx の編集グリッドで
+// 人が確認・訂正してから確定する（画面自体は変えていない。取込元だけが変わった）。
+export async function handleWasteRecordImport(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
   try {
     const payload = await req.json().catch(() => null)
-    const scanId = payload?.scan_id
-    if (typeof scanId !== 'string' || !scanId) return json({ error: 'scan_id は必須です' }, 400)
+    const rawRows = payload?.rows
+    if (!Array.isArray(rawRows) || rawRows.length === 0) return json({ error: 'rows は必須です' }, 400)
+    if (rawRows.length > MAX_IMPORT_ROWS) return json({ error: '行数が多すぎます' }, 400)
+
+    const rows = []
+    for (const raw of rawRows) {
+      const { row, error: buildErr } = validateRecordPayload(raw)
+      if (buildErr) return json({ error: buildErr }, 400)
+      rows.push({ ...row, source: 'excel', is_confirmed: false })
+    }
 
     const supabase = getAdminClient()
-    const { data: scan } = await supabase
-      .from('waste_scans')
-      .select('id, target_month, storage_key, mime')
-      .eq('id', scanId)
-      .maybeSingle()
-    if (!scan) return json({ error: '取込画像が見つかりません' }, 404)
-
-    // サーキットブレーカー（2026-09-04）。本日のAI利用が上限に達していたら読み取らない。
-    // **Claudeを呼ぶ前に判定すること**（呼んだ後では課金が発生してしまう）。
-    const { data: aiSettings } = await supabase
-      .from('settings')
-      .select('key, value')
-      .in('key', ['daily_api_cost_limit_usd', 'ai_provider'])
-    const settingOf = (key) => (aiSettings || []).find((r) => r.key === key)?.value
-    const aiProvider = resolveProvider(settingOf('ai_provider'))
-    const limitState = await checkDailyLimit(supabase, settingOf('daily_api_cost_limit_usd'))
-    if (limitState.exceeded) {
-      await setLimitAlert(supabase, limitState.message)
-      return json({ error: limitState.message }, 429)
+    const { data, error: err } = await supabase
+      .from('waste_records')
+      .upsert(rows, { onConflict: 'record_date,floor' })
+      .select(RECORD_COLUMNS)
+    if (err) {
+      console.error('waste-record-import:', err.message)
+      return json({ error: '実測値の取り込みに失敗しました' }, 500)
     }
-
-    const res = await getObject(scan.storage_key)
-    if (!res.ok) return json({ error: '画像の取得に失敗しました' }, 500)
-    const buf = await res.arrayBuffer()
-    const base64 = Buffer.from(buf).toString('base64')
-
-    const { days, usage } = await recognizeWasteSheet(
-      base64,
-      scan.mime || 'image/jpeg',
-      { month: scan.target_month, floors: WASTE_FLOORS },
-      aiProvider
-    )
-
-    await addTodayUsage(supabase, {
-      input: usage.input_tokens,
-      output: usage.output_tokens,
-      calls: 1,
-      provider: aiProvider,
-    })
-
-    const month = new Date().toISOString().slice(0, 7)
-    const { error: usageErr } = await supabase.rpc('add_api_usage', {
-      p_month: month,
-      p_input: usage.input_tokens,
-      p_output: usage.output_tokens,
-      p_calls: 1,
-      p_fax_calls: 0,
-      p_fax_input: 0,
-      p_fax_output: 0,
-      p_parking_calls: 0,
-      p_waste_calls: 1,
-      p_cost: estimateCostUSD(aiProvider, usage.input_tokens, usage.output_tokens),
-    })
-    // 記録に失敗すると、実際には課金されているのに従量課金事項の画面に出ない状態になる。
-    // console.error だけでは画面から気づけないため、処理ログにも残す（2026-09-04）。
-    if (usageErr) {
-      console.error('waste-recognize(usage):', usageErr.message)
-      await supabase.from('activity_logs').insert({
-        log_type: 'error',
-        actor: 'システム（自動）',
-        message: `廃棄物スキャンのAI読み取りの利用量記録に失敗しました（${usageErr.message}）。実際のAPI利用は発生しているため、従量課金事項の表示が実額より少なくなります。`,
-      })
-    }
-
-    // 読み取れたマスだけを upsert 候補にする（null は既存値を消さないよう対象外）
-    const rows = []
-    for (const [day, byFloor] of Object.entries(days || {})) {
-      const dayNum = Number(day)
-      if (!Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) continue
-      const recordDate = `${scan.target_month}-${String(dayNum).padStart(2, '0')}`
-      if (!byFloor || typeof byFloor !== 'object') continue
-      for (const floor of WASTE_FLOORS) {
-        const raw = byFloor[floor]
-        if (raw === null || raw === undefined) continue
-        const weight = Number(raw)
-        if (!Number.isFinite(weight) || weight < 0 || weight > 999.99) continue
-        rows.push({
-          record_date: recordDate,
-          floor,
-          weight_kg: Math.round(weight * 100) / 100,
-          source: 'ocr',
-          is_confirmed: false,
-          scan_id: scan.id,
-        })
-      }
-    }
-
-    let saved = []
-    if (rows.length > 0) {
-      const { data, error: upsertErr } = await supabase
-        .from('waste_records')
-        .upsert(rows, { onConflict: 'record_date,floor' })
-        .select(RECORD_COLUMNS)
-      if (upsertErr) {
-        console.error('waste-recognize(upsert):', upsertErr.message)
-        return json({ error: '読み取り結果の保存に失敗しました' }, 500)
-      }
-      saved = data || []
-    }
-
-    await supabase
-      .from('waste_scans')
-      .update({ raw_result: days, status: 'pending' })
-      .eq('id', scan.id)
-
-    return json({ records: saved, read_count: rows.length })
+    return json({ records: data || [], imported: data?.length || 0 })
   } catch (err) {
-    console.error('waste-scan-recognize 失敗:', err)
-    const message = err.isBillingError ? 'APIクレジット残高が不足しています' : '画像の解析に失敗しました'
-    return json({ error: message }, err.isBillingError ? 402 : 500)
+    console.error('waste-record-import 失敗:', err)
+    return json({ error: '実測値の取り込みに失敗しました' }, 500)
   }
 }
