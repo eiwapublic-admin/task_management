@@ -39,7 +39,7 @@ const FEATURE_TITLES = [
   { path: '/contacts', title: '連絡帳' },
   { path: '/reminders', title: 'リマインダー' },
   { path: '/bilmen/masters', title: '作業マスタ', exact: true },
-  { path: '/bilmen', title: 'ビルメン' },
+  { path: '/bilmen', title: 'ビルメンテナンス管理' },
   { path: '/reports/inspections', title: '自主検査表' },
   { path: '/reports/parking', title: '違反車両' },
   { path: '/reports/chlorine', title: '残留塩素等検査' },

@@ -3,6 +3,18 @@
 
 /* ---- 一覧（/bilmen・/bilmen/masters 共通） ---- */
 
+/* 「日程表」「連絡票」「テナントへの報知」は1つの作業（連絡票PDFを出力してテナントへ
+   報知する）としてまとめて行うため、機能ヘッダのボタン列の中で枠で囲んで示す（2026-09-09） */
+.bilmen-action-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
 .bilmen-row.is-canceled td { opacity: 0.6; }
 .bilmen-row.is-disabled td { color: var(--text-muted); }
 

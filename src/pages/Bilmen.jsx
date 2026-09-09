@@ -317,26 +317,6 @@ export default function Bilmen() {
           }
           actions={
             <>
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => scheduleExport.download(month, schedules, holidays)}
-                disabled={scheduleExport.busy}
-                title="1階掲示用の日程表PDFを出力"
-              >
-                <IconDocument size={16} />
-                <span className="btn-plain-label">日程表</span>
-              </button>
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => noticeExport.download(month, schedules, monthlyNote)}
-                disabled={noticeExport.busy}
-                title="EV掲示・投函・メール添付用の連絡票PDFを出力"
-              >
-                <IconDocument size={16} />
-                <span className="btn-plain-label">連絡票</span>
-              </button>
               {!searching && !readOnly && (
                 <button
                   type="button"
@@ -348,12 +328,36 @@ export default function Bilmen() {
                   <span className="btn-plain-label">今月の注釈</span>
                 </button>
               )}
-              {!readOnly && (
-                <button type="button" className="btn-plain" onClick={() => setNotifying(true)}>
-                  <IconMail size={16} />
-                  <span className="btn-plain-label">テナントへ報知</span>
+              {/* 日程表・連絡票・テナントへの報知は1つの作業（連絡票を出力してテナントへ
+                  報知する）としてまとめて行うため、枠で囲んで1つのまとまりだと分かるようにする */}
+              <div className="bilmen-action-group">
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => scheduleExport.download(month, schedules, holidays)}
+                  disabled={scheduleExport.busy}
+                  title="1階掲示用の日程表PDFを出力"
+                >
+                  <IconDocument size={16} />
+                  <span className="btn-plain-label">日程表</span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => noticeExport.download(month, schedules, monthlyNote)}
+                  disabled={noticeExport.busy}
+                  title="EV掲示・投函・メール添付用の連絡票PDFを出力"
+                >
+                  <IconDocument size={16} />
+                  <span className="btn-plain-label">連絡票</span>
+                </button>
+                {!readOnly && (
+                  <button type="button" className="btn-plain" onClick={() => setNotifying(true)}>
+                    <IconMail size={16} />
+                    <span className="btn-plain-label">テナントへの報知</span>
+                  </button>
+                )}
+              </div>
               {!readOnly && (
                 <button type="button" className="btn-primary" onClick={() => setGenerating(true)}>
                   予定の自動作成
