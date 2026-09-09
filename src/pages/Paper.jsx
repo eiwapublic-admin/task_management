@@ -377,9 +377,12 @@ function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSav
   return (
     <tr className={`paper-row${skipped ? ' is-skipped' : ''}${isToday ? ' is-today' : ''}`}>
       {/* 年は月見出し行が示すので日付からは省く（「9/7（月）」）。固定列の幅を詰めて、
-          狭い画面で計量値の入力欄に幅を回すため。日付そのものは透明化したネイティブの
-          <input type="date"> で直接編集できる（祝日・休館日で日がずれた週を、備考への
-          自由記入ではなく実際の日付に直す。src/components/ReminderForm.jsx と同じ技法） */}
+          狭い画面で計量値の入力欄に幅を回すため。祝日名は表示せず、日付の文字色を
+          赤くするだけにする（モバイルでの横幅節約。土曜は青。weekdayInfo() の
+          className を td に付け、色は子へ継承させる）。日付そのものは透明化した
+          ネイティブの <input type="date"> で直接編集できる（祝日・休館日で日がずれた
+          週を、備考への自由記入ではなく実際の日付に直す。src/components/ReminderForm.jsx
+          と同じ技法）。見た目は他の入力欄と同じ枠付きにして、編集できることを示す */}
       <td className={`paper-date ${wd.className}`}>
         <div className="paper-date-field">
           <input
@@ -387,13 +390,12 @@ function PaperRow({ date, record, isToday, holidays, closedDays, readOnly, onSav
             className="paper-date-native"
             value={date}
             disabled={readOnly}
-            aria-label={`回収予定日 ${date}`}
+            aria-label={`回収予定日 ${date}${wd.holidayName ? `（${wd.holidayName}）` : ''}`}
             onChange={(e) => onDateChange(date, e.target.value)}
           />
           <div className="paper-date-display">
             {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}（{wd.label}）
-            {wd.holidayName && <span className="paper-date-flag">{wd.holidayName}</span>}
-            {!wd.holidayName && isClosed && <span className="paper-date-flag">休館日</span>}
+            {isClosed && <span className="paper-date-flag">休館日</span>}
           </div>
         </div>
       </td>

@@ -27,7 +27,7 @@
   align-items: center;
   margin-bottom: var(--space-5);
   padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
@@ -161,7 +161,30 @@
 
 .paper-date-native:disabled { cursor: default; }
 
-.paper-date-display { pointer-events: none; }
+/* 見た目を他の入力欄（.paper-note-input 等）と揃えた枠付きにして、日付欄も
+   編集できることが一目で分かるようにする（2026-09-09。依頼） */
+.paper-date-display {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-h-sm, 32px);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  pointer-events: none;
+}
+
+.paper-date-native:disabled + .paper-date-display {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+/* 祝日・休館日の色分け。祝日名の文字は表示せず（モバイルでの横幅節約）、
+   日付そのものの文字色を赤くする（日曜も同様）。土曜は青。td に付いた
+   weekdayInfo() の className（is-holiday / is-saturday）を子へ継承させる */
+.paper-table td.paper-date.is-holiday { color: var(--color-danger); }
+.paper-table td.paper-date.is-saturday { color: var(--color-primary-hover); }
 
 /* 1列目（回収予定日）を左端に固定する（frozen column。Waste.css の月別一覧と同じ考え方）。
    区分が4つ＋備考＋合計で列数が多く、モバイルでは横スクロールが前提になるため、
@@ -184,8 +207,8 @@
    固定列は自前で不透明に塗らないと下の行が透ける */
 .paper-table .paper-row.is-today td:nth-child(1) { background: var(--color-brand-softer); }
 
-/* 祝日・休館日の目印（その週は中止になりやすい）。日付の色分けは
-   weekdayInfo() の className（is-holiday / is-saturday）に任せる */
+/* 休館日の目印（その週は中止になりやすい）。祝日は上の .is-holiday による
+   日付の赤字だけで示し、名称は表示しない（モバイルでの横幅節約） */
 .paper-date-flag {
   margin-left: var(--space-2);
   padding: 0 var(--space-2);
@@ -219,7 +242,7 @@
   min-width: 0;
   height: var(--control-h-sm, 32px);
   padding: 0 var(--space-2);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   font-family: inherit;
@@ -233,7 +256,7 @@
   width: 5.5em;
   height: var(--control-h-sm, 32px);
   padding: 0 var(--space-2);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   font-family: inherit;
