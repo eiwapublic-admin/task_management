@@ -21,9 +21,22 @@ export default function AttachmentPreview({ attachment, url, onClose, headerActi
   const overlayRef = useRef(null)
   const dragRef = useRef(null)
   const pinchRef = useRef(null)
+  const iframeRef = useRef(null)
 
   const [scale, setScale] = useState(1)
   const [pos, setPos] = useState({ x: 0, y: 0 })
+  // iOS/iPadOSのホーム画面アプリ（standalone）ではwindow.print()が無反応になる
+  // （プロジェクトスキル print-and-pdf-download Gotcha 1）。回避策が無いため検出して隠す
+  const [printSupported, setPrintSupported] = useState(true)
+
+  useEffect(() => {
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    const isStandalone =
+      navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches
+    setPrintSupported(!(isIOS && isStandalone))
+  }, [])
 
   // 表示対象が変わったらズーム・位置をリセットする
   useEffect(() => {
@@ -112,6 +125,15 @@ export default function AttachmentPreview({ attachment, url, onClose, headerActi
     if (e.touches.length < 2) pinchRef.current = null
   }
 
+  // iframeに表示中のPDFを、そのiframe自身のcontentWindowでprint()する
+  // （window.print()だと親ページ〈このモーダルのDOM〉を印刷しようとしてしまうため）
+  function handlePrint() {
+    const win = iframeRef.current?.contentWindow
+    if (!win) return
+    win.focus()
+    win.print()
+  }
+
   return (
     <div className="attachment-preview-overlay" ref={overlayRef} onClick={handleOverlayClick}>
       <div
@@ -140,6 +162,11 @@ export default function AttachmentPreview({ attachment, url, onClose, headerActi
             </div>
           )}
           {headerAction}
+          {isPdf && printSupported && (
+            <button type="button" className="attachment-preview-print" onClick={handlePrint}>
+              プリント
+            </button>
+          )}
           <button
             className="attachment-preview-close"
             onClick={(e) => {
@@ -172,7 +199,9 @@ export default function AttachmentPreview({ attachment, url, onClose, headerActi
               onTouchEnd={handleTouchEnd}
             />
           )}
-          {isPdf && <iframe src={url} title={attachment.filename} className="attachment-preview-pdf" />}
+          {isPdf && (
+            <iframe ref={iframeRef} src={url} title={attachment.filename} className="attachment-preview-pdf" />
+          )}
           {!isImage && !isPdf && (
             <p className="attachment-preview-unsupported">このファイル形式はプレビューに対応していません。</p>
           )}
