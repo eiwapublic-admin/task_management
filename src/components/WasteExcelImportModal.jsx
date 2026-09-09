@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { IconChevronLeft, IconChevronRight } from './Icons'
+import PdfBusyOverlay from './PdfBusyOverlay'
 import { parseWasteExcelFile } from '../lib/wasteExcelImport'
 import { importWasteRecords } from '../lib/waste'
 import { shiftMonth } from '../lib/reports'
@@ -98,15 +99,11 @@ export default function WasteExcelImportModal({ defaultMonth, onClose, onDone })
               accept=".xlsx"
               className="ui-input"
               disabled={busy}
-              onChange={(e) => {
-                handlePick(e.target.files)
-                e.target.value = ''
-              }}
+              onChange={(e) => handlePick(e.target.files)}
             />
           </label>
           <p className="ui-note">
             「日・曜日・1〜7階・合計」の列を持つ、添付の記入用シートと同じ形式のExcelファイルを選んでください。
-            {file && `（選択中: ${file.name}）`}
           </p>
 
           {error && (
@@ -127,6 +124,7 @@ export default function WasteExcelImportModal({ defaultMonth, onClose, onDone })
           </div>
         </div>
       </div>
+      <PdfBusyOverlay show={busy} label={busyLabel || '処理しています…'} />
     </div>
   )
 }

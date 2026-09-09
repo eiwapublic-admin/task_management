@@ -91,6 +91,13 @@
   font: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--text-strong);
+  /* 数値は直接タイプするマスのため、ブラウザ既定の上下スピンボタンは不要（2026-09-09） */
+  -moz-appearance: textfield;
+}
+.waste-cell-input::-webkit-inner-spin-button,
+.waste-cell-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .waste-cell-input:hover:not(:disabled) { border-color: var(--border-strong); }
 .waste-cell-input:focus {
@@ -105,7 +112,7 @@
 .waste-cell-input.is-high { background: var(--color-warn-surface); color: var(--color-warn-ink); font-weight: 700; }
 .waste-cell-input.is-extreme { background: var(--color-danger-surface); color: var(--color-danger); font-weight: 700; }
 
-/* スキャン取込直後・未確認のマス（3-2）。点線の枠で「まだ人が見ていない」ことを示す */
+/* Excel取込直後・未確認のマス（3-2）。点線の枠で「まだ人が見ていない」ことを示す */
 .waste-cell-input.is-unconfirmed { border-style: dashed; border-color: var(--color-primary); }
 
 .waste-row-total,

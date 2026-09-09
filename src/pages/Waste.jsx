@@ -311,7 +311,7 @@ function WasteCell({ record, recordDate, floor, readOnly, onSave, onClear }) {
       value={draft}
       disabled={readOnly}
       placeholder="—"
-      title={unconfirmed ? '未確認（スキャン取込。内容を確認してください）' : undefined}
+      title={unconfirmed ? '未確認（Excel取込。内容を確認してください）' : undefined}
       onFocus={() => setEditing(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
