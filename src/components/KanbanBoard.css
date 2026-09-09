@@ -936,7 +936,8 @@ select.task-detail-input.is-unassigned {
 /* PDFプレビューの「ダウンロード」「共有」（2026-09-09に分離。src/components/
    PdfPreviewActions.jsx）。自動で共有シートを出す代わりにユーザーが明示的に
    タップしたときだけ実行するための操作（元は2026-08-07に1つのボタンとして追加）。
-   ダウンロードは常に見える主操作、共有は対応環境でだけ出る副操作にする */
+   ダウンロードは常に見える主操作、共有は対応環境でだけ出る副操作にする。
+   「プリント」（2026-09-09追加。AttachmentPreview.jsx）も同じ見た目を共有する */
 .attachment-preview-actions {
   display: flex;
   align-items: center;
@@ -945,7 +946,8 @@ select.task-detail-input.is-unassigned {
 }
 
 .attachment-preview-download,
-.attachment-preview-share {
+.attachment-preview-share,
+.attachment-preview-print {
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-strong);

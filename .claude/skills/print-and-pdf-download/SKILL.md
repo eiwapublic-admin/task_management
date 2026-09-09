@@ -61,6 +61,27 @@ const printSupported = !(isIOS && isStandalone);
 Run this in a `useEffect` (it needs `navigator`/`window`, so it can't run at render time on the
 server) and conditionally render the print button on `printSupported`.
 
+**2026-09-09 applied — printing an already-open in-app PDF preview.** This app's PDF preview
+modal (`src/components/AttachmentPreview.jsx`, used by every `use*PdfExport.jsx` hook, task
+attachments, document templates, etc. — see Gotcha 8's real-fix section for how that modal itself
+is built) already renders the PDF via a same-origin `<iframe>`. Adding a print button there means
+calling `print()` on the **iframe's own `contentWindow`**, not on `window` — `window.print()` from
+the modal's own scope would try to print the surrounding app chrome (filename bar, buttons)
+instead of the framed PDF:
+```ts
+const iframeRef = useRef<HTMLIFrameElement>(null);
+function handlePrint() {
+  const win = iframeRef.current?.contentWindow;
+  if (!win) return;
+  win.focus();
+  win.print();
+}
+```
+The `printSupported` detection above still applies unchanged — it gates the *button's visibility*,
+not which window object `print()` is called on. Because the button lives in the shared preview
+component, every PDF preview in the app got it in one change, the same one-place-not-seven
+consequence as Gotcha 8's `PdfPreviewActions.jsx` share/download split.
+
 ### Gotcha 2 — "hide everything else, show the sheet, `window.print()`" produces a blank 2nd page
 
 The common pattern for printing "just this one thing" out of a larger app page is: portal a
