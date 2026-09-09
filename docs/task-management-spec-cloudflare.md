@@ -665,7 +665,8 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
   必ず2ページ構成にしている（`halfMonthRanges()`、`src/lib/reports.js`）。
   - **作り方**: A4縦ちょうど（210×297mm）で組んだ専用シート `src/components/InspectionSheet.jsx` / `InspectionSheet.css` を
     普段は `display:none` にしておき、PDF作成中だけ `body.pdf-capture-mode` で画面外（`left:-10000px`）に描画して
-    `html2canvas` で1枚ずつ撮り、`jsPDF` の `addImage` で1枚＝1ページとして並べる（`Inspections.jsx` の `handleDownloadPdf`）。
+    `html2canvas` で1枚ずつ撮り、`jsPDF` の `addImage` で1枚＝1ページとして並べる（`src/hooks/useInspectionPdfExport.jsx` の `download()`。
+    2026-08-07にこの生成処理を `Inspections.jsx` から切り出して他画面〈日報一覧〉からも使えるフックにした。下記参照）。
     ページ割りを紙の様式に合わせて先に決めているのでシートは必ず1ページに収まり、**キャンバスの分割は不要**。
     画面の表（日付を縦に並べた一覧）は従来のまま残し、PDFだけ紙の体裁にしている
   - **印刷ボタンは設けない**: 日報アプリはiPhoneのホーム画面アプリ（PWA・`display-mode: standalone`）として使うが、
@@ -692,11 +693,18 @@ FileMaker で運用していた日報アプリ `koizumi-report` を統合した�
     `GET /api/report/inspection-pdf-preview?token=…` へその実URLを`<iframe>`で直接ナビゲーションさせ、
     `Content-Disposition: inline` ＋そのレスポンスだけ `X-Frame-Options: SAMEORIGIN`/
     CSP `frame-ancestors 'self'` を緩めて自オリジンのプレビューiframeに埋め込めるようにする。
-    共有シートは自動起動せず、モーダルの「共有 / 保存」ボタンを明示的に押したときだけ
-    `navigator.canShare`で機能検出し、対応環境は`navigator.share`、非対応（主にデスクトップ）は
-    通常のBlobダウンロードを行う（`Inspections.jsx` の `handleDownloadPdf` / `handleSharePdf`）。
+    共有シートは自動起動せず、モーダルのボタンを明示的に押したときだけ実行する。
+    **2026-09-09に「共有 / 保存」の単一ボタンから分離・再整理**（このボタン群自体は
+    7つの`use*PdfExport.jsx`フック全てが同じ部品を使うよう共通化してあり、
+    ここに書いた内容は自主検査表に限らず全PDFプレビューに共通する。詳細はプロジェクトスキル
+    `print-and-pdf-download`のGotcha 8の実装ノート・追記2件を参照）：
+    「共有」（`navigator.canShare`で機能検出できた場合だけ表示）・「ダウンロード」（常に表示。
+    通常のBlobダウンロード）はアイコンのみのボタン（`src/components/PdfPreviewActions.jsx`）、
+    「プリント」（プレビュー中のiframeの`contentWindow`で`print()`。iOS/iPadOSのホーム画面
+    アプリでは`window.print()`系が無反応になるため検出して非表示にする）は文字ラベル付きの
+    青いボタン（`src/components/AttachmentPreview.jsx`）で、共有→ダウンロード→プリントの順に並ぶ。
     **実機（iPhone・ホーム画面追加アプリ）で表示・×での復帰・共有ボタンとも問題なしを確認済み
-    （2026-08-07）**
+    （2026-08-07。プリントボタン追加後の実機確認は依頼中）**
 - **画面自体は一旦ペンディング（2026-08-30）**: 業務メニュー（PC幅のショートカットナビ）・ダッシュボード・
   ハンバーガーメニューのいずれからもこの画面（`/reports/inspections`）への導線を削除した
   （4-3・4-9参照。ルート自体・機能・実装コードは削除していない）。**紙の様式でのPDF出力機能だけは
