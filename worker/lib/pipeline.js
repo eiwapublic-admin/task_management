@@ -230,6 +230,8 @@ function compactBody(text) {
 function stripHtml(text) {
   return (text || '')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    // </p> 直前の <br> は閉じタグ自体が改行を意味するため冗長（残すと空行が二重になる）
+    .replace(/<br\s*\/?>\s*(?=<\/p>)/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')

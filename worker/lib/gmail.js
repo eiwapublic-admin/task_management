@@ -91,6 +91,10 @@ function extractText(payload) {
     return decodeBody(html)
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      // ブロック要素の閉じタグ直前の <br> は、その閉じタグ自体が改行を意味するため冗長。
+      // 先に除去しておかないと1行につき改行が2つ入り、空行が二重に挟まってしまう
+      // （Gmail等が1行ごとに <div>text<br></div> という形でHTMLメールを組み立てるため）。
+      .replace(/<br\s*\/?>\s*(?=<\/(?:p|div|tr|li|h[1-6]|blockquote)>)/gi, '')
       // 改行を伴うブロック要素は改行に変換してから他のタグを除去する（改行を保持するため）
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|tr|li|h[1-6]|blockquote)>/gi, '\n')
