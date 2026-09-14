@@ -54,7 +54,7 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
         <div className="bsch-cell bsch-head-cell bsch-time-cell">予定時刻</div>
         <div className="bsch-cell bsch-head-cell bsch-title-cell">作業</div>
         <div className="bsch-cell bsch-head-cell bsch-vendor-cell">担当会社</div>
-        <div className="bsch-cell bsch-head-cell bsch-mark">入室あり*</div>
+        <div className="bsch-cell bsch-head-cell bsch-mark">入室*</div>
         <div className="bsch-cell bsch-head-cell bsch-notice-cell">注意事項</div>
 
         {days.map((d) => {
@@ -107,7 +107,7 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
         })}
       </div>
 
-      <p className="bsch-footnote">入室あり*：各テナント様のお部屋に入室して作業いたします。</p>
+      <p className="bsch-footnote">*入室：各テナント様のお部屋に入室して作業いたします。</p>
     </div>
   )
 }
