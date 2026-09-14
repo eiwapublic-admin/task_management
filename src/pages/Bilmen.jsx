@@ -495,7 +495,7 @@ export default function Bilmen() {
         <BilmenNotifyModal
           month={month}
           schedules={schedules}
-          onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote, loadNoticeLayout())}
+          onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote, loadNoticeLayout(), holidays)}
           onClose={() => setNotifying(false)}
         />
       )}
@@ -507,7 +507,7 @@ export default function Bilmen() {
           onClose={() => setPickingLayout(false)}
           onSelect={(layout) => {
             setPickingLayout(false)
-            noticeExport.download(month, schedules, monthlyNote, layout)
+            noticeExport.download(month, schedules, monthlyNote, layout, holidays)
           }}
         />
       )}

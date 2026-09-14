@@ -145,6 +145,17 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
   letter-spacing: 0.04em;
 }
 
+/* 曜日による色分け（2026-09-14〜。土曜＝水色系、日曜・祝日＝ピンク系）。
+   見出し帯が濃いグリーンのため、白地用の配色（InspectionSheet.css の
+   #06c／#c00 相当）ではなく、地の色の上で読めるよう明るめの色にしている */
+.bnc-strip-date.is-saturday {
+  color: #9fd8f0;
+}
+
+.bnc-strip-date.is-holiday {
+  color: #ffb6c8;
+}
+
 .bnc-strip-time {
   margin-left: auto;
   font-size: 8.5pt;

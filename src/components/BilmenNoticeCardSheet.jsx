@@ -1,14 +1,13 @@
 import { formatTimeRange } from '../lib/bilmen'
+import { weekdayInfo } from '../lib/reports'
 import './BilmenNoticeCardSheet.css'
 
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
-
-// カードの見出し帯に出す日付。紙面が狭いので「09/04 金」まで詰める
+// カードの見出し帯に出す日付。紙面が狭いので「09/04（金）」まで詰める
 function formatShortDate(date) {
   const d = new Date(`${date}T00:00:00Z`)
   const m = String(d.getUTCMonth() + 1).padStart(2, '0')
   const day = String(d.getUTCDate()).padStart(2, '0')
-  return `${m}/${day} ${WEEKDAY_LABELS[d.getUTCDay()]}`
+  return `${m}/${day}`
 }
 
 // 作業予定連絡票「カード版」（docs/bilmen-plan.md 8-2）。A4縦。
@@ -28,6 +27,7 @@ export default function BilmenNoticeCardSheet({
   isLastPage,
   note,
   measuring,
+  holidays,
 }) {
   const [y, m] = month.split('-').map(Number)
   // 今月の注釈は1ページ目だけに出す（従来版と同じ。8-2）
@@ -52,37 +52,43 @@ export default function BilmenNoticeCardSheet({
       {isFirstPage && note && <p className="bnc-note">{note}</p>}
 
       <div className="bnc-grid">
-        {items.map((it, idx) => (
-          <div key={it.id} className="bnc-card">
-            <div className="bnc-strip">
-              <span className="bnc-strip-no">{String(startIndex + idx + 1).padStart(2, '0')}</span>
-              <span className="bnc-strip-date">{formatShortDate(it.plan_date)}</span>
-              <span className="bnc-strip-time">{formatTimeRange(it.plan_start, it.plan_end)}</span>
-            </div>
-            <div className="bnc-body">
-              <div className="bnc-name">
-                {it.title}
-                {it.title_note && <span className="bnc-name-note">　／ {it.title_note}</span>}
+        {items.map((it, idx) => {
+          const wd = weekdayInfo(it.plan_date, holidays)
+          const wdClass = wd.isRed ? 'is-holiday' : wd.isBlue ? 'is-saturday' : ''
+          return (
+            <div key={it.id} className="bnc-card">
+              <div className="bnc-strip">
+                <span className="bnc-strip-no">{String(startIndex + idx + 1).padStart(2, '0')}</span>
+                <span className={`bnc-strip-date${wdClass ? ` ${wdClass}` : ''}`}>
+                  {formatShortDate(it.plan_date)}（{wd.label}）
+                </span>
+                <span className="bnc-strip-time">{formatTimeRange(it.plan_start, it.plan_end)}</span>
               </div>
-              {it.content && <p className="bnc-desc">{it.content}</p>}
-              <dl className="bnc-kv">
-                {it.place && (
-                  <>
-                    <dt>場所</dt>
-                    <dd>{it.place}</dd>
-                  </>
-                )}
-                {it.vendor_name && (
-                  <>
-                    <dt>担当</dt>
-                    <dd>{it.vendor_name}</dd>
-                  </>
-                )}
-              </dl>
-              {it.notice && <div className="bnc-caution">{it.notice}</div>}
+              <div className="bnc-body">
+                <div className="bnc-name">
+                  {it.title}
+                  {it.title_note && <span className="bnc-name-note">　／ {it.title_note}</span>}
+                </div>
+                {it.content && <p className="bnc-desc">{it.content}</p>}
+                <dl className="bnc-kv">
+                  {it.place && (
+                    <>
+                      <dt>場所</dt>
+                      <dd>{it.place}</dd>
+                    </>
+                  )}
+                  {it.vendor_name && (
+                    <>
+                      <dt>担当</dt>
+                      <dd>{it.vendor_name}</dd>
+                    </>
+                  )}
+                </dl>
+                {it.notice && <div className="bnc-caution">{it.notice}</div>}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {isLastPage && (
