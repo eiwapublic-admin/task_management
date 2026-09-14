@@ -81,7 +81,7 @@ body.pdf-capture-mode .bsch-sheet {
 .bsch-time-cell { grid-column: 2; white-space: nowrap; justify-content: center; }
 .bsch-title-cell { grid-column: 3; }
 .bsch-vendor-cell { grid-column: 4; }
-.bsch-mark { grid-column: 5; justify-content: center; font-size: 9pt; font-weight: 700; }
+.bsch-mark { grid-column: 5; justify-content: center; white-space: nowrap; font-size: 9pt; font-weight: 700; }
 .bsch-notice-cell { grid-column: 6; }
 
 .bsch-head-cell {

@@ -118,7 +118,8 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
 .bnc-card {
   display: flex;
   flex-direction: column;
-  border: 0.2mm solid #d3ddd7;
+  /* 2026-09-14、各予定の外枠を太くしてほしいとの依頼で 0.2mm → 0.5mm に */
+  border: 0.5mm solid #d3ddd7;
   border-radius: 1.6mm;
   overflow: hidden;
   background: #fff;
