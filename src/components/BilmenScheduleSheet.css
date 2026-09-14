@@ -96,13 +96,6 @@ body.pdf-capture-mode .bsch-sheet {
   white-space: nowrap;
 }
 
-.bsch-holiday-name {
-  display: block;
-  color: #c00;
-  font-size: 6pt;
-  font-weight: 400;
-}
-
 .bsch-day-row.is-saturday { background: #eaf4fb; }
 .bsch-day-row.is-holiday { background: #fbeaf0; }
 .bsch-day-row.is-holiday.bsch-date-cell { color: #c00; }
