@@ -7,6 +7,15 @@ import './BilmenScheduleSheet.css'
 // 「報知対象☑ かつ 予定日付あり かつ 中止でない」行だけを載せる（3-4）。
 // 画面には出さず、PDF化のときだけ画面外で描画して html2canvas で撮る
 // （print-and-pdf-download スキル。他の帳票と同じ方式）。
+//
+// 2026-09-14、<table>のrowSpanをCSS Gridに書き換えた。1日に複数件ある日の日付セルを
+// rowSpanで結合していたが、実機（Safari/WebKit）で「セルの高さが正しく積算されず
+// 文字の下半分が欠ける」「行の背景の塗りが日付の上に被さる」という、rowSpan固有の
+// 描画不具合が2件続けて見つかった（table-layout:fixed・colgroup・rowSpanの組み合わせは
+// エンジンごとの実装差が大きい）。CSS Gridの `grid-row: span N` は、テーブルの行占有の
+// 仕組みに頼らずとも「複数行にまたがるセル」を表現できるため、根本的に作り替えた。
+// 列幅・行の高さの計算方法・見た目は変えていない（各セルを .bsch-cell な div にして
+// grid-template-columns で列を、grid-auto-rows で行の高さを揃える）
 export default function BilmenScheduleSheet({ month, buildingName, items, holidays, outputDate }) {
   const total = daysInMonth(month)
   const [y, m] = month.split('-').map(Number)
@@ -40,74 +49,64 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
         <span className="bsch-output-date">{outputDate}</span>
       </div>
 
-      <table className="bsch-table" style={{ '--bsch-row-h': rowHeight }}>
-        <colgroup>
-          <col className="bsch-col-date" />
-          <col className="bsch-col-time" />
-          <col className="bsch-col-title" />
-          <col className="bsch-col-vendor" />
-          <col className="bsch-col-enter" />
-          <col className="bsch-col-notice" />
-        </colgroup>
-        <thead>
-          <tr className="bsch-row-head">
-            <th />
-            <th>予定時刻</th>
-            <th>作業</th>
-            <th>担当会社</th>
-            <th>入室あり*</th>
-            <th>注意事項</th>
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d) => {
-            const wd = weekdayInfo(d.date, holidays)
-            const rowClass = `bsch-day-row ${wd.className}`.trim()
-            if (d.rows.length === 0) {
-              return (
-                <tr key={d.date} className={rowClass}>
-                  <td className="bsch-date-cell">
-                    {formatMonthDay(d.date)} ({wd.label})
-                    {wd.holidayName && <span className="bsch-holiday-name">{wd.holidayName}</span>}
-                  </td>
-                  <td />
-                  <td />
-                  <td />
-                  <td />
-                  <td />
-                </tr>
-              )
-            }
-            return d.rows.map((it, idx) => (
-              <tr key={it.id} className={rowClass}>
-                {idx === 0 && (
-                  // 複数件ある日は日付セルをrowSpanで結合するが、Safari(WebKit)は
-                  // rowSpanセルの高さを「結合先の各<tr>の実際の高さ」から正しく積算せず、
-                  // 1行分の高さしか確保しないことがある（2026-09-14に実機で発覚。
-                  // vertical-align:middleで中央寄せした文字の下半分がoverflow:hiddenで
-                  // 消えて見える）。件数分の高さを明示指定してこの曖昧さを無くす
-                  <td
-                    className="bsch-date-cell"
-                    rowSpan={d.rows.length}
-                    style={{ height: `calc(var(--bsch-row-h) * ${d.rows.length})` }}
-                  >
-                    {formatMonthDay(d.date)} ({wd.label})
-                    {wd.holidayName && <span className="bsch-holiday-name">{wd.holidayName}</span>}
-                  </td>
-                )}
-                <td className="bsch-time-cell">{formatTimeRange(it.plan_start, it.plan_end)}</td>
-                <td className="bsch-title-cell">
-                  {it.title}
-                  {it.title_note && <span className="bsch-title-note">（{it.title_note}）</span>}
-                </td>
-                <td>{it.vendor_name || ''}</td>
-                <td className="bsch-mark">{it.enter_room ? '✓' : ''}</td>
-                <td className="bsch-notice-cell">{it.notice || ''}</td>
-              </tr>
-            ))
-          })}
-        </tbody>
-      </table>
+      <div className="bsch-table" style={{ '--bsch-row-h': rowHeight }}>
+        <div className="bsch-cell bsch-head-cell bsch-date-cell" />
+        <div className="bsch-cell bsch-head-cell bsch-time-cell">予定時刻</div>
+        <div className="bsch-cell bsch-head-cell bsch-title-cell">作業</div>
+        <div className="bsch-cell bsch-head-cell bsch-vendor-cell">担当会社</div>
+        <div className="bsch-cell bsch-head-cell bsch-mark">入室あり*</div>
+        <div className="bsch-cell bsch-head-cell bsch-notice-cell">注意事項</div>
+
+        {days.map((d) => {
+          const wd = weekdayInfo(d.date, holidays)
+          const rowClass = `bsch-day-row ${wd.className}`.trim()
+          const span = Math.max(1, d.rows.length)
+
+          const dateCell = (
+            <div
+              key={`${d.date}-date`}
+              className={`bsch-cell bsch-date-cell ${rowClass}`}
+              style={{ gridRow: `span ${span}` }}
+            >
+              {formatMonthDay(d.date)} ({wd.label})
+              {wd.holidayName && <span className="bsch-holiday-name">{wd.holidayName}</span>}
+            </div>
+          )
+
+          if (d.rows.length === 0) {
+            return (
+              <div key={d.date} style={{ display: 'contents' }}>
+                {dateCell}
+                <div className={`bsch-cell bsch-time-cell ${rowClass}`} />
+                <div className={`bsch-cell bsch-title-cell ${rowClass}`} />
+                <div className={`bsch-cell bsch-vendor-cell ${rowClass}`} />
+                <div className={`bsch-cell bsch-mark ${rowClass}`} />
+                <div className={`bsch-cell bsch-notice-cell ${rowClass}`} />
+              </div>
+            )
+          }
+
+          return (
+            <div key={d.date} style={{ display: 'contents' }}>
+              {dateCell}
+              {d.rows.map((it) => (
+                <div key={it.id} style={{ display: 'contents' }}>
+                  <div className={`bsch-cell bsch-time-cell ${rowClass}`}>
+                    {formatTimeRange(it.plan_start, it.plan_end)}
+                  </div>
+                  <div className={`bsch-cell bsch-title-cell ${rowClass}`}>
+                    {it.title}
+                    {it.title_note && <span className="bsch-title-note">（{it.title_note}）</span>}
+                  </div>
+                  <div className={`bsch-cell bsch-vendor-cell ${rowClass}`}>{it.vendor_name || ''}</div>
+                  <div className={`bsch-cell bsch-mark ${rowClass}`}>{it.enter_room ? '✓' : ''}</div>
+                  <div className={`bsch-cell bsch-notice-cell ${rowClass}`}>{it.notice || ''}</div>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
 
       <p className="bsch-footnote">入室あり*：各テナント様のお部屋に入室して作業いたします。</p>
     </div>

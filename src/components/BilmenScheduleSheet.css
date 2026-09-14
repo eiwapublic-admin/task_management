@@ -1,6 +1,10 @@
 /* ビルメン：日程表（1階掲示用）のPDF用シート。A4縦1枚。
    InspectionSheet.css と同じ方式（手書きの hex 色・mm 指定。html2canvas は oklch 等の
-   新しい色関数を解釈できないため、ここに生値以外の色関数を持ち込まない）。 */
+   新しい色関数を解釈できないため、ここに生値以外の色関数を持ち込まない）。
+
+   2026-09-14、<table>のrowSpanをCSS Gridに書き換えた（BilmenScheduleSheet.jsx参照。
+   1日に複数件ある日の日付セルをrowSpanで結合していたことに起因する、Safari(WebKit)固有の
+   描画不具合が2件続けて見つかったため）。列幅・行の高さ・見た目は変えていない。 */
 
 .bsch-sheet {
   display: none;
@@ -45,38 +49,46 @@ body.pdf-capture-mode .bsch-sheet {
   color: #333;
 }
 
+/* 列は grid-template-columns で固定幅、行は先頭行（見出し）だけ8mm・以降は
+   --bsch-row-h で揃える。1日に複数件ある日の日付セルは `grid-row: span N` で
+   複数行にまたがらせる（JSX参照）。auto-placementが列を自動で割り振るため、
+   各 .bsch-*-cell は grid-column の明示だけ担う */
 .bsch-table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
+  display: grid;
+  grid-template-columns: 22mm 24mm 40mm 26mm 14mm 64mm;
+  grid-template-rows: 8mm;
+  grid-auto-rows: var(--bsch-row-h, 6mm);
+  /* 表全体の外枠（上端・左端）。内側は各セルのborder-right/bottomだけで
+     1本線になる（table の border-collapse と同じ見た目をgridで再現） */
+  border-top: 0.15mm solid #666;
+  border-left: 0.15mm solid #666;
 }
 
-.bsch-col-date { width: 22mm; }
-.bsch-col-time { width: 24mm; }
-.bsch-col-title { width: 40mm; }
-.bsch-col-vendor { width: 26mm; }
-.bsch-col-enter { width: 14mm; }
-.bsch-col-notice { width: 64mm; }
-
-.bsch-table th,
-.bsch-table td {
-  border: 0.15mm solid #666;
+.bsch-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 0.15mm solid #666;
+  border-bottom: 0.15mm solid #666;
   padding: 0.5mm 1.5mm;
   font-size: 7.5pt;
   line-height: 1.15;
-  vertical-align: middle;
-  overflow: hidden;
 }
 
-.bsch-row-head th {
-  height: 8mm;
+.bsch-date-cell { grid-column: 1; }
+.bsch-time-cell { grid-column: 2; white-space: nowrap; justify-content: center; }
+.bsch-title-cell { grid-column: 3; }
+.bsch-vendor-cell { grid-column: 4; }
+.bsch-mark { grid-column: 5; justify-content: center; font-size: 9pt; font-weight: 700; }
+.bsch-notice-cell { grid-column: 6; }
+
+.bsch-head-cell {
   background: #eee;
   font-weight: 700;
+  justify-content: center;
   text-align: center;
-}
-
-.bsch-day-row td {
-  height: var(--bsch-row-h, 6mm);
 }
 
 .bsch-date-cell {
@@ -91,22 +103,14 @@ body.pdf-capture-mode .bsch-sheet {
   font-weight: 400;
 }
 
-.bsch-day-row.is-saturday td { background: #eaf4fb; }
-.bsch-day-row.is-holiday td { background: #fbeaf0; }
-.bsch-day-row.is-holiday .bsch-date-cell { color: #c00; }
-.bsch-day-row.is-saturday .bsch-date-cell { color: #06c; }
-
-.bsch-time-cell { white-space: nowrap; text-align: center; }
+.bsch-day-row.is-saturday { background: #eaf4fb; }
+.bsch-day-row.is-holiday { background: #fbeaf0; }
+.bsch-day-row.is-holiday.bsch-date-cell { color: #c00; }
+.bsch-day-row.is-saturday.bsch-date-cell { color: #06c; }
 
 .bsch-title-note {
   color: #333;
   font-size: 6.5pt;
-}
-
-.bsch-mark {
-  text-align: center;
-  font-size: 9pt;
-  font-weight: 700;
 }
 
 .bsch-footnote {
