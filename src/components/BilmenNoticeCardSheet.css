@@ -1,0 +1,220 @@
+/* ビルメン：作業予定連絡票「カード版」のPDF用シート。A4縦。
+   従来版（BilmenNoticeSheet.css）と選んで出せる2つ目のレイアウトとして
+   2026-09-14に追加した。従来版は1件＝1行を縦に積むが、こちらは1件＝1枚の
+   カードを2段組で並べるため、同じ件数なら縦の消費がおよそ半分になる。
+   件数の多い月向け。長い留意事項が多い月は従来版のほうが収まりが良い。
+
+   色はアプリのブランドグリーン（src/index.css の --color-brand #33604d）に
+   合わせてあるが、**var() を参照せず値を直接書いている**。この用紙は
+   html2canvas で画像化してから jsPDF に載せるため、画面側のテーマ変更に
+   紙面が引きずられないよう固定値にしておく。 */
+
+.bnc-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .bnc-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 12mm;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+/* ページ割りを決める前の計測用シート（従来版と同じ考え方）。全件を高さ無制限で
+   描き、各 .bnc-card の実際の高さから1ページに入る行数をフック側で逆算する */
+body.pdf-capture-mode .bnc-sheet.is-measuring {
+  height: auto;
+  overflow: visible;
+}
+
+.bnc-sheet * {
+  box-sizing: border-box;
+}
+
+.bnc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10pt;
+  color: #5b6a62;
+}
+
+/* --- 見出し。対象年月を紙面の主役に据える（EV掲示で見上げたとき、まず
+       「何月分か」が読めるようにする） --- */
+.bnc-head {
+  margin-top: 3.5mm;
+  padding-bottom: 3.4mm;
+  border-bottom: 0.7mm solid #33604d;
+  text-align: center;
+}
+
+.bnc-month {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1mm;
+  color: #33604d;
+  line-height: 1;
+}
+
+.bnc-month-year {
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+.bnc-month-num {
+  font-size: 42pt;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.bnc-month-label {
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+.bnc-title {
+  margin: 2.4mm 0 0;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #17221d;
+  line-height: 1.45;
+}
+
+/* --- 今月の注釈（5-4）。紙面全体にかかる注意なので、作業ごとの留意事項より
+       強く見せる（枠付きの琥珀色）。従来版は赤字中央寄せだったが、緑と
+       当たるため琥珀に変えた --- */
+.bnc-note {
+  margin-top: 3.7mm;
+  padding: 2.4mm 3.7mm;
+  border: 0.2mm solid #e3cf9e;
+  border-radius: 1.3mm;
+  background: #fdf6e8;
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: #7a5205;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+/* --- カード --- */
+.bnc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.9mm;
+  margin-top: 3.7mm;
+}
+
+.bnc-card {
+  display: flex;
+  flex-direction: column;
+  border: 0.2mm solid #d3ddd7;
+  border-radius: 1.6mm;
+  overflow: hidden;
+  background: #fff;
+}
+
+.bnc-strip {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  padding: 1.8mm 2.9mm;
+  background: #33604d;
+  color: #fff;
+}
+
+.bnc-strip-no {
+  font-size: 8pt;
+  font-weight: 700;
+  color: #a9c6b8;
+}
+
+.bnc-strip-date {
+  font-size: 10.5pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bnc-strip-time {
+  margin-left: auto;
+  font-size: 8.5pt;
+  color: #dbe8e2;
+}
+
+.bnc-body {
+  flex: 1;
+  padding: 2.6mm 3.2mm 3.2mm;
+}
+
+.bnc-name {
+  font-size: 10.5pt;
+  font-weight: 700;
+  color: #17221d;
+  line-height: 1.45;
+}
+
+.bnc-name-note {
+  font-size: 8.5pt;
+  font-weight: 400;
+  color: #5b6a62;
+}
+
+.bnc-desc {
+  margin: 1mm 0 0;
+  font-size: 8.5pt;
+  color: #45705c;
+}
+
+.bnc-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8mm 2.6mm;
+  margin: 2.4mm 0 0;
+}
+
+.bnc-kv dt {
+  font-size: 8pt;
+  letter-spacing: 0.07em;
+  color: #7b8a82;
+}
+
+.bnc-kv dd {
+  margin: 0;
+  font-size: 9pt;
+  color: #2b3833;
+}
+
+/* 作業ごとの留意事項。今月の注釈より一段弱く見せる */
+.bnc-caution {
+  margin-top: 2.4mm;
+  padding: 1.6mm 2.6mm;
+  border-left: 0.5mm solid #7d9a8c;
+  border-radius: 1mm;
+  background: #f0f4f2;
+  font-size: 8.5pt;
+  color: #3b4a43;
+  white-space: pre-wrap;
+}
+
+.bnc-foot {
+  position: absolute;
+  left: 12mm;
+  right: 12mm;
+  bottom: 12mm;
+  padding-top: 2.4mm;
+  border-top: 0.15mm solid #dde4e0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9pt;
+  color: #5b6a62;
+}
