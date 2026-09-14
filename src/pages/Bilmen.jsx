@@ -138,7 +138,7 @@ export default function Bilmen() {
     }
   }
 
-  // 「予定通り ➡」。予定の日付・時刻をそのまま実績へ写す（2-1）
+  // 「予定通り」。予定の日付・時刻をそのまま実績へ写す（2-1）
   function handleCopyPlan(schedule) {
     if (!schedule.plan_date) {
       setError('予定日付が未入力のため実績へ写せません')
@@ -257,7 +257,7 @@ export default function Bilmen() {
                 disabled={!s.plan_date}
                 title={s.plan_date ? '予定日時をそのまま実績へ写す' : '予定日付が未入力のため写せません'}
               >
-                予定通り ➡
+                予定通り
               </button>
             )}
             <span className="bilmen-actual">{formatActual(s.actual_date, s.actual_start) || '—'}</span>

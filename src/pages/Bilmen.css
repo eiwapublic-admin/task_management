@@ -133,7 +133,7 @@
   color: var(--color-brand);
 }
 
-/* 「予定通り ➡」。予定日を過ぎたのに実績が空の行だけオレンジで催促する（2-1） */
+/* 「予定通り」。予定日を過ぎたのに実績が空の行だけオレンジで催促する（2-1） */
 .bilmen-copy-btn {
   display: block;
   border: none;
@@ -402,4 +402,37 @@ a.btn-primary.is-disabled {
   font-size: 13px;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* メンテナンス予定の詳細（BilmenScheduleForm）で、選んだ作業マスタの定義画面へ
+   ジャンプするリンク（2026-09-14〜）。新しいタブで開くのでモーダルの入力状態は失われない */
+.bilmen-master-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.bilmen-master-jump {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bilmen-master-jump:hover { text-decoration: underline; }
+
+/* 詳細モーダルの「予定」「実績」見出し帯（2026-09-14）。実績側だけ「予定通り」
+   ボタンが乗っており、それが .btn-plain の固定高さを持つ通常ボタンだと帯の高さが
+   予定側と揃わなかったため、一覧の「予定通り」と同じ地の文字リンク（.bilmen-copy-btn）
+   に統一して高さのズレを解消した。あわせて帯の塗りつぶしを一覧表の見出し行
+   （.bilmen-table thead th と同じ --border-strong）に揃えて濃くした */
+.bilmen-detail-col .ui-card-title {
+  background: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.bilmen-detail-col .ui-card-title .bilmen-copy-btn.ui-card-title-action {
+  font-weight: 400;
 }
