@@ -826,7 +826,7 @@ create table if not exists bilmen_masters (
   content       text,                           -- 作業内容（予定詳細の「補足」）
   notice        text,                           -- 注意事項（告知）。連絡票の「(4) 留意事項」
   place         text,                           -- 作業場所。連絡票の「(2) 場所」
-  enter_room    boolean not null default false, -- 入室作業（日程表の「入室あり*」に ✓）
+  enter_room    boolean not null default false, -- 入室作業（日程表の「入室*」に ✓）
   notify        boolean not null default false, -- 報知対象（掲示・メールに載せるか。3-4）
   jurisdiction  text,                           -- 管轄（'栄和' | '小泉産業'）
   vendor_code   text,                           -- 担当会社コード（K-004 等）
