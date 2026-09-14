@@ -81,7 +81,16 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
             return d.rows.map((it, idx) => (
               <tr key={it.id} className={rowClass}>
                 {idx === 0 && (
-                  <td className="bsch-date-cell" rowSpan={d.rows.length}>
+                  // 複数件ある日は日付セルをrowSpanで結合するが、Safari(WebKit)は
+                  // rowSpanセルの高さを「結合先の各<tr>の実際の高さ」から正しく積算せず、
+                  // 1行分の高さしか確保しないことがある（2026-09-14に実機で発覚。
+                  // vertical-align:middleで中央寄せした文字の下半分がoverflow:hiddenで
+                  // 消えて見える）。件数分の高さを明示指定してこの曖昧さを無くす
+                  <td
+                    className="bsch-date-cell"
+                    rowSpan={d.rows.length}
+                    style={{ height: `calc(var(--bsch-row-h) * ${d.rows.length})` }}
+                  >
                     {formatMonthDay(d.date)} ({wd.label})
                     {wd.holidayName && <span className="bsch-holiday-name">{wd.holidayName}</span>}
                   </td>
