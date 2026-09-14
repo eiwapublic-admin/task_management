@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import BilmenMasterForm from '../components/BilmenMasterForm'
@@ -17,6 +18,7 @@ export default function BilmenMasters() {
   const [info, setInfo] = useState('')
   const [renumbering, setRenumbering] = useState(false)
   const [editing, setEditing] = useState(null) // null | 'new' | master
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,6 +35,21 @@ export default function BilmenMasters() {
   useEffect(() => {
     load()
   }, [load])
+
+  // メンテナンス予定の詳細から「マスタの定義を見る」で ?master=<id> 付きで開かれた場合、
+  // 該当マスタの編集モーダルを自動で開く（2026-09-14）。開いたらURLからは消し、
+  // モーダルを閉じた後に再読み込みしても再度開かないようにする
+  useEffect(() => {
+    const wantedId = searchParams.get('master')
+    if (!wantedId || masters.length === 0) return
+    const target = masters.find((m) => m.id === wantedId)
+    if (target) setEditing(target)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('master')
+      return next
+    })
+  }, [masters, searchParams, setSearchParams])
 
   // 担当会社名の入力候補（既存の登録値から。備品・連絡帳と同じ考え方で選択式には強制しない）
   const vendorOptions = useMemo(() => {

@@ -52,12 +52,11 @@ export default function BilmenNoticeCardSheet({
       {isFirstPage && note && <p className="bnc-note">{note}</p>}
 
       <div className="bnc-grid">
-        {items.map((it, idx) => {
+        {items.map((it) => {
           const wd = weekdayInfo(it.plan_date, holidays)
           return (
             <div key={it.id} className="bnc-card">
               <div className="bnc-strip">
-                <span className="bnc-strip-no">{String(startIndex + idx + 1).padStart(2, '0')}</span>
                 <span className={`bnc-strip-date${wd.className ? ` ${wd.className}` : ''}`}>
                   {formatShortDate(it.plan_date)}（{wd.label}）
                 </span>

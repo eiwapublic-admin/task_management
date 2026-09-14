@@ -99,7 +99,7 @@ export default function BilmenScheduleForm({
     setPlanEnd(toTimeValue(m.plan_end))
   }
 
-  // 「予定通り ➡」。予定の日付・時刻をそのまま実績へ写す（2-1・2-2）
+  // 「予定通り」。予定の日付・時刻をそのまま実績へ写す（2-1・2-2）
   function copyPlanToActual() {
     if (!planDate) {
       setError('予定日付が未入力のため実績へ写せません')
@@ -202,7 +202,19 @@ export default function BilmenScheduleForm({
               </p>
             </div>
             <label className="ui-field">
-              <span>作業マスタ</span>
+              <span className="bilmen-master-label-row">
+                作業マスタ
+                {masterId && (
+                  <a
+                    className="bilmen-master-jump"
+                    href={`/bilmen/masters?master=${masterId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    マスタの定義を見る ↗
+                  </a>
+                )}
+              </span>
               <select className="ui-select" value={masterId} onChange={(e) => applyMaster(e.target.value)}>
                 <option value="">（マスタに紐付けない）</option>
                 {masters.map((m) => (
@@ -377,8 +389,12 @@ export default function BilmenScheduleForm({
             <section className="ui-card bilmen-detail-col">
               <h4 className="ui-card-title">
                 実績
-                <button type="button" className="btn-plain ui-card-title-action" onClick={copyPlanToActual}>
-                  予定通り ➡
+                <button
+                  type="button"
+                  className="bilmen-copy-btn ui-card-title-action"
+                  onClick={copyPlanToActual}
+                >
+                  予定通り
                 </button>
               </h4>
 
