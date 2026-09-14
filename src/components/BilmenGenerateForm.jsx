@@ -93,11 +93,18 @@ export default function BilmenGenerateForm({ defaultMonth, onClose, onGenerated 
             <p className="ui-empty">この月を実施月に含む作業マスタがありません。</p>
           ) : (
             <>
+              {selectable.length === 0 && (
+                <p className="ui-empty">
+                  この月の作業はすべて作成済みです。チェックボックスは選択できません。
+                </p>
+              )}
+
               <div className="bilmen-generate-actions">
                 <button
                   type="button"
                   className="btn-plain"
                   onClick={() => setSelected(new Set(selectable.map((c) => c.id)))}
+                  disabled={selectable.length === 0}
                 >
                   すべて選ぶ
                 </button>
