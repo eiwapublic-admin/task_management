@@ -16,7 +16,16 @@ import {
 // 実施月は1〜12のチェックボックス、管轄は2値のラジオボタンにする（現行の詳細画面と同じ）。
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-export default function BilmenMasterForm({ existing, vendorOptions = [], onClose, onSaved, onDeleted }) {
+export default function BilmenMasterForm({
+  existing,
+  vendorOptions = [],
+  // メンテナンス予定の詳細から「マスタの定義を見る」で別タブとして開かれた場合だけ true。
+  // 戻り道（タブを閉じる）を出すために使う（2026-09-14）
+  openedAsJumpTab = false,
+  onClose,
+  onSaved,
+  onDeleted,
+}) {
   useBodyScrollLock()
 
   const [masterNo, setMasterNo] = useState(existing?.master_no != null ? String(existing.master_no) : '')
@@ -43,6 +52,22 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
   const [disabled, setDisabled] = useState(existing?.disabled || false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [closeTabFailed, setCloseTabFailed] = useState(false)
+
+  // 別タブで開かれたときの戻り道（2026-09-14）。ホーム画面に追加したアプリから
+  // 「マスタの定義を見る」を押すとアプリの外の Safari で開くため、タブバーも戻るボタンも
+  // 無く元の画面に戻れなくなる。スクリプトで開かれたタブは window.close() で閉じられるので、
+  // 閉じれば直前の画面（予定の詳細）に戻る。
+  // 直接URLを開いた場合などブラウザが拒否することもあるため、閉じられなかったときは
+  // 手動で戻る案内を出す（close() が成功していればこのタブ自体が消えるので表示されない）
+  function handleCloseTab() {
+    window.close()
+    setTimeout(() => setCloseTabFailed(true), 300)
+  }
+
+  // ×・オーバーレイクリックでの閉じ方も、別タブで開かれている場合はタブごと閉じる
+  // （モーダルだけ閉じてもマスタ一覧が残るだけで、元の画面には戻れないため）
+  const handleDismiss = openedAsJumpTab ? handleCloseTab : onClose
 
   function toggleMonth(m) {
     setMonths((prev) => {
@@ -87,6 +112,9 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
       }
       const saved = existing ? await updateBilmenMaster(existing.id, payload) : await createBilmenMaster(payload)
       onSaved(saved)
+      // 別タブで開かれている場合は、保存したらそのまま閉じて元の画面へ戻す
+      // （閉じないとマスタ一覧だけが残った行き止まりのタブになるため）
+      if (openedAsJumpTab) handleCloseTab()
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -97,17 +125,18 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
     try {
       await deleteBilmenMaster(existing.id)
       onDeleted(existing.id)
+      if (openedAsJumpTab) handleCloseTab()
     } catch (err) {
       setError(err.message)
     }
   }
 
   return (
-    <div className="ui-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="ui-overlay" role="dialog" aria-modal="true" onClick={handleDismiss}>
       <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
           <h3 className="ui-modal-title">{existing ? '作業マスタの編集' : '作業マスタを追加'}</h3>
-          <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
+          <button type="button" className="icon-btn-close" onClick={handleDismiss} aria-label="閉じる">
             ×
           </button>
         </div>
@@ -116,6 +145,20 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
           {error && (
             <p className="dashboard-error dashboard-banner" role="alert">
               {error}
+            </p>
+          )}
+
+          {openedAsJumpTab && (
+            <p className="ui-note bilmen-jump-note">
+              メンテナンス予定から開きました。確認・編集が済んだら
+              <strong>「閉じて予定に戻る」</strong>で元の画面に戻れます。
+            </p>
+          )}
+
+          {closeTabFailed && (
+            <p className="dashboard-banner" role="status">
+              このタブは自動で閉じられませんでした。お手数ですが、ブラウザのタブ一覧から
+              元の画面（メンテナンス予定）に戻ってください。
             </p>
           )}
 
@@ -279,7 +322,7 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
 
           <label className="bilmen-check-field">
             <input type="checkbox" checked={enterRoom} onChange={(e) => setEnterRoom(e.target.checked)} />
-            入室作業（日程表の「入室あり*」に ✓ が付く）
+            入室作業（日程表の「入室*」に ✓ が付く）
           </label>
           <label className="bilmen-check-field">
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
@@ -312,9 +355,15 @@ export default function BilmenMasterForm({ existing, vendorOptions = [], onClose
             {existing && <ConfirmDeleteButton onConfirm={handleDelete} label="この作業マスタを削除" size={22} />}
           </div>
           <div className="ui-modal-foot-end">
-            <button type="button" className="btn-plain" onClick={onClose}>
-              キャンセル
-            </button>
+            {openedAsJumpTab ? (
+              <button type="button" className="btn-plain" onClick={handleCloseTab}>
+                閉じて予定に戻る
+              </button>
+            ) : (
+              <button type="button" className="btn-plain" onClick={onClose}>
+                キャンセル
+              </button>
+            )}
             <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? '保存中…' : '保存する'}
             </button>

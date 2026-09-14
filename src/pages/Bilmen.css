@@ -436,3 +436,12 @@ a.btn-primary.is-disabled {
 .bilmen-detail-col .ui-card-title .bilmen-copy-btn.ui-card-title-action {
   font-weight: 400;
 }
+
+/* 作業マスタのモーダルを「マスタの定義を見る」から別タブで開いたときの案内
+   （2026-09-14）。戻り道があることを先に知らせる */
+.bilmen-jump-note {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-primary-weak);
+  color: var(--text-base);
+}
