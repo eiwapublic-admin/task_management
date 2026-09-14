@@ -69,7 +69,6 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
               style={{ gridRow: `span ${span}` }}
             >
               {formatMonthDay(d.date)} ({wd.label})
-              {wd.holidayName && <span className="bsch-holiday-name">{wd.holidayName}</span>}
             </div>
           )
 
