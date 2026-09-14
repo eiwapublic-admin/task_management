@@ -18,6 +18,9 @@ export default function BilmenMasters() {
   const [info, setInfo] = useState('')
   const [renumbering, setRenumbering] = useState(false)
   const [editing, setEditing] = useState(null) // null | 'new' | master
+  // 「マスタの定義を見る」から別タブで開かれたマスタのID。そのマスタを開いている間だけ、
+  // モーダルに「閉じて予定に戻る」を出すために覚えておく（URLのクエリは直後に消すため別で持つ）
+  const [jumpedMasterId, setJumpedMasterId] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const load = useCallback(async () => {
@@ -43,12 +46,21 @@ export default function BilmenMasters() {
     const wantedId = searchParams.get('master')
     if (!wantedId || masters.length === 0) return
     const target = masters.find((m) => m.id === wantedId)
-    if (target) setEditing(target)
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.delete('master')
-      return next
-    })
+    if (target) {
+      setEditing(target)
+      setJumpedMasterId(target.id)
+    }
+    // replace: true は必須。push にすると履歴が2件になり、ブラウザが「スクリプトで
+    // 閉じてよいタブ」と見なさなくなって window.close()（＝「閉じて予定に戻る」）が
+    // 効かなくなる（履歴が1件のタブだけが script-closable）
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('master')
+        return next
+      },
+      { replace: true },
+    )
   }, [masters, searchParams, setSearchParams])
 
   // 担当会社名の入力候補（既存の登録値から。備品・連絡帳と同じ考え方で選択式には強制しない）
@@ -79,6 +91,7 @@ export default function BilmenMasters() {
 
   function handleSaved() {
     setEditing(null)
+    setJumpedMasterId(null)
     load()
   }
 
@@ -166,7 +179,11 @@ export default function BilmenMasters() {
           key={editing === 'new' ? 'new' : editing.id}
           existing={editing === 'new' ? null : editing}
           vendorOptions={vendorOptions}
-          onClose={() => setEditing(null)}
+          openedAsJumpTab={editing !== 'new' && jumpedMasterId === editing.id}
+          onClose={() => {
+            setEditing(null)
+            setJumpedMasterId(null)
+          }}
           onSaved={handleSaved}
           onDeleted={handleSaved}
         />
