@@ -355,3 +355,51 @@ a.btn-primary.is-disabled {
   cursor: default;
   text-decoration: none;
 }
+
+/* 連絡票の版を選ぶモーダル（BilmenNoticeLayoutModal）。従来版・カード版は
+   載せる内容が同じで見た目だけが違うため、ラジオに説明文を添えて選ばせる */
+.bilmen-layout-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bilmen-layout-choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.bilmen-layout-choice.is-selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-softer);
+}
+
+.bilmen-layout-choice input {
+  margin-top: 3px;
+  flex: none;
+}
+
+.bilmen-layout-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bilmen-layout-label {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.bilmen-layout-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}

@@ -134,6 +134,44 @@ export function notifyTargets(schedules) {
   return schedules.filter((s) => s.notify && s.plan_date && !s.canceled)
 }
 
+// 連絡票PDFの版（2026-09-14〜）。どちらも載せる内容・報知対象の絞り込みは同じで、
+// 違うのは用紙の見た目とページの詰め方だけ。月の件数や留意事項の長さで使い分ける。
+// 用紙コンポーネントとDOMの要素名は useBilmenNoticePdfExport.jsx 側が持つ
+export const NOTICE_LAYOUTS = {
+  standard: {
+    label: '従来版',
+    description: '1件ずつ縦に並べる、これまでの連絡票。留意事項が長い月でも収まりが良い。',
+  },
+  card: {
+    label: 'カード版',
+    description: '1件を1枚のカードにして2段組。件数が多い月でもページが増えにくい。',
+  },
+}
+
+export const DEFAULT_NOTICE_LAYOUT = 'standard'
+
+const NOTICE_LAYOUT_KEY = 'bilmen-notice-layout'
+
+// 前回選んだ版を次回の既定にする（月次の作業なので毎回選び直させない）。
+// localStorage はプライベートウィンドウ等で参照そのものが例外を投げることがあるため
+// 読み書きとも握りつぶし、失敗したら既定（従来版）で動かす
+export function loadNoticeLayout() {
+  try {
+    const saved = localStorage.getItem(NOTICE_LAYOUT_KEY)
+    return saved && NOTICE_LAYOUTS[saved] ? saved : DEFAULT_NOTICE_LAYOUT
+  } catch {
+    return DEFAULT_NOTICE_LAYOUT
+  }
+}
+
+export function saveNoticeLayout(layout) {
+  try {
+    localStorage.setItem(NOTICE_LAYOUT_KEY, layout)
+  } catch {
+    /* 保存できなくてもPDFの出力自体は続けられるので無視する */
+  }
+}
+
 // メール本文・件名の変数展開（4-2）。%今月の注釈% は今月の注釈機能が未実装のため
 // 対応する変数を用意していない（Phase 2 追加分）
 export function expandMailVariables(text, { month, count }) {

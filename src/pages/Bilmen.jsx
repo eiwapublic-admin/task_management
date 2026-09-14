@@ -6,6 +6,7 @@ import BilmenScheduleForm from '../components/BilmenScheduleForm'
 import BilmenGenerateForm from '../components/BilmenGenerateForm'
 import BilmenNotifyModal from '../components/BilmenNotifyModal'
 import BilmenMonthlyNoteModal from '../components/BilmenMonthlyNoteModal'
+import BilmenNoticeLayoutModal from '../components/BilmenNoticeLayoutModal'
 import { IconChevronLeft, IconChevronRight, IconSearch, IconDocument, IconMail, IconClipboard } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import useBilmenSchedulePdfExport from '../hooks/useBilmenSchedulePdfExport'
@@ -19,6 +20,8 @@ import {
   formatMonthDay,
   isOverdueActual,
   isUnsettled,
+  loadNoticeLayout,
+  notifyTargets,
   toTimeValue,
 } from '../lib/bilmen'
 import { currentMonthJST, fetchHolidays, shiftMonth, todayJST, weekdayInfo } from '../lib/reports'
@@ -58,6 +61,7 @@ export default function Bilmen() {
   const [notifying, setNotifying] = useState(false)
   const [monthlyNote, setMonthlyNote] = useState('')
   const [editingNote, setEditingNote] = useState(false)
+  const [pickingLayout, setPickingLayout] = useState(false)
 
   const scheduleExport = useBilmenSchedulePdfExport()
   const noticeExport = useBilmenNoticePdfExport()
@@ -344,9 +348,9 @@ export default function Bilmen() {
                 <button
                   type="button"
                   className="btn-plain"
-                  onClick={() => noticeExport.download(month, schedules, monthlyNote)}
+                  onClick={() => setPickingLayout(true)}
                   disabled={noticeExport.busy}
-                  title="EV掲示・投函・メール添付用の連絡票PDFを出力"
+                  title="EV掲示・投函・メール添付用の連絡票PDFを出力（従来版・カード版を選べます）"
                 >
                   <IconDocument size={16} />
                   <span className="btn-plain-label">連絡票</span>
@@ -491,8 +495,20 @@ export default function Bilmen() {
         <BilmenNotifyModal
           month={month}
           schedules={schedules}
-          onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote)}
+          onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote, loadNoticeLayout())}
           onClose={() => setNotifying(false)}
+        />
+      )}
+
+      {pickingLayout && (
+        <BilmenNoticeLayoutModal
+          month={month}
+          count={notifyTargets(schedules).length}
+          onClose={() => setPickingLayout(false)}
+          onSelect={(layout) => {
+            setPickingLayout(false)
+            noticeExport.download(month, schedules, monthlyNote, layout)
+          }}
         />
       )}
 

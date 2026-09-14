@@ -59,7 +59,8 @@ export default function BilmenMonthlyNoteModal({ month, onClose, onSaved }) {
             </p>
           )}
           <p className="ui-note">
-            連絡票PDFの見出し直下に赤字・太字・中央揃えで表示されます。空欄のまま保存すると消えます。
+            連絡票PDFの見出し直下に、作業リストより目立つ形で表示されます（従来版は赤字、カード版は琥珀色の枠付き）。
+            空欄のまま保存すると消えます。
           </p>
           <label className="ui-field">
             <span>注釈</span>
