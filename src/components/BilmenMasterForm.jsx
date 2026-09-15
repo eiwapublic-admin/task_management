@@ -55,7 +55,13 @@ export default function BilmenMasterForm({
   const [sortOrder, setSortOrder] = useState(existing?.sort_order != null ? String(existing.sort_order) : '999')
   const [disabled, setDisabled] = useState(existing?.disabled || false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  // 入力の誤りは state に溜めず毎回の描画で作り直し、直したその場で消えるようにする
+  // （2026-09-15。周期の片方だけ入れて保存→もう片方を入れても、以前は保存を押し直すまで
+  //   エラーが残り「両方入れているのにエラーが出る」ように見えていた）。
+  // submitted は「一度でも保存を押したか」で、押す前から赤字を出さないための目印。
+  // サーバー由来のエラーだけは次に保存を押すまで消さずに出しておく
+  const [submitted, setSubmitted] = useState(false)
+  const [serverError, setServerError] = useState('')
   const [closeTabFailed, setCloseTabFailed] = useState(false)
 
   // 別タブで開かれたときの戻り道（2026-09-14）。ホーム画面に追加したアプリから
@@ -82,6 +88,37 @@ export default function BilmenMasterForm({
     return Array.from({ length: 4 }, (_, i) => `${start + i * years}年`).join('・')
   })()
 
+  // 入力の誤りを1つだけ返す（無ければ空文字）。描画のたびに評価する
+  function validate() {
+    if (!title.trim()) return '作業名は必須です'
+    const no = Number(masterNo)
+    if (!Number.isInteger(no) || no <= 0) return '作業マスタIDは1以上の整数で入力してください'
+
+    // 周期は「◯年に1回」と「起点の年」がセットで初めて判定できる（5-3-1）。
+    // 片方だけだと黙って毎年扱いになってしまうため、ここで気づけるようにする
+    const { years, anchor } = cycleValues()
+    if ((years === null) !== (anchor === null)) {
+      return '周期は「何年に1回」と「起点の年」の両方を入力してください（毎年の作業は両方とも空欄）'
+    }
+    if (years !== null && (!Number.isInteger(years) || years < 2 || years > 50)) {
+      return '周期の「何年に1回」は2〜50の整数で入力してください'
+    }
+    if (anchor !== null && (!Number.isInteger(anchor) || anchor < 1900 || anchor > 2200)) {
+      return '周期の「起点の年」は1900〜2200の範囲で入力してください'
+    }
+    return ''
+  }
+
+  function cycleValues() {
+    return {
+      years: cycleYears.trim() ? Number(cycleYears) : null,
+      anchor: cycleAnchorYear.trim() ? Number(cycleAnchorYear) : null,
+    }
+  }
+
+  const validationError = validate()
+  const shownError = serverError || (submitted ? validationError : '')
+
   // ×・オーバーレイクリックでの閉じ方も、別タブで開かれている場合はタブごと閉じる
   // （モーダルだけ閉じてもマスタ一覧が残るだけで、元の画面には戻れないため）
   const handleDismiss = openedAsJumpTab ? handleCloseTab : onClose
@@ -96,29 +133,15 @@ export default function BilmenMasterForm({
   }
 
   async function handleSave() {
-    setError('')
-    if (!title.trim()) return setError('作業名は必須です')
-    const no = Number(masterNo)
-    if (!Number.isInteger(no) || no <= 0) return setError('作業マスタIDは1以上の整数で入力してください')
+    setSubmitted(true)
+    setServerError('')
+    if (validationError) return
 
-    // 周期は「◯年に1回」と「起点の年」がセットで初めて判定できる（5-3-1）。
-    // 片方だけだと黙って毎年扱いになってしまうため、ここで気づけるようにする
-    const years = cycleYears.trim() ? Number(cycleYears) : null
-    const anchor = cycleAnchorYear.trim() ? Number(cycleAnchorYear) : null
-    if ((years === null) !== (anchor === null)) {
-      return setError('周期は「何年に1回」と「起点の年」の両方を入力してください（毎年の作業は両方とも空欄）')
-    }
-    if (years !== null && (!Number.isInteger(years) || years < 2 || years > 50)) {
-      return setError('周期の「何年に1回」は2〜50の整数で入力してください')
-    }
-    if (anchor !== null && (!Number.isInteger(anchor) || anchor < 1900 || anchor > 2200)) {
-      return setError('周期の「起点の年」は1900〜2200の範囲で入力してください')
-    }
-
+    const { years, anchor } = cycleValues()
     setSaving(true)
     try {
       const payload = {
-        master_no: no,
+        master_no: Number(masterNo),
         title: title.trim(),
         title_note: titleNote,
         content,
@@ -149,7 +172,7 @@ export default function BilmenMasterForm({
       // （閉じないとマスタ一覧だけが残った行き止まりのタブになるため）
       if (openedAsJumpTab) handleCloseTab()
     } catch (err) {
-      setError(err.message)
+      setServerError(err.message)
       setSaving(false)
     }
   }
@@ -160,7 +183,7 @@ export default function BilmenMasterForm({
       onDeleted(existing.id)
       if (openedAsJumpTab) handleCloseTab()
     } catch (err) {
-      setError(err.message)
+      setServerError(err.message)
     }
   }
 
@@ -175,12 +198,6 @@ export default function BilmenMasterForm({
         </div>
 
         <div className="ui-modal-body is-stacked">
-          {error && (
-            <p className="dashboard-error dashboard-banner" role="alert">
-              {error}
-            </p>
-          )}
-
           {openedAsJumpTab && (
             <p className="ui-note bilmen-jump-note">
               メンテナンス予定から開きました。確認・編集が済んだら
@@ -419,6 +436,14 @@ export default function BilmenMasterForm({
             無効にする（自動作成の候補に出さない。過去の予定はそのまま残る）
           </label>
         </div>
+
+        {/* エラーは本文の外（スクロールしない位置）に出す。縦に長いフォームでは
+            本文の先頭に置くと、下の方を編集している間は画面外に隠れて気づけない（2026-09-15） */}
+        {shownError && (
+          <p className="ui-modal-alert" role="alert">
+            {shownError}
+          </p>
+        )}
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
