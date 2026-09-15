@@ -19,14 +19,14 @@ export default function useBilmenSchedulePdfExport() {
   const [sheetData, setSheetData] = useState(null)
   const sheetRef = useRef(null)
 
-  async function download(month, schedules, holidays) {
+  async function download(month, schedules, holidays, revisedOn = '') {
     setBusy(true)
     setError('')
     try {
       const items = notifyTargets(schedules)
       const outputDate = todayJST().replaceAll('-', '/')
 
-      setSheetData({ month, items, holidays, outputDate })
+      setSheetData({ month, items, holidays, outputDate, revisedOn })
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       if (!sheetRef.current) throw new Error('シートの準備に失敗しました')
 
@@ -69,6 +69,7 @@ export default function useBilmenSchedulePdfExport() {
             items={sheetData.items}
             holidays={sheetData.holidays}
             outputDate={sheetData.outputDate}
+            revisedOn={sheetData.revisedOn}
           />
         </div>,
         document.body,

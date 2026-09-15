@@ -65,6 +65,13 @@ body.pdf-capture-mode .bno-sheet.is-measuring {
   font-weight: 700;
 }
 
+/* 差し替え版のときだけタイトル右に出る「（yyyy/mm/dd 変更版）」（5-4。2026-09-15〜） */
+.bno-revision {
+  margin-left: 2mm;
+  font-size: 11pt;
+  color: #c00;
+}
+
 /* 今月の注釈（5-4）。大見出しの直下・作業リストの上に1回だけ出す（8-2） */
 .bno-note {
   margin: 0 0 4mm;

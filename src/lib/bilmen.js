@@ -75,20 +75,36 @@ export async function generateBilmenSchedules(month, masterIds) {
   })
 }
 
-// ---- 今月の注釈（5-4。月固有の但し書き。連絡票PDFの大見出し直下に表示する） ----
+// ---- 注釈と変更表記（5-4。月固有の但し書きと、差し替え版の日付）----
+//
+// note       … 連絡票PDFの大見出し直下に出る月固有の但し書き
+// revised_on … 変更版の日付（'YYYY-MM-DD'）。掲示・報知をやり直すときに入れると、
+//              掲示物のタイトル右に赤字で「（yyyy/mm/dd 変更版）」が出る（2026-09-15〜）
+//
+// **戻り値は文字列ではなくオブジェクト**（2026-09-15に変更日付を足した際に変えた）。
+// 呼び出し側で `note` を直に文字列として扱っていないか注意すること
+
+export const EMPTY_MONTHLY_NOTE = { note: '', revised_on: '' }
 
 export async function fetchBilmenMonthlyNote(month) {
   const data = await authFetch(`/api/bilmen/notes?month=${encodeURIComponent(month)}`)
-  return data.note || ''
+  return { note: data.note || '', revised_on: data.revised_on || '' }
 }
 
-// 空文字を渡すと未登録（中立色）に戻る
-export async function saveBilmenMonthlyNote(month, note) {
+// note・revised_on の両方が空なら未登録（中立色）に戻る
+export async function saveBilmenMonthlyNote(month, { note, revised_on: revisedOn }) {
   const data = await authFetch('/api/bilmen/notes', {
     method: 'PUT',
-    body: JSON.stringify({ target_month: month, note }),
+    body: JSON.stringify({ target_month: month, note, revised_on: revisedOn }),
   })
-  return data.note || ''
+  return { note: data.note || '', revised_on: data.revised_on || '' }
+}
+
+// 変更版の表記（'（2026/09/15 変更版）'）。日付が無ければ空文字。
+// 掲示物のタイトル右に赤字で出す（5-4）
+export function formatRevisionLabel(revisedOn) {
+  if (!revisedOn) return ''
+  return `（${revisedOn.replaceAll('-', '/')} 変更版）`
 }
 
 // ---- メール設定（文面・宛先） ----

@@ -1,4 +1,4 @@
-import { formatTimeRange } from '../lib/bilmen'
+import { formatTimeRange, formatRevisionLabel } from '../lib/bilmen'
 import './BilmenNoticeSheet.css'
 
 const WEEKDAY_LABELS_LONG = ['日', '月', '火', '水', '木', '金', '土']
@@ -24,6 +24,7 @@ export default function BilmenNoticeSheet({
   isLastPage,
   note,
   measuring,
+  revisedOn,
 }) {
   const [y, m] = month.split('-').map(Number)
   // 今月の注釈（5-4）は大見出しの直下・作業リストの上に1回だけ出す（8-2）。
@@ -39,6 +40,10 @@ export default function BilmenNoticeSheet({
       </div>
       <h1 className="bno-heading">
         {y}年{m}月度 {buildingName} メンテナンス・イベントのお知らせ
+        {/* 差し替え版のときだけ、タイトルの右に赤字で「（yyyy/mm/dd 変更版）」（5-4） */}
+        {formatRevisionLabel(revisedOn) && (
+          <span className="bno-revision">{formatRevisionLabel(revisedOn)}</span>
+        )}
       </h1>
       {isFirstPage && note && <p className="bno-note">{note}</p>}
 
