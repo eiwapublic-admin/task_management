@@ -581,7 +581,7 @@ export async function handleBilmenScheduleDelete(req) {
 // 今月の注釈（2026-09-09〜。5-4）
 // ============================================================
 
-// GET /api/bilmen/notes?month=YYYY-MM — 対象月の注釈（未登録なら note: ''）
+// GET /api/bilmen/notes?month=YYYY-MM — 対象月の注釈と変更日付（未登録なら空）
 export async function handleBilmenMonthlyNoteGet(req) {
   const { error } = await requireAuth(req)
   if (error) return error
@@ -591,21 +591,24 @@ export async function handleBilmenMonthlyNoteGet(req) {
     const supabase = getAdminClient()
     const { data, error: err } = await supabase
       .from('bilmen_monthly_notes')
-      .select('note')
+      .select('note, revised_on')
       .eq('target_month', month)
       .maybeSingle()
     if (err) {
       console.error('bilmen-monthly-note-get:', err.message)
-      return json({ error: '今月の注釈の取得に失敗しました' }, 500)
+      return json({ error: '注釈と変更表記の取得に失敗しました' }, 500)
     }
-    return json({ note: data?.note || '' })
+    return json({ note: data?.note || '', revised_on: data?.revised_on || '' })
   } catch (err) {
     console.error('bilmen-monthly-note-get 失敗:', err)
-    return json({ error: '今月の注釈の取得に失敗しました' }, 500)
+    return json({ error: '注釈と変更表記の取得に失敗しました' }, 500)
   }
 }
 
-// PUT /api/bilmen/notes — 対象月の注釈を保存する。空文字なら行ごと削除し、未登録（＝中立色）に戻す
+// PUT /api/bilmen/notes — 対象月の注釈と変更日付を保存する。
+// **両方とも空のときだけ行ごと削除**する（未登録＝ボタンが中立色に戻る）。
+// 変更日付だけを入れる（注釈なしで「変更版」とだけ出す）使い方があるため、
+// 注釈が空でも変更日付があれば行は残す（2026-09-15。5-4）
 export async function handleBilmenMonthlyNoteUpdate(req) {
   const { auth, error } = await requireAuth(req, { write: true })
   if (error) return error
@@ -614,27 +617,31 @@ export async function handleBilmenMonthlyNoteUpdate(req) {
     const month = typeof payload?.target_month === 'string' ? payload.target_month : ''
     if (!MONTH_PATTERN.test(month)) return json({ error: '対象年月は YYYY-MM 形式で指定してください' }, 400)
     const note = trimOrNull(payload?.note, 2000)
+    const revisedOn = dateOrNull(payload?.revised_on)
 
     const supabase = getAdminClient()
-    if (!note) {
+    if (!note && !revisedOn) {
       const { error: err } = await supabase.from('bilmen_monthly_notes').delete().eq('target_month', month)
       if (err) {
         console.error('bilmen-monthly-note-delete:', err.message)
-        return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+        return json({ error: '注釈と変更表記の保存に失敗しました' }, 500)
       }
-      return json({ note: '' })
+      return json({ note: '', revised_on: '' })
     }
-    const { error: err } = await supabase
-      .from('bilmen_monthly_notes')
-      .upsert({ target_month: month, note, updated_by: auth?.display_name || auth?.username || null })
+    const { error: err } = await supabase.from('bilmen_monthly_notes').upsert({
+      target_month: month,
+      note,
+      revised_on: revisedOn,
+      updated_by: auth?.display_name || auth?.username || null,
+    })
     if (err) {
       console.error('bilmen-monthly-note-update:', err.message)
-      return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+      return json({ error: '注釈と変更表記の保存に失敗しました' }, 500)
     }
-    return json({ note })
+    return json({ note: note || '', revised_on: revisedOn || '' })
   } catch (err) {
     console.error('bilmen-monthly-note-update 失敗:', err)
-    return json({ error: '今月の注釈の保存に失敗しました' }, 500)
+    return json({ error: '注釈と変更表記の保存に失敗しました' }, 500)
   }
 }
 

@@ -5,13 +5,16 @@
 
 /* 「日程表」「連絡票」「テナントへの報知」は1つの作業（連絡票PDFを出力してテナントへ
    報知する）としてまとめて行うため、機能ヘッダのボタン列の中で枠で囲んで示す（2026-09-09） */
+/* 2026-09-15、もう少し目立たせたいとの依頼で地をブランドグリーンの薄い色に変えた
+   （`--color-brand-soft` は 12% の緑。ボタン自体は白地の .btn-plain なので、
+   枠の中だけがうっすら緑になってまとまりが分かる） */
 .bilmen-action-group {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1);
-  background: var(--bg-muted);
-  border: 1px solid var(--border-strong);
+  background: var(--color-brand-soft);
+  border: 1px solid var(--color-brand);
   border-radius: var(--radius-md);
 }
 
@@ -449,4 +452,10 @@ a.btn-primary.is-disabled {
   border-left: 3px solid var(--color-primary);
   background: var(--color-primary-weak);
   color: var(--text-base);
+}
+
+/* 「注釈と変更表記」モーダルで、入力した変更日付がどう出るかのプレビュー（5-4） */
+.bilmen-revision-preview {
+  margin: 0 var(--space-05);
+  color: var(--color-danger);
 }

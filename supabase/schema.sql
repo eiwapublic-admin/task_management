@@ -931,6 +931,10 @@ revoke all on bilmen_schedules from anon, authenticated;
 create table if not exists bilmen_monthly_notes (
   target_month text primary key,                 -- 'YYYY-MM'
   note         text,                             -- 掲示物・メール本文に差し込む月固有の但し書き
+  -- 変更版の日付（2026-09-15追加。5-4-1）。入っていると掲示物のタイトル右に
+  -- 赤字で「（yyyy/mm/dd 変更版）」が出る。null＝初版。
+  -- note と revised_on が両方とも空のときだけ行を消す
+  revised_on   date,
   updated_by   text,
   updated_at   timestamptz not null default now()
 );

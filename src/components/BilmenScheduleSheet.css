@@ -49,6 +49,22 @@ body.pdf-capture-mode .bsch-sheet {
   color: #333;
 }
 
+/* タイトル行の右端。差し替え版のときだけ「（yyyy/mm/dd 変更版）」を出力日の上に積む
+   （5-4。2026-09-15〜。JSX側のコメント参照＝見出しの直後に置くと折り返して切れるため） */
+.bsch-title-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  white-space: nowrap;
+}
+
+.bsch-revision {
+  font-size: 9.5pt;
+  font-weight: 700;
+  color: #c00;
+}
+
 /* 列は grid-template-columns で固定幅、行は先頭行（見出し）だけ8mm・以降は
    --bsch-row-h で揃える。1日に複数件ある日の日付セルは `grid-row: span N` で
    複数行にまたがらせる（JSX参照）。auto-placementが列を自動で割り振るため、

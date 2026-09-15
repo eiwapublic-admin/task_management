@@ -91,6 +91,13 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
   line-height: 1.45;
 }
 
+/* 差し替え版のときだけタイトル右に出る「（yyyy/mm/dd 変更版）」（5-4。2026-09-15〜） */
+.bnc-revision {
+  margin-left: 2mm;
+  font-size: 11pt;
+  color: #c00;
+}
+
 /* --- 今月の注釈（5-4）。紙面全体にかかる注意なので、作業ごとの留意事項より
        強く見せる（枠付きの琥珀色）。従来版は赤字中央寄せだったが、緑と
        当たるため琥珀に変えた --- */

@@ -1,4 +1,4 @@
-import { formatTimeRange } from '../lib/bilmen'
+import { formatTimeRange, formatRevisionLabel } from '../lib/bilmen'
 import { weekdayInfo } from '../lib/reports'
 import './BilmenNoticeCardSheet.css'
 
@@ -28,6 +28,7 @@ export default function BilmenNoticeCardSheet({
   note,
   measuring,
   holidays,
+  revisedOn,
 }) {
   const [y, m] = month.split('-').map(Number)
   // 今月の注釈は1ページ目だけに出す（従来版と同じ。8-2）
@@ -46,7 +47,13 @@ export default function BilmenNoticeCardSheet({
           <span className="bnc-month-num">{m}</span>
           <span className="bnc-month-label">月度</span>
         </div>
-        <h1 className="bnc-title">{buildingName}　メンテナンス・イベントのお知らせ</h1>
+        <h1 className="bnc-title">
+          {buildingName}　メンテナンス・イベントのお知らせ
+          {/* 差し替え版のときだけ、タイトルの右に赤字で「（yyyy/mm/dd 変更版）」（5-4） */}
+          {formatRevisionLabel(revisedOn) && (
+            <span className="bnc-revision">{formatRevisionLabel(revisedOn)}</span>
+          )}
+        </h1>
       </div>
 
       {isFirstPage && note && <p className="bnc-note">{note}</p>}

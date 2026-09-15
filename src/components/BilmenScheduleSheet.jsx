@@ -1,5 +1,5 @@
 import { daysInMonth, weekdayInfo } from '../lib/reports'
-import { formatMonthDay, formatTimeRange } from '../lib/bilmen'
+import { formatMonthDay, formatTimeRange, formatRevisionLabel } from '../lib/bilmen'
 import './BilmenScheduleSheet.css'
 
 // 日程表（1階掲示用。docs/bilmen-plan.md 8-1）。A4縦1枚。
@@ -16,7 +16,7 @@ import './BilmenScheduleSheet.css'
 // 仕組みに頼らずとも「複数行にまたがるセル」を表現できるため、根本的に作り替えた。
 // 列幅・行の高さの計算方法・見た目は変えていない（各セルを .bsch-cell な div にして
 // grid-template-columns で列を、grid-auto-rows で行の高さを揃える）
-export default function BilmenScheduleSheet({ month, buildingName, items, holidays, outputDate }) {
+export default function BilmenScheduleSheet({ month, buildingName, items, holidays, outputDate, revisedOn }) {
   const total = daysInMonth(month)
   const [y, m] = month.split('-').map(Number)
 
@@ -46,7 +46,17 @@ export default function BilmenScheduleSheet({ month, buildingName, items, holida
         <span className="bsch-heading">
           {y}年{String(m).padStart(2, '0')}月 {buildingName} メンテナンス・イベント予定表
         </span>
-        <span className="bsch-output-date">{outputDate}</span>
+        {/* 差し替え版のときだけ出す「（yyyy/mm/dd 変更版）」（5-4）。
+            この見出し行は高さ12mm固定＋シートが overflow:hidden で、その12mmは
+            表の行高の計算（277mm - 12mm - 8mm - 12mm）にも効いている。見出しの直後に
+            並べると長い建物名で折り返して**2行目が切れて消える**ため、右端で出力日の上に
+            積む形にした（見た目上はタイトル行の右側に出る） */}
+        <span className="bsch-title-right">
+          {formatRevisionLabel(revisedOn) && (
+            <span className="bsch-revision">{formatRevisionLabel(revisedOn)}</span>
+          )}
+          <span className="bsch-output-date">{outputDate}</span>
+        </span>
       </div>
 
       <div className="bsch-table" style={{ '--bsch-row-h': rowHeight }}>

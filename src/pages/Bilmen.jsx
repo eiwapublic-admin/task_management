@@ -15,6 +15,7 @@ import {
   fetchBilmenSchedules,
   fetchBilmenMasters,
   fetchBilmenMonthlyNote,
+  EMPTY_MONTHLY_NOTE,
   updateBilmenSchedule,
   formatActual,
   formatMonthDay,
@@ -59,7 +60,7 @@ export default function Bilmen() {
   const [duplicateFrom, setDuplicateFrom] = useState(null) // 複製元（'new' として開く間だけ使う）
   const [generating, setGenerating] = useState(false)
   const [notifying, setNotifying] = useState(false)
-  const [monthlyNote, setMonthlyNote] = useState('')
+  const [monthlyNote, setMonthlyNote] = useState(EMPTY_MONTHLY_NOTE)
   const [editingNote, setEditingNote] = useState(false)
   const [pickingLayout, setPickingLayout] = useState(false)
 
@@ -97,12 +98,12 @@ export default function Bilmen() {
       .catch(() => setHolidays({}))
   }, [])
 
-  // 今月の注釈（5-4）。検索中は対象月が無いため取得しない
+  // 注釈と変更表記（5-4）。検索中は対象月が無いため取得しない
   useEffect(() => {
     if (searching) return
     fetchBilmenMonthlyNote(month)
       .then(setMonthlyNote)
-      .catch(() => setMonthlyNote(''))
+      .catch(() => setMonthlyNote(EMPTY_MONTHLY_NOTE))
   }, [month, searching])
 
   const vendorOptions = useMemo(() => {
@@ -324,12 +325,14 @@ export default function Bilmen() {
               {!searching && !readOnly && (
                 <button
                   type="button"
-                  className={`btn-plain bilmen-note-btn${monthlyNote ? ' has-note' : ''}`}
+                  className={`btn-plain bilmen-note-btn${
+                    monthlyNote.note || monthlyNote.revised_on ? ' has-note' : ''
+                  }`}
                   onClick={() => setEditingNote(true)}
-                  title="連絡票PDFの見出し直下に載る、月固有の但し書きを編集"
+                  title="連絡票PDFの見出し直下に載る月固有の但し書きと、差し替え版の変更日付を編集"
                 >
                   <IconClipboard size={16} />
-                  <span className="btn-plain-label">今月の注釈</span>
+                  <span className="btn-plain-label">注釈と変更表記</span>
                 </button>
               )}
               {/* 日程表・連絡票・テナントへの報知は1つの作業（連絡票を出力してテナントへ
@@ -338,7 +341,7 @@ export default function Bilmen() {
                 <button
                   type="button"
                   className="btn-plain"
-                  onClick={() => scheduleExport.download(month, schedules, holidays)}
+                  onClick={() => scheduleExport.download(month, schedules, holidays, monthlyNote.revised_on)}
                   disabled={scheduleExport.busy}
                   title="1階掲示用の日程表PDFを出力"
                 >
@@ -358,7 +361,7 @@ export default function Bilmen() {
                 {!readOnly && (
                   <button type="button" className="btn-plain" onClick={() => setNotifying(true)}>
                     <IconMail size={16} />
-                    <span className="btn-plain-label">テナントへの報知</span>
+                    <span className="btn-plain-label">報知</span>
                   </button>
                 )}
               </div>

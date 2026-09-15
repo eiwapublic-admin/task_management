@@ -95,7 +95,11 @@ export default function useBilmenNoticePdfExport() {
     return pages
   }
 
-  async function download(month, schedules, note, layout = DEFAULT_NOTICE_LAYOUT, holidays = {}) {
+  // monthlyNote は { note, revised_on } のオブジェクト（2026-09-15に変更日付を足した際、
+  // 注釈の文字列から差し替えた。5-4）
+  async function download(month, schedules, monthlyNote, layout = DEFAULT_NOTICE_LAYOUT, holidays = {}) {
+    const note = monthlyNote?.note || ''
+    const revisedOn = monthlyNote?.revised_on || ''
     const sel = LAYOUT_SELECTORS[layout] || LAYOUT_SELECTORS[DEFAULT_NOTICE_LAYOUT]
     setBusy(true)
     setError('')
@@ -111,7 +115,7 @@ export default function useBilmenNoticePdfExport() {
       // --- 1. 計測用シート（高さ無制限・全件。今月の注釈があれば見出し直下に含める）を
       //     描き、実際の高さを読む。注釈は1ページ目にしか出さないが、全ページに同じ
       //     （注釈込みの）budgetPxを使う簡略化のため、ここで一緒に測っておく ---
-      setSheetData({ month, layout, mode: 'measure', items, outputDate, note, holidays })
+      setSheetData({ month, layout, mode: 'measure', items, outputDate, note, holidays, revisedOn })
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       const measureRoot = sheetsRef.current
       const sheetEl = measureRoot?.querySelector(sel.sheet)
@@ -142,7 +146,7 @@ export default function useBilmenNoticePdfExport() {
       }
 
       // --- 2. 実測に基づくページ割りで改めて描画し、1ページずつ撮る ---
-      setSheetData({ month, layout, mode: 'print', pages, outputDate, note, holidays })
+      setSheetData({ month, layout, mode: 'print', pages, outputDate, note, holidays, revisedOn })
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       if (!sheetsRef.current) throw new Error('シートの準備に失敗しました')
 
@@ -191,6 +195,7 @@ export default function useBilmenNoticePdfExport() {
                 isLastPage={false}
                 note={sheetData.note}
                 holidays={sheetData.holidays}
+                revisedOn={sheetData.revisedOn}
                 measuring
               />
               {/* 1ページに使える高さを実測するための目盛り（表示はしない。CSS参照）。
@@ -213,6 +218,7 @@ export default function useBilmenNoticePdfExport() {
                 isLastPage={i === sheetData.pages.length - 1}
                 note={sheetData.note}
                 holidays={sheetData.holidays}
+                revisedOn={sheetData.revisedOn}
               />
             ))
           )}
