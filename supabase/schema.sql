@@ -838,8 +838,16 @@ create table if not exists bilmen_masters (
   -- 定例実施月。{1,3,5,7,9,11}。空配列＝自動作成の対象外（随時作業）
   months        int[] not null default '{}',
   day_pattern   text,                           -- 実施日パターン（'月半ば' 等。フリーテキスト）
-  -- 不規則周期のメモ（'2019,2022,2025,2028' / '3年に1回（2025年〜）'）。機械判定はしない
+  -- 周期のメモ（'２年に１回（奇数年）' 等）。人が読むためのもので、判定には使わない
   cycle_pattern text,
+  -- 数年に1回の作業の機械判定用（2026-09-15追加。5-3-1）。
+  --   cycle_years       … 何年に1回か（2=隔年）。null＝毎年実施
+  --   cycle_anchor_year … 実施年の起点。(年 - この値) % cycle_years == 0 の年が対象
+  -- 2つは必ずセット（片方だけでは判定できないため check 制約で縛っている）
+  cycle_years       int check (cycle_years is null or cycle_years between 2 and 50),
+  cycle_anchor_year int check (cycle_anchor_year is null or cycle_anchor_year between 1900 and 2200),
+  constraint bilmen_masters_cycle_pair_check
+    check ((cycle_years is null) = (cycle_anchor_year is null)),
   memo          text,                           -- 管理メモ／注意事項（社内専用）
   remark        text,                           -- 備考
   sort_order    int  not null default 999,      -- 表示順（10, 20, 30…。再採番機能あり）

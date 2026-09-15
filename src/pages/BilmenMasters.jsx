@@ -4,7 +4,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import BilmenMasterForm from '../components/BilmenMasterForm'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
-import { fetchBilmenMasters, renumberBilmenMasters, formatMonths } from '../lib/bilmen'
+import { fetchBilmenMasters, renumberBilmenMasters, formatMonths, formatCycle } from '../lib/bilmen'
 import './Dashboard.css'
 import './Bilmen.css'
 
@@ -162,7 +162,13 @@ export default function BilmenMasters() {
                     <td>
                       {formatMonths(m.months)}
                       {m.day_pattern && <span className="bilmen-pattern">{m.day_pattern}</span>}
-                      {m.cycle_pattern && <span className="bilmen-pattern">{m.cycle_pattern}</span>}
+                      {/* 周期を設定してあるものは判定に使われる値を出す。設定が無いものは
+                          従来どおり人向けのメモ（cycle_pattern）だけを出す（5-3-1） */}
+                      {formatCycle(m) ? (
+                        <span className="bilmen-pattern">{formatCycle(m)}</span>
+                      ) : (
+                        m.cycle_pattern && <span className="bilmen-pattern">{m.cycle_pattern}</span>
+                      )}
                     </td>
                     <td>{m.enter_room ? '✓' : ''}</td>
                     <td>{m.notify ? '✓' : ''}</td>

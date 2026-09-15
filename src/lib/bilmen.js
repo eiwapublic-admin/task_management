@@ -105,9 +105,14 @@ export async function updateBilmenMailSettings(patch) {
   return data.settings
 }
 
+// 宛先は**宛先名順**で返す（2026-09-15の依頼）。サーバー側は FileMaker 由来の
+// sort_order 順で返してくるが、その並びは移行時の登録順でしかなく探しにくいため、
+// ここで並べ替える。Postgres の order by より localeCompare('ja') のほうが
+// 日本語の並びが自然（かなを読みの順に並べられる。漢字は読みが分からないため
+// コードポイント順のままになる点は変わらない）
 export async function fetchBilmenMailRecipients() {
   const data = await authFetch('/api/bilmen/mail/recipients')
-  return data.recipients || []
+  return [...(data.recipients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'))
 }
 
 export async function createBilmenMailRecipient(payload) {
@@ -181,10 +186,26 @@ export function expandMailVariables(text, { month, count }) {
     .replaceAll('%作業件数%', String(count))
 }
 
+// メールの宛先1件を `"宛先名" <アドレス>` の形にする（2026-09-15の依頼。メールソフト上で
+// アドレスだけでなく宛先名が出るようにするため）。
+// **宛先名は必ず二重引用符で囲む**: BCC はカンマ区切りのため、名前に「,」（例: '(株)A, B支店'）が
+// 入っていると囲まないと宛先が分割されてしまう。RFC 5322 の quoted-string に合わせ、
+// 名前の中の「\」と「"」はエスケープする。宛先名が空のときはアドレスだけを返す
+export function formatMailAddress(name, email) {
+  const addr = (email || '').trim()
+  const label = (name || '').trim()
+  if (!addr) return ''
+  if (!label) return addr
+  return `"${label.replace(/([\\"])/g, '\\$1')}" <${addr}>`
+}
+
 // mailto: リンクの組み立て（3-5・7-3 方式B）。宛先は BCC にまとめ、TO は空欄にする
 // （共有アドレス自身が送信元になるため。src/lib/mail.js の buildReplyMailto と同じ考え方）
-export function buildBilmenNoticeMailto(subject, body, recipientEmails) {
-  const bcc = recipientEmails.join(',')
+export function buildBilmenNoticeMailto(subject, body, recipients) {
+  const bcc = (recipients || [])
+    .map((r) => (typeof r === 'string' ? r : formatMailAddress(r?.name, r?.email)))
+    .filter(Boolean)
+    .join(',')
   const params = new URLSearchParams({ subject, body })
   if (bcc) params.set('bcc', bcc)
   return `mailto:?${params.toString().replace(/\+/g, '%20')}`
@@ -196,6 +217,40 @@ export function buildBilmenNoticeMailto(subject, body, recipientEmails) {
 export function formatMonths(months) {
   if (!Array.isArray(months) || months.length === 0) return '随時'
   return months.join(', ')
+}
+
+// ---- 数年に1回の作業の周期（cycle_years / cycle_anchor_year。5-3-1。2026-09-15〜）----
+//
+// これまでは cycle_pattern（'２年に１回（奇数年）' 等のフリーテキスト）を人が読んで
+// 「今年は対象か」を判断し、対象外なら自動作成してから消していた。それを機械判定に置き換える。
+// 「何年に1回か（cycle_years）」と「実施年の起点（cycle_anchor_year）」の2つで表し、
+// 起点から cycle_years 年ごとの年だけを実施年とみなす。
+// cycle_years が無い＝毎年実施（従来どおり）。
+// 判定は worker/lib/bilmen.js の同名関数と必ず揃えること（画面とAPIの両方で使う）
+export function isCycleTargetYear(master, year) {
+  const years = master?.cycle_years
+  const anchor = master?.cycle_anchor_year
+  if (!years || !anchor) return true
+  // 起点より前の年でも「◯年ごと」の並びに乗っていれば対象（剰余が負にならないよう補正）
+  return (((year - anchor) % years) + years) % years === 0
+}
+
+// 周期の表示（'2年に1回（2025年から）'）。毎年の作業は空文字
+export function formatCycle(master) {
+  const years = master?.cycle_years
+  const anchor = master?.cycle_anchor_year
+  if (!years || !anchor) return ''
+  return `${years}年に1回（${anchor}年から）`
+}
+
+// 指定年より後で、次に実施年になる年（対象外の理由を示すために使う）
+export function nextCycleYear(master, year) {
+  const years = master?.cycle_years
+  const anchor = master?.cycle_anchor_year
+  if (!years || !anchor) return null
+  let next = year + 1
+  while (!isCycleTargetYear(master, next)) next += 1
+  return next
 }
 
 // 予定日付を 'mm/dd' にする（一覧・PDFの年月ヘッダで年は分かるため年を出さない。修正依頼）

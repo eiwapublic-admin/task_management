@@ -25,7 +25,7 @@ async function requireMailAccess(req) {
 const MASTER_COLUMNS =
   'id, master_no, title, title_note, content, notice, place, enter_room, notify, jurisdiction, ' +
   'vendor_code, vendor_name, worker_name, prep_note, plan_start, plan_end, months, day_pattern, ' +
-  'cycle_pattern, memo, remark, sort_order, disabled, created_at, updated_at'
+  'cycle_pattern, cycle_years, cycle_anchor_year, memo, remark, sort_order, disabled, created_at, updated_at'
 
 const SCHEDULE_COLUMNS =
   'id, work_no, master_id, target_month, plan_date, plan_start, plan_end, title, title_note, content, ' +
@@ -83,6 +83,27 @@ function monthsArray(value) {
     if (Number.isInteger(n) && n >= 1 && n <= 12) set.add(n)
   }
   return [...set].sort((a, b) => a - b)
+}
+
+// 数年に1回の作業の周期（cycle_years / cycle_anchor_year。5-3-1）。
+// 2つは必ずセットで、片方だけ来たら両方 null に倒す（DB の check 制約と同じ扱い）。
+// 範囲外の値も制約に弾かれて 500 になるだけなので、ここで落としておく
+function cyclePair(payload) {
+  const years = Number(payload?.cycle_years)
+  const anchor = Number(payload?.cycle_anchor_year)
+  const validYears = Number.isInteger(years) && years >= 2 && years <= 50
+  const validAnchor = Number.isInteger(anchor) && anchor >= 1900 && anchor <= 2200
+  if (!validYears || !validAnchor) return { cycle_years: null, cycle_anchor_year: null }
+  return { cycle_years: years, cycle_anchor_year: anchor }
+}
+
+// その年が実施年か（毎年の作業は常に true）。src/lib/bilmen.js の同名関数と同じ判定
+function isCycleTargetYear(master, year) {
+  const years = master?.cycle_years
+  const anchor = master?.cycle_anchor_year
+  if (!years || !anchor) return true
+  // 起点より前の年でも「◯年ごと」の並びに乗っていれば対象（剰余が負にならないよう補正）
+  return (((year - anchor) % years) + years) % years === 0
 }
 
 // 'YYYY-MM' を n か月ずらす（src/lib/reports.js の shiftMonth と同じ計算）
@@ -185,6 +206,7 @@ function buildMasterRow(payload) {
       months: monthsArray(payload?.months),
       day_pattern: trimOrNull(payload?.day_pattern, 100),
       cycle_pattern: trimOrNull(payload?.cycle_pattern, 200),
+      ...cyclePair(payload),
       memo: trimOrNull(payload?.memo),
       remark: trimOrNull(payload?.remark),
       sort_order: Number.isFinite(Number(payload?.sort_order)) ? Number(payload.sort_order) : 999,
@@ -618,7 +640,9 @@ export async function handleBilmenMonthlyNoteUpdate(req) {
 
 // GET /api/bilmen/schedules/generate?month=YYYY-MM
 // 自動作成モーダルを開いたときの候補一覧。対象月を months に含む有効なマスタを返し、
-// 既に同じ月・同じマスタの予定があるものには created:true を立てる（二重作成の防止。5-3）
+// 既に同じ月・同じマスタの予定があるものには created:true を立てる（二重作成の防止。5-3）。
+// 数年に1回の作業には in_cycle を立て、その年が実施年でなければ false にする
+// （2026-09-15。5-3-1。従来は cycle_pattern のメモを人が読んで判断していた）
 export async function handleBilmenGenerateCandidates(req) {
   const { error } = await requireAuth(req)
   if (error) return error
@@ -626,6 +650,7 @@ export async function handleBilmenGenerateCandidates(req) {
     const month = new URL(req.url).searchParams.get('month') || ''
     if (!MONTH_PATTERN.test(month)) return json({ error: '対象年月は YYYY-MM 形式で指定してください' }, 400)
     const monthNumber = Number(month.slice(5, 7))
+    const year = Number(month.slice(0, 4))
 
     const supabase = getAdminClient()
     const { data: masters, error: mastersErr } = await supabase
@@ -653,7 +678,11 @@ export async function handleBilmenGenerateCandidates(req) {
 
     return json({
       month,
-      candidates: (masters || []).map((m) => ({ ...m, created: createdIds.has(m.id) })),
+      candidates: (masters || []).map((m) => ({
+        ...m,
+        created: createdIds.has(m.id),
+        in_cycle: isCycleTargetYear(m, year),
+      })),
     })
   } catch (err) {
     console.error('bilmen-generate-candidates 失敗:', err)
