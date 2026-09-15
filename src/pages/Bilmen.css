@@ -277,6 +277,11 @@ a.btn-primary.is-disabled {
 
 .bilmen-generate-item.is-created { background: var(--bg-subtle); color: var(--text-muted); }
 
+/* 数年に1回の作業で、その年が実施年でないもの（5-3-1。2026-09-15〜）。
+   作成済みと違ってチェックは付けられる（例外的に実施するケースがあるため）ので、
+   地は変えずに文字だけ落として「既定では作らない」ことを示す */
+.bilmen-generate-item.is-out-of-cycle .bilmen-generate-title { color: var(--text-muted); }
+
 .bilmen-generate-item > .bilmen-check-field { flex: 1 1 auto; min-width: 0; }
 
 .bilmen-generate-title { display: block; }

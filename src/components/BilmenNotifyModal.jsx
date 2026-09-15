@@ -39,11 +39,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   const subject = settings ? expandMailVariables(settings.subject, { month, count: targets.length }) : ''
   const body = settings ? expandMailVariables(settings.body, { month, count: targets.length }) : ''
   const mailtoUrl = settings
-    ? buildBilmenNoticeMailto(
-        subject,
-        body,
-        activeRecipients.map((r) => r.email),
-      )
+    ? buildBilmenNoticeMailto(subject, body, activeRecipients)
     : '#'
 
   return (

@@ -46,6 +46,10 @@ export default function BilmenMasterForm({
   const [months, setMonths] = useState(() => new Set(existing?.months || []))
   const [dayPattern, setDayPattern] = useState(existing?.day_pattern || '')
   const [cyclePattern, setCyclePattern] = useState(existing?.cycle_pattern || '')
+  const [cycleYears, setCycleYears] = useState(existing?.cycle_years != null ? String(existing.cycle_years) : '')
+  const [cycleAnchorYear, setCycleAnchorYear] = useState(
+    existing?.cycle_anchor_year != null ? String(existing.cycle_anchor_year) : '',
+  )
   const [memo, setMemo] = useState(existing?.memo || '')
   const [remark, setRemark] = useState(existing?.remark || '')
   const [sortOrder, setSortOrder] = useState(existing?.sort_order != null ? String(existing.sort_order) : '999')
@@ -65,6 +69,19 @@ export default function BilmenMasterForm({
     setTimeout(() => setCloseTabFailed(true), 300)
   }
 
+  // 入力した周期で実際にどの年が対象になるかを出す（5-3-1）。起点より前は出さず、
+  // 今年（または起点）以降の直近4回ぶんだけ並べる。入力が揃っていなければ空文字
+  const cyclePreview = (() => {
+    const years = Number(cycleYears)
+    const anchor = Number(cycleAnchorYear)
+    if (!Number.isInteger(years) || years < 2 || years > 50) return ''
+    if (!Number.isInteger(anchor) || anchor < 1900 || anchor > 2200) return ''
+    const thisYear = new Date().getFullYear()
+    // 今年以降で最初に来る実施年から数える（起点が未来ならその起点から）
+    const start = anchor >= thisYear ? anchor : anchor + Math.ceil((thisYear - anchor) / years) * years
+    return Array.from({ length: 4 }, (_, i) => `${start + i * years}年`).join('・')
+  })()
+
   // ×・オーバーレイクリックでの閉じ方も、別タブで開かれている場合はタブごと閉じる
   // （モーダルだけ閉じてもマスタ一覧が残るだけで、元の画面には戻れないため）
   const handleDismiss = openedAsJumpTab ? handleCloseTab : onClose
@@ -83,6 +100,20 @@ export default function BilmenMasterForm({
     if (!title.trim()) return setError('作業名は必須です')
     const no = Number(masterNo)
     if (!Number.isInteger(no) || no <= 0) return setError('作業マスタIDは1以上の整数で入力してください')
+
+    // 周期は「◯年に1回」と「起点の年」がセットで初めて判定できる（5-3-1）。
+    // 片方だけだと黙って毎年扱いになってしまうため、ここで気づけるようにする
+    const years = cycleYears.trim() ? Number(cycleYears) : null
+    const anchor = cycleAnchorYear.trim() ? Number(cycleAnchorYear) : null
+    if ((years === null) !== (anchor === null)) {
+      return setError('周期は「何年に1回」と「起点の年」の両方を入力してください（毎年の作業は両方とも空欄）')
+    }
+    if (years !== null && (!Number.isInteger(years) || years < 2 || years > 50)) {
+      return setError('周期の「何年に1回」は2〜50の整数で入力してください')
+    }
+    if (anchor !== null && (!Number.isInteger(anchor) || anchor < 1900 || anchor > 2200)) {
+      return setError('周期の「起点の年」は1900〜2200の範囲で入力してください')
+    }
 
     setSaving(true)
     try {
@@ -105,6 +136,8 @@ export default function BilmenMasterForm({
         months: [...months].sort((a, b) => a - b),
         day_pattern: dayPattern,
         cycle_pattern: cyclePattern,
+        cycle_years: years,
+        cycle_anchor_year: anchor,
         memo,
         remark,
         sort_order: Number(sortOrder) || 999,
@@ -214,28 +247,65 @@ export default function BilmenMasterForm({
             <p className="ui-note">すべて外すと「随時」（予定の自動作成の対象外）になります。</p>
           </fieldset>
 
-          <div className="report-fields bilmen-halves">
+          <label className="ui-field">
+            <span>実施日パターン</span>
+            <input
+              type="text"
+              className="ui-input"
+              placeholder="月半ば 等"
+              value={dayPattern}
+              onChange={(e) => setDayPattern(e.target.value)}
+            />
+          </label>
+
+          {/* 数年に1回の作業の周期（5-3-1。2026-09-15〜）。ここを入れておくと、予定の自動作成が
+              実施年でない年を自動で外してくれる（従来は「周期のメモ」を人が読んで判断していた） */}
+          <fieldset className="bilmen-fieldset">
+            <legend>周期（毎年でない作業）</legend>
+            <div className="report-fields bilmen-halves">
+              <label className="ui-field">
+                <span>何年に1回</span>
+                <input
+                  type="number"
+                  className="ui-input"
+                  inputMode="numeric"
+                  min="2"
+                  max="50"
+                  placeholder="2"
+                  value={cycleYears}
+                  onChange={(e) => setCycleYears(e.target.value)}
+                />
+              </label>
+              <label className="ui-field">
+                <span>起点の年（実施した年）</span>
+                <input
+                  type="number"
+                  className="ui-input"
+                  inputMode="numeric"
+                  min="1900"
+                  max="2200"
+                  placeholder="2025"
+                  value={cycleAnchorYear}
+                  onChange={(e) => setCycleAnchorYear(e.target.value)}
+                />
+              </label>
+            </div>
+            <p className="ui-note">
+              {cyclePreview
+                ? `${cyclePreview} が実施年になります（以降も同じ間隔で続きます）。`
+                : '毎年実施する作業は両方とも空欄にしてください。例: 「2年に1回・奇数年」なら 2 と 2025。'}
+            </p>
             <label className="ui-field">
-              <span>実施日パターン</span>
+              <span>周期のメモ（人向け。判定には使いません）</span>
               <input
                 type="text"
                 className="ui-input"
-                placeholder="月半ば 等"
-                value={dayPattern}
-                onChange={(e) => setDayPattern(e.target.value)}
-              />
-            </label>
-            <label className="ui-field">
-              <span>周期のメモ</span>
-              <input
-                type="text"
-                className="ui-input"
-                placeholder="3年に1回（2025年〜） 等"
+                placeholder="２年に１回（奇数年） 等"
                 value={cyclePattern}
                 onChange={(e) => setCyclePattern(e.target.value)}
               />
             </label>
-          </div>
+          </fieldset>
 
           <div className="report-fields bilmen-halves">
             <label className="ui-field">
