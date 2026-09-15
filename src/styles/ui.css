@@ -1210,6 +1210,20 @@ input.ui-input[type="datetime-local"] {
   gap: var(--space-3);
 }
 
+/* 入力の誤りを、本文（.ui-modal-body）の外＝スクロールしない位置に出すための帯。
+   縦に長いフォームでは本文の先頭に置くと、下の方を編集している間は画面外に隠れて
+   気づけない（2026-09-15、作業マスタの編集で発生）。フッターの真上に固定する */
+.ui-modal-alert {
+  flex-shrink: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--due-overdue);
+  background: color-mix(in srgb, var(--due-overdue) 10%, var(--bg-surface));
+  color: var(--due-overdue);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
 .ui-modal-foot {
   display: flex;
   align-items: center;

@@ -488,7 +488,11 @@ export default function Bilmen() {
 
       {generating && (
         <BilmenGenerateForm
-          defaultMonth={shiftMonth(currentMonthJST(), 1)}
+          /* 対象年月の既定は「画面で選んでいる年月」（2026-09-15）。
+             以前は今日から見た翌月に決め打ちしていたため、◀▶で11月に移してから
+             自動作成を押しても10月が対象になってしまっていた。
+             翌月分を作るときは▶で1つ進めてから押す（モーダル内でも変更できる） */
+          defaultMonth={month}
           onClose={() => setGenerating(false)}
           onGenerated={handleGenerated}
         />
