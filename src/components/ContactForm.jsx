@@ -2,7 +2,7 @@ import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import Combobox from './Combobox'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
-import { IconPhone, IconMail, IconGlobe } from './Icons'
+import { IconPhone, IconMobile, IconMail, IconGlobe } from './Icons'
 import { createContact, updateContact, deleteContact, buildContactMailto, toExternalUrl } from '../lib/contacts'
 
 // 連絡帳の追加・編集モーダル（2026-08-31〜）。EquipmentItemForm・DocumentTemplateFormと同じ
@@ -157,7 +157,7 @@ export default function ContactForm({ existing, categories, assignees, onClose, 
                     aria-label={`携帯に電話（${mobilePhone.trim()}）`}
                     title={`携帯に電話（${mobilePhone.trim()}）`}
                   >
-                    <IconPhone size={18} />
+                    <IconMobile size={18} />
                   </a>
                 )}
               </div>

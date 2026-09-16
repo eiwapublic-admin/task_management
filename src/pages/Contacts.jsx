@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ContactForm from '../components/ContactForm'
-import { IconSearch, IconPhone, IconMail, IconGlobe } from '../components/Icons'
+import { IconSearch, IconPhone, IconMobile, IconMail, IconGlobe } from '../components/Icons'
 import {
   fetchContacts,
   fetchContactCategories,
@@ -240,7 +240,7 @@ export default function Contacts() {
                                 aria-label={`携帯に電話（${c.mobile_phone}）`}
                                 title={`携帯に電話（${c.mobile_phone}）`}
                               >
-                                <IconPhone size={18} />
+                                <IconMobile size={18} />
                               </a>
                             )}
                             {mailto && (

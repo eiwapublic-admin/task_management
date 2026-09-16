@@ -266,6 +266,17 @@ export function IconPhone(props) {
 }
 
 // メール新規作成（mailto: リンク用）
+// 携帯電話（2026-09-16）。連絡帳では会社電話（IconPhone＝受話器）とすぐ隣に並ぶため、
+// ひと目で見分けが付くようスマートフォンの筐体の形にしている
+export function IconMobile(props) {
+  return (
+    <Icon {...props}>
+      <rect x="7" y="2" width="10" height="20" rx="2" />
+      <path d="M10.5 18.5h3" />
+    </Icon>
+  )
+}
+
 export function IconMail(props) {
   return (
     <Icon {...props}>
