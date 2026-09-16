@@ -35,9 +35,22 @@ export async function syncContactsFromTasks() {
 // 新規メール作成用の mailto: リンクを組み立てる。TOに加え、登録されたCC（定例で付ける先）を
 // 自動で付与する。返信ではなく新規作成のため、件名・本文は入れない
 export function buildContactMailto(contact) {
-  if (!contact?.email_to) return null
+  const to = (contact?.email_to || '').trim()
+  if (!to) return null
+  const cc = (contact?.email_cc || '').trim()
   const params = new URLSearchParams()
-  if (contact.email_cc) params.set('cc', contact.email_cc)
+  if (cc) params.set('cc', cc)
   const query = params.toString()
-  return `mailto:${encodeURIComponent(contact.email_to)}${query ? `?${query}` : ''}`
+  return `mailto:${encodeURIComponent(to)}${query ? `?${query}` : ''}`
+}
+
+// ホームページを外部ブラウザで開くためのURL。登録値に 'www.example.com' のように
+// スキームが無いものが混ざっており、そのまま href に入れるとアプリ内の**相対パス**として
+// 解釈されて 404 になる（2026-09-16）。スキームが無ければ https:// を補う。
+// http(s) 以外（javascript: 等）は開かない
+export function toExternalUrl(url) {
+  const raw = (url || '').trim()
+  if (!raw) return null
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`
+  return /^https?:\/\//i.test(withScheme) ? withScheme : null
 }

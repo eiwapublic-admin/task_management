@@ -30,3 +30,48 @@
   gap: var(--space-1);
   white-space: nowrap;
 }
+
+/* 連絡先の編集画面：項目の見出しの右に発信アイコンを置く行（2026-09-16。依頼）。
+   .ui-field の中に入れるため、見出しの字面は .ui-field > span/label と同じにしておく
+   （直下の子でなくなり共通指定が当たらないため）。
+   アイコンは .icon-btn-phone 等（--control-h-sm）なので、値が空でアイコンが消えても
+   見出しの高さが動かないよう min-height を揃えておく */
+.contact-field-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  min-width: 0;
+}
+
+.contact-field-head > span,
+.contact-field-head > label {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* メールは「メール」1つの見出しの下にTO・CCの2行を置き、それぞれの入力欄の左に
+   TO: / CC: を添える。幅は固定にして2行の入力欄の左端を揃える */
+.contact-mail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.contact-mail-prefix {
+  flex: none;
+  width: 2.4em;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* flex アイテムの既定 min-width:auto は、中身（<input> なら既定の size=20 ぶん）より
+   細くならない。今の文言・幅では実測 390px でも効いてこないが、TO:/CC: のラベルぶん
+   狭くなっている行なので、この先ラベルが増えたり画面が狭くなったときに
+   押し出されないよう 0 にしておく（.ui-field-row > .ui-field と同じ扱い） */
+.contact-mail-row > .ui-input {
+  flex: 1 1 0;
+  min-width: 0;
+}

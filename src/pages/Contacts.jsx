@@ -3,7 +3,13 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ContactForm from '../components/ContactForm'
 import { IconSearch, IconPhone, IconMail, IconGlobe } from '../components/Icons'
-import { fetchContacts, fetchContactCategories, syncContactsFromTasks, buildContactMailto } from '../lib/contacts'
+import {
+  fetchContacts,
+  fetchContactCategories,
+  syncContactsFromTasks,
+  buildContactMailto,
+  toExternalUrl,
+} from '../lib/contacts'
 import { fetchSettings } from '../lib/tasks'
 import './Dashboard.css'
 import './Contacts.css'
@@ -208,6 +214,9 @@ export default function Contacts() {
                     </tr>
                     {g.rows.map((c) => {
                       const mailto = buildContactMailto(c)
+                      // 'www.example.com' のようにスキームの無い登録値があり、そのままだと
+                      // アプリ内の相対パス扱いになって開けない（2026-09-16）
+                      const website = toExternalUrl(c.website_url)
                       return (
                         <tr key={c.id} className="contact-row" onClick={() => setEditingContact(c)}>
                           <td>{c.company_name}</td>
@@ -244,10 +253,10 @@ export default function Contacts() {
                                 <IconMail size={18} />
                               </a>
                             )}
-                            {c.website_url && (
+                            {website && (
                               <a
                                 className="icon-btn-globe"
-                                href={c.website_url}
+                                href={website}
                                 target="_blank"
                                 rel="noreferrer"
                                 aria-label="ホームページを開く"
