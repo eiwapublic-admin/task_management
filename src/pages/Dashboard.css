@@ -1907,32 +1907,27 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   border-color: var(--due-soon);
 }
 
-.parking-card-violations { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-
-.parking-violation-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  /* 2026-08-19: 読みやすさのため fs-xs(12px) → fs-sm(13px) に拡大 */
-  font-size: var(--fs-sm);
-  color: var(--text-base);
-}
-
-/* 違反車両の更新画面（ParkingViolationDetail.jsx）だけ、見出しと同程度の大きさに
-   拡大する（2026-08-19。日報詳細のカード側 .parking-violation-chip は対象外のため
-   共通クラスは変えず修飾クラスを分けた）。
-   2026-09-28: iPhoneでチェックボックスが小さく詰まっていて押しにくいとの指摘を受け、
-   横並びの折り返しから2列前後のグリッドに変え、1項目ずつを枠で囲って指で押せる
-   大きさ（高さ44px以上）のタップ領域にした。日報詳細のカード側は従来どおり */
-.parking-card-violations.is-lg {
+/* 違反の種類のチェックボックス。iPhoneで指で押せる大きさにするため、横並びの
+   折り返しではなく2列前後のグリッドに並べ、1項目ずつを枠で囲って高さ44px以上の
+   タップ領域にしている。
+   経緯: 2026-08-19に文字とチェックボックスを一段大きくし（fs-md・18px）、
+   2026-09-28にこの形（22px・枠付き・グリッド）へ広げた。当初は違反車両一覧の
+   詳細モーダル（ParkingViolationDetail.jsx）だけを対象にした修飾クラス .is-lg
+   だったが、**日報詳細のカード側（ReportParkingViolations.jsx）も同じにしたい**との
+   依頼で基底クラスへ統合した（2026-09-28）。2画面で見た目を分ける理由が無くなったため、
+   .is-lg そのものを廃止している */
+.parking-card-violations {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-2);
 }
 
-.parking-violation-chip.is-lg {
+.parking-violation-chip {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
   font-size: var(--fs-md);
+  color: var(--text-base);
   /* ラベル全体をタップ領域にする（文字だけでなく枠内のどこを押しても切り替わる） */
   min-height: 44px;
   padding: var(--space-2) var(--space-3);
@@ -1942,11 +1937,11 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 }
 /* 選択中は枠と下地で分かるようにする。:has() 非対応の古い端末では
    チェックボックスの状態だけで判別でき、表示が壊れることはない */
-.parking-card-violations.is-lg .parking-violation-chip.is-lg:has(input:checked) {
+.parking-violation-chip:has(input:checked) {
   border-color: var(--color-primary);
   background: var(--color-primary-weak);
 }
-.parking-violation-chip.is-lg input[type='checkbox'] {
+.parking-violation-chip input[type='checkbox'] {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
