@@ -9,6 +9,7 @@ import {
   recognizeParkingPhoto,
   sanitizePlateNumber,
   VIOLATION_LABELS,
+  UNKNOWN_OWNER,
   jstDateOnly,
   jstTimeOnly,
 } from '../lib/reports'
@@ -201,6 +202,14 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
   function toggleType(type) {
     if (readOnly) return
     setViolationTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
+    // 無断駐車＝テナントが特定できていない記録がほとんどなので、
+    // 空欄のときだけ「（不明）」を先に入れておく（2026-09-28。依頼）。
+    // **既に入っている値は上書きしない**——テナントの車が無断駐車するケースが実際にあり
+    // （実データでも同一テナント名で無断駐車の記録が複数ある）、消してしまうと情報が失われるため。
+    // 外したときも空には戻さない（戻す判断は人に委ねる）
+    if (type === 'unrecorded' && !violationTypes.includes(type) && !ownerCompany.trim()) {
+      setOwnerCompany(UNKNOWN_OWNER)
+    }
   }
 
   async function handleSave() {
@@ -415,17 +424,6 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             </div>
           </div>
 
-          <div className="report-field">
-            <Combobox
-              value={ownerCompany}
-              onChange={setOwnerCompany}
-              options={options.owner}
-              placeholder="所有会社・訪問先"
-              disabled={readOnly}
-              className={ownerCompany ? '' : 'is-required-empty'}
-            />
-          </div>
-
           <div className="parking-card-violations">
             {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
               <label key={key} className="parking-violation-chip">
@@ -438,6 +436,17 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
                 {label}
               </label>
             ))}
+          </div>
+
+          <div className="report-field">
+            <Combobox
+              value={ownerCompany}
+              onChange={setOwnerCompany}
+              options={options.owner}
+              placeholder="所有会社・訪問先"
+              disabled={readOnly}
+              className={ownerCompany ? '' : 'is-required-empty'}
+            />
           </div>
 
           <label className="report-field chlorine-note-field">

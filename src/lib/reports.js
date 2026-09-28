@@ -421,6 +421,12 @@ export function halfMonthDayRanges(month) {
 
 // ---- 不正駐車（Phase 4。2026-08-05〜）----
 
+// テナント（所有会社・訪問先）が分からないときに入れる決まり文句（2026-09-28）。
+// 以前は「不明」「2階不明」など書き方がまちまちで、履歴からの候補選択（Combobox）に
+// 同じ意味の値が並んでしまっていたため、この1つに統一した。
+// 無断駐車を選んだときの自動セットにも使う
+export const UNKNOWN_OWNER = '（不明）'
+
 export const VIOLATION_LABELS = {
   unrecorded: '無断駐車',
   false_entry: '虚偽記入',
