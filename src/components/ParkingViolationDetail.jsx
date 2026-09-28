@@ -426,9 +426,9 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             />
           </div>
 
-          <div className="parking-card-violations is-lg">
+          <div className="parking-card-violations">
             {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
-              <label key={key} className="parking-violation-chip is-lg">
+              <label key={key} className="parking-violation-chip">
                 <input
                   type="checkbox"
                   checked={violationTypes.includes(key)}
