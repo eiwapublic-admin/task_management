@@ -1920,15 +1920,64 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 /* 違反車両の更新画面（ParkingViolationDetail.jsx）だけ、見出しと同程度の大きさに
    拡大する（2026-08-19。日報詳細のカード側 .parking-violation-chip は対象外のため
-   共通クラスは変えず修飾クラスを分けた） */
+   共通クラスは変えず修飾クラスを分けた）。
+   2026-09-28: iPhoneでチェックボックスが小さく詰まっていて押しにくいとの指摘を受け、
+   横並びの折り返しから2列前後のグリッドに変え、1項目ずつを枠で囲って指で押せる
+   大きさ（高さ44px以上）のタップ領域にした。日報詳細のカード側は従来どおり */
+.parking-card-violations.is-lg {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
 .parking-violation-chip.is-lg {
-  gap: 6px;
+  gap: var(--space-2);
   font-size: var(--fs-md);
+  /* ラベル全体をタップ領域にする（文字だけでなく枠内のどこを押しても切り替わる） */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+/* 選択中は枠と下地で分かるようにする。:has() 非対応の古い端末では
+   チェックボックスの状態だけで判別でき、表示が壊れることはない */
+.parking-card-violations.is-lg .parking-violation-chip.is-lg:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-weak);
 }
 .parking-violation-chip.is-lg input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--color-primary);
 }
+
+/* 違反車両の更新画面の日時欄（2026-09-28）。「日時」ラベル＋日付＋時刻を1行に収める。
+   時刻はTimeInput（4桁のテンキー入力）のため内容に合わせた固定幅で足り、
+   余った幅は日付側へ渡す */
+.parking-datetime-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.parking-datetime-label {
+  flex-shrink: 0;
+  font-size: var(--fs-md);
+  color: var(--text-muted);
+}
+.parking-datetime-row input {
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: var(--fs-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-base);
+}
+.parking-datetime-date { flex: 1 1 auto; }
+.parking-datetime-time { flex: 0 0 4.5em; text-align: center; }
 
 .parking-card-note {
   width: 100%;

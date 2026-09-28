@@ -257,20 +257,27 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             </p>
           )}
 
-          <div className="report-fields is-halves">
-            <label className="report-field">
-              <span>日付</span>
-              <input
-                type="date"
-                value={checkedDate}
-                disabled={readOnly}
-                onChange={(e) => setCheckedDate(e.target.value)}
-              />
-            </label>
-            <label className="report-field">
-              <span>時刻</span>
-              <TimeInput value={checkedTime} disabled={readOnly} onChange={setCheckedTime} />
-            </label>
+          {/* 日付・時刻は「日時」ラベルごと1行に収める（2026-09-28）。下の違反の種類を
+              iPhoneで押しやすい大きさに広げた分、その上の縦幅を詰める必要があったため、
+              ラベルを入力欄の上ではなく日付の左へ移す構成に変更した（以前は
+              「日付」「時刻」をそれぞれラベル付きで2列に並べていた） */}
+          <div className="parking-datetime-row">
+            <span className="parking-datetime-label">日時</span>
+            <input
+              type="date"
+              className="parking-datetime-date"
+              value={checkedDate}
+              disabled={readOnly}
+              onChange={(e) => setCheckedDate(e.target.value)}
+              aria-label="日付"
+            />
+            <TimeInput
+              className="parking-datetime-time"
+              value={checkedTime}
+              disabled={readOnly}
+              onChange={setCheckedTime}
+              aria-label="時刻"
+            />
           </div>
 
           <div className="parking-card-photos">
@@ -419,7 +426,7 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
             />
           </div>
 
-          <div className="parking-card-violations">
+          <div className="parking-card-violations is-lg">
             {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
               <label key={key} className="parking-violation-chip is-lg">
                 <input
