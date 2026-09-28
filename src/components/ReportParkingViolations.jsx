@@ -11,6 +11,7 @@ import {
   fetchPhotoObjectUrl,
   sanitizePlateNumber,
   VIOLATION_LABELS,
+  UNKNOWN_OWNER,
 } from '../lib/reports'
 import { prepareImage, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
@@ -208,7 +209,16 @@ export default function ReportParkingViolations({ reportId, readOnly, filterIds,
   function toggleViolationType(v, type) {
     const has = v.violations.includes(type)
     const next = has ? v.violations.filter((t) => t !== type) : [...v.violations, type]
-    patchViolation(v.id, { violations: next })
+    const patch = { violations: next }
+    // 無断駐車＝テナントが特定できていない記録がほとんどなので、
+    // 空欄のときだけ「（不明）」を先に入れておく（2026-09-28。依頼）。
+    // **既に入っている値は上書きしない**——テナントの車が無断駐車するケースが実際にあり
+    // （実データでも同一テナント名で無断駐車の記録が複数ある）、消してしまうと情報が失われるため。
+    // 外したときも空には戻さない（戻す判断は人に委ねる）
+    if (type === 'unrecorded' && !has && !(v.owner_company || '').trim()) {
+      patch.owner_company = UNKNOWN_OWNER
+    }
+    patchViolation(v.id, patch)
   }
 
   async function handleDeleteViolation(id) {
@@ -551,17 +561,6 @@ function ParkingCard({
             disabled={readOnly}
           />
         </div>
-        {/* 所有会社・訪問先は必須項目。不明な場合は「（不明）」と入力する運用のため、
-            未入力のときはプレースホルダとオレンジの枠でその旨を示す（2026-08-19）。
-            自動保存のカードのため保存自体はブロックしない（入力を促す表示のみ） */}
-        <Combobox
-          value={v.owner_company || ''}
-          onChange={(text) => onPatch({ owner_company: text })}
-          options={options.owner}
-          placeholder="所有会社・訪問先（必須。不明な場合は「（不明）」）"
-          disabled={readOnly}
-          className={v.owner_company ? '' : 'is-required-empty'}
-        />
         <div className="parking-card-violations">
           {Object.entries(VIOLATION_LABELS).map(([key, label]) => (
             <label key={key} className="parking-violation-chip">
@@ -575,6 +574,17 @@ function ParkingCard({
             </label>
           ))}
         </div>
+        {/* 所有会社・訪問先は必須項目。不明な場合は「（不明）」と入力する運用のため、
+            未入力のときはプレースホルダとオレンジの枠でその旨を示す（2026-08-19）。
+            自動保存のカードのため保存自体はブロックしない（入力を促す表示のみ） */}
+        <Combobox
+          value={v.owner_company || ''}
+          onChange={(text) => onPatch({ owner_company: text })}
+          options={options.owner}
+          placeholder="所有会社・訪問先（必須。不明な場合は「（不明）」）"
+          disabled={readOnly}
+          className={v.owner_company ? '' : 'is-required-empty'}
+        />
         <textarea
           className="parking-card-note"
           rows={2}
