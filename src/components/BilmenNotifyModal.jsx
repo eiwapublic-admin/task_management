@@ -194,6 +194,36 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                     {/* 下書きはサーバーが持つ共有アドレスのトークンで作るため、端末でどの Google
                         アカウントにログインしていても送信元は共有アドレスになる（2026-09-29に文言を修正） */}
                     <p className="bilmen-notify-method-note">送信元は、eiwa.public@gmail.com となります。</p>
+                    {/* Gmail の画面から送ると Reply-To が落ちる（Gmail がメールを組み立て直すため。
+                        実機で確認済み・7-3-3）ので、返信先は本文の末尾に書き添える（2026-09-29の依頼） */}
+                    {replyTo && (
+                      <p className="bilmen-notify-method-note is-muted">
+                        本文の末尾に「ご返信は {replyTo} までお願いいたします。」を付けて作成します。
+                      </p>
+                    )}
+
+                    {/* 作成後は「下書きを開く」をこの枠の中に出す（2026-09-29の依頼。以前は2列の下に
+                        別枠で出していたが、操作の流れが分かりにくく、画面の下に隠れて気づきにくかった） */}
+                    {draftStep === 'done' && draftResult && (
+                      <div className="bilmen-notify-done" role="status">
+                        <p className="bilmen-notify-done-title">✓ 下書きを作成しました</p>
+                        <p className="bilmen-notify-method-note">
+                          宛先 {draftResult.recipient_count} 件・連絡票を添付。<strong>まだ送信されていません。</strong>
+                        </p>
+                        <a
+                          className="btn-primary bilmen-notify-open"
+                          href={draftResult.draft_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Gmail で下書きを開く
+                        </a>
+                        {/* 下書きが直接開かなかったときの逃げ道。普段は使わないので小さく添えるだけ */}
+                        <a className="bilmen-notify-sublink" href={draftResult.drafts_url} target="_blank" rel="noreferrer">
+                          開かないときは下書きフォルダへ
+                        </a>
+                      </div>
+                    )}
 
                     <div className="bilmen-notify-method-actions">
                       <button
@@ -214,30 +244,6 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                   </div>
                 </section>
               </div>
-
-              {/* Gmail方式の完了表示。iPhone幅では1列が約160pxしかなく、列の中に置くと
-                  リンクのボタンや説明が縦に潰れて読めないため、2列の下に全幅で出す */}
-              {draftStep === 'done' && draftResult ? (
-                <div className="bilmen-notify-done" role="status">
-                  <p className="bilmen-notify-done-title">Gmail方式：下書きを作成しました</p>
-                  <p>
-                    宛先 <strong>{draftResult.recipient_count}</strong> 件・連絡票を添付。<strong>まだ送信されていません</strong>。
-                    Gmail で中身を確かめてから送信してください。
-                  </p>
-                  <div className="bilmen-notify-done-actions">
-                    <a className="btn-primary" href={draftResult.draft_url} target="_blank" rel="noreferrer">
-                      Gmail で下書きを開く
-                    </a>
-                    <a className="btn-plain" href={draftResult.drafts_url} target="_blank" rel="noreferrer">
-                      下書きフォルダを開く
-                    </a>
-                  </div>
-                  <p className="bilmen-notify-method-note">
-                    直接開かないときは「下書きフォルダを開く」から、いちばん上の下書きを開いてください。
-                    「下書きをもう一度作成」を押すと<strong>別の下書きがもう1通</strong>できます。
-                  </p>
-                </div>
-              ) : null}
             </>
           )}
         </div>
