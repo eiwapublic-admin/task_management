@@ -22,6 +22,7 @@ const EMPTY_RECIPIENT = { name: '', email: '', note: '', disabled: false }
 export default function BilmenMail() {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [replyTo, setReplyTo] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const [recipients, setRecipients] = useState([])
   const [drafts, setDrafts] = useState({}) // id -> 編集中の値（保存前）
@@ -38,6 +39,7 @@ export default function BilmenMail() {
       const [settings, recipientRows] = await Promise.all([fetchBilmenMailSettings(), fetchBilmenMailRecipients()])
       setSubject(settings.subject)
       setBody(settings.body)
+      setReplyTo(settings.reply_to || '')
       setRecipients(recipientRows)
       setDrafts({})
     } catch (err) {
@@ -56,8 +58,9 @@ export default function BilmenMail() {
     setError('')
     setInfo('')
     try {
-      await updateBilmenMailSettings({ subject, body })
-      setInfo('文面を保存しました。')
+      const saved = await updateBilmenMailSettings({ subject, body, reply_to: replyTo })
+      setReplyTo(saved.reply_to || '')
+      setInfo('文面と返信先を保存しました。')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -137,11 +140,27 @@ export default function BilmenMail() {
         ) : (
           <>
             <section className="bilmen-fieldset">
-              <h2 className="ui-page-title">案内メールの文面</h2>
+              <h2 className="ui-page-title">案内メールの返信先と文面</h2>
               <p className="ui-note">
                 使える変数: <code>%対象年月%</code>（例: 2026年9月度）／ <code>%建物名%</code>／{' '}
                 <code>%作業件数%</code>（報知対象の件数）
               </p>
+              {/* 返信先（2026-09-29〜）。テナントが「返信」したときの宛先。送信元（共有アドレス
+                  または各自のメールソフトのアカウント）ではなく、管理の窓口へ返信が届くようにする。
+                  方式A（Gmail下書き）・方式B（mailto:）の両方で Reply-To に入る */}
+              <div className="ui-field">
+                <label htmlFor="bilmen-mail-reply-to">返信先アドレス</label>
+                <input
+                  id="bilmen-mail-reply-to"
+                  className="ui-input"
+                  type="email"
+                  inputMode="email"
+                  placeholder="bkb@eiwa-up.com"
+                  value={replyTo}
+                  onChange={(e) => setReplyTo(e.target.value)}
+                />
+                <p className="ui-note">テナント様がこのメールに「返信」したときの宛先になります（空欄なら送信元に返信されます）。</p>
+              </div>
               <div className="ui-field">
                 <label>件名</label>
                 <input className="ui-input" value={subject} onChange={(e) => setSubject(e.target.value)} />
@@ -151,7 +170,7 @@ export default function BilmenMail() {
                 <textarea className="ui-textarea" rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
               </div>
               <button type="button" className="btn-primary" onClick={handleSaveSettings} disabled={savingSettings}>
-                {savingSettings ? '保存中…' : '文面を保存'}
+                {savingSettings ? '保存中…' : '文面と返信先を保存'}
               </button>
             </section>
 

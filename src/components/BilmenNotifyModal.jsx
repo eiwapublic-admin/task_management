@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   fetchBilmenMailSettings,
@@ -10,16 +11,18 @@ import {
 } from '../lib/bilmen'
 import '../pages/Bilmen.css'
 
-// テナントへの報知（docs/bilmen-plan.md 7-3・3-5）。2つの方式を並べて出す。
+// テナントへの報知（docs/bilmen-plan.md 7-3・3-5）。2つの方式を左右に並べて出す。
 //
-//   方式A（2026-09-29〜。Phase 4'）… 共有アドレスの Gmail に、連絡票PDFを添付した下書きを
-//     自動で作る。宛先（BCC）もPDFも付いた状態で、人が Gmail で中身を確かめて送る
-//   方式B（2026-09-03〜）… mailto: で端末のメールソフトを開く。mailto: は仕様上
-//     ファイルを添付できないため、先に連絡票PDFを保存し、開いた画面に手で添付してもらう
+//   左: メールソフト方式（方式B。2026-09-03〜）… mailto: で端末のメールソフトを開く。
+//     mailto: は仕様上ファイルを添付できないため、先に連絡票をダウンロードし、
+//     開いたメール作成画面に手で添付してもらう
+//   右: Gmail方式（方式A。2026-09-29〜。Phase 4'）… 共有アドレスの Gmail に、連絡票PDFを
+//     添付した下書きを自動で作る。人が Gmail で中身を確かめて送る
 //
-// 2026-09-29時点では、両方式を実際に使ってみて「どちらにするか・併用するか」を依頼元が
-// 判断する段階のため、どちらも同じ重みで並べている（判断が出たら片方を畳む想定）。
-// 件名・本文はどちらもメール設定の雛形を展開したもの（下のプレビューと同じ文面）。
+// 2026-09-29 の依頼で「方式A/B」の呼び名をやめ、画面上は「メールソフト方式」「Gmail方式」とし、
+// 左右に分けて目立たせた（依頼どおりメールソフト方式が左）。両方式を実際に使って
+// 「どちらにするか・併用するか」を決める段階のため、どちらも同じ重みで並べている。
+// 件名・本文・返信先はどちらもメール設定の値（下のプレビューと同じもの）。
 // noticeError: 連絡票PDFの作成に失敗したときのメッセージ（連絡票のフックが持つ）。
 // 一覧画面にも出るが、このモーダルの裏に隠れて見えないため、ここでも出す
 export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, onBuildNotice, noticeError, onClose }) {
@@ -29,7 +32,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   const [recipients, setRecipients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // 方式A の進み具合: idle → pdf（連絡票PDFを作成中）→ draft（Gmailに登録中）→ done
+  // Gmail方式の進み具合: idle → pdf（連絡票PDFを作成中）→ draft（Gmailに登録中）→ done
   const [draftStep, setDraftStep] = useState('idle')
   const [draftResult, setDraftResult] = useState(null)
   const [draftError, setDraftError] = useState('')
@@ -55,9 +58,10 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   const activeRecipients = recipients.filter((r) => !r.disabled)
   const cannotSend = targets.length === 0 || activeRecipients.length === 0
 
+  const replyTo = settings?.reply_to || ''
   const subject = settings ? expandMailVariables(settings.subject, { month, count: targets.length }) : ''
   const body = settings ? expandMailVariables(settings.body, { month, count: targets.length }) : ''
-  const mailtoUrl = settings ? buildBilmenNoticeMailto(subject, body, activeRecipients) : '#'
+  const mailtoUrl = settings ? buildBilmenNoticeMailto(subject, body, activeRecipients, replyTo) : '#'
 
   const drafting = draftStep === 'pdf' || draftStep === 'draft'
 
@@ -74,6 +78,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
         return
       }
       setDraftStep('draft')
+      // 宛先・返信先はサーバーがメール設定から引き直す（ここからは送らない）
       const result = await createBilmenMailDraft({ month, subject, body, pdfBlob: built.blob, filename: built.filename })
       setDraftResult(result)
       setDraftStep('done')
@@ -93,6 +98,11 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
           </button>
         </div>
         <div className="ui-modal-body is-stacked">
+          {/* 宛先・返信先をここで変えられないことを先に伝える（2026-09-29の依頼で右上に置いた） */}
+          <p className="bilmen-notify-settings-note">
+            ※ 宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
+          </p>
+
           {error && (
             <p className="dashboard-error dashboard-banner" role="alert">
               {error}
@@ -116,6 +126,14 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
               )}
 
               <div className="ui-field">
+                <label>返信先</label>
+                <input
+                  className="ui-input"
+                  value={replyTo || '（未設定：送信元のアドレスに返信されます）'}
+                  readOnly
+                />
+              </div>
+              <div className="ui-field">
                 <label>件名（プレビュー）</label>
                 <input className="ui-input" value={subject} readOnly />
               </div>
@@ -124,93 +142,100 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                 <textarea className="ui-textarea" rows={6} value={body} readOnly />
               </div>
 
-              {/* --- 方式A: Gmail 下書き（PDF自動添付） --- */}
-              <section className="bilmen-notify-method">
-                <h3 className="bilmen-notify-method-title">
-                  <span className="bilmen-notify-method-badge">A</span>
-                  Gmail に下書きを作成（PDFを自動で添付）
-                </h3>
-                <p className="bilmen-notify-method-note">
-                  連絡票PDFを作り、宛先（BCC）とPDFが付いた下書きを共有アドレスの Gmail に作ります。
-                  <strong>まだ送信はされません</strong>。Gmail で中身を確かめてから送信してください。
+              {(draftError || noticeError) && (
+                <p className="dashboard-error dashboard-banner" role="alert">
+                  {draftError || noticeError}
                 </p>
+              )}
 
-                {(draftError || noticeError) && (
-                  <p className="dashboard-error dashboard-banner" role="alert">
-                    {draftError || noticeError}
-                  </p>
-                )}
+              <p className="bilmen-notify-lead">下記の２つの方式のいずれかでメールを作成してください。</p>
 
-                {draftStep === 'done' && draftResult ? (
-                  <div className="bilmen-notify-done" role="status">
-                    <p>
-                      下書きを作成しました（宛先 <strong>{draftResult.recipient_count}</strong> 件・
-                      {draftResult.filename} を添付）。
+              <div className="bilmen-notify-methods">
+                {/* --- 左: メールソフト方式（mailto:。連絡票は手動で添付） --- */}
+                <section className="bilmen-notify-method is-mailto">
+                  <div className="bilmen-notify-method-head">
+                    <h3 className="bilmen-notify-method-title">メールソフト方式</h3>
+                    <p className="bilmen-notify-method-sub">手動で連絡票ファイルを添付</p>
+                  </div>
+                  <div className="bilmen-notify-method-body">
+                    <p className="bilmen-notify-method-note">
+                      ① 連絡票をダウンロード　② メールは自動作成されるので①を手動で添付してください。
                     </p>
-                    <div className="bilmen-generate-actions">
-                      <a className="btn-primary" href={draftResult.draft_url} target="_blank" rel="noreferrer">
-                        Gmail で下書きを開く
-                      </a>
-                      <a className="btn-plain" href={draftResult.drafts_url} target="_blank" rel="noreferrer">
-                        下書きフォルダを開く
+                    <div className="bilmen-notify-method-actions">
+                      <button
+                        type="button"
+                        className="btn-plain"
+                        onClick={() => onDownloadNotice(month, schedules)}
+                        disabled={drafting}
+                      >
+                        ① 連絡票をダウンロード
+                      </button>
+                      <a
+                        className={`btn-primary${cannotSend ? ' is-disabled' : ''}`}
+                        href={mailtoUrl}
+                        aria-disabled={cannotSend}
+                        onClick={(e) => {
+                          if (cannotSend) e.preventDefault()
+                        }}
+                      >
+                        ② メールを作成
                       </a>
                     </div>
-                    <p className="bilmen-notify-method-note">
-                      下書きが直接開かないときは「下書きフォルダを開く」から、いちばん上の下書きを開いてください。
-                      下のボタンをもう一度押すと<strong>別の下書きがもう1通</strong>できます（不要な分は Gmail で削除）。
-                    </p>
                   </div>
-                ) : null}
+                </section>
 
-                <div className="bilmen-generate-actions">
-                  <button
-                    type="button"
-                    className={draftStep === 'done' ? 'btn-plain' : 'btn-primary'}
-                    onClick={handleCreateDraft}
-                    disabled={cannotSend || drafting || !settings}
-                  >
-                    {draftStep === 'pdf'
-                      ? '連絡票PDFを作成中…'
-                      : draftStep === 'draft'
-                        ? 'Gmail に登録中…'
-                        : draftStep === 'done'
-                          ? '下書きをもう一度作成'
-                          : 'Gmail に下書きを作成'}
-                  </button>
-                </div>
-              </section>
+                {/* --- 右: Gmail方式（Gmail下書き。連絡票は自動添付） --- */}
+                <section className="bilmen-notify-method is-gmail">
+                  <div className="bilmen-notify-method-head">
+                    <h3 className="bilmen-notify-method-title">Gmail方式</h3>
+                    <p className="bilmen-notify-method-sub">連絡票は自動添付</p>
+                  </div>
+                  <div className="bilmen-notify-method-body">
+                    <p className="bilmen-notify-method-note">現在ログインしているGmailアカウントが送信元になります。</p>
 
-              {/* --- 方式B: mailto:（PDFは手動で添付） --- */}
-              <section className="bilmen-notify-method">
-                <h3 className="bilmen-notify-method-title">
-                  <span className="bilmen-notify-method-badge is-b">B</span>
-                  メールソフトで作成（PDFは手動で添付）
-                </h3>
-                <p className="bilmen-notify-method-note">
-                  mailto: はファイルを添付できないため、①で連絡票PDFを保存し、
-                  ②で開くメール作成画面にPDFを手動で添付してから送信してください。
-                </p>
-                <div className="bilmen-generate-actions">
-                  <button
-                    type="button"
-                    className="btn-plain"
-                    onClick={() => onDownloadNotice(month, schedules)}
-                    disabled={drafting}
-                  >
-                    ①連絡票PDFを作成
-                  </button>
-                  <a
-                    className={`btn-plain${cannotSend ? ' is-disabled' : ''}`}
-                    href={mailtoUrl}
-                    aria-disabled={cannotSend}
-                    onClick={(e) => {
-                      if (cannotSend) e.preventDefault()
-                    }}
-                  >
-                    ②メールを作成
-                  </a>
+                    <div className="bilmen-notify-method-actions">
+                      <button
+                        type="button"
+                        className={draftStep === 'done' ? 'btn-plain' : 'btn-primary'}
+                        onClick={handleCreateDraft}
+                        disabled={cannotSend || drafting || !settings}
+                      >
+                        {draftStep === 'pdf'
+                          ? '連絡票を作成中…'
+                          : draftStep === 'draft'
+                            ? 'Gmail に登録中…'
+                            : draftStep === 'done'
+                              ? '下書きをもう一度作成'
+                              : 'Gmail に下書きを作成'}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* Gmail方式の完了表示。iPhone幅では1列が約160pxしかなく、列の中に置くと
+                  リンクのボタンや説明が縦に潰れて読めないため、2列の下に全幅で出す */}
+              {draftStep === 'done' && draftResult ? (
+                <div className="bilmen-notify-done" role="status">
+                  <p className="bilmen-notify-done-title">Gmail方式：下書きを作成しました</p>
+                  <p>
+                    宛先 <strong>{draftResult.recipient_count}</strong> 件・連絡票を添付。<strong>まだ送信されていません</strong>。
+                    Gmail で中身を確かめてから送信してください。
+                  </p>
+                  <div className="bilmen-notify-done-actions">
+                    <a className="btn-primary" href={draftResult.draft_url} target="_blank" rel="noreferrer">
+                      Gmail で下書きを開く
+                    </a>
+                    <a className="btn-plain" href={draftResult.drafts_url} target="_blank" rel="noreferrer">
+                      下書きフォルダを開く
+                    </a>
+                  </div>
+                  <p className="bilmen-notify-method-note">
+                    直接開かないときは「下書きフォルダを開く」から、いちばん上の下書きを開いてください。
+                    「下書きをもう一度作成」を押すと<strong>別の下書きがもう1通</strong>できます。
+                  </p>
                 </div>
-              </section>
+              ) : null}
             </>
           )}
         </div>
