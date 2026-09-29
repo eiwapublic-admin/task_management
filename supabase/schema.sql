@@ -907,6 +907,9 @@ create table if not exists bilmen_schedules (
   -- ↓ Google カレンダー連携（Phase 3。7-2）
   google_event_id  text,
   google_synced_at timestamptz,
+  -- 反映した時点のイベント内容の指紋（2026-09-29〜。7-2）。今の内容から作った指紋と違えば「要再反映」。
+  -- 更新日時（updated_at）で比べないのは、実績の入力などカレンダーに関係ない変更でも要再反映に見えてしまうため
+  google_synced_hash text,
 
   sort_order    int  not null default 999,       -- 同一日内の並び
   created_by    text,
