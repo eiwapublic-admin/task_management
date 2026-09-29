@@ -107,6 +107,7 @@ import {
   handleBilmenMailRecipientCreate,
   handleBilmenMailRecipientUpdate,
   handleBilmenMailRecipientDelete,
+  handleBilmenMailDraftCreate,
 } from './lib/bilmen.js'
 import {
   handleWasteRecordList,
@@ -1195,6 +1196,11 @@ async function route(req, env) {
   if (pathname === '/api/bilmen/mail/settings') {
     if (req.method === 'GET') return handleBilmenMailSettingsGet(req)
     if (req.method === 'PUT') return handleBilmenMailSettingsUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 案内メール 方式A: Gmail に連絡票PDF添付の下書きを作る（Phase 4'。送信はしない）
+  if (pathname === '/api/bilmen/mail/draft') {
+    if (req.method === 'POST') return handleBilmenMailDraftCreate(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/bilmen/mail/recipients') {
