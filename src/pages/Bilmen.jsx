@@ -7,7 +7,16 @@ import BilmenGenerateForm from '../components/BilmenGenerateForm'
 import BilmenNotifyModal from '../components/BilmenNotifyModal'
 import BilmenMonthlyNoteModal from '../components/BilmenMonthlyNoteModal'
 import BilmenNoticeLayoutModal from '../components/BilmenNoticeLayoutModal'
-import { IconChevronLeft, IconChevronRight, IconSearch, IconDocument, IconMail, IconClipboard } from '../components/Icons'
+import BilmenCalendarModal from '../components/BilmenCalendarModal'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconSearch,
+  IconDocument,
+  IconMail,
+  IconClipboard,
+  IconCalendar,
+} from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import useBilmenSchedulePdfExport from '../hooks/useBilmenSchedulePdfExport'
 import useBilmenNoticePdfExport from '../hooks/useBilmenNoticePdfExport'
@@ -24,6 +33,7 @@ import {
   loadNoticeLayout,
   notifyTargets,
   toTimeValue,
+  fetchBilmenCalendarSettings,
 } from '../lib/bilmen'
 import { currentMonthJST, fetchHolidays, shiftMonth, todayJST, weekdayInfo } from '../lib/reports'
 import './Dashboard.css'
@@ -63,6 +73,9 @@ export default function Bilmen() {
   const [monthlyNote, setMonthlyNote] = useState(EMPTY_MONTHLY_NOTE)
   const [editingNote, setEditingNote] = useState(false)
   const [pickingLayout, setPickingLayout] = useState(false)
+  // Google カレンダー反映（Phase 3。2026-09-29〜）。開始月より前の月は反映できない（7-2）
+  const [calendarSettings, setCalendarSettings] = useState({ start_month: null, calendar_ready: false })
+  const [syncingCalendar, setSyncingCalendar] = useState(false)
 
   const scheduleExport = useBilmenSchedulePdfExport()
   const noticeExport = useBilmenNoticePdfExport()
@@ -90,6 +103,13 @@ export default function Bilmen() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (readOnly) return
+    fetchBilmenCalendarSettings()
+      .then(setCalendarSettings)
+      .catch(() => {})
+  }, [readOnly])
 
   // 祝日は日付列の色分けにだけ使う。取得できなくても一覧は出す（土日判定は暦から分かる）
   useEffect(() => {
@@ -152,9 +172,12 @@ export default function Bilmen() {
     })
   }
 
-  function handleSaved() {
+  // message: カレンダー反映など、保存と一緒に知らせたいこと（2026-09-29〜）
+  function handleSaved(saved, message) {
     setEditing(null)
     setDuplicateFrom(null)
+    if (saved?._warning) setInfo(saved._warning)
+    else if (message) setInfo(message)
     load()
   }
 
@@ -229,6 +252,18 @@ export default function Bilmen() {
                 <span className="bilmen-undecided">作業ID未入力</span>
               )}
               {s.canceled && <span className="ui-badge is-danger">中止</span>}
+              {/* カレンダーの反映状態（2026-09-29〜）。反映済みと要再反映だけ出す（未反映まで出すと一覧が騒がしくなるため） */}
+              {s.calendar_state === 'synced' && (
+                <span className="bilmen-cal-mark is-synced" title="Google カレンダーに反映済み">
+                  <IconCalendar size={14} />
+                </span>
+              )}
+              {s.calendar_state === 'stale' && (
+                <span className="bilmen-cal-mark is-stale" title="反映後に内容が変わっています。カレンダーに再反映してください">
+                  <IconCalendar size={14} />
+                  要再反映
+                </span>
+              )}
               {s.prep_note && <span className="ui-badge">管理側作業・準備</span>}
             </span>
           </span>
@@ -364,6 +399,17 @@ export default function Bilmen() {
                     <span className="btn-plain-label">報知</span>
                   </button>
                 )}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="btn-plain"
+                    onClick={() => setSyncingCalendar(true)}
+                    title="この月の予定を Google カレンダー「栄和共通」へ反映"
+                  >
+                    <IconCalendar size={16} />
+                    <span className="btn-plain-label">カレンダー</span>
+                  </button>
+                )}
               </div>
               {!readOnly && (
                 <button type="button" className="btn-primary" onClick={() => setGenerating(true)}>
@@ -481,8 +527,23 @@ export default function Bilmen() {
             setDuplicateFrom(null)
           }}
           onSaved={handleSaved}
-          onDeleted={handleSaved}
+          onDeleted={() => handleSaved()}
           onDuplicate={handleDuplicate}
+          calendarStartMonth={calendarSettings.start_month}
+        />
+      )}
+
+      {syncingCalendar && (
+        <BilmenCalendarModal
+          month={month}
+          schedules={schedules}
+          startMonth={calendarSettings.start_month}
+          calendarReady={calendarSettings.calendar_ready}
+          onClose={() => setSyncingCalendar(false)}
+          onDone={() => {
+            setSyncingCalendar(false)
+            load()
+          }}
         />
       )}
 

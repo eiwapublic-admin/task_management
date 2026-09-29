@@ -583,3 +583,136 @@ a.btn-plain.is-disabled {
   margin: 0 var(--space-05);
   color: var(--color-danger);
 }
+
+/* ============================================================
+   Google カレンダー反映（Phase 3。2026-09-29〜。docs/bilmen-plan.md 7-2）
+   ============================================================ */
+
+/* 一覧の作業名の下に出す反映状態の印。反映済み＝緑のアイコンだけ、要再反映＝橙で文字も出す */
+.bilmen-cal-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bilmen-cal-mark.is-synced {
+  color: var(--color-brand);
+}
+
+.bilmen-cal-mark.is-stale {
+  color: var(--due-soon);
+}
+
+/* 予定詳細の「Google カレンダー」の枠。状態で左端の色を変える */
+.bilmen-calendar-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.bilmen-calendar-box.is-synced {
+  border-left-color: var(--color-brand);
+}
+
+.bilmen-calendar-box.is-stale {
+  border-left-color: var(--due-soon);
+}
+
+.bilmen-calendar-box p {
+  margin: 0;
+}
+
+.bilmen-calendar-box-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.bilmen-calendar-box-state {
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
+}
+
+.bilmen-calendar-box.is-stale .bilmen-calendar-box-state {
+  color: var(--due-soon);
+  font-weight: 700;
+}
+
+.bilmen-calendar-box-at {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.bilmen-calendar-box-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.bilmen-calendar-box-actions .btn-plain.is-danger {
+  color: var(--color-danger);
+}
+
+/* 月まとめ反映モーダル */
+.bilmen-calendar-counts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+
+.bilmen-calendar-counts th,
+.bilmen-calendar-counts td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.bilmen-calendar-counts th {
+  width: 7em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.bilmen-calendar-hint {
+  margin-left: var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.bilmen-calendar-blocked {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--due-soon);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--due-soon) 10%, var(--bg-surface));
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+
+.bilmen-calendar-result {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-brand-soft);
+}
+
+.bilmen-calendar-result.is-warn {
+  background: color-mix(in srgb, var(--due-soon) 12%, var(--bg-surface));
+}
+
+.bilmen-calendar-result p {
+  margin: 0;
+}
+
+.bilmen-calendar-result ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.2em;
+  font-size: var(--fs-sm);
+}

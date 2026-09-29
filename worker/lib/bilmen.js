@@ -13,6 +13,8 @@ import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken, createDraft } from './gmail.js'
 import { buildMimeMessage } from './mime.js'
+import { insertEvent, patchEvent, deleteEvent, writableCalendarId } from './calendar.js'
+import { buildBilmenEvent, eventFingerprint, withCalendarState } from './bilmen-calendar.js'
 
 // メール設定・宛先は「外部に出る操作」の一部として、owner・備品出庫限定ロールには
 // 一切見せない（10章・13-14）。canWrite() と同じ判定だが、GET も含めて塞ぐ意図を
@@ -33,7 +35,7 @@ const SCHEDULE_COLUMNS =
   'id, work_no, master_id, target_month, plan_date, plan_start, plan_end, title, title_note, content, ' +
   'notice, place, enter_room, notify, jurisdiction, vendor_code, vendor_name, worker_name, prep_note, ' +
   'remark, memo, actual_date, actual_start, actual_end, actual_note, report_confirmed_on, canceled, ' +
-  'cancel_reason, google_event_id, google_synced_at, sort_order, created_by, created_at, updated_at'
+  'cancel_reason, google_event_id, google_synced_at, google_synced_hash, sort_order, created_by, created_at, updated_at'
 
 // 予定の一覧で既定で返す月数（11章。既定は直近12ヶ月、「もっと見る」で遡る）
 const DEFAULT_MONTHS = 12
@@ -400,7 +402,8 @@ export async function handleBilmenScheduleList(req) {
       console.error('bilmen-schedule-list:', err.message)
       return json({ error: 'メンテナンス予定の取得に失敗しました' }, 500)
     }
-    return json({ schedules: data || [], month, months })
+    // 各行にカレンダーの反映状態（calendar_state。7-2）を付けて返す
+    return json({ schedules: (data || []).map(withCalendarState), month, months })
   } catch (err) {
     console.error('bilmen-schedule-list 失敗:', err)
     return json({ error: 'メンテナンス予定の取得に失敗しました' }, 500)
@@ -476,7 +479,7 @@ export async function handleBilmenScheduleCreate(req) {
       if (err.code === '23505') return json({ error: 'この作業IDは既に使われています。もう一度保存してください' }, 409)
       return json({ error: 'メンテナンス予定の登録に失敗しました' }, 500)
     }
-    return json({ schedule: data })
+    return json({ schedule: withCalendarState(data) })
   } catch (err) {
     console.error('bilmen-schedule-create 失敗:', err)
     return json({ error: 'メンテナンス予定の登録に失敗しました' }, 500)
@@ -551,7 +554,17 @@ export async function handleBilmenScheduleUpdate(req) {
       return json({ error: 'メンテナンス予定の更新に失敗しました' }, 500)
     }
     if (!data) return json({ error: 'メンテナンス予定が見つかりません' }, 404)
-    return json({ schedule: data })
+
+    // 中止にした予定がカレンダーに反映済みなら、イベントを消して反映の記録を空に戻す（7-2）。
+    // 消せなかったときも予定の保存自体は成功させ、警告だけ返す（中止の記録を失わないため）
+    if (data.canceled && data.google_event_id) {
+      const removed = await removeScheduleEvent(supabase, data)
+      if (removed.error) {
+        return json({ schedule: withCalendarState(data), warning: `中止にしましたが、カレンダーの予定を消せませんでした（${removed.error}）。カレンダー側で手動で削除してください` })
+      }
+      return json({ schedule: withCalendarState(removed.schedule) })
+    }
+    return json({ schedule: withCalendarState(data) })
   } catch (err) {
     console.error('bilmen-schedule-update 失敗:', err)
     return json({ error: 'メンテナンス予定の更新に失敗しました' }, 500)
@@ -559,7 +572,9 @@ export async function handleBilmenScheduleUpdate(req) {
 }
 
 // DELETE /api/bilmen/schedules?id=…
-// ※ カレンダー登録済みのイベント削除は Phase 3（7-2）で足す
+// カレンダーに反映済みなら、先にイベントを消す（2026-09-29〜。7-2）。**イベントを消せなかったときは
+// 予定も消さない**: 予定だけ消えると、カレンダーに行き先の無いイベントが残り、どの予定のものか
+// 追えなくなるため（時間をおいてもう一度削除すればよい）
 export async function handleBilmenScheduleDelete(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
@@ -567,6 +582,17 @@ export async function handleBilmenScheduleDelete(req) {
     const id = new URL(req.url).searchParams.get('id') || ''
     if (!id) return json({ error: 'id は必須です' }, 400)
     const supabase = getAdminClient()
+    const { data: row } = await supabase
+      .from('bilmen_schedules')
+      .select('id, google_event_id')
+      .eq('id', id)
+      .maybeSingle()
+    if (row?.google_event_id) {
+      const removed = await removeScheduleEvent(supabase, row, { clearRow: false })
+      if (removed.error) {
+        return json({ error: `カレンダーの予定を消せなかったため、削除を取りやめました（${removed.error}）` }, 502)
+      }
+    }
     const { error: err } = await supabase.from('bilmen_schedules').delete().eq('id', id)
     if (err) {
       console.error('bilmen-schedule-delete:', err.message)
@@ -1087,5 +1113,224 @@ export async function handleBilmenMailDraftCreate(req) {
   } catch (err) {
     console.error('bilmen-mail-draft:', err)
     return json({ error: err instanceof Error ? err.message : '下書きの作成に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// Google カレンダー反映（Phase 3。2026-09-29〜。docs/bilmen-plan.md 7-2）
+// ============================================================
+//
+// 反映先は settings.calendar_name（中身はカレンダーID eiwa.public@gmail.com＝「栄和共通」）。
+// **表示名から引く方式は使わない**（7-2 の注意書き。calendar.js の writableCalendarId 参照）。
+//
+// 開始月（settings.bilmen_calendar_start_month）より前の月は反映させない。
+// 現行は FileMaker → Claris Connect がその月の中旬に翌月分を一括登録しており（2026-09 分は 8/17 に
+// 作られていた）、同じ月を本システムからも反映するとイベントが二重になる（7-2「現行の連携方式からの移行」）。
+// 本システムからの反映を始める月を決め、Claris Connect 側のフローはその前月の中旬までに止める運用。
+
+const CALENDAR_SYNC_CHUNK = 10 // 1回の呼び出しで反映する件数。外部リクエスト上限（50/回）に収めるため
+
+async function loadCalendarSettings(supabase) {
+  const { data } = await supabase
+    .from('settings')
+    .select('key, value')
+    .in('key', ['calendar_name', 'calendar_id_cache', 'bilmen_calendar_start_month'])
+  const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]))
+  return {
+    calendarId: writableCalendarId(map),
+    startMonth: MONTH_PATTERN.test(map.bilmen_calendar_start_month || '') ? map.bilmen_calendar_start_month : null,
+  }
+}
+
+function startMonthError(month, startMonth) {
+  if (startMonth && month < startMonth) {
+    return `${month.replace('-', '年')}月はカレンダーに反映できません。本システムからの反映は ${startMonth.replace('-', '年')}月分からです（それより前の月は現行の仕組みで登録済みのため、反映すると予定が二重になります）`
+  }
+  return null
+}
+
+function calendarErrorMessage(err) {
+  if (err?.isScopeError) return 'カレンダーへの書き込み権限がありません（calendar.events）'
+  return err instanceof Error ? err.message : String(err)
+}
+
+// 1件をカレンダーへ反映する（イベントIDがあれば更新、無ければ作成）。成功時は DB の反映記録も更新する。
+// 反映済みのイベントを人がカレンダー側で消していた場合（404/410）は、作り直す
+async function syncScheduleEvent(supabase, accessToken, calendarId, schedule) {
+  const event = buildBilmenEvent(schedule)
+  let result
+  let action
+  if (schedule.google_event_id) {
+    try {
+      result = await patchEvent(accessToken, calendarId, schedule.google_event_id, event)
+      action = 'updated'
+    } catch (err) {
+      if (!err.isGone) throw err
+      result = await insertEvent(accessToken, calendarId, event)
+      action = 'created'
+    }
+  } else {
+    result = await insertEvent(accessToken, calendarId, event)
+    action = 'created'
+  }
+  const { data, error } = await supabase
+    .from('bilmen_schedules')
+    .update({
+      google_event_id: result?.id || schedule.google_event_id,
+      google_synced_at: new Date().toISOString(),
+      google_synced_hash: eventFingerprint(schedule),
+    })
+    .eq('id', schedule.id)
+    .select(SCHEDULE_COLUMNS)
+    .maybeSingle()
+  if (error) throw new Error(`反映の記録に失敗しました: ${error.message}`)
+  return { action, schedule: data }
+}
+
+// イベントを消し、（clearRow なら）DB の反映記録を空に戻す。失敗しても例外は投げず { error } を返す
+async function removeScheduleEvent(supabase, schedule, { clearRow = true } = {}) {
+  try {
+    const settings = await loadCalendarSettings(supabase)
+    if (!settings.calendarId) return { error: '反映先のカレンダーIDが設定されていません' }
+    const accessToken = await getAccessToken()
+    await deleteEvent(accessToken, settings.calendarId, schedule.google_event_id)
+    if (!clearRow) return { schedule }
+    const { data, error } = await supabase
+      .from('bilmen_schedules')
+      .update({ google_event_id: null, google_synced_at: null, google_synced_hash: null })
+      .eq('id', schedule.id)
+      .select(SCHEDULE_COLUMNS)
+      .maybeSingle()
+    if (error) return { error: error.message }
+    return { schedule: data }
+  } catch (err) {
+    return { error: calendarErrorMessage(err) }
+  }
+}
+
+// GET /api/bilmen/calendar — 反映の設定（開始月・反映先が決まっているか）。画面の案内表示用
+export async function handleBilmenCalendarSettings(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const settings = await loadCalendarSettings(getAdminClient())
+    return json({ start_month: settings.startMonth, calendar_ready: Boolean(settings.calendarId) })
+  } catch (err) {
+    console.error('bilmen-calendar-settings 失敗:', err)
+    return json({ error: 'カレンダー反映の設定の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/bilmen/calendar/schedule — 1件を手動で反映／取り消す（詳細画面から。2026-09-29の依頼）
+//   { id, action: 'sync' | 'remove' }
+export async function handleBilmenCalendarSchedule(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const id = typeof payload?.id === 'string' ? payload.id : ''
+    const action = payload?.action === 'remove' ? 'remove' : 'sync'
+    if (!id) return json({ error: 'id は必須です' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: schedule } = await supabase.from('bilmen_schedules').select(SCHEDULE_COLUMNS).eq('id', id).maybeSingle()
+    if (!schedule) return json({ error: 'メンテナンス予定が見つかりません' }, 404)
+    const actor = auth?.display_name || auth?.username || null
+
+    if (action === 'remove') {
+      if (!schedule.google_event_id) return json({ schedule: withCalendarState(schedule) })
+      const removed = await removeScheduleEvent(supabase, schedule)
+      if (removed.error) return json({ error: `カレンダーから削除できませんでした（${removed.error}）` }, 502)
+      await logBilmen(supabase, actor, `ビルメン: 「${schedule.title}」をカレンダーから削除しました`, { id, plan_date: schedule.plan_date })
+      return json({ schedule: withCalendarState(removed.schedule) })
+    }
+
+    if (schedule.canceled) return json({ error: '中止の予定はカレンダーに反映できません' }, 400)
+    if (!schedule.plan_date) return json({ error: '予定日付が未定のため、カレンダーに反映できません' }, 400)
+    const settings = await loadCalendarSettings(supabase)
+    if (!settings.calendarId) return json({ error: '反映先のカレンダーIDが設定されていません' }, 500)
+    const guard = startMonthError(schedule.plan_date.slice(0, 7), settings.startMonth)
+    if (guard) return json({ error: guard }, 400)
+
+    const accessToken = await getAccessToken()
+    const synced = await syncScheduleEvent(supabase, accessToken, settings.calendarId, schedule)
+    await logBilmen(
+      supabase,
+      actor,
+      `ビルメン: 「${schedule.title}」（${schedule.plan_date}）をカレンダーに${synced.action === 'created' ? '登録' : '反映'}しました`,
+      { id, action: synced.action, google_event_id: synced.schedule?.google_event_id || null },
+    )
+    return json({ schedule: withCalendarState(synced.schedule), action: synced.action })
+  } catch (err) {
+    console.error('bilmen-calendar-schedule 失敗:', err)
+    return json({ error: `カレンダーへの反映に失敗しました（${calendarErrorMessage(err)}）` }, 500)
+  }
+}
+
+// POST /api/bilmen/calendar/sync — 月まとめ反映 { month }。
+// 反映が要る行（未反映・要再反映）を最大 CALENDAR_SYNC_CHUNK 件ずつ処理し、残り件数を返す。
+// 画面は remaining が 0 になるか、1件も進まなくなるまで繰り返し呼ぶ（外部リクエスト上限のため分割）。
+// 対象は予定日付が入っていて中止でない行（7-2）。失敗した行は飛ばして続け、理由を返す
+export async function handleBilmenCalendarSync(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const month = typeof payload?.month === 'string' ? payload.month : ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: '対象年月が不正です' }, 400)
+    // 前の呼び出しで失敗した行は、今回の呼び出しでは飛ばす（同じ行で延々と失敗し続けないように）
+    const skipIds = new Set(Array.isArray(payload?.skip_ids) ? payload.skip_ids.filter((v) => typeof v === 'string') : [])
+
+    const supabase = getAdminClient()
+    const settings = await loadCalendarSettings(supabase)
+    if (!settings.calendarId) return json({ error: '反映先のカレンダーIDが設定されていません' }, 500)
+    const guard = startMonthError(month, settings.startMonth)
+    if (guard) return json({ error: guard }, 400)
+
+    const [y, m] = month.split('-').map(Number)
+    const first = `${month}-01`
+    const next = shiftMonth(month, 1)
+    const { data: rows, error: err } = await supabase
+      .from('bilmen_schedules')
+      .select(SCHEDULE_COLUMNS)
+      .gte('plan_date', first)
+      .lt('plan_date', `${next}-01`)
+      .eq('canceled', false)
+      .order('plan_date', { ascending: true })
+      .order('plan_start', { ascending: true, nullsFirst: true })
+    if (err) {
+      console.error('bilmen-calendar-sync select:', err.message)
+      return json({ error: 'メンテナンス予定の取得に失敗しました' }, 500)
+    }
+    const pending = (rows || [])
+      .map(withCalendarState)
+      .filter((r) => (r.calendar_state === 'none' || r.calendar_state === 'stale') && !skipIds.has(r.id))
+    const batch = pending.slice(0, CALENDAR_SYNC_CHUNK)
+
+    const result = { created: 0, updated: 0, failed: [] }
+    if (batch.length > 0) {
+      const accessToken = await getAccessToken()
+      for (const row of batch) {
+        try {
+          const synced = await syncScheduleEvent(supabase, accessToken, settings.calendarId, row)
+          result[synced.action] += 1
+        } catch (e) {
+          result.failed.push({ id: row.id, title: row.title, plan_date: row.plan_date, error: calendarErrorMessage(e) })
+          // 権限が無いなら残りも全部失敗するので、ここで打ち切る
+          if (e?.isScopeError) break
+        }
+      }
+      const actor = auth?.display_name || auth?.username || null
+      await logBilmen(
+        supabase,
+        actor,
+        `ビルメン: ${y}年${m}月の予定をカレンダーに反映しました（登録 ${result.created} 件・更新 ${result.updated} 件・失敗 ${result.failed.length} 件）`,
+        { month, ...result },
+      )
+    }
+    return json({ ...result, remaining: Math.max(pending.length - batch.length, 0) })
+  } catch (err) {
+    console.error('bilmen-calendar-sync 失敗:', err)
+    return json({ error: `カレンダーへの反映に失敗しました（${calendarErrorMessage(err)}）` }, 500)
   }
 }

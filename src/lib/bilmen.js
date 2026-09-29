@@ -55,7 +55,51 @@ export async function createBilmenSchedule(payload) {
 // 一覧のその場編集（送った列だけの部分更新）になる（worker/lib/bilmen.js 参照）
 export async function updateBilmenSchedule(id, patch) {
   const data = await authFetch('/api/bilmen/schedules', { method: 'PATCH', body: JSON.stringify({ id, ...patch }) })
+  // 中止にしたがカレンダーの予定を消せなかった、などの警告（保存自体は成功。2026-09-29〜）
+  return data.warning ? { ...data.schedule, _warning: data.warning } : data.schedule
+}
+
+// ---- Google カレンダー反映（Phase 3。2026-09-29〜。docs/bilmen-plan.md 7-2）----
+
+// 反映の設定: { start_month: 'YYYY-MM' | null, calendar_ready: boolean }
+export async function fetchBilmenCalendarSettings() {
+  return authFetch('/api/bilmen/calendar')
+}
+
+// 1件を反映（action='sync'。未反映なら登録、反映済みなら更新）／取り消す（action='remove'）
+export async function setBilmenScheduleCalendar(id, action = 'sync') {
+  const data = await authFetch('/api/bilmen/calendar/schedule', { method: 'POST', body: JSON.stringify({ id, action }) })
   return data.schedule
+}
+
+// 月まとめ反映。サーバーは1回に10件ずつしか処理しない（外部リクエスト上限のため）ので、
+// 残りが無くなるまで繰り返し呼ぶ。失敗した行は次の呼び出しで飛ばしてもらい（skip_ids）、
+// 1件も進まなくなったら打ち切る（同じ行で延々と失敗し続けないように）。
+// onProgress({ created, updated, failed }) で途中経過を返す
+export async function syncBilmenCalendarMonth(month, onProgress) {
+  const total = { created: 0, updated: 0, failed: [] }
+  for (let round = 0; round < 20; round += 1) {
+    const data = await authFetch('/api/bilmen/calendar/sync', {
+      method: 'POST',
+      body: JSON.stringify({ month, skip_ids: total.failed.map((f) => f.id) }),
+    })
+    total.created += data.created || 0
+    total.updated += data.updated || 0
+    total.failed.push(...(data.failed || []))
+    onProgress?.({ ...total })
+    const progressed = (data.created || 0) + (data.updated || 0) + (data.failed || []).length
+    if (!data.remaining || progressed === 0) break
+  }
+  return total
+}
+
+// 反映状態の表示名（サーバーの calendar_state。worker/lib/bilmen-calendar.js の calendarState）
+export const CALENDAR_STATE_LABELS = {
+  none: '未反映',
+  synced: '反映済み',
+  stale: '要再反映（反映後に内容が変わりました）',
+  undated: '予定日付が未定のため反映できません',
+  canceled: '中止（カレンダーには載せません）',
 }
 
 export async function deleteBilmenSchedule(id) {
