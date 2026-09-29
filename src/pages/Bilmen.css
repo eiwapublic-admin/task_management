@@ -261,57 +261,116 @@ a.btn-plain.is-disabled {
   pointer-events: none;
 }
 
-/* テナントへ報知モーダルの方式A／方式B（2026-09-29〜）。どちらにするか・併用するかを
-   実際に使って決める段階のため、2つを同じ重みの枠で並べる（docs/bilmen-plan.md 3-5・7-3） */
-.bilmen-notify-method {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
+/* テナントへ報知モーダルの2方式（2026-09-29〜）。依頼により左＝メールソフト方式・
+   右＝Gmail方式として左右に分け、見出し帯で目立たせる。どちらにするか・併用するかを
+   実際に使って決める段階のため、2つは同じ大きさ・同じ重みにしている（docs/bilmen-plan.md 7-3-2）。
+   iPhone幅でも左右に並べる（依頼が「左右に分けて」のため）。1列が約160pxになるので、
+   ボタンは列幅いっぱいにして文言を折り返させる */
+.bilmen-notify-settings-note {
+  margin: 0;
+  text-align: right;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
-.bilmen-notify-method-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--fs-md);
+.bilmen-notify-lead {
+  margin: var(--space-2) 0 0;
   font-weight: 700;
   color: var(--text-strong);
 }
 
-.bilmen-notify-method-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6em;
-  height: 1.6em;
-  border-radius: 50%;
-  background: var(--color-brand);
-  color: #fff;
-  font-size: var(--fs-sm);
-  flex: none;
+.bilmen-notify-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  align-items: stretch;
 }
 
-.bilmen-notify-method-badge.is-b {
-  background: var(--text-muted);
+.bilmen-notify-method {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 2px solid var(--notify-accent);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.bilmen-notify-method.is-mailto {
+  --notify-accent: #4a5f78;
+}
+
+.bilmen-notify-method.is-gmail {
+  --notify-accent: var(--color-brand);
+}
+
+.bilmen-notify-method-head {
+  padding: var(--space-2) var(--space-3);
+  background: var(--notify-accent);
+  color: #fff;
+}
+
+.bilmen-notify-method-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.bilmen-notify-method-sub {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  opacity: 0.92;
+}
+
+.bilmen-notify-method-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .bilmen-notify-method-note {
   margin: 0;
   font-size: var(--fs-sm);
+  color: var(--text-base);
+}
+
+.bilmen-notify-done .bilmen-notify-method-note {
   color: var(--text-muted);
+}
+
+/* ボタンは列幅いっぱいに縦に積む（狭い列でも押しやすく、文言が切れないように）。
+   列の下端に揃えて、左右でボタンの位置が合うようにする */
+.bilmen-notify-method-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.bilmen-notify-method-actions > .btn-primary,
+.bilmen-notify-method-actions > .btn-plain {
+  width: 100%;
+  /* 狭い列では文言が折り返すので、ボタンの高さを固定にせず文言に合わせて伸ばす
+     （固定のままだと2行目が枠の外にはみ出す。390px幅で確認） */
+  height: auto;
+  min-height: var(--control-h);
+  padding-block: var(--space-1);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
 }
 
 .bilmen-notify-done {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--radius-card);
   background: var(--color-brand-soft);
 }
 
@@ -319,9 +378,22 @@ a.btn-plain.is-disabled {
   margin: 0;
 }
 
+.bilmen-notify-done-title {
+  font-weight: 800;
+  color: var(--color-brand);
+}
+
+.bilmen-notify-done-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* <a> で作ったボタン（Gmail を開く・mailto:）に下線が付かないようにし、<button> と高さを揃える */
 .bilmen-notify-method a.btn-primary,
-.bilmen-notify-method a.btn-plain {
+.bilmen-notify-method a.btn-plain,
+.bilmen-notify-done a.btn-primary,
+.bilmen-notify-done a.btn-plain {
   display: inline-flex;
   align-items: center;
   justify-content: center;

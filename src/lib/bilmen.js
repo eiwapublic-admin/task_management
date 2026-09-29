@@ -250,13 +250,18 @@ export async function createBilmenMailDraft({ month, subject, body, pdfBlob, fil
   return data
 }
 
-export function buildBilmenNoticeMailto(subject, body, recipients) {
+// replyTo（2026-09-29〜）: 返信先アドレス。mailto: の reply-to パラメータとして付ける。
+// **mailto: で標準的に扱われるのは to/cc/bcc/subject/body までで、reply-to を反映するかは
+// メールソフト次第**（RFC 6068。無視されても送信自体には影響しない）。
+// 実際に効くかは利用端末での確認が必要（docs/bilmen-plan.md 7-3-2）
+export function buildBilmenNoticeMailto(subject, body, recipients, replyTo = '') {
   const bcc = (recipients || [])
     .map((r) => (typeof r === 'string' ? r : formatMailAddress(r?.name, r?.email)))
     .filter(Boolean)
     .join(',')
   const params = new URLSearchParams({ subject, body })
   if (bcc) params.set('bcc', bcc)
+  if (replyTo) params.set('reply-to', replyTo)
   return `mailto:?${params.toString().replace(/\+/g, '%20')}`
 }
 

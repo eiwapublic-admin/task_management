@@ -798,7 +798,19 @@ export async function handleBilmenScheduleGenerate(req) {
 // ============================================================
 
 const MAIL_SETTINGS_ID = 'default'
+const MAIL_SETTINGS_COLUMNS = 'id, subject, body, reply_to, updated_at'
 const MAIL_RECIPIENT_COLUMNS = 'id, name, email, note, disabled, sort_order, created_at, updated_at'
+
+// 返信先アドレス（2026-09-29〜）は**メールのヘッダーにそのまま入る**ため、宛先より厳しく検証する。
+// 空白・改行・カンマ・<>・引用符を含むものを弾くことで、ヘッダーの差し込み（改行で別の
+// ヘッダーを足す）や、カンマ区切りで返信先を複数に増やすことを防ぐ
+const REPLY_TO_RE = /^[^\s@,<>"]+@[^\s@,<>"]+\.[^\s@,<>"]+$/
+function normalizeReplyTo(value) {
+  const v = typeof value === 'string' ? value.trim() : ''
+  if (!v) return { value: null }
+  if (v.length > 200 || !REPLY_TO_RE.test(v)) return { error: '返信先アドレスの形式が正しくありません' }
+  return { value: v.toLowerCase() }
+}
 
 // GET /api/bilmen/mail/settings — 件名・本文の雛形
 export async function handleBilmenMailSettingsGet(req) {
@@ -808,14 +820,14 @@ export async function handleBilmenMailSettingsGet(req) {
     const supabase = getAdminClient()
     const { data, error: err } = await supabase
       .from('bilmen_mail_settings')
-      .select('id, subject, body, updated_at')
+      .select(MAIL_SETTINGS_COLUMNS)
       .eq('id', MAIL_SETTINGS_ID)
       .maybeSingle()
     if (err) {
       console.error('bilmen-mail-settings-get:', err.message)
       return json({ error: 'メール設定の取得に失敗しました' }, 500)
     }
-    return json({ settings: data || { id: MAIL_SETTINGS_ID, subject: '', body: '' } })
+    return json({ settings: data || { id: MAIL_SETTINGS_ID, subject: '', body: '', reply_to: null } })
   } catch (err) {
     console.error('bilmen-mail-settings-get 失敗:', err)
     return json({ error: 'メール設定の取得に失敗しました' }, 500)
@@ -832,12 +844,14 @@ export async function handleBilmenMailSettingsUpdate(req) {
     const body = typeof payload?.body === 'string' ? payload.body.slice(0, 5000) : ''
     if (!subject) return json({ error: '件名は必須です' }, 400)
     if (!body.trim()) return json({ error: '本文は必須です' }, 400)
+    const replyTo = normalizeReplyTo(payload?.reply_to)
+    if (replyTo.error) return json({ error: replyTo.error }, 400)
 
     const supabase = getAdminClient()
     const { data, error: err } = await supabase
       .from('bilmen_mail_settings')
-      .upsert({ id: MAIL_SETTINGS_ID, subject, body }, { onConflict: 'id' })
-      .select('id, subject, body, updated_at')
+      .upsert({ id: MAIL_SETTINGS_ID, subject, body, reply_to: replyTo.value }, { onConflict: 'id' })
+      .select(MAIL_SETTINGS_COLUMNS)
       .single()
     if (err) {
       console.error('bilmen-mail-settings-update:', err.message)
@@ -1003,13 +1017,15 @@ export async function handleBilmenMailDraftCreate(req) {
     if (pdf.size > DRAFT_PDF_MAX_BYTES) return json({ error: '連絡票PDFが大きすぎます（20MBまで）' }, 400)
 
     const supabase = getAdminClient()
-    const [{ data: recipients, error: recErr }, { data: shared }] = await Promise.all([
+    const [{ data: recipients, error: recErr }, { data: shared }, { data: mailSettings }] = await Promise.all([
       supabase
         .from('bilmen_mail_recipients')
         .select('name, email')
         .eq('disabled', false)
         .order('sort_order', { ascending: true }),
       supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
+      // 返信先（Reply-To）はメール設定から。画面からは受け取らない（宛先と同じ理由）
+      supabase.from('bilmen_mail_settings').select('reply_to').eq('id', MAIL_SETTINGS_ID).maybeSingle(),
     ])
     if (recErr) {
       console.error('bilmen-mail-draft recipients:', recErr.message)
@@ -1021,8 +1037,11 @@ export async function handleBilmenMailDraftCreate(req) {
     }
 
     const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`
+    // 保存時に検証済みだが、ヘッダーに入る値なので作る直前にもう一度確かめる
+    const replyTo = normalizeReplyTo(mailSettings?.reply_to || '')
     const raw = buildMimeMessage({
       bcc,
+      replyTo: replyTo.value ? [{ email: replyTo.value }] : [],
       subject,
       body,
       attachment: { filename, contentType: 'application/pdf', bytes: new Uint8Array(await pdf.arrayBuffer()) },
@@ -1043,6 +1062,7 @@ export async function handleBilmenMailDraftCreate(req) {
       draft_id: draft?.id || null,
       message_id: messageId || null,
       recipients: bcc.length,
+      reply_to: replyTo.value || null,
       pdf_bytes: pdf.size,
     })
 
@@ -1050,6 +1070,7 @@ export async function handleBilmenMailDraftCreate(req) {
       draft_id: draft?.id || null,
       message_id: messageId || null,
       recipient_count: bcc.length,
+      reply_to: replyTo.value || null,
       filename,
       // 作った下書きを直接開くリンク（Gmail の仕様変更で開けなくなった場合に備えて、
       // 下書きフォルダを開くリンクも一緒に返す）

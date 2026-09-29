@@ -72,13 +72,16 @@ function attachmentHeaders(filename, contentType) {
 // bcc: [{ name, email }]  subject/body: 文字列（本文は改行コードを問わない）
 // attachment: { filename, contentType, bytes: Uint8Array | ArrayBuffer }
 // to（任意）: [{ name, email }]。方式Bに合わせ、既定は BCC のみ（テナント同士にアドレスを見せない）
-export function buildMimeMessage({ to = [], bcc = [], subject, body, attachment }) {
+// replyTo（任意）: [{ name, email }]。受け取った側が「返信」したときの宛先（2026-09-29〜。
+// 送信元＝共有アドレスではなく、管理事務所の窓口へ返信が届くようにするため）
+export function buildMimeMessage({ to = [], bcc = [], replyTo = [], subject, body, attachment }) {
   const boundary = `=_bilmen_${crypto.randomUUID().replace(/-/g, '')}`
   const addressList = (list) => list.map((r) => formatAddress(r.name, r.email)).filter(Boolean).join(`,${CRLF} `)
 
   const headers = ['MIME-Version: 1.0']
   if (to.length > 0) headers.push(`To: ${addressList(to)}`)
   if (bcc.length > 0) headers.push(`Bcc: ${addressList(bcc)}`)
+  if (replyTo.length > 0) headers.push(`Reply-To: ${addressList(replyTo)}`)
   headers.push(`Subject: ${encodeHeaderText(subject)}`)
   headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`)
 
