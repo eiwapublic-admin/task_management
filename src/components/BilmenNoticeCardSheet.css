@@ -14,6 +14,15 @@
 }
 
 body.pdf-capture-mode .bnc-sheet {
+  /* カードの見出し帯（日付・時刻）と作業名の文字の大きさ（2026-09-29〜）。
+     貼り出すと予定部分が読みにくいとの指摘で拡大した。**大きさは実物を見て
+     評価しながら詰める前提なので、ここの3つだけ変えれば済むようにしてある**。
+     変更前: 日付 10.5pt／時刻 8.5pt／作業名 10.5pt。
+     （ここで定義するのは紙面内だけで使う変数で、アプリのテーマ（src/index.css）は
+     参照していない。紙面が画面側のテーマに引きずられない方針は変わらない） */
+  --bnc-date-size: 15pt;
+  --bnc-time-size: 11pt;
+  --bnc-name-size: 15pt;
   display: block;
   position: fixed;
   top: 0;
@@ -142,7 +151,8 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
 }
 
 .bnc-strip-date {
-  font-size: 10.5pt;
+  font-size: var(--bnc-date-size);
+  line-height: 1.25;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -160,8 +170,10 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
 
 .bnc-strip-time {
   margin-left: auto;
-  font-size: 8.5pt;
+  font-size: var(--bnc-time-size);
+  font-weight: 700;
   color: #dbe8e2;
+  white-space: nowrap;
 }
 
 .bnc-body {
@@ -170,10 +182,10 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
 }
 
 .bnc-name {
-  font-size: 10.5pt;
+  font-size: var(--bnc-name-size);
   font-weight: 700;
   color: #17221d;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 .bnc-name-note {
@@ -188,21 +200,33 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
   color: #45705c;
 }
 
+/* 場所・担当は1行に並べる（2026-09-29〜）。日付・作業名を大きくしたぶんカードが
+   縦に伸びないよう、以前の「見出し＋値」の2行組みから横並びにした。
+   値が長いときだけ折り返す（どちらかが切れて消えることはない） */
 .bnc-kv {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.8mm 2.6mm;
-  margin: 2.4mm 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 4mm;
+  row-gap: 0.6mm;
+  margin: 1.8mm 0 0;
 }
 
-.bnc-kv dt {
+.bnc-kv-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1.6mm;
+  min-width: 0;
+}
+
+.bnc-kv-label {
+  flex: none;
   font-size: 8pt;
   letter-spacing: 0.07em;
   color: #7b8a82;
 }
 
-.bnc-kv dd {
-  margin: 0;
+.bnc-kv-value {
   font-size: 9pt;
   color: #2b3833;
 }

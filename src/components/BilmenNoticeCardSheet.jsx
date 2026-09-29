@@ -75,20 +75,23 @@ export default function BilmenNoticeCardSheet({
                   {it.title_note && <span className="bnc-name-note">　／ {it.title_note}</span>}
                 </div>
                 {it.content && <p className="bnc-desc">{it.content}</p>}
-                <dl className="bnc-kv">
-                  {it.place && (
-                    <>
-                      <dt>場所</dt>
-                      <dd>{it.place}</dd>
-                    </>
-                  )}
-                  {it.vendor_name && (
-                    <>
-                      <dt>担当</dt>
-                      <dd>{it.vendor_name}</dd>
-                    </>
-                  )}
-                </dl>
+                {/* 場所・担当は1行に並べる（2026-09-29。作業名を大きくしたぶんの縦幅を詰める） */}
+                {(it.place || it.vendor_name) && (
+                  <div className="bnc-kv">
+                    {it.place && (
+                      <span className="bnc-kv-item">
+                        <span className="bnc-kv-label">場所</span>
+                        <span className="bnc-kv-value">{it.place}</span>
+                      </span>
+                    )}
+                    {it.vendor_name && (
+                      <span className="bnc-kv-item">
+                        <span className="bnc-kv-label">担当</span>
+                        <span className="bnc-kv-value">{it.vendor_name}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
                 {it.notice && <div className="bnc-caution">{it.notice}</div>}
               </div>
             </div>
