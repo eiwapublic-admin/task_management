@@ -1,7 +1,8 @@
 // Gmail API を fetch で直接叩く軽量クライアント（追加依存なし）。
 // OAuth2 のリフレッシュトークン方式でアクセストークンを取得し、
 // 共有アドレス（eiwa.public@gmail.com）の受信メールを読み取る。
-// スコープは gmail.readonly を想定（読み取り専用）。
+// 読み取りは gmail.readonly、ビルメンの案内メールの下書き作成（createDraft。2026-09-29〜）は
+// gmail.compose を使う（どちらも 2026-09-02 に付与済み。docs/google-oauth-scope-update.md）。
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me'
@@ -246,4 +247,29 @@ export async function getThreadMessages(accessToken, threadId) {
     to: header(m.payload || {}, 'To'),
     cc: header(m.payload || {}, 'Cc'),
   }))
+}
+
+// 下書きを作る（2026-09-29〜。ビルメンの案内メール 方式A。docs/bilmen-plan.md 7-3）。
+// raw は worker/lib/mime.js の buildMimeMessage で組み立てた生のメッセージ（文字列）。
+// **送信はしない**（人が Gmail で確認してから送る運用。3-5）。
+// JSON の message.raw ではなくアップロード用の口（uploadType=media）に生のまま送る:
+// 連絡票PDFは1ページで数百KB〜数MBになり、base64url で JSON に埋めると
+// 通常の口の上限にかかる恐れがあるため（アップロード口は35MBまで）。
+// 戻り値: { id（下書きID）, message: { id, threadId } }
+export async function createDraft(accessToken, raw) {
+  const res = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'message/rfc822',
+    },
+    body: raw,
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    // 403 はスコープ不足（gmail.compose がトークンに含まれていない）のことが多い
+    const hint = res.status === 403 ? '（Gmail の下書き作成の権限＝gmail.compose が無い可能性があります）' : ''
+    throw new Error(`Gmail の下書き作成に失敗しました (${res.status})${hint}: ${text.slice(0, 300)}`)
+  }
+  return res.json()
 }

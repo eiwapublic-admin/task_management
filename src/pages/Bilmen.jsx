@@ -503,6 +503,8 @@ export default function Bilmen() {
           month={month}
           schedules={schedules}
           onDownloadNotice={(m, s) => noticeExport.download(m, s, monthlyNote, loadNoticeLayout(), holidays)}
+          onBuildNotice={(m, s) => noticeExport.build(m, s, monthlyNote, loadNoticeLayout(), holidays)}
+          noticeError={noticeExport.error}
           onClose={() => setNotifying(false)}
         />
       )}

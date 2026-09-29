@@ -11,6 +11,8 @@
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
+import { getAccessToken, createDraft } from './gmail.js'
+import { buildMimeMessage } from './mime.js'
 
 // メール設定・宛先は「外部に出る操作」の一部として、owner・備品出庫限定ロールには
 // 一切見せない（10章・13-14）。canWrite() と同じ判定だが、GET も含めて塞ぐ意図を
@@ -961,5 +963,101 @@ export async function handleBilmenMailRecipientDelete(req) {
   } catch (err) {
     console.error('bilmen-mail-recipient-delete 失敗:', err)
     return json({ error: '宛先の削除に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 案内メール 方式A（Gmail下書きの自動作成・PDF自動添付。Phase 4'。2026-09-29〜）
+// ============================================================
+//
+// POST /api/bilmen/mail/draft（multipart/form-data）
+//   month    … 'YYYY-MM'（操作ログ用）
+//   subject  … 件名（画面側で変数を展開済みのもの。プレビューと同じ文面を下書きにする）
+//   body     … 本文（同上）
+//   pdf      … 連絡票PDF（画面側で html2canvas＋jsPDF で作ったもの。8-2）
+//
+// 共有アドレスの Gmail に「BCC＝有効な宛先全員・連絡票PDF添付」の下書きを作るだけで、
+// **送信はしない**（人が Gmail で中身を確かめてから送る。3-5）。
+// 宛先は**画面から受け取らずサーバー側でDBから引き直す**（画面の表示と送り先が
+// 食い違う余地をなくすため。方式Bの mailto: と同じく、無効にした宛先は含めない）。
+// 方式B（mailto:）は残したまま（2026-09-29時点では両方式を実際に試して、どちらにするか・
+// 併用するかを依頼元が判断する段階。docs/bilmen-plan.md 3-5）
+const DRAFT_PDF_MAX_BYTES = 20 * 1024 * 1024
+
+export async function handleBilmenMailDraftCreate(req) {
+  const { auth, error } = await requireMailAccess(req)
+  if (error) return error
+  try {
+    const form = await req.formData().catch(() => null)
+    if (!form) return json({ error: 'フォームの受け取りに失敗しました' }, 400)
+
+    const month = String(form.get('month') || '')
+    const subject = String(form.get('subject') || '').trim().slice(0, 200)
+    const body = String(form.get('body') || '').slice(0, 5000)
+    const pdf = form.get('pdf')
+
+    if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: '対象年月が不正です' }, 400)
+    if (!subject) return json({ error: '件名が空です。メール設定で件名を登録してください' }, 400)
+    if (!body.trim()) return json({ error: '本文が空です。メール設定で本文を登録してください' }, 400)
+    if (!pdf || typeof pdf === 'string') return json({ error: '連絡票PDFが添付されていません' }, 400)
+    if (pdf.size > DRAFT_PDF_MAX_BYTES) return json({ error: '連絡票PDFが大きすぎます（20MBまで）' }, 400)
+
+    const supabase = getAdminClient()
+    const [{ data: recipients, error: recErr }, { data: shared }] = await Promise.all([
+      supabase
+        .from('bilmen_mail_recipients')
+        .select('name, email')
+        .eq('disabled', false)
+        .order('sort_order', { ascending: true }),
+      supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
+    ])
+    if (recErr) {
+      console.error('bilmen-mail-draft recipients:', recErr.message)
+      return json({ error: '宛先の取得に失敗しました' }, 500)
+    }
+    const bcc = (recipients || []).filter((r) => r.email && r.email.trim())
+    if (bcc.length === 0) {
+      return json({ error: '有効な宛先が登録されていません。メール設定から登録してください' }, 400)
+    }
+
+    const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`
+    const raw = buildMimeMessage({
+      bcc,
+      subject,
+      body,
+      attachment: { filename, contentType: 'application/pdf', bytes: new Uint8Array(await pdf.arrayBuffer()) },
+    })
+
+    const accessToken = await getAccessToken()
+    const draft = await createDraft(accessToken, raw)
+
+    // Gmail の画面で下書きを開くためのリンク。共有アドレス以外の Google アカウントで
+    // ブラウザにログインしていても正しいアカウントの Gmail が開くよう authuser を付ける
+    const account = (shared?.value || '').trim()
+    const base = `https://mail.google.com/mail/${account ? `?authuser=${encodeURIComponent(account)}` : 'u/0/'}`
+    const messageId = draft?.message?.id || ''
+
+    const actor = auth?.display_name || auth?.username || null
+    await logBilmen(supabase, actor, `ビルメン: ${month} の案内メールの下書きを作成しました（宛先 ${bcc.length} 件・PDF添付）`, {
+      month,
+      draft_id: draft?.id || null,
+      message_id: messageId || null,
+      recipients: bcc.length,
+      pdf_bytes: pdf.size,
+    })
+
+    return json({
+      draft_id: draft?.id || null,
+      message_id: messageId || null,
+      recipient_count: bcc.length,
+      filename,
+      // 作った下書きを直接開くリンク（Gmail の仕様変更で開けなくなった場合に備えて、
+      // 下書きフォルダを開くリンクも一緒に返す）
+      draft_url: messageId ? `${base}#drafts?compose=${messageId}` : `${base}#drafts`,
+      drafts_url: `${base}#drafts`,
+    })
+  } catch (err) {
+    console.error('bilmen-mail-draft:', err)
+    return json({ error: err instanceof Error ? err.message : '下書きの作成に失敗しました' }, 500)
   }
 }

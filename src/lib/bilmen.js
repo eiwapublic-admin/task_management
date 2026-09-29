@@ -1,4 +1,5 @@
 import { authFetch } from './api'
+import { getToken } from './auth'
 
 // ビルメンテナンス管理（ビルメン。Phase 1。2026-09-02〜）の API 呼び出し・共通ユーティリティ。
 // 現行 FileMaker「BKB-Mgt / 作業管理」の移行。詳細は docs/bilmen-plan.md 参照。
@@ -217,6 +218,38 @@ export function formatMailAddress(name, email) {
 
 // mailto: リンクの組み立て（3-5・7-3 方式B）。宛先は BCC にまとめ、TO は空欄にする
 // （共有アドレス自身が送信元になるため。src/lib/mail.js の buildReplyMailto と同じ考え方）
+// 案内メール 方式A（2026-09-29〜。7-3）: 共有アドレスの Gmail に、連絡票PDFを添付した
+// 下書きを作ってもらう。送信はしない（人が Gmail で確かめて送る）。宛先（BCC）は
+// サーバー側がDBの有効な宛先から引き直すので、ここでは渡さない。
+// 戻り値: { draft_url, drafts_url, recipient_count, filename, ... }
+export async function createBilmenMailDraft({ month, subject, body, pdfBlob, filename }) {
+  const form = new FormData()
+  form.append('month', month)
+  form.append('subject', subject)
+  form.append('body', body)
+  form.append('pdf', pdfBlob, filename)
+  const controller = new AbortController()
+  // PDFのアップロード＋Gmail への登録で数秒〜十数秒かかる。電波の悪い場所で固まらないよう打ち切る
+  const timeoutId = setTimeout(() => controller.abort(), 60000)
+  let res
+  try {
+    res = await fetch('/api/bilmen/mail/draft', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('下書きの作成がタイムアウトしました。通信環境をご確認のうえ再度お試しください。')
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `下書きの作成に失敗しました (${res.status})`)
+  return data
+}
+
 export function buildBilmenNoticeMailto(subject, body, recipients) {
   const bcc = (recipients || [])
     .map((r) => (typeof r === 'string' ? r : formatMailAddress(r?.name, r?.email)))

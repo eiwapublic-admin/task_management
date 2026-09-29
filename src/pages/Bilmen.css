@@ -249,14 +249,83 @@
 
 .bilmen-generate-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
 /* テナントへ報知モーダルの「メールを作成」（<a>タグは:disabled が使えないため
    aria-disabled と組み合わせたクラスで見た目を合わせる） */
-a.btn-primary.is-disabled {
+a.btn-primary.is-disabled,
+a.btn-plain.is-disabled {
   opacity: 0.55;
   pointer-events: none;
+}
+
+/* テナントへ報知モーダルの方式A／方式B（2026-09-29〜）。どちらにするか・併用するかを
+   実際に使って決める段階のため、2つを同じ重みの枠で並べる（docs/bilmen-plan.md 3-5・7-3） */
+.bilmen-notify-method {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.bilmen-notify-method-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.bilmen-notify-method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: var(--fs-sm);
+  flex: none;
+}
+
+.bilmen-notify-method-badge.is-b {
+  background: var(--text-muted);
+}
+
+.bilmen-notify-method-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.bilmen-notify-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-brand-soft);
+}
+
+.bilmen-notify-done p {
+  margin: 0;
+}
+
+/* <a> で作ったボタン（Gmail を開く・mailto:）に下線が付かないようにし、<button> と高さを揃える */
+.bilmen-notify-method a.btn-primary,
+.bilmen-notify-method a.btn-plain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .bilmen-generate-list {

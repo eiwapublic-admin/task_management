@@ -95,9 +95,13 @@ export default function useBilmenNoticePdfExport() {
     return pages
   }
 
+  // 連絡票PDFを作って { blob, filename } を返す（プレビューは開かない）。
+  // 2026-09-29、案内メールの方式A（Gmail下書きへPDFを自動添付。7-3）でも同じPDFを使うため、
+  // 「作る」と「プレビューを開く」（download）を分けた。失敗時は error をセットして null を返す
+  // （呼び出し側は null なら何もしない）。
   // monthlyNote は { note, revised_on } のオブジェクト（2026-09-15に変更日付を足した際、
   // 注釈の文字列から差し替えた。5-4）
-  async function download(month, schedules, monthlyNote, layout = DEFAULT_NOTICE_LAYOUT, holidays = {}) {
+  async function build(month, schedules, monthlyNote, layout = DEFAULT_NOTICE_LAYOUT, holidays = {}) {
     const note = monthlyNote?.note || ''
     const revisedOn = monthlyNote?.revised_on || ''
     const sel = LAYOUT_SELECTORS[layout] || LAYOUT_SELECTORS[DEFAULT_NOTICE_LAYOUT]
@@ -108,7 +112,7 @@ export default function useBilmenNoticePdfExport() {
       const items = notifyTargets(schedules).sort((a, b) => (a.plan_date || '').localeCompare(b.plan_date || ''))
       if (items.length === 0) {
         setError('この月には報知対象（報知☑・予定日付あり・中止でない）の予定がありません')
-        return
+        return null
       }
       const outputDate = todayJST().replaceAll('-', '/')
 
@@ -166,15 +170,26 @@ export default function useBilmenNoticePdfExport() {
       }
 
       const filename = `作業予定連絡票_${month}.pdf`
-      const pdfBlob = pdf.output('blob')
-      const previewUrl = await getReportPdfPreviewUrl(pdfBlob, filename, 'bilmen-notice')
-      setPreview({ filename, url: previewUrl, blob: pdfBlob })
+      return { blob: pdf.output('blob'), filename }
     } catch (err) {
       setError(`PDFの作成に失敗しました（${err instanceof Error ? err.message : String(err)}）`)
+      return null
     } finally {
       document.body.classList.remove('pdf-capture-mode')
       setBusy(false)
       setSheetData(null)
+    }
+  }
+
+  // 連絡票PDFを作ってプレビューを開く（従来からの「連絡票」ボタン・方式Bの①）
+  async function download(...args) {
+    const built = await build(...args)
+    if (!built) return
+    try {
+      const previewUrl = await getReportPdfPreviewUrl(built.blob, built.filename, 'bilmen-notice')
+      setPreview({ filename: built.filename, url: previewUrl, blob: built.blob })
+    } catch (err) {
+      setError(`PDFの作成に失敗しました（${err instanceof Error ? err.message : String(err)}）`)
     }
   }
 
@@ -238,5 +253,5 @@ export default function useBilmenNoticePdfExport() {
 
   const busyOverlay = <PdfBusyOverlay show={busy} />
 
-  return { busy, error, download, sheetsPortal, previewModal, busyOverlay }
+  return { busy, error, build, download, sheetsPortal, previewModal, busyOverlay }
 }
