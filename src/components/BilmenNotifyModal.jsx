@@ -191,7 +191,9 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                     <p className="bilmen-notify-method-sub">連絡票は自動添付</p>
                   </div>
                   <div className="bilmen-notify-method-body">
-                    <p className="bilmen-notify-method-note">現在ログインしているGmailアカウントが送信元になります。</p>
+                    {/* 下書きはサーバーが持つ共有アドレスのトークンで作るため、端末でどの Google
+                        アカウントにログインしていても送信元は共有アドレスになる（2026-09-29に文言を修正） */}
+                    <p className="bilmen-notify-method-note">送信元は、eiwa.public@gmail.com となります。</p>
 
                     <div className="bilmen-notify-method-actions">
                       <button
