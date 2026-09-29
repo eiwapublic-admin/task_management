@@ -1039,11 +1039,18 @@ export async function handleBilmenMailDraftCreate(req) {
     const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`
     // 保存時に検証済みだが、ヘッダーに入る値なので作る直前にもう一度確かめる
     const replyTo = normalizeReplyTo(mailSettings?.reply_to || '')
+    // 返信先は本文の末尾にも書き添える（2026-09-29〜）。Gmail の画面から送ると Gmail がメールを
+    // 組み立て直して Reply-To ヘッダーが落ちることを実機で確認したため（docs/bilmen-plan.md 7-3-3）。
+    // ヘッダーの Reply-To は害が無いので残す（Gmail が将来引き継ぐようになれば効く）。
+    // メールソフト方式（mailto:）は Reply-To が効いたので、この一文は付けない
+    const draftBody = replyTo.value
+      ? `${body.replace(/\s+$/, '')}\n\nご返信は ${replyTo.value} までお願いいたします。\n`
+      : body
     const raw = buildMimeMessage({
       bcc,
       replyTo: replyTo.value ? [{ email: replyTo.value }] : [],
       subject,
-      body,
+      body: draftBody,
       attachment: { filename, contentType: 'application/pdf', bytes: new Uint8Array(await pdf.arrayBuffer()) },
     })
 

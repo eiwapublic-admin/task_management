@@ -336,6 +336,9 @@ a.btn-plain.is-disabled {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--text-base);
+  /* メールアドレスのように途中で切れ目の無い長い文字列が、iPhone幅の細い列から
+     はみ出さないよう、必要なら語の途中でも折り返す */
+  overflow-wrap: anywhere;
 }
 
 .bilmen-notify-done .bilmen-notify-method-note {
@@ -364,13 +367,15 @@ a.btn-plain.is-disabled {
   line-height: 1.35;
 }
 
+/* Gmail方式の作成完了（2026-09-29〜。Gmail方式の枠の中に出す）。iPhone幅では列が約160pxしか
+   ないため、文言は短く、ボタンは列幅いっぱいにする */
 .bilmen-notify-done {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 2px solid var(--color-brand);
-  border-radius: var(--radius-card);
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-control);
   background: var(--color-brand-soft);
 }
 
@@ -383,10 +388,25 @@ a.btn-plain.is-disabled {
   color: var(--color-brand);
 }
 
-.bilmen-notify-done-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.bilmen-notify-done .bilmen-notify-open {
+  width: 100%;
+  height: auto;
+  min-height: var(--control-h);
+  padding-block: var(--space-1);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* 「下書きフォルダへ」は普段使わない逃げ道なので、小さな文字リンクで添えるだけ */
+.bilmen-notify-sublink {
+  align-self: center;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.bilmen-notify-method-note.is-muted {
+  color: var(--text-muted);
 }
 
 /* <a> で作ったボタン（Gmail を開く・mailto:）に下線が付かないようにし、<button> と高さを揃える */
