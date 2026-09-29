@@ -941,6 +941,46 @@ create table if not exists bilmen_monthly_notes (
 alter table bilmen_monthly_notes enable row level security;
 revoke all on bilmen_monthly_notes from anon, authenticated;
 
+-- 案内メールの文面と宛先（Phase 2・4。2026-09-03〜。docs/bilmen-plan.md 7-3・5-6）。
+-- 2026-09-03 に本番へ直接適用したまま、このファイルに書き戻していなかった
+-- （2026-09-29、本番の定義から起こして追記）。
+-- 文面は複数テンプレート管理をせず id='default' の1行だけ
+create table if not exists bilmen_mail_settings (
+  id         text primary key default 'default',
+  subject    text not null default 'ビルメンテナンスのお知らせ（%対象年月%）',
+  body       text not null default E'テナント各位\n\nいつもお世話になっております。\n添付の通り備後町コイズミビルのメンテナンスを行いますので、\n何卒ご了承の上ご協力をお願いいたします。',
+  -- 返信先（Reply-To。2026-09-29〜。7-3-2）。メールソフト方式は mailto: の reply-to、
+  -- Gmail方式は本文末尾の「ご返信は…まで」に使う（Gmail の画面から送ると Reply-To が落ちるため。7-3-3）。
+  -- ヘッダーにそのまま入るので、API側（worker/lib/bilmen.js の normalizeReplyTo）で改行・カンマ等を拒否している。
+  -- 本番の値は bkb@eiwa-up.com（.jp ではない。依頼元に確認済み）
+  reply_to   text,
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists bilmen_mail_settings_set_updated_at on bilmen_mail_settings;
+create trigger bilmen_mail_settings_set_updated_at before update on bilmen_mail_settings
+  for each row execute function set_updated_at();
+
+create table if not exists bilmen_mail_recipients (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,                -- 宛先名（BCC に「"宛先名" <アドレス>」の形で入る）
+  email      text not null,
+  note       text,
+  disabled   boolean not null default false, -- 削除の代わりに無効化する運用（5-6）
+  sort_order integer not null default 999,   -- FileMaker 由来の登録順。画面は宛先名順に並べ替えて表示する
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists bilmen_mail_recipients_email_idx on bilmen_mail_recipients (lower(email));
+create index if not exists bilmen_mail_recipients_order_idx on bilmen_mail_recipients (disabled, sort_order, name);
+drop trigger if exists bilmen_mail_recipients_set_updated_at on bilmen_mail_recipients;
+create trigger bilmen_mail_recipients_set_updated_at before update on bilmen_mail_recipients
+  for each row execute function set_updated_at();
+
+alter table bilmen_mail_settings   enable row level security;
+alter table bilmen_mail_recipients enable row level security;
+revoke all on bilmen_mail_settings   from anon, authenticated;
+revoke all on bilmen_mail_recipients from anon, authenticated;
+
 -- ============================================================
 -- 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜。docs/waste-plan.md）
 -- ============================================================

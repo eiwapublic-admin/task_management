@@ -81,7 +81,7 @@ https://www.googleapis.com/auth/calendar.events
 | スコープ | 用途 | 状態 |
 |---|---|---|
 | `gmail.readonly` | メールの自動取得（既存のパイプライン） | **現行・必ず含める** |
-| `gmail.compose` | 案内メールの**下書き作成**（ビルメン。将来の直接送信も含む） | **今回追加** |
+| `gmail.compose` | 案内メールの**下書き作成**（ビルメン。将来の直接送信も含む） | **今回追加**（2026-09-02 付与済み。**2026-09-29 から使用中**: ビルメン報知の Gmail方式。`worker/lib/gmail.js` の `createDraft`） |
 | `calendar.readonly` | カレンダー一覧・当日イベントの取得（既存のタスク化機能） | **現行・必ず含める** |
 | `calendar.events` | 予定の**作成・更新・削除**（ビルメン） | **今回追加** |
 
