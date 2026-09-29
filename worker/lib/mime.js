@@ -59,13 +59,23 @@ function wrapBase64(b64) {
 
 // 添付ファイル名。RFC 2231（filename*=UTF-8''...）と、古いメールソフト向けの
 // RFC 2047 の name= を両方付ける（Gmail・Outlook・iPhoneのメールのどれでも日本語名が出るように）
+//
+// Content-ID と X-Attachment-Id（2026-09-29〜）: この下書きを Gmail の画面で開いて送ると、
+// Gmail はメールを組み立て直し、添付のパートに**元のパートの値を引き継いだ** Content-ID と
+// X-Attachment-Id を付ける。元に無いと `Content-ID: <>`（空）になり、受け取った側の
+// メールソフトによっては添付が「？」の壊れた画像として表示された（実際に送られたメールの
+// ソースで確認。docs/bilmen-plan.md 7-3-3）。Gmail 自身が添付に付けるのと同じ形
+// （f_ で始まるID）で最初から入れておく
 function attachmentHeaders(filename, contentType) {
   const star = `UTF-8''${encodeURIComponent(filename)}`
   const legacy = isAscii(filename) ? filename : `=?UTF-8?B?${utf8Base64(filename)}?=`
+  const attachmentId = `f_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
   return [
     `Content-Type: ${contentType}; name="${legacy}"`,
-    `Content-Disposition: attachment; filename*=${star}`,
+    `Content-Disposition: attachment; filename="${legacy}"; filename*=${star}`,
     'Content-Transfer-Encoding: base64',
+    `X-Attachment-Id: ${attachmentId}`,
+    `Content-ID: <${attachmentId}>`,
   ]
 }
 
