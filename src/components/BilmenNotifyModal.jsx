@@ -190,58 +190,53 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                     <h3 className="bilmen-notify-method-title">Gmail方式</h3>
                     <p className="bilmen-notify-method-sub">連絡票は自動添付</p>
                   </div>
-                  <div className="bilmen-notify-method-body">
-                    {/* 下書きはサーバーが持つ共有アドレスのトークンで作るため、端末でどの Google
-                        アカウントにログインしていても送信元は共有アドレスになる（2026-09-29に文言を修正） */}
-                    <p className="bilmen-notify-method-note">送信元は、eiwa.public@gmail.com となります。</p>
-                    {/* Gmail の画面から送ると Reply-To が落ちる（Gmail がメールを組み立て直すため。
-                        実機で確認済み・7-3-3）ので、返信先は本文の末尾に書き添える（2026-09-29の依頼） */}
-                    {replyTo && (
-                      <p className="bilmen-notify-method-note is-muted">
-                        本文の末尾に「ご返信は {replyTo} までお願いいたします。」を付けて作成します。
-                      </p>
-                    )}
-
-                    {/* 作成後は「下書きを開く」をこの枠の中に出す（2026-09-29の依頼。以前は2列の下に
-                        別枠で出していたが、操作の流れが分かりにくく、画面の下に隠れて気づきにくかった） */}
-                    {draftStep === 'done' && draftResult && (
-                      <div className="bilmen-notify-done" role="status">
-                        <p className="bilmen-notify-done-title">✓ 下書きを作成しました</p>
-                        <p className="bilmen-notify-method-note">
-                          宛先 {draftResult.recipient_count} 件・連絡票を添付。<strong>まだ送信されていません。</strong>
-                        </p>
-                        <a
-                          className="btn-primary bilmen-notify-open"
-                          href={draftResult.draft_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                  {/* 作成後は説明書きをすべて消し、ボタンだけに切り替える（2026-09-29の依頼）。
+                      以前は説明の下に完了の枠を足していたため、枠が縦に伸びて画面からはみ出した。
+                      ボタン2つ＋小さなリンクなら、隣のメールソフト方式の枠（説明＋ボタン2つ）より
+                      背が高くならず、作成前と同じ大きさのまま収まる */}
+                  {draftStep === 'done' && draftResult ? (
+                    <div className="bilmen-notify-method-body" role="status">
+                      <div className="bilmen-notify-method-actions">
+                        <a className="btn-primary" href={draftResult.draft_url} target="_blank" rel="noreferrer">
                           Gmail で下書きを開く
                         </a>
+                        <button type="button" className="btn-plain" onClick={handleCreateDraft} disabled={cannotSend}>
+                          下書きをもう一度作成
+                        </button>
                         {/* 下書きが直接開かなかったときの逃げ道。普段は使わないので小さく添えるだけ */}
                         <a className="bilmen-notify-sublink" href={draftResult.drafts_url} target="_blank" rel="noreferrer">
                           開かないときは下書きフォルダへ
                         </a>
                       </div>
-                    )}
-
-                    <div className="bilmen-notify-method-actions">
-                      <button
-                        type="button"
-                        className={draftStep === 'done' ? 'btn-plain' : 'btn-primary'}
-                        onClick={handleCreateDraft}
-                        disabled={cannotSend || drafting || !settings}
-                      >
-                        {draftStep === 'pdf'
-                          ? '連絡票を作成中…'
-                          : draftStep === 'draft'
-                            ? 'Gmail に登録中…'
-                            : draftStep === 'done'
-                              ? '下書きをもう一度作成'
-                              : 'Gmail に下書きを作成'}
-                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bilmen-notify-method-body">
+                      {/* 下書きはサーバーが持つ共有アドレスのトークンで作るため、端末でどの Google
+                          アカウントにログインしていても送信元は共有アドレスになる（2026-09-29に文言を修正） */}
+                      <p className="bilmen-notify-method-note">送信元は、eiwa.public@gmail.com となります。</p>
+                      {/* Gmail の画面から送ると Reply-To が落ちる（Gmail がメールを組み立て直すため。
+                          実機で確認済み・7-3-3）ので、返信先は本文の末尾に書き添える（2026-09-29の依頼） */}
+                      {replyTo && (
+                        <p className="bilmen-notify-method-note is-muted">
+                          本文の末尾に「ご返信は {replyTo} までお願いいたします。」を付けて作成します。
+                        </p>
+                      )}
+                      <div className="bilmen-notify-method-actions">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleCreateDraft}
+                          disabled={cannotSend || drafting || !settings}
+                        >
+                          {draftStep === 'pdf'
+                            ? '連絡票を作成中…'
+                            : draftStep === 'draft'
+                              ? 'Gmail に登録中…'
+                              : 'Gmail に下書きを作成'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </div>
             </>
