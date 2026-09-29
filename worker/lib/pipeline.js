@@ -737,8 +737,11 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       // 重複判定。このメッセージ自体が既にタスク化済みなら、タスクの状態を問わず常に
       // スキップする（メッセージ単位。全チャネル共通の一次判定）。
       // FAXは同一件名・同一送信元でGmailが別々のFAXを1スレッドに束ねるため、スレッド単位の
-      // 判定は行わずここで終える（送信元が自社ドメイン外のため上の件名/フォーム返信検知にも
-      // 掛からない）。通常メールはさらにスレッド単位でも判定するが、対象は existingThreads
+      // 判定は行わずここで終える。上の件名/フォーム返信検知にも掛からない
+      // （2026-09-29に eiwa-up.com を自社ドメインに足したため、複合機アドレス mimi@eiwa-up.com は
+      // 自社扱いになった。それでも、件名の返信検知は「顧客（＝FAXタスクの sender_email も複合機）と
+      // 差出人が異なること」と「宛先に顧客を含むこと」が条件、フォーム返信検知は宛先がフォーム顧客で
+      // あることが条件で、宛先が共有アドレスだけのFAXはどちらも満たさない）。通常メールはさらにスレッド単位でも判定するが、対象は existingThreads
       // （＝進行中＝未処理/返信済みのタスクを持つスレッドのみ。完了/アーカイブ済みタスクしか
       // 無いスレッドは対象外）に限定しており、完了済みタスクの陰に別件が隠れて取りこぼされる
       // のを防ぐ（2026-08-17。上記 existingThreads の構築箇所のコメント参照）。
@@ -1049,13 +1052,22 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     const { data: openTasks } = await supabase
       .from('tasks')
       .select(
-        'id, task_no, status, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
+        'id, task_no, status, channel, gmail_thread_id, gmail_message_id, title, subject, sender, sender_email, body_preview, classification_note, last_reply_message_id'
       )
       .in('status', ['未処理', '返信済み'])
       .eq('source', 'email')
     budget.use(1)
 
-    const sortedTasks = (openTasks || []).slice().sort((a, b) => Number(a.task_no) - Number(b.task_no))
+    // FAXのタスクは返信検知の対象にしない（2026-09-29）。Gmail は同じ複合機アドレスから届く
+    // **別々のFAXを1つのスレッドに束ねる**ため、スレッド内の後のFAXを「顧客からの返信」と
+    // 誤認し、前のFAXのタスクの本文を置き換えて「未処理」に戻してしまっていた
+    // （2026-07-31〜09-28 に FAX 64件中20件で発生。後のFAXは別タスクとしても登録されるので二重になる）。
+    // FAXの送り主は複合機（mimi@eiwa-up.com）でしかなく、スレッドで返信のやり取りをする相手ではない。
+    // 自社ドメインに eiwa-up.com を足したことで、複合機アドレスが自社扱いになり顧客が特定できず
+    // 結果的にも飛ばされるようになったが、自社ドメインの設定に頼らないよう明示的に外す
+    const sortedTasks = (openTasks || [])
+      .filter((t) => t.channel !== 'fax')
+      .sort((a, b) => Number(a.task_no) - Number(b.task_no))
 
     // 読む対象を「直近に動きのあったスレッド」に絞る（2026-09-05）。
     // 従来は進行中タスク全件（30件）のスレッドを毎回読んでいたが、その大半は前回から
