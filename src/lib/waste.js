@@ -59,10 +59,15 @@ export async function confirmWasteMonth(month) {
 }
 
 // Excel取込（2026-09-09〜。src/lib/wasteExcelImport.js でブラウザ側にパース済みの
-// 行データをまとめて送る。ファイル自体はサーバーへ送らない）
-export async function importWasteRecords(rows) {
-  const data = await authFetch('/api/waste/records/import', { method: 'POST', body: JSON.stringify({ rows }) })
-  return { records: data.records || [], imported: data.imported || 0 }
+// 行データをまとめて送る。ファイル自体はサーバーへ送らない）。
+// month を渡すと、その月の未確認の下書きのうちファイルに無いマスはサーバー側で削除される
+// （前回取り込んだ誤ったファイルの値を残さないため。2026-09-30〜）
+export async function importWasteRecords(rows, month) {
+  const data = await authFetch('/api/waste/records/import', {
+    method: 'POST',
+    body: JSON.stringify({ rows, month }),
+  })
+  return { records: data.records || [], imported: data.imported || 0, removed: data.removed || 0 }
 }
 
 // Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）。
