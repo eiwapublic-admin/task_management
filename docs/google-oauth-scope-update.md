@@ -1,6 +1,9 @@
 # Google OAuth スコープ拡張 手順書（リフレッシュトークンの再発行）
 
-最終更新: 2026-09-02（ビルメンテナンス管理機能（`docs/bilmen-plan.md`）の 13-1 への対応として作成）
+最終更新: 2026-09-30（7章の `drive.readonly` 追加を実施。**現在のトークンのスコープは5つ**: `gmail.readonly`・
+`gmail.compose`・`calendar.readonly`・`calendar.events`・`drive.readonly`。次に再発行するときは7-1の1行を使うこと）
+
+作成: 2026-09-02（ビルメンテナンス管理機能（`docs/bilmen-plan.md`）の 13-1 への対応として作成）
 
 ---
 
@@ -302,4 +305,13 @@ https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/g
   **名前に「廃棄物」を含むスプレッドシート（Googleスプレッドシート・.xlsx）だけ**を取得できるように
   絞っています。
 - **切り戻し**: 5章と同じ（旧トークンに戻せば、ドライブ取込以外は元どおり動きます）。
+
+### 7-3. 実施記録（2026-09-30）
+
+- 依頼元が Drive API の有効化 → 5つのスコープでの再発行 → GitHub Secrets `GMAIL_REFRESH_TOKEN` の差し替えまでを実施。
+  反映は廃棄物のGoogleドライブ取込を含む main への取り込み（自動デプロイ）で行った。
+- 本番で「Excelアップロード」→「Googleドライブから」の一覧表示・取込を依頼元が確認済み。以後のメール取得・
+  カレンダー連携でのエラー報告は無し。
+- **手順7（Playground のリダイレクトURIの削除）を実施したかは未確認**。残っていても実害は無い（手順7の注記参照）が、
+  次回の再発行時は登録の有無を確かめてから始めること。
 

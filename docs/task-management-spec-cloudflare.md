@@ -32,7 +32,7 @@
 | バックエンド | Cloudflare Workers（単一 Worker） | 静的配信 + API + Cron を1つで担う |
 | DB | Supabase (PostgreSQL) | プロジェクト: Eiwapublic Project (`pfiogfdnbctunkhslmcp`) |
 | 定期実行 | Cloudflare Cron Triggers | `*/5 * * * *`（5分ごとに起動、実処理は設定でゲート） |
-| メール取得 | Gmail API (OAuth 2.0 リフレッシュトークン) | scope: gmail.readonly |
+| メール取得 | Gmail API (OAuth 2.0 リフレッシュトークン) | 共有アカウントの1本のトークンを Gmail・Calendar・Drive で共用。scope は `gmail.readonly`・`gmail.compose`・`calendar.readonly`・`calendar.events`・`drive.readonly`（2026-09-30時点。`docs/google-oauth-scope-update.md`） |
 | AI 処理 | Claude API (`claude-haiku-4-5`) | 環境変数 `CLAUDE_MODEL` で変更可 |
 | 認証 | カスタム認証（bcrypt + HS256 JWT） | JWT は Web Crypto による自前実装。有効期限30日 |
 | PWA | 自前の最小 Service Worker（キャッシュなし） | 更新通知バナー・ロゴタップ最新化。ビルド時に `public/sw.js` を生成 |
@@ -104,7 +104,7 @@ docs/                   本書・引き継ぎ書・旧設計書・UI標準・機
     ├── daily-report-plan.md             日報・自主検査表・違反車両・残留塩素の開発計画
     ├── equipment-plan.md                備品管理の開発計画（FileMaker移行の先例）
     ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02〜。Phase 1・2・4方式B実装済み）
-    ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み）
+    ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み。取込はExcel／Googleドライブ〈10-7〜10-9〉）
     ├── google-oauth-scope-update.md     Google OAuth スコープ拡張の作業手順（トークン再発行）
     ├── disaster-recovery.md             Supabaseバックアップからの復旧手順
     └── ai-cost-and-alternatives.md      AI利用コストの試算と代替案（9章に2026-09-04の課金事故と再発防止）
@@ -1426,7 +1426,7 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 - **タスクスコープの限定（2026-07-16追加）**: `thread_id` を必須化し、①タスクに紐づくスレッドであること ②`message_id` がそのスレッドに実在すること、を検証してから取得する。以前は `message_id` の形式チェックのみで、タスク化されていない共有メールボックスの任意メッセージまで取得できた（審査での指摘: H3）
 
 ### レスポンス・通信
-- Gmail は readonly スコープ。HTTPS は Cloudflare が終端
+- Google連携のスコープは上の技術構成表のとおり（Gmail の送信系は `gmail.compose` による下書き作成のみ使用。Drive は廃棄物実測集計表の読み取りのみで、名前に「廃棄物」を含むスプレッドシート以外はWorker側で拒否。2026-09-30）。HTTPS は Cloudflare が終端
 - **エラー詳細の非露出（2026-07-16追加）**: Supabase等の内部エラーメッセージをクライアントへそのまま返さず、汎用メッセージのみ返却。詳細は `console.error` でサーバーログにのみ出力（審査での指摘: N1）
 - **セキュリティヘッダ/CSP（2026-07-16追加）**: 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（外部CDN等を使わないため、ほぼ全ディレクティブ `'self'`）を付与（審査での指摘: N2）。**`img-src`/`frame-src`のみ`blob:`を追加で許可**（2026-07-22。添付ファイルのアプリ内プレビュー機能が`URL.createObjectURL()`のBlob URLを`<img>`/`<iframe>`で表示するために必要。外部オリジンへの許可ではないため、この機能追加によるリスク増は無い）。**PDFプレビュー（preview_token経由）のレスポンスに限り`X-Frame-Options: SAMEORIGIN` / CSP`frame-ancestors 'self'`へ緩和**（2026-07-23。アプリ内PDFプレビューの同一オリジンiframe埋め込みを許可するため。`withSecurityHeaders`は既定で`DENY`/`frame-ancestors 'none'`を付与するが、このレスポンスのみ自オリジン限定に緩める。他サイトからのフレーム埋め込み＝クリックジャッキングは引き続き全面的に防止される）
 
