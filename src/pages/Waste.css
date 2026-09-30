@@ -127,3 +127,10 @@
 .waste-legend { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 .waste-legend-high { color: var(--color-warn-ink); font-weight: 700; }
 .waste-legend-extreme { color: var(--color-danger); font-weight: 700; }
+
+/* 機能ヘッダ下段の取込手順の案内（2026-09-30）。ヘッダーと一緒に固定表示されるので、
+   本文より一段小さい補足文字（.ui-note）のまま、ボタン行との間だけ少し空ける */
+.waste-head-note {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}

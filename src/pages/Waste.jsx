@@ -229,7 +229,15 @@ export default function Waste() {
               </>
             )
           }
-        />
+        >
+          {/* 取込の手順の案内（2026-09-30。依頼の文言そのまま。docs/waste-plan.md 10-9）。
+              Excelアップロードボタンが見える人（書き込み可・月別表示）にだけ出す */}
+          {viewMode === 'month' && !readOnly && (
+            <p className="ui-note waste-head-note">
+              手書きの集計表をスキャンして取り込む場合、Claude ChatにExcelファイルとしてGoogleDriveに保存するよう指示したのちに[Excelアップロード]から取り込んでください。
+            </p>
+          )}
+        </FeatureHeader>
 
         {error && (
           <p className="dashboard-error dashboard-banner" role="alert">
