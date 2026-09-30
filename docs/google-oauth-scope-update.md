@@ -20,6 +20,12 @@
 
 ---
 
+> **2026-09-30 追記**: 廃棄物実測集計表のGoogleドライブ取込（`docs/waste-plan.md` 10-7）のため、
+> **5つ目のスコープ `drive.readonly` を追加する再発行**が必要になりました。手順は同じで、
+> 違いだけを **7章** にまとめています（7章から読み始めてください）。
+
+---
+
 ## URL 一覧（作業で開くページ）
 
 使う順に並べています。**Google 側の操作は `eiwa.public@gmail.com` でログインした状態で行ってください。**
@@ -261,3 +267,39 @@ GitHub Secrets から更新します（デプロイ時に Worker へ自動同期
   着手できるようになります（`docs/bilmen-plan.md` 12章）
 - Phase 1・2・4（一覧・マスタ・掲示PDF・`mailto:` でのメール作成）は**この作業を待たずに**進められます
 - 完了後、`docs/HANDOFF.md` に実施記録を残してください
+
+---
+
+## 7. 追記（2026-09-30）：Googleドライブの読み取り（`drive.readonly`）を追加する
+
+廃棄物実測値管理の「Excelアップロード」→「**Googleドライブから**」（`docs/waste-plan.md` 10-7）は、
+共有アカウントのドライブにあるスプレッドシートを読み取るため、トークンに **`drive.readonly`** が
+必要です。**この作業が済むまでは「Googleドライブから」を選ぶと「読み取り権限がありません」と
+表示されます**（「ファイルを選ぶ」でのアップロードはこれまでどおり使えます）。
+
+### 7-1. 3章との違い（ここ以外は3章の手順1〜7と同じ）
+
+| # | 違い | 内容 |
+|---|---|---|
+| 1 | **Google Drive API を有効にする**（手順1の前に1回だけ） | https://console.cloud.google.com/apis/library/drive.googleapis.com を開き、プロジェクトがこのシステム用であることを確かめて「**有効にする**」を押す（無料。既に「管理」と表示されていれば有効化済み） |
+| 2 | **手順3で入力するスコープが5つになる** | 下の1行をそのまま貼り付ける（**既存の4つを必ず含める**。含め忘れるとメール取得・カレンダー連携・下書き作成が止まる） |
+| 3 | **同意画面に出る権限が1つ増える** | 「**Google ドライブのすべてのファイルの表示とダウンロード**」（`drive.readonly`）。3章 手順3の表の4つとあわせて**5つすべて**にチェックが入っていることを確認して「続行」 |
+| 4 | **動作確認の場所** | 手順6の確認に加えて、 https://task-management.eiwa-public.workers.dev/waste の「Excelアップロード」→「Googleドライブから」で、ファイル一覧が表示されることを確かめる |
+
+手順3の「Input your own scopes」に貼り付ける文字列（5つ・半角スペース区切りの1行）:
+
+```
+https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly
+```
+
+### 7-2. 補足
+
+- **費用**: Google Drive API の利用は無料です（今回の使い方で課金は発生しません）。
+- **「このアプリは Google で確認されていません」**: `drive.readonly` は Google が「制限付き」に分類する
+  スコープのため、この警告は従来どおり表示されます。自社の共有アカウントだけで使うアプリなので、
+  3章 手順3の4と同じく「詳細」→「移動」で続行して構いません（Google の審査は不要）。
+- **読み取れる範囲の制限**: トークン自体はドライブ全体を読めますが、アプリ側（`worker/lib/waste.js`）で
+  **名前に「廃棄物」を含むスプレッドシート（Googleスプレッドシート・.xlsx）だけ**を取得できるように
+  絞っています。
+- **切り戻し**: 5章と同じ（旧トークンに戻せば、ドライブ取込以外は元どおり動きます）。
+
