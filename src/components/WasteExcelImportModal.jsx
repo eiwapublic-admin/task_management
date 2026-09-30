@@ -114,8 +114,8 @@ export default function WasteExcelImportModal({ defaultMonth, onClose, onDone })
         return
       }
       setBusyLabel('保存中…')
-      const { imported } = await importWasteRecords(rows)
-      onDone(month, imported)
+      const { imported, removed } = await importWasteRecords(rows, month)
+      onDone(month, imported, removed)
     } catch (err) {
       setError(err.message)
       setBusy(false)

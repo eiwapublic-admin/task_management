@@ -113,9 +113,10 @@ export default function Waste() {
     }
   }
 
-  function handleImportDone(targetMonth, importedCount) {
+  function handleImportDone(targetMonth, importedCount, removedCount = 0) {
     setImportOpen(false)
-    setInfo(`${targetMonth.replace('-', '年')}月分を${importedCount}件取り込みました。内容を確認してください。`)
+    const removedNote = removedCount > 0 ? `（ファイルで空欄だった未確認の${removedCount}件は削除しました）` : ''
+    setInfo(`${targetMonth.replace('-', '年')}月分を${importedCount}件取り込みました${removedNote}。内容を確認してください。`)
     setViewMode('month')
     setMonth(targetMonth)
   }
@@ -364,7 +365,7 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
                     />
                   </td>
                 ))}
-                <td className="is-numeric waste-row-total">{rowTotal > 0 ? rowTotal.toFixed(1) : ''}</td>
+                <td className="is-numeric waste-row-total">{rowTotal > 0 ? rowTotal.toFixed(2) : ''}</td>
               </tr>
             )
           })}
@@ -372,10 +373,10 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
             <td colSpan={2}>合計</td>
             {colTotals.map((total, i) => (
               <td key={WASTE_FLOORS[i]} className="is-numeric">
-                {total > 0 ? total.toFixed(1) : ''}
+                {total > 0 ? total.toFixed(2) : ''}
               </td>
             ))}
-            <td className="is-numeric">{grandTotal > 0 ? grandTotal.toFixed(1) : ''}</td>
+            <td className="is-numeric">{grandTotal > 0 ? grandTotal.toFixed(2) : ''}</td>
           </tr>
         </tbody>
       </table>

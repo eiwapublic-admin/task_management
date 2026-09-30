@@ -168,6 +168,12 @@ export async function handleWasteRecordConfirmMonth(req) {
 // 読み取り、日×階の行データに変換した結果をここへまとめて送ってもらう方式に変更した。
 // OCR取込と同じく is_confirmed=false の下書きとして保存し、Waste.jsx の編集グリッドで
 // 人が確認・訂正してから確定する（画面自体は変えていない。取込元だけが変わった）。
+//
+// 2026-09-30〜: month（'YYYY-MM'）を指定すると、その月の「未確認の下書き」のうち今回の
+// ファイルに無い日×階を削除する（docs/waste-plan.md 10-8）。upsertは値のあるマスしか
+// 上書きしないため、誤ったファイルを取り込んだ後に正しいファイルを取り込み直しても、
+// 正しいファイルでは空欄のマスに前回の誤った値が残ってしまっていた。確認済みの行は
+// 人が確定した値のため消さない。
 export async function handleWasteRecordImport(req) {
   const { error } = await requireAuth(req, { write: true })
   if (error) return error
@@ -177,10 +183,16 @@ export async function handleWasteRecordImport(req) {
     if (!Array.isArray(rawRows) || rawRows.length === 0) return json({ error: 'rows は必須です' }, 400)
     if (rawRows.length > MAX_IMPORT_ROWS) return json({ error: '行数が多すぎます' }, 400)
 
+    const month = payload?.month || ''
+    if (month && !MONTH_PATTERN.test(month)) return json({ error: 'month の形式が不正です' }, 400)
+
     const rows = []
     for (const raw of rawRows) {
       const { row, error: buildErr } = validateRecordPayload(raw)
       if (buildErr) return json({ error: buildErr }, 400)
+      if (month && !row.record_date.startsWith(`${month}-`)) {
+        return json({ error: '対象月以外の日付が含まれています' }, 400)
+      }
       rows.push({ ...row, source: 'excel', is_confirmed: false })
     }
 
@@ -193,7 +205,33 @@ export async function handleWasteRecordImport(req) {
       console.error('waste-record-import:', err.message)
       return json({ error: '実測値の取り込みに失敗しました' }, 500)
     }
-    return json({ records: data || [], imported: data?.length || 0 })
+
+    let removed = 0
+    if (month) {
+      const keep = new Set(rows.map((r) => `${r.record_date}|${r.floor}`))
+      const { data: drafts, error: draftErr } = await supabase
+        .from('waste_records')
+        .select('id, record_date, floor')
+        .eq('is_confirmed', false)
+        .gte('record_date', `${month}-01`)
+        .lt('record_date', `${shiftMonth(month, 1)}-01`)
+      if (draftErr) {
+        console.error('waste-record-import（残りの下書き取得）:', draftErr.message)
+        return json({ error: '取り込みは完了しましたが、前回の下書きの整理に失敗しました' }, 500)
+      }
+      const staleIds = (drafts || []).filter((r) => !keep.has(`${r.record_date}|${r.floor}`)).map((r) => r.id)
+      // id（UUID）を in() で渡すとURLが長くなるため、50件ずつに分けて削除する
+      for (let i = 0; i < staleIds.length; i += 50) {
+        const chunk = staleIds.slice(i, i + 50)
+        const { error: delErr } = await supabase.from('waste_records').delete().in('id', chunk)
+        if (delErr) {
+          console.error('waste-record-import（残りの下書き削除）:', delErr.message)
+          return json({ error: '取り込みは完了しましたが、前回の下書きの整理に失敗しました' }, 500)
+        }
+        removed += chunk.length
+      }
+    }
+    return json({ records: data || [], imported: data?.length || 0, removed })
   } catch (err) {
     console.error('waste-record-import 失敗:', err)
     return json({ error: '実測値の取り込みに失敗しました' }, 500)
