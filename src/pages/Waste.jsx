@@ -36,6 +36,9 @@ export default function Waste() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  // 取込後の再読込用（2026-09-30）。取込前と同じ月を表示中だと month / viewMode が変わらず
+  // load が作り直されないため、一覧が取込前の状態のまま（削除した下書きも表示されたまま）になっていた
+  const [reloadKey, setReloadKey] = useState(0)
   const [importOpen, setImportOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const sheetExport = useWasteSheetPdfExport()
@@ -52,7 +55,9 @@ export default function Waste() {
     } finally {
       setLoading(false)
     }
-  }, [viewMode, month, fiscalYear])
+    // reloadKey は再読込のきっかけにだけ使う（値そのものは参照しない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, month, fiscalYear, reloadKey])
 
   useEffect(() => {
     load()
@@ -119,6 +124,7 @@ export default function Waste() {
     setInfo(`${targetMonth.replace('-', '年')}月分を${importedCount}件取り込みました${removedNote}。内容を確認してください。`)
     setViewMode('month')
     setMonth(targetMonth)
+    setReloadKey((k) => k + 1)
   }
 
   return (
