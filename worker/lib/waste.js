@@ -3,6 +3,8 @@
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
+import { getAccessToken } from './gmail.js'
+import { searchSpreadsheets, getFileMetadata, downloadAsXlsx, DRIVE_SHEET_MIME, XLSX_MIME } from './drive.js'
 
 export const WASTE_FLOORS = ['1', '2', '3', '4', '5', '6', '7']
 
@@ -195,5 +197,82 @@ export async function handleWasteRecordImport(req) {
   } catch (err) {
     console.error('waste-record-import 失敗:', err)
     return json({ error: '実測値の取り込みに失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）。
+// AIチャット（Claude等）で手書き表を読み取らせるとGoogleドライブにスプレッドシートとして
+// 保存されるため、ダウンロード→アップロードの手間を省いて直接取り込めるようにした。
+// サーバーはファイルの中身（.xlsx）を返すだけで、読み取りは従来どおりブラウザ側の
+// src/lib/wasteExcelImport.js が行い、保存は /api/waste/records/import を使う。
+//
+// 共有アカウント（eiwa.public@gmail.com）のドライブ全体を読める権限（drive.readonly）を使うため、
+// 取込対象外のファイルを読み出す窓口にならないよう、名前に「廃棄物」を含む
+// スプレッドシート（Googleスプレッドシート・.xlsx）だけに限定する。
+
+const DRIVE_NAME_KEYWORD = '廃棄物'
+const DRIVE_FILE_ID_PATTERN = /^[A-Za-z0-9_-]{10,200}$/
+// 実測集計表は数十KB程度。安全弁として上限を設ける
+const MAX_DRIVE_FILE_BYTES = 5 * 1024 * 1024
+
+function driveErrorResponse(err, fallback) {
+  if (err?.isScopeError) {
+    return json(
+      {
+        error:
+          'Googleドライブの読み取り権限がありません。管理者がGoogle連携の権限（drive.readonly）を追加する必要があります。',
+      },
+      502
+    )
+  }
+  if (err?.isApiDisabled) {
+    return json({ error: 'Google Drive API が有効になっていません。管理者が Google Cloud で有効化してください。' }, 502)
+  }
+  if (err?.isNotFound) return json({ error: 'Googleドライブにファイルが見つかりませんでした' }, 404)
+  return json({ error: fallback }, 500)
+}
+
+// GET /api/waste/drive-files — 名前に「廃棄物」を含むスプレッドシートを更新日の新しい順に返す
+export async function handleWasteDriveFileList(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const accessToken = await getAccessToken()
+    const files = await searchSpreadsheets(accessToken, DRIVE_NAME_KEYWORD, 20)
+    return json({
+      files: files.map((f) => ({ id: f.id, name: f.name, mime_type: f.mimeType, modified_time: f.modifiedTime })),
+    })
+  } catch (err) {
+    console.error('waste-drive-file-list 失敗:', err)
+    return driveErrorResponse(err, 'Googleドライブのファイル一覧を取得できませんでした')
+  }
+}
+
+// GET /api/waste/drive-file?id=... — ファイルの中身を .xlsx で返す
+export async function handleWasteDriveFileDownload(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  const id = new URL(req.url).searchParams.get('id') || ''
+  if (!DRIVE_FILE_ID_PATTERN.test(id)) return json({ error: 'id の形式が不正です' }, 400)
+  try {
+    const accessToken = await getAccessToken()
+    const meta = await getFileMetadata(accessToken, id)
+    const allowedType = meta.mimeType === DRIVE_SHEET_MIME || meta.mimeType === XLSX_MIME
+    if (meta.trashed || !allowedType || !(meta.name || '').includes(DRIVE_NAME_KEYWORD)) {
+      return json({ error: '廃棄物実測集計表のスプレッドシートではありません' }, 400)
+    }
+    if (meta.mimeType === XLSX_MIME && Number(meta.size || 0) > MAX_DRIVE_FILE_BYTES) {
+      return json({ error: 'ファイルが大きすぎます' }, 400)
+    }
+    const body = await downloadAsXlsx(accessToken, meta)
+    if (body.byteLength > MAX_DRIVE_FILE_BYTES) return json({ error: 'ファイルが大きすぎます' }, 400)
+    return new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': XLSX_MIME, 'Cache-Control': 'no-store' },
+    })
+  } catch (err) {
+    console.error('waste-drive-file-download 失敗:', err)
+    return driveErrorResponse(err, 'Googleドライブからファイルを取得できませんでした')
   }
 }

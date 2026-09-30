@@ -118,6 +118,8 @@ import {
   handleWasteRecordDelete,
   handleWasteRecordConfirmMonth,
   handleWasteRecordImport,
+  handleWasteDriveFileList,
+  handleWasteDriveFileDownload,
 } from './lib/waste.js'
 import {
   handlePaperRecordList,
@@ -1241,6 +1243,16 @@ async function route(req, env) {
     if (req.method === 'POST') return handleWasteRecordImport(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
+  // Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）
+  if (pathname === '/api/waste/drive-files') {
+    if (req.method === 'GET') return handleWasteDriveFileList(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/waste/drive-file') {
+    if (req.method === 'GET') return handleWasteDriveFileDownload(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+
   // 古紙回収量の記録（設計書 4-18。廃棄物と同じ権限で扱う）
   if (pathname === '/api/paper/records') {
     if (req.method === 'GET') return handlePaperRecordList(req)

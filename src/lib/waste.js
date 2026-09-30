@@ -1,4 +1,5 @@
 import { authFetch } from './api'
+import { getToken, logout } from './auth'
 
 // 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜）の API 呼び出し・共通ユーティリティ。
 // 詳細は docs/waste-plan.md 参照。
@@ -62,4 +63,33 @@ export async function confirmWasteMonth(month) {
 export async function importWasteRecords(rows) {
   const data = await authFetch('/api/waste/records/import', { method: 'POST', body: JSON.stringify({ rows }) })
   return { records: data.records || [], imported: data.imported || 0 }
+}
+
+// Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）。
+// 名前に「廃棄物」を含むスプレッドシートを更新日の新しい順に返す
+export async function fetchWasteDriveFiles() {
+  const data = await authFetch('/api/waste/drive-files')
+  return data.files || []
+}
+
+// ドライブのファイルの中身を .xlsx（ArrayBuffer）で受け取る。Googleスプレッドシートは
+// サーバー側で .xlsx に書き出されて返るので、そのまま parseWasteExcelBuffer で読める。
+// バイナリを受け取るため authFetch（JSON前提）は使わず、401の扱いだけ揃える
+export async function fetchWasteDriveFileBuffer(fileId) {
+  const token = getToken()
+  const res = await fetch(`/api/waste/drive-file?id=${encodeURIComponent(fileId)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (res.status === 401) {
+    logout()
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.assign('/login?expired=1')
+    }
+    throw new Error('セッションの有効期限が切れました。再度ログインしてください。')
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || `Googleドライブからの取得に失敗しました (${res.status})`)
+  }
+  return res.arrayBuffer()
 }

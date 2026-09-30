@@ -12,7 +12,14 @@ import { daysInMonth } from './reports'
 
 const CENTRAL_DIR_SIG = 0x02014b50
 const EOCD_SIG = 0x06054b50
-const FLOOR_LABEL = /^([1-7])\s*F$/i
+// 「1F」だけでなく「1階」「１階」「１Ｆ」も受け付ける（2026-09-30。AIチャットがGoogle
+// スプレッドシートで作った表は見出しが「1階」〜「7階」だったため読み取れなかった）。
+// 全角は normalizeLabel（NFKC）で半角にそろえてから判定する
+const FLOOR_LABEL = /^([1-7])\s*(?:F|階)$/i
+
+function normalizeLabel(value) {
+  return value.normalize('NFKC').replace(/\s+/g, ' ').trim()
+}
 
 function assertBrowserSupport() {
   if (typeof DecompressionStream === 'undefined' || typeof DOMParser === 'undefined') {
@@ -124,12 +131,42 @@ function findFloorHeader(rows) {
     const cells = rows.get(rowNum)
     const found = new Map()
     for (const [colIdx, value] of cells) {
-      const m = typeof value === 'string' ? FLOOR_LABEL.exec(value.trim()) : null
+      const m = typeof value === 'string' ? FLOOR_LABEL.exec(normalizeLabel(value)) : null
       if (m) found.set(colIdx, m[1])
     }
     if (found.size >= 7) return { headerRowNum: rowNum, floorCols: found }
   }
   return null
+}
+
+// ブック内のシートXMLのパスを、Excel上のタブの並び順で返す（workbook.xml と
+// そのリレーション定義から引く）。以前は xl/worksheets/sheet1.xml 決め打ちだったが、
+// タブが複数ある・並べ替えたブックでは sheet1.xml が先頭タブとは限らないため
+async function listSheetPaths(buffer, entries, decoder) {
+  const wbEntry = entries.get('xl/workbook.xml')
+  const relsEntry = entries.get('xl/_rels/workbook.xml.rels')
+  const fallback = [...entries.keys()].filter((n) => /^xl\/worksheets\/[^/]+\.xml$/.test(n)).sort()
+  if (!wbEntry || !relsEntry) return fallback
+
+  const [wbBytes, relsBytes] = await Promise.all([readZipEntry(buffer, wbEntry), readZipEntry(buffer, relsEntry)])
+  const parser = new DOMParser()
+  const relsDoc = parser.parseFromString(decoder.decode(relsBytes), 'application/xml')
+  const targets = new Map()
+  for (const rel of relsDoc.getElementsByTagName('Relationship')) {
+    const target = rel.getAttribute('Target') || ''
+    // Target は xl/ からの相対パス（例: worksheets/sheet1.xml）か、/xl/... の絶対パス
+    targets.set(rel.getAttribute('Id'), target.startsWith('/') ? target.slice(1) : `xl/${target}`)
+  }
+  const wbDoc = parser.parseFromString(decoder.decode(wbBytes), 'application/xml')
+  const paths = []
+  for (const sheet of wbDoc.getElementsByTagName('sheet')) {
+    const rid =
+      sheet.getAttribute('r:id') ||
+      sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
+    const path = targets.get(rid)
+    if (path && entries.has(path)) paths.push(path)
+  }
+  return paths.length ? paths : fallback
 }
 
 /**
@@ -140,12 +177,20 @@ function findFloorHeader(rows) {
  * @returns {{ rows: { record_date: string, floor: string, weight_kg: number }[] }}
  */
 export async function parseWasteExcelFile(file, targetMonth) {
-  assertBrowserSupport()
   if (!/\.xlsx$/i.test(file.name || '')) {
     throw new Error('.xlsx形式のファイルを選んでください')
   }
+  return parseWasteExcelBuffer(await file.arrayBuffer(), targetMonth)
+}
 
-  const buffer = await file.arrayBuffer()
+/**
+ * parseWasteExcelFile の本体。Googleドライブから取得したファイル（2026-09-30〜。
+ * スプレッドシートはサーバー側で.xlsxに書き出して返す）もここで読み取る。
+ * @param {ArrayBuffer} buffer .xlsxファイルの中身
+ * @param {string} targetMonth 対象月 'YYYY-MM'
+ */
+export async function parseWasteExcelBuffer(buffer, targetMonth) {
+  assertBrowserSupport()
   let entries
   try {
     entries = listZipEntries(buffer)
@@ -153,19 +198,27 @@ export async function parseWasteExcelFile(file, targetMonth) {
     throw new Error('Excelファイルとして読み取れませんでした（.xlsx形式かご確認ください）')
   }
 
-  const sheetEntry = entries.get('xl/worksheets/sheet1.xml')
-  if (!sheetEntry) throw new Error('Excelファイルの形式が想定と異なります（シートが見つかりません）')
-
-  const [sheetBytes, sharedBytes] = await Promise.all([
-    readZipEntry(buffer, sheetEntry),
-    entries.has('xl/sharedStrings.xml') ? readZipEntry(buffer, entries.get('xl/sharedStrings.xml')) : null,
-  ])
-
   const decoder = new TextDecoder('utf-8')
-  const sharedStrings = parseSharedStrings(sharedBytes ? decoder.decode(sharedBytes) : '')
-  const rows = parseSheetRows(decoder.decode(sheetBytes), sharedStrings)
+  const sheetPaths = await listSheetPaths(buffer, entries, decoder)
+  if (sheetPaths.length === 0) throw new Error('Excelファイルの形式が想定と異なります（シートが見つかりません）')
 
-  const header = findFloorHeader(rows)
+  const sharedBytes = entries.has('xl/sharedStrings.xml')
+    ? await readZipEntry(buffer, entries.get('xl/sharedStrings.xml'))
+    : null
+  const sharedStrings = parseSharedStrings(sharedBytes ? decoder.decode(sharedBytes) : '')
+
+  // タブの並び順に見て、1〜7階の見出し行を持つ最初のシートを使う
+  let rows = null
+  let header = null
+  for (const path of sheetPaths) {
+    const sheetRows = parseSheetRows(decoder.decode(await readZipEntry(buffer, entries.get(path))), sharedStrings)
+    const found = findFloorHeader(sheetRows)
+    if (found) {
+      rows = sheetRows
+      header = found
+      break
+    }
+  }
   if (!header) {
     throw new Error('見出し行（1階〜7階）が見つかりませんでした。想定と異なる形式のファイルです。')
   }
