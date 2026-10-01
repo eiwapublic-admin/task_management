@@ -65,7 +65,9 @@ body.pdf-capture-mode .mr-sheet {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  border: 0.6mm solid #000;
+  border: none;
+  /* 外枠（.mr-sheet-frame の黒地）が透けないよう、表自体は白で塗る */
+  background: #fff;
 }
 
 .mr-col-date { width: 14mm; }
@@ -86,22 +88,30 @@ body.pdf-capture-mode .mr-sheet {
 
 /* 表の外枠（2026-10-01）。html2canvas は border-collapse の表で、表自体の枠線を
    内側の罫線（隣り合うセルの線が重なって太く出る）と同じか細いくらいにしか描かず、
-   左右の外枠が内側の線に埋もれて見えなかった。そのため外周のセルに太線を直接付けて、
-   上下左右とも同じ太さの太枠にする。html2canvas の線幅は1px単位で丸められ、
-   0.5mm以下では内側の線と見分けがつかないため0.6mm（2px相当）にしている。
-   分見出し行（.mr-row-minutes）の先頭セルは、日付・曜日列を rowSpan で上の行に
-   譲っているため左端ではない。左線の対象から外す */
+   左右の外枠が内側の線に埋もれて見えなかった。最初は外周のセルに0.6mmの太線を付けたが、
+   「もう少し細く。ただし内側の罫線よりは太く」との依頼（同日）を受けて作り方を変えた。
+   ・枠線（border）の太さはブラウザが1px単位に切り捨てる（0.4mm＝1.5pxでも1pxになる）ため、
+     1pxの内側の罫線と2pxの太線の中間が作れない
+   ・box-shadow は html2canvas が表に描かない
+   そこで表を黒地の箱（.mr-sheet-frame）で包み、その padding を外枠として見せる。padding は
+   切り捨てられないので mm 指定どおりの太さになる。外周のセルの線は外枠と重なって二重線に
+   見えるため消す。分見出し行（.mr-row-minutes）の先頭セルは、日付・曜日列を rowSpan で
+   上の行に譲っているため左端ではない。左線を消す対象から外す */
+.mr-sheet-frame {
+  padding: 0.65mm;
+  background: #000;
+}
 .mr-sheet-table tr:not(.mr-row-minutes) > :first-child {
-  border-left: 0.6mm solid #000;
+  border-left: none;
 }
 .mr-sheet-table tr > :last-child {
-  border-right: 0.6mm solid #000;
+  border-right: none;
 }
 .mr-row-hours th {
-  border-top: 0.6mm solid #000;
+  border-top: none;
 }
 .mr-sheet-table tbody tr:last-child td {
-  border-bottom: 0.6mm solid #000;
+  border-bottom: none;
 }
 
 /* 日付・曜日・時間帯の見出し行は薄いグレーで塗る（2026-10-01） */

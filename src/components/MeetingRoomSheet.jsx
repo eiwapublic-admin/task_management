@@ -34,59 +34,62 @@ export default function MeetingRoomSheet({ month, range, holidays, closedDays })
         <span className="mr-sheet-title">備後町コイズミビル５階　会議室利用申込書</span>
       </div>
 
-      <table className="mr-sheet-table">
-        <colgroup>
-          <col className="mr-col-date" />
-          <col className="mr-col-wd" />
-          {Array.from({ length: SLOT_COUNT }, (_, i) => (
-            <col className="mr-col-time" key={i} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr className="mr-row-hours">
-            <th rowSpan={2}>日付</th>
-            <th rowSpan={2}>曜日</th>
-            {HOURS.map((h) => (
-              <th colSpan={2} key={h}>{h}</th>
+      {/* 外枠は黒地の箱の padding で描く（MeetingRoomSheet.css の .mr-sheet-frame） */}
+      <div className="mr-sheet-frame">
+        <table className="mr-sheet-table">
+          <colgroup>
+            <col className="mr-col-date" />
+            <col className="mr-col-wd" />
+            {Array.from({ length: SLOT_COUNT }, (_, i) => (
+              <col className="mr-col-time" key={i} />
             ))}
-          </tr>
-          <tr className="mr-row-minutes">
-            {HOURS.map((h) => (
-              <Fragment key={h}>
-                <th>00</th>
-                <th>30</th>
-              </Fragment>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {/* 記入例（10:00〜12:30の予約を書く見本）。列2つ分（9:00・9:30）を空けたあと、
-              10:00〜12:30にあたる5列（10:00・10:30・11:00・11:30・12:00）をまたぐ */}
-          <tr className="mr-row-example">
-            <th colSpan={2}>記入例</th>
-            <td colSpan={2} />
-            <td className="mr-example-cell" colSpan={5}>
-              <div className="mr-example-time">10：00 〜 12：30</div>
-              <div className="mr-example-arrow">
-                <span className="mr-example-arrowhead is-left" />
-                <span className="mr-example-arrowhead is-right" />
-              </div>
-              <div className="mr-example-name">備後町ｺｲｽﾞﾐﾋﾞﾙ/鍵本(06-6251-9881）</div>
-            </td>
-            <td colSpan={SLOT_COUNT - 7} />
-          </tr>
-
-          {range.days.map((date) => (
-            <tr className={rowClassName(date, holidays, closedDays)} key={date}>
-              <td className="mr-date">{Number(date.slice(-2))}日</td>
-              <td className="mr-wd">{weekdayInfo(date, holidays).label}</td>
-              {Array.from({ length: SLOT_COUNT }, (_, i) => (
-                <td key={i} />
+          </colgroup>
+          <thead>
+            <tr className="mr-row-hours">
+              <th rowSpan={2}>日付</th>
+              <th rowSpan={2}>曜日</th>
+              {HOURS.map((h) => (
+                <th colSpan={2} key={h}>{h}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr className="mr-row-minutes">
+              {HOURS.map((h) => (
+                <Fragment key={h}>
+                  <th>00</th>
+                  <th>30</th>
+                </Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {/* 記入例（10:00〜12:30の予約を書く見本）。列2つ分（9:00・9:30）を空けたあと、
+                10:00〜12:30にあたる5列（10:00・10:30・11:00・11:30・12:00）をまたぐ */}
+            <tr className="mr-row-example">
+              <th colSpan={2}>記入例</th>
+              <td colSpan={2} />
+              <td className="mr-example-cell" colSpan={5}>
+                <div className="mr-example-time">10：00 〜 12：30</div>
+                <div className="mr-example-arrow">
+                  <span className="mr-example-arrowhead is-left" />
+                  <span className="mr-example-arrowhead is-right" />
+                </div>
+                <div className="mr-example-name">備後町ｺｲｽﾞﾐﾋﾞﾙ/鍵本(06-6251-9881）</div>
+              </td>
+              <td colSpan={SLOT_COUNT - 7} />
+            </tr>
+
+            {range.days.map((date) => (
+              <tr className={rowClassName(date, holidays, closedDays)} key={date}>
+                <td className="mr-date">{Number(date.slice(-2))}日</td>
+                <td className="mr-wd">{weekdayInfo(date, holidays).label}</td>
+                {Array.from({ length: SLOT_COUNT }, (_, i) => (
+                  <td key={i} />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <p className="mr-sheet-note">※予定に変更が生じた際には修正をお願い致します。</p>
     </div>
