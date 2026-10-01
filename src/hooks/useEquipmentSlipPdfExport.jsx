@@ -20,7 +20,7 @@ export default function useEquipmentSlipPdfExport() {
   const sheetsRef = useRef(null)
 
   // records: [{ id, occurredAt, floor, tenantName, productCode, quantity, staffName,
-  //             hasSignature }]（呼び出し元で reason==='tenant' に絞り込み・日付降順に
+  //             hasSignature, freeExchange }]（呼び出し元で reason==='tenant' に絞り込み・日付降順に
   // 並べ替え済みのものを渡す）。monthLabel はファイル名に使う表示用の年月（例: '2026年8月'）
   async function download(records, monthLabel) {
     if (!records || records.length === 0) return
