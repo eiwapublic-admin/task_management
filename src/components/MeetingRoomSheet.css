@@ -65,7 +65,7 @@ body.pdf-capture-mode .mr-sheet {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  border: 0.3mm solid #000;
+  border: 0.6mm solid #000;
 }
 
 .mr-col-date { width: 14mm; }
@@ -82,6 +82,31 @@ body.pdf-capture-mode .mr-sheet {
   font-size: 8pt;
   line-height: 1.15;
   overflow: hidden;
+}
+
+/* 表の外枠（2026-10-01）。html2canvas は border-collapse の表で、表自体の枠線を
+   内側の罫線（隣り合うセルの線が重なって太く出る）と同じか細いくらいにしか描かず、
+   左右の外枠が内側の線に埋もれて見えなかった。そのため外周のセルに太線を直接付けて、
+   上下左右とも同じ太さの太枠にする。html2canvas の線幅は1px単位で丸められ、
+   0.5mm以下では内側の線と見分けがつかないため0.6mm（2px相当）にしている。
+   分見出し行（.mr-row-minutes）の先頭セルは、日付・曜日列を rowSpan で上の行に
+   譲っているため左端ではない。左線の対象から外す */
+.mr-sheet-table tr:not(.mr-row-minutes) > :first-child {
+  border-left: 0.6mm solid #000;
+}
+.mr-sheet-table tr > :last-child {
+  border-right: 0.6mm solid #000;
+}
+.mr-row-hours th {
+  border-top: 0.6mm solid #000;
+}
+.mr-sheet-table tbody tr:last-child td {
+  border-bottom: 0.6mm solid #000;
+}
+
+/* 日付・曜日・時間帯の見出し行は薄いグレーで塗る（2026-10-01） */
+.mr-sheet-table thead th {
+  background: #e6e6e6;
 }
 
 .mr-row-hours th {
