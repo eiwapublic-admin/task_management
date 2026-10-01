@@ -62,7 +62,8 @@ export default function Equipment() {
   const [transactionsByItem, setTransactionsByItem] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showDisabled, setShowDisabled] = useState(false)
+  // 無効品込みは既定でオン（2026-10-01の依頼）
+  const [showDisabled, setShowDisabled] = useState(true)
   const [mode, setMode] = useState(null) // null | 'in' | 'out'
   // 並べ順（2026-08-26）。'item'＝備品順（既定・従来どおりカテゴリ→備品ごとの明細表）、
   // 'month'＝年月順（全備品の明細を年月でグルーピングし、直近から日付順に混在表示）
