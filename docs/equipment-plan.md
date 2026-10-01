@@ -384,6 +384,10 @@ create table if not exists equipment_transactions (
   -- 署名を受け取った時刻。移行データは FileMaker の受領タイムスタンプをそのまま入れる。
   -- 「signed_at あり・signature_key なし」＝署名済みだが画像は現行 FileMaker 側（8-4(4)）
   signed_at   timestamptz,
+  -- 無償交換（2026-10-01 追加。289番）。過去の不良品に対する無償の取替で請求対象外。
+  -- テナント設置のときだけ true にできる（CHECK 制約 equipment_txn_free_exchange_only_tenant）。
+  -- 6-2 の API では返さない（5-4）
+  free_exchange boolean not null default false,
   -- 移行元 FileMaker の「入出荷ID」。再取込の冪等性と、問い合わせ時の突合のために持つ
   legacy_txn_id int unique,
   note        text,
@@ -1237,6 +1241,7 @@ FileMaker Server を公開する必要もない。**7-1 も同じ Push 方式に
 | 型番 | 備品の**「備品名 (補足)」表記**（`FLR40SN (メロウホワイト)`。CSV の `備品名_補足` と同じ組み立て） |
 | 本数 | `quantity` |
 | 担当者 | `staff_name` |
+| **無償交換**（2026-10-01〜） | `free_exchange` が true なら、「◆ランプ取替」の右に**枠囲みで「無償交換」**（`.equip-slip-free`）。請求対象と取り違えないため。通常のテナント設置では何も出ない |
 
 - **実装は自主検査表・残留塩素の帳票PDFと同じ型**（画面外にA4のシートを組んで html2canvas → jsPDF →
   短時間トークンでアプリ内プレビュー。設計書 4-12・4-14 と `print-and-pdf-download` スキル）
@@ -1268,6 +1273,7 @@ FileMaker Server を公開する必要もない。**7-1 も同じ Push 方式に
   **共用部設置・新規入替・在庫調整・調達は載っていない** → 3-4 の「請求対象はテナント設置のみ」を
   実データが裏づけた
 - 同一テナント・同一備品が月内に複数回あれば**合算**し、日付は列挙する形（1行にまとめる）
+- **無償交換（`free_exchange`。2026-10-01〜）はテナント設置でも請求対象外**なので、この表（6-2 の `billing`）には載せない
 
 **この表は 6-2 の公開 API と同じ内容**なので、次の2経路で出せるようにする。
 
