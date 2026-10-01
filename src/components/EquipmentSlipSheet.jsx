@@ -47,7 +47,11 @@ function SlipBody({ rec }) {
           </tr>
         </tbody>
       </table>
-      <div className="equip-slip-lamp-head">◆ランプ取替</div>
+      <div className="equip-slip-lamp-head">
+        ◆ランプ取替
+        {/* 無償交換（2026-10-01〜）。過去の不良品に対する無償の取替で請求しないことを伝票上でも示す */}
+        {rec.freeExchange && <span className="equip-slip-free">無償交換</span>}
+      </div>
       <table className="equip-slip-table equip-slip-lamp-table">
         <thead>
           <tr>

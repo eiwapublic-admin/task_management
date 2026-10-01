@@ -152,6 +152,7 @@ export default function Equipment() {
       quantity: t.quantity,
       staffName: t.staff_name,
       hasSignature: Boolean(t.signature_key),
+      freeExchange: Boolean(t.free_exchange),
     }))
     slipExport.download(records, monthLabelOfTxn(monthKey))
   }
