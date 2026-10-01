@@ -266,6 +266,12 @@
   color: var(--text-base);
 }
 
+/* 無償交換（2026-10-01〜。テナント設置のみ）。補足は小さく薄く */
+.equipment-free-exchange-hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
 /* 署名入力（5-5） */
 .signature-pad {
   display: flex;

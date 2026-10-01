@@ -8,7 +8,7 @@ import useEquipmentSlipPdfExport from '../hooks/useEquipmentSlipPdfExport'
 import { getCurrentUser } from '../lib/auth'
 import { todayJST, jstDateOnly } from '../lib/reports'
 import {
-  EQUIPMENT_REASON_LABELS,
+  equipmentReasonLabel,
   deleteEquipmentTransaction,
   fetchEquipmentItems,
   fetchEquipmentTransactionsAll,
@@ -347,7 +347,7 @@ export default function Equipment() {
                                 <td className="is-numeric equipment-history-in">
                                   {t.kind === 'in' ? t.quantity : ''}
                                 </td>
-                                <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
+                                <td>{equipmentReasonLabel(t)}</td>
                                 <td>{t.staff_name || ''}</td>
                               </tr>
                             )
@@ -458,7 +458,7 @@ export default function Equipment() {
                                         {t.kind === 'in' ? t.quantity : ''}
                                       </td>
                                       <td className="is-numeric">{t.balance}</td>
-                                      <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
+                                      <td>{equipmentReasonLabel(t)}</td>
                                       <td>{t.staff_name || ''}</td>
                                     </tr>
                                     )
