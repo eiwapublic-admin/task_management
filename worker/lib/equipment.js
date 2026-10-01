@@ -14,7 +14,8 @@ const CATEGORY_COLUMNS = 'code, name, sort_order, note, created_at, updated_at'
 const TENANT_COLUMNS = 'id, billing_code, name, short_name, floor, moved_out, default_item_id, note, synced_at'
 const TXN_COLUMNS =
   'id, txn_no, item_id, kind, reason, occurred_at, quantity, supplier, tenant_id, tenant_code, tenant_name, ' +
-  'tenant_short_name, floor, location, staff_name, signature_key, signed_at, note, created_by, updated_by, created_at, updated_at'
+  'tenant_short_name, floor, location, staff_name, signature_key, signed_at, free_exchange, note, created_by, updated_by, ' +
+  'created_at, updated_at'
 
 const VALID_KINDS = new Set(['in', 'out'])
 const REASONS_BY_KIND = {
@@ -537,6 +538,8 @@ export async function handleEquipmentTransactionCreate(req) {
       floor: tenantFloor,
       location: reason === 'tenant' ? null : trimOrNull(payload.location, 200),
       staff_name: staffName,
+      // 無償交換（2026-10-01〜）。過去の不良品に対する無償の取替で請求対象外。テナント設置のときだけ持てる
+      free_exchange: reason === 'tenant' && payload.free_exchange === true,
       note: trimOrNull(payload.note, 1000),
       created_by: auth.sub,
       updated_by: auth.sub,
@@ -667,6 +670,12 @@ export async function handleEquipmentTransactionUpdate(req) {
     }
     if ('staff_name' in payload) patch.staff_name = trimOrNull(payload.staff_name, 200)
     if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
+    // 無償交換はテナント設置のときだけ。テナント設置以外へ変えたら必ず外す（DB の CHECK 制約とも一致させる）
+    if (reason !== 'tenant') {
+      if ('reason' in payload || 'free_exchange' in payload) patch.free_exchange = false
+    } else if ('free_exchange' in payload) {
+      patch.free_exchange = payload.free_exchange === true
+    }
     // 備品の選び間違いを訂正できるよう、item_id も修正対象にする（2026-08-26。
     // 登録時に間違った備品を選んでいた場合、以前は入出庫理由等しか直せなかった）
     if ('item_id' in payload) {
@@ -940,6 +949,7 @@ function formatInstallationSummary(dates, shortName) {
 // FileMaker 向けの公開API（6-2。APIキー認証）。「テナントに設置したランプ情報を年月指定で取得」への回答。
 // 請求の元データになるため、reason は scope で明示的に絞り、replace（新規入替）・discard（不良品処分）は
 // どの scope でも返さない（3-4。新規入替は請求対象外であり、混ぜると誤請求のもとになる）。
+// 無償交換（free_exchange。2026-10-01〜）も同じ理由で返さない（installations・billing のどちらにも出さない）。
 export async function handleEquipmentInstallations(req, env) {
   if (!verifyEquipmentApiKey(req, 'EQUIPMENT_API_KEY')) {
     return json({ error: '認証に失敗しました' }, 401)
@@ -964,6 +974,7 @@ export async function handleEquipmentInstallations(req, env) {
       .select('txn_no, occurred_at, tenant_code, tenant_name, floor, quantity, staff_name, signed_at, note, item_id, reason')
       .eq('kind', 'out')
       .in('reason', reasons)
+      .eq('free_exchange', false)
       .gte('occurred_at', start.toISOString())
       .lt('occurred_at', end.toISOString())
       .order('occurred_at', { ascending: true })

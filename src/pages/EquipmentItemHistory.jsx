@@ -8,7 +8,7 @@ import { IconHome } from '../components/Icons'
 import { getCurrentUser } from '../lib/auth'
 import { todayJST, jstDateOnly } from '../lib/reports'
 import {
-  EQUIPMENT_REASON_LABELS,
+  equipmentReasonLabel,
   fetchEquipmentItems,
   fetchEquipmentTransactions,
   deleteEquipmentTransaction,
@@ -167,7 +167,7 @@ export default function EquipmentItemHistory() {
                         onClick={editable ? () => setEditing(t) : undefined}
                       >
                         <td>{formatEquipmentDate(t.occurred_at)}</td>
-                        <td>{EQUIPMENT_REASON_LABELS[t.reason] || t.reason}</td>
+                        <td>{equipmentReasonLabel(t)}</td>
                         <td className="is-numeric equipment-history-in">{t.kind === 'in' ? t.quantity : ''}</td>
                         <td className="is-numeric equipment-history-out">{t.kind === 'out' ? t.quantity : ''}</td>
                         <td className="is-numeric">{t.balance}</td>

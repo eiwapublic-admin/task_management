@@ -59,6 +59,9 @@ export default function EquipmentOutForm({
   const [staffName, setStaffName] = useState(existing?.staff_name || '')
   const [staffOptions, setStaffOptions] = useState([])
   const [note, setNote] = useState(existing?.note || '')
+  // 無償交換（2026-10-01〜。テナント設置のみ）。過去の不良品に対する無償の取替で、請求対象外
+  // （FileMaker への設置実績APIで返さない）
+  const [freeExchange, setFreeExchange] = useState(Boolean(existing?.free_exchange))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   // 本体（出庫レコード）は保存できたが署名の登録だけ失敗した場合に保持する。
@@ -179,6 +182,7 @@ export default function EquipmentOutForm({
           staff_name: staffName || null,
           note: note || null,
           quantity: numericQty,
+          free_exchange: reason === 'tenant' && freeExchange,
           ...(reason === 'tenant' ? { tenant_id: tenantId } : {}),
         }
         saved = existing
@@ -301,6 +305,21 @@ export default function EquipmentOutForm({
                 />
               </div>
             </div>
+          )}
+
+          {reason === 'tenant' && (
+            <label className="equipment-checkbox-field equipment-free-exchange-field">
+              <input
+                type="checkbox"
+                checked={freeExchange}
+                disabled={locked}
+                onChange={(e) => setFreeExchange(e.target.checked)}
+              />
+              <span>
+                無償交換
+                <span className="equipment-free-exchange-hint">（過去の不良品の取替。請求しない）</span>
+              </span>
+            </label>
           )}
 
           {reason === 'common' && (

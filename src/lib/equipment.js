@@ -24,6 +24,13 @@ export const EQUIPMENT_REASON_LABELS = Object.fromEntries(
   [...EQUIPMENT_IN_REASONS, ...EQUIPMENT_OUT_REASONS].map((r) => [r.key, r.label])
 )
 
+// 入出庫の理由の表示名。無償交換（2026-10-01〜。テナント設置のみ）は「テナント」の代わりに
+// 「無償交換」と出し、請求対象のテナント設置と一覧で見分けられるようにする
+export function equipmentReasonLabel(t) {
+  if (t.reason === 'tenant' && t.free_exchange) return '無償交換'
+  return EQUIPMENT_REASON_LABELS[t.reason] || t.reason
+}
+
 // 共用部設置の階（リスト選択。2026-08-26）。B=地下
 export const EQUIPMENT_FLOOR_OPTIONS = ['B', '1', '2', '3', '4', '5', '6', '7']
 

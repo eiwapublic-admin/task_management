@@ -667,6 +667,9 @@ create table if not exists equipment_transactions (
   -- 署名を受け取った時刻。移行データは FileMaker の受領タイムスタンプをそのまま入れる。
   -- 「signed_at あり・signature_key なし」＝署名済みだが画像は現行 FileMaker 側
   signed_at   timestamptz,
+  -- 無償交換（2026-10-01〜。テナント設置のみ）。過去の不良品に対する無償の取替で、請求対象外。
+  -- FileMaker への設置実績API（/api/equipment/installations）では返さない（docs/equipment-plan.md 6-2）
+  free_exchange boolean not null default false,
   -- 移行元 FileMaker の「入出荷ID」。再取込の冪等性と、問い合わせ時の突合のために持つ
   legacy_txn_id int unique,
   note        text,
@@ -682,7 +685,9 @@ create table if not exists equipment_transactions (
   -- 負数は在庫調整のときだけ
   constraint equipment_txn_negative_only_adjust check (quantity > 0 or reason = 'adjust'),
   -- 署名はテナント設置のときだけ持つ
-  constraint equipment_txn_signature_only_tenant check (signature_key is null or reason = 'tenant')
+  constraint equipment_txn_signature_only_tenant check (signature_key is null or reason = 'tenant'),
+  -- 無償交換もテナント設置のときだけ
+  constraint equipment_txn_free_exchange_only_tenant check (not free_exchange or reason = 'tenant')
   -- 「請求先（tenant_id等）を持てるのはテナント設置のときだけ」は、あえて DB の CHECK 制約には
   -- しない。過去データに例外が実在したことに加え、この業務ルールは「新規登録の画面でテナントを
   -- 選ばせない」という入力制御が本質であり、DB が一律拒否すると移行のたびに手当てが要る。
@@ -691,6 +696,12 @@ create table if not exists equipment_transactions (
 create index if not exists equipment_txn_item_idx     on equipment_transactions (item_id, occurred_at desc);
 create index if not exists equipment_txn_occurred_idx on equipment_transactions (occurred_at desc);
 create index if not exists equipment_txn_tenant_idx   on equipment_transactions (tenant_code, occurred_at desc);
+-- 無償交換（2026-10-01 追加。既存DB向け）
+alter table equipment_transactions add column if not exists free_exchange boolean not null default false;
+do $$ begin
+  alter table equipment_transactions add constraint equipment_txn_free_exchange_only_tenant
+    check (not free_exchange or reason = 'tenant');
+exception when duplicate_object then null; end $$;
 
 drop trigger if exists equipment_transactions_set_updated_at on equipment_transactions;
 create trigger equipment_transactions_set_updated_at before update on equipment_transactions
