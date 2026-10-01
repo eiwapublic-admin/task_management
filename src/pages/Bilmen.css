@@ -58,7 +58,15 @@
 
 /* 予定一覧は行のどこをクリックしても詳細モーダルが開く（作業マスタ一覧と同じ
    .is-clickable。2026-09-03。以前は作業名だけがリンクだったのを行全体に広げた） */
-.bilmen-title-text { display: block; }
+/* 作業名は他画面のカード内タイトル（タスクカードの .task-card-title）と同じ字にそろえる
+   （サイズ 14px・太さ 600・濃い文字色。2026-10-01の依頼） */
+.bilmen-title-text {
+  display: block;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.4;
+}
 
 .bilmen-title-note,
 .bilmen-row-sub,
