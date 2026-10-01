@@ -452,6 +452,7 @@ create table if not exists bilmen_schedules (
   -- ↓ Google カレンダー連携（7-2）
   google_event_id  text,
   google_synced_at timestamptz,
+  google_synced_hash text,                       -- 反映時点のイベント内容の指紋（2026-09-29 追加。7-2-1）
 
   sort_order    int  not null default 999,       -- 同一日内の並び
   created_by    text,
@@ -861,8 +862,9 @@ const NAV_ITEMS = [
 | POST/PATCH/DELETE | `/api/bilmen/masters[/:id]` | マスタの追加・更新・削除 |
 | POST | `/api/bilmen/masters/renumber` | 表示順の再採番 |
 | GET/PUT | `/api/bilmen/notes/:month` | 今月の注釈の取得・保存 |
-| POST | `/api/bilmen/schedules/:id/calendar` | 1件をカレンダーへ反映（作成 or 更新） |
-| POST | `/api/bilmen/calendar/sync` | 対象月をまとめて反映（`{ month }`） |
+| POST | `/api/bilmen/schedules/:id/calendar` | 1件をカレンダーへ反映（作成 or 更新）。**実装は `POST /api/bilmen/calendar/schedule`（`{ id, action: 'sync'\|'remove' }`）**（7-2-1） |
+| POST | `/api/bilmen/calendar/sync` | 対象月をまとめて反映（`{ month }`）。**実装は `{ month, skip_ids }` を受け、1回10件ずつ処理して `remaining` を返す**（7-2-1） |
+| GET | `/api/bilmen/calendar` | **（実装時に追加）** 反映開始月（`start_month`）と反映先カレンダーの設定有無（`calendar_ready`） |
 | GET/PUT | `/api/bilmen/mail/template` | メール文面の取得・保存 |
 | GET/POST/PATCH/DELETE | `/api/bilmen/mail/recipients[/:id]` | 宛先の管理 |
 | POST | `/api/bilmen/mail/preview` | 変数展開後の件名・本文・宛先件数を返す（送信はしない） |
@@ -1022,13 +1024,18 @@ Claris Connect の契約・フロー保守が不要になる）。
 
 - 実データを見ると、**2026年9月分のイベントは 8/17 に Claris Connect が作っていた**（翌月分を当月の中旬にまとめて登録している）。
   このため **2026年10月分は 9月中旬に登録済み**とみて、本システムからの反映は **2026年11月分から**にした（`bilmen_calendar_start_month`）
-- **Claris Connect 側のフローは、10月中旬（11月分の一括登録）より前に止めること**。止めずに本システムからも11月分を反映すると、
-  11月の予定が二重になる。開始月を変えたいときは `settings.bilmen_calendar_start_month` を書き換える
+- **Claris Connect 側のフローは、10月中旬（9月分が 8/17 に登録されていたことから、10/17 ごろが目安）より前に止めること**。
+  止めずに本システムからも11月分を反映すると、11月の予定が二重になる。停止操作はお客様側で行う（13-10。当方からは操作できない）。
+  開始月を変えたいときは `settings.bilmen_calendar_start_month` を書き換える
+- **開始月（2026年11月）は当方の推定で決めた値**で、依頼元の確認待ち（2026-09-29 の報告で確認をお願いした）
 
 **検証**: 実際のハンドラを、Supabase と Calendar API を偽物に差し替えた Node 上で動かし、21項目を確認した
 （開始月より前の拒否・10件ずつの分割・再実行で重複しない・実績入力では要再反映にならない・時刻変更で要再反映・1件反映は更新・
 カレンダー側で消されたら作り直す・中止／取り消し／削除でイベントが消える・日付未定の拒否・説明文の形・終日・操作ログ）。
-**実際の Google カレンダーへの書き込みは、この作業環境に資格情報が無いため未確認**（`calendar.events` は付与済みだが、コードから使うのは初めて）
+**実際の Google カレンダーへの書き込みは、この作業環境に資格情報が無いため未確認**（`calendar.events` は付与済みだが、コードから使うのは初めて）。
+11月分の予定で1件ずつ試してから月まとめを使ってもらう（実機確認の手順は `docs/HANDOFF.md` の要確認（286番））。
+
+**デプロイ**: 2026-09-29 に main へマージし、Deploy to Cloudflare Workers の成功を確認した（本番 DB の列追加・設定値は実装時に適用済み）。
 
 ### 7-3. 案内メールの送信
 
