@@ -1,6 +1,6 @@
 # タスク管理システム 設計書（Cloudflare 版）
 
-最終更新: 2026-07-31
+最終更新: 2026-10-02（3章の構成・4-4 のAPI一覧・6章のシークレットを現状に合わせて更新）
 対象: 本番稼働中の現行システム（https://task-management.eiwa-public.workers.dev）
 リポジトリ: `eiwapublic-admin/task_management`（**非公開（Private）**。2026-07-16 にPrivate化）
 
@@ -59,7 +59,21 @@ worker/
     ├── pipeline.js     取得〜分類〜保存〜返信検知〜利用量集計の一括パイプライン
     ├── gmail.js        Gmail API 軽量クライアント（fetch 直叩き・依存なし。スレッド取得・添付一覧/取得を含む）
     ├── mail-utils.js   アドレス判定・顧客(counterpart)特定の共通ロジック（返信検知と添付集約で共有）
-    ├── calendar.js     Google カレンダー API クライアント（当日イベント取得）
+    ├── calendar.js     Google カレンダー API クライアント（当日イベント取得。2026-09-29〜 ビルメン用の登録・更新・削除も）
+    ├── drive.js        Google Drive API クライアント（廃棄物のGoogleドライブ取込。2026-09-30〜）
+    ├── mime.js         添付付きメール（MIME）の組み立て（ビルメンの Gmail 下書き。2026-09-29〜）
+    ├── push.js         Web Push 送信（新規タスク・AI利用の停止・リマインダー）
+    ├── storage.js      Supabase Storage の薄いクライアント（写真・署名・雛形ファイル）
+    ├── holidays.js     祝日一覧の取得（外部の静的JSONをエッジキャッシュして中継）
+    ├── reports.js      日報・写真・自主検査表・違反車両・残留塩素の API（4-10〜4-14）
+    ├── equipment.js    備品管理の API と FileMaker 連携API（`docs/equipment-plan.md`）
+    ├── documents.js    雛形ファイルの API（4-15）
+    ├── contacts.js     連絡帳の API（4-16）
+    ├── reminders.js    リマインダーの API と通知（4-17）
+    ├── paper.js        古紙回収の API（4-18）
+    ├── bilmen.js       ビルメンテナンス管理の API（`docs/bilmen-plan.md`）
+    ├── bilmen-calendar.js  ビルメン予定→カレンダーイベントの組み立て・内容の指紋（API を叩かない部品）
+    ├── waste.js        廃棄物実測値管理の API（`docs/waste-plan.md`）
     ├── ai/             AI提供元の切り替え層（2026-09-05。ai-cost-and-alternatives.md 11章）
     │   ├── index.js    切り替え口。**呼び出し側はここだけを import する**
     │   │               （settings.ai_provider で提供元を選ぶ。未知の値は既定へフォールバック）
@@ -97,13 +111,14 @@ supabase/schema.sql     DB スキーマ（IaC。SQL Editor / migration で適用
 wrangler.jsonc          Worker 設定（assets / cron / nodejs_compat）
 .github/workflows/
 ├── deploy.yml          main push → ビルド → デプロイ → シークレット同期
+├── backup.yml          日次DBバックアップ（pg_dump → 別リポジトリ task_management-backups へ push。2026-08-27〜）
 └── cleanup-worker.yml  不要 Worker の手動削除（workflow_dispatch）
 docs/                   本書・引き継ぎ書・旧設計書・UI標準・機能ごとの開発計画書
     ├── HANDOFF.md                       引き継ぎ書（日付ごと・番号付きの作業履歴）
     ├── ui-standard.md                   UI標準（3層構造・デザイントークン・ボタン方針）
     ├── daily-report-plan.md             日報・自主検査表・違反車両・残留塩素の開発計画
     ├── equipment-plan.md                備品管理の開発計画（FileMaker移行の先例）
-    ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02〜。Phase 1・2・4方式B実装済み）
+    ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02〜。Phase 1〜4・4'実装済み、Phase 5 未着手）
     ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み。取込はExcel／Googleドライブ〈10-7〜10-9〉）
     ├── google-oauth-scope-update.md     Google OAuth スコープ拡張の作業手順（トークン再発行）
     ├── disaster-recovery.md             Supabaseバックアップからの復旧手順
@@ -431,10 +446,15 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET/POST/PATCH/DELETE `/api/report/parking` | JWT（書込はowner不可） | 違反車両（4-13参照）。GET は `report_id=` を指定すればその日だけ、省略すれば全期間（新しい順・上限1000）。全期間取得時は各行に `report_date`（記録元の日報の日付）を付与する。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-05追加） |
 | POST `/api/report/parking/recognize` | JWT（owner不可） | 違反車両の写真（`photo_id`）からナンバー・車種をClaude(vision)で読み取り `{plate_region, plate_number, maker, model}` を返す（`plate_number`は数字4桁に正規化。判読不可の項目は`null`）。手動トリガー式で自動実行はしない。利用量は`api_usage`の`parking_calls`列に加算し、メール/FAXとは別内訳として従量課金事項画面に表示する（2026-08-05追加。4-13参照） |
 | GET/POST/PATCH/DELETE `/api/report/chlorine` | JWT（書込はowner不可） | 残留塩素等検査（4-14参照）。GET は `year=YYYY`（JST基準の1年）・`building=`・`report_id=`（2026-08-10追加。日報詳細の「残留塩素」ボタン用）で絞り込み（省略で全期間・全施設。新しい順・上限1000）、各行に `report_date`（記録元の日報の日付）を付ける。POST は `tested_at` のJST日付から日報を引き当て（無ければ作成）て紐付ける。PATCH で測定日を別の日に変えた場合は紐づく写真の `report_id` も付け替える。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-10追加） |
+| `/api/documents`・`/api/contacts`・`/api/reminders`・`/api/paper/*` | JWT | 雛形ファイル・連絡帳・リマインダー・古紙回収。それぞれ 4-15〜4-18 を参照 |
+| `/api/equipment/*` | JWT（書込は staff/admin。出庫だけ備品出庫限定ロールも可） | 備品管理（カテゴリ・備品・入出庫・テナント・署名）。一覧は `docs/equipment-plan.md` 6-1 |
+| GET `/api/equipment/installations`・POST `/api/equipment/tenants/sync` | **APIキー**（`X-API-Key`。JWT 不要） | FileMaker 連携（設置実績の提供／テナント同期の受信）。**JWT の外側に開く唯一の口**。請求対象外の新規入替・不良品処分・無償交換は返さない（`docs/equipment-plan.md` 6-2・6-3） |
+| `/api/bilmen/*` | JWT（書込は staff/admin。メール設定は owner・備品出庫限定ロールに GET も不可） | ビルメン（作業マスタ・予定・自動作成・注釈・メール設定・Gmail 下書き・カレンダー反映）。一覧は `docs/HANDOFF.md` 3章「ビルメン API」 |
+| `/api/waste/*` | JWT（書込は staff/admin） | 廃棄物実測値（記録・Excel 取込・Googleドライブ取込）。`docs/waste-plan.md` |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
-- settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`, `archive_after_days`
+- settings の許可キー: `fetch_interval_minutes`, `active_hours_start`, `active_hours_end`, `assignees`, `business_keywords`, `org_context`, `shared_gmail`, `company_domains`, `calendar_name`, `archive_after_days`, `daily_api_cost_limit_usd`（2026-09-04〜）
 - 添付系APIは `thread_id` 必須（`message_id` 単体でタスクに紐づかない共有メールボックスの任意メッセージを引ける経路は廃止済み）
 - 全レスポンス（API・静的アセット共通）に `X-Frame-Options: DENY` / `X-Content-Type-Options: nosniff` / `Referrer-Policy: strict-origin-when-cross-origin` / `Content-Security-Policy`（ほぼ全ディレクティブ `'self'`）を付与（`worker/lib/http.js` の `withSecurityHeaders`）
 
@@ -1377,6 +1397,8 @@ Claude に渡す実装のため、営業FAX・チラシPDFが多い日ほど費�
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
 | VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | Web Push通知の署名鍵（2026-07-21）。未設定の間は通知機能が無効のまま（デプロイは失敗しない）。`web-push-browser`パッケージの`generateVapidKeys`/`serializeVapidKeys`で生成した値。VAPID_SUBJECTは`mailto:`アドレス（無指定時は`eiwa.public@gmail.com`にフォールバック） |
+| EQUIPMENT_API_KEY / EQUIPMENT_TENANT_SYNC_API_KEY | 備品の FileMaker 連携API の認証キー（設置実績の提供／テナント同期の受信。2026-08-17） |
+| EQUIPMENT_API_ALLOW_IPS | 同APIの接続元IPの許可リスト（任意。カンマ区切り。空なら制限なし） |
 
 ### KV Namespace（`wrangler.jsonc` にバインド）
 | バインディング名 | 用途 |
@@ -1385,6 +1407,8 @@ Claude に渡す実装のため、営業FAX・チラシPDFが多い日ほど費�
 
 ### CI 用
 CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUDFLARE_ACCOUNT_ID
+
+日次DBバックアップ（`backup.yml`）だけが使うもの: SUPABASE_DB_PASSWORD（pooler 経由の `pg_dump`）/ BACKUP_REPO_TOKEN（バックアップ先リポジトリへの push。`docs/disaster-recovery.md`）
 
 > **2026-07-16 削除**: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（フロントエンド埋め込みの公開値）は、フロントが Supabase を直接読み書きしなくなったため不要になり削除した。
 
