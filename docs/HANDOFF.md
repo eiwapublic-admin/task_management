@@ -1,6 +1,14 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-10-01（**備品のテナント設置に「無償交換」のフラグを追加し、FileMaker への設置実績APIでは返さないようにした**（依頼）。
+最終更新: 2026-10-02（**引き継ぎ書の不整合を直した**（依頼）。①**1章「現在の状態」**: ビルメンの「Phase 3・4'は未着手」を実装済みに、
+DBバックアップの「まだ動いていない」を稼働中に、Anthropic の「$5クレジット・枯渇」を会社アカウント・前払い運用に直した。
+Google カレンダー連携に書き込み（ビルメン。`calendar.events`）とスコープ5つを追記。②**2章**: `company_domains` の本番値
+（`eiwa-up.jp,eiwa-up.com`）を明記。③**3章**: ビルメンのスキーマ「本番への適用は未実施」を適用済みに直し、一覧に無かった
+テーブル14件と最近の列・設定を表で追記。ビルメンAPIに注釈・メール設定・下書き・カレンダー反映を追記。GitHub Secrets に
+備品連携・バックアップ用の5つを追記し、VAPID の「要追加」を登録済みに直した（本番に購読があることで確認）。
+④**番号の重複**: 287番が2件（9/30の廃棄物と10/1の会議室予約表）あったため、10/1の3件を1つずつ繰り下げた（288〜290番）。
+291番）。
+2026-10-01（**備品のテナント設置に「無償交換」のフラグを追加し、FileMaker への設置実績APIでは返さないようにした**（依頼）。
 依頼は「テナントでの交換の際に過去の不良品に対する無償交換を行う必要がある。テナント向けの出庫時に『無償交換』フラグを。
 無償交換の備品は FileMaker からの WebAPI で情報を渡すときには対象外に」。①新列`equipment_transactions.free_exchange`
 （boolean・既定false。**本番へ直接適用**。テナント設置以外では true にできない CHECK 制約つき）。②出庫モーダルのテナント設置で
@@ -8,10 +16,10 @@
 `free_exchange=false` だけを返す（`installations`・`billing` のどちらにも出ない）。④一覧・履歴の理由欄は「テナント」の代わりに
 「無償交換」と出す。在庫は通常どおり減り、修理伝票PDFにも通常どおり出る。⑤**修理伝票には「◆ランプ取替」の右に枠囲みで
 「無償交換」と表示する**（同日の追加依頼。html2canvas と同じ描き方で表示を確認済み）。偽の Supabase で
-登録・修正・API の10項目を確認済み。`docs/equipment-plan.md` 5-4・6-2・3-4。289番）。
+登録・修正・API の10項目を確認済み。`docs/equipment-plan.md` 5-4・6-2・3-4。290番）。
 2026-10-01（**備品一覧の「無効品込み」を既定でオンにした**（依頼）。`Equipment.jsx`の初期値を`true`に変更。
 iPhone幅（480px以下）ではこのチェックを出していないため、iPhone幅では常に無効品込みで表示される（以前は常に除外）。
-`docs/equipment-plan.md`。288番）。
+`docs/equipment-plan.md`。289番）。
 2026-10-01（**会議室予約表PDFの外枠を少し細くし、ビルメン一覧の作業名をカードのタイトルと同じ字にした**（依頼）。
 ①会議室予約表: 同日に外周のセルへ0.6mmの太線を付けて外枠を太くしたが、「もう少し細く、ただし内側の罫線よりは太く」との依頼。
 枠線（border）はブラウザが1px単位に切り捨てるため1pxと2pxの中間が作れず、box-shadow は html2canvas が表に描かない。
@@ -19,7 +27,9 @@ iPhone幅（480px以下）ではこのチェックを出していないため、
 外周のセルの線は二重線に見えるため消した。ヘッドレス Chromium＋html2canvas（scale 3）で、外枠≒7px・内側の罫線≒6px・
 変更前の外枠≒9px（いずれもPDF画像上）を実測して確認。
 ②ビルメンの予定一覧の作業名（`.bilmen-title-text`）を、タスクカードのタイトル（`.task-card-title`）と同じ
-14px・太さ600・濃い文字色にした（サイズは元々同じで、太さと色が違っていた）。作業マスタ一覧は対象外。287番）。
+14px・太さ600・濃い文字色にした（サイズは元々同じで、太さと色が違っていた）。作業マスタ一覧は対象外。288番。
+※ 287番は前日の廃棄物の記録と重複していたため、2026-10-02 にこの記録以降を1つずつ繰り下げた（288〜290番）。
+コミットメッセージやそれまでのやり取りで「287〜289番」と書いたものは、それぞれ288〜290番のこと）。
 2026-09-30（**廃棄物実測値管理のExcel取込を直し、Googleドライブから直接取り込めるようにした**（依頼）。
 ①**原因**: Claude（チャット）で手書き表を読み取らせて作ったGoogleスプレッドシートは階の見出しが「1階」〜「7階」で、
 パーサーが「1F」形式しか受け付けていなかったため「見出し行（1階〜7階）が見つかりませんでした」になっていた。
@@ -390,8 +400,10 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
   Phase 4 方式B（メール設定画面・テナントへの報知）を実装済み**（スキーマは本番へ適用済みで稼働中）。
   **作業予定連絡票のPDFは「従来版」「カード版」の2つから選んで出力する**（2026-09-14〜。
   載せる内容は同じで見た目だけが違う。選んだ版は次回の既定として記憶される）。
-  カレンダー反映（Phase 3）・案内メール方式A（Phase 4'）・実施報告書ファイル（Phase 5）は未着手。
-  計画・フェーズ・実装内容は `docs/bilmen-plan.md` を参照
+  **カレンダー反映（Phase 3）は2026-09-29に実装済み**（反映は2026年11月分から。実機での初回確認と
+  Claris Connect の停止が残っている。6章の286番の要確認）。**案内メール方式A（Phase 4'。Gmail下書き＋PDF自動添付）も
+  2026-09-29に実装済み**で、メールソフト方式と併用して運用で評価中。**実施報告書ファイル・現行データのCSV移行（Phase 5）は未着手**。
+  計画・フェーズ・実装内容は `docs/bilmen-plan.md` を参照（2026-10-02 更新）
 - **廃棄物（廃棄物実測値管理。2026-09-03〜）**: BKBビル・一般廃棄物の日次重量計測。手入力・
   月別/年度別集計を実装済み（Phase 1〜3を一括実装。スキーマは本番へ適用済みで稼働中）。
   **紙シートの取込は当初Claude Visionでのスキャン読み取りだったが、実際の筆跡で読み取り失敗が
@@ -404,8 +416,9 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
 - **リポジトリ**: `eiwapublic-admin/task_management`（デフォルトブランチ main。**2026-07-16 に非公開（Private）化**）
 - **Cloudflare**: Worker 名 `task-management`（アカウントに残す Worker はこの1つだけ）
 - **Supabase**: プロジェクト `Eiwapublic Project`（ref: `pfiogfdnbctunkhslmcp`, region: ap-southeast-2）。スキーマ・マイグレーション適用済み。**Storage バケット `report-photos`**（非公開・日報の写真保管用）も追加済み
-- **Anthropic**: $5 クレジット購入済みのアカウントの API キーで稼働（モデル: claude-haiku-4-5）。
-  **2026-09-04時点でクレジットは枯渇しており、依頼元が後日チャージ予定**（219番の課金障害による）
+- **Anthropic**: **会社アカウントの API キーで稼働**（モデル: claude-haiku-4-5）。2026-09-07 に依頼元個人の
+  アカウントから会社アカウントへ移管し、**前払い・オートチャージOFF**で運用している（234番。5章の訂正も参照）。
+  キーの有効期限は2027-09-07（6章の要確認）。※ 2026-09-04 に個人アカウント側のクレジットが219番の課金障害で枯渇した経緯がある
 - **AI利用コストの安全機構（2026-09-04に3段構えで整備。219〜222番）**: ①**原因を塞ぐ** —
   業務外と判定したメールを `processed_messages` に記録し、二度とClaudeへ送らない（これが無いと
   巡回のたびに添付PDF・画像ごと再送信され、実際に平常の約20倍のコストが発生した）。
@@ -415,9 +428,10 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
   ③**気づける** — 停止時はダッシュボードにバナー＋**Web Push通知**、処理ログにも`error`種別（赤）で記録。
   詳細は「経緯の要約」219〜222番と `docs/ai-cost-and-alternatives.md` を参照
 - **DBバックアップ（2026-08-27〜）**: `.github/workflows/backup.yml` が毎日 `pg_dump` を
-  `eiwapublic-admin/task_management-backups`（別リポジトリ）へ自動push。**このリポジトリの作成・
-  PAT発行・GitHub Secrets登録が未実施のため、現状はまだ動いていない**（要人手対応。手順は
-  `docs/disaster-recovery.md`「初回セットアップ」参照）
+  `eiwapublic-admin/task_management-backups`（別リポジトリ）へ自動push。**稼働中**（初回セットアップは
+  2026-08-27 に完了、スケジュールでの自動実行も2026-08-29に確認済み。181・186番）。結果は操作ログにも
+  `backup` 種別で残る。残るのは年1回の復元ドリル（`docs/disaster-recovery.md` 7章）。
+  **Storage のファイル本体（写真・雛形ファイル・署名画像）はバックアップの対象外**（6章）
 
 ### Google カレンダー連携（開通済み）
 - Gmail と同じ Google アカウント（eiwa.public@gmail.com）の「栄和共通」カレンダー（＝このアカウントのメインカレンダー）の**当日イベント**を、毎回の取得時にタスク化（未処理）する。イベントのタイトル・詳細をそのまま登録し、詳細に「担当：〜」（「担当者：」も可）があればその担当者を割り当てる。ステータス進行は手動
@@ -427,6 +441,11 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
   2. **Google Cloud プロジェクトで Calendar API を有効化**（Gmail API とは別に有効化が必要）
   3. **カレンダーIDの特定**: 「栄和共通」は副カレンダーではなくメインカレンダーの表示名だったため、ID はメールアドレス `eiwa.public@gmail.com`。表示名「栄和共通」では calendarList から解決できず、ID 直接指定で解決した。カレンダーIDはカレンダー設定の「カレンダーの統合」で確認できる
 - カレンダーが見つからない場合、操作ログに「利用可能なカレンダー: …」と購読中カレンダー名の一覧が出るので、名前の食い違い/未共有の切り分けに使える
+- **書き込み（2026-09-29〜）**: ビルメンのメンテナンス予定を同じカレンダーへ登録・更新・削除する（スコープ `calendar.events`。
+  `docs/bilmen-plan.md` 7-2-1）。書き込み先は `calendar_name` の ID をそのまま使い、表示名からは引かない。
+  登録したイベントも、その日になると上記の仕組みでタスク化される（現行の Claris Connect のイベントと同じ扱い）。
+  トークンのスコープは現在5つ（`gmail.readonly`・`gmail.compose`・`calendar.readonly`・`calendar.events`・`drive.readonly`。
+  `docs/google-oauth-scope-update.md`）
 
 ### 経緯の要約
 
@@ -1191,7 +1210,7 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
 - 振り分け精度の調整: 設定画面の「業務背景・振り分けルール（org_context）」を編集して保存（**再デプロイ不要**、次回取得から反映）。各タスク詳細の「AI判定の理由」が調整の参考になる
 - ユーザー追加: Supabase の `users` テーブルに `username / password_hash(bcrypt) / display_name` を INSERT
 - 登録済みユーザー: `nishikawa`（西川）/ `okada`（岡田）/ `kaz`（橋口）/ `hyoka`（評価ユーザー）/ `koizumi`（小泉本社。`role='owner'`＝日報・備品・自主検査・違反車両・残留塩素の閲覧のみで書き込み不可。2026-08-25追加）/ `staff`（表示名「スタッフ」。`role='equipment_out_staff'`＝上記5画面の閲覧に加え、備品の「出庫」新規登録・当日入力分の「出庫」修正のみ書き込み可。2026-08-25追加）
-- 自社ドメインの変更: settings の `company_domains`（カンマ区切り、既定 `eiwa-up.jp`）。このドメイン発のメールは「自社からの返信」として返信検知に使われる
+- 自社ドメインの変更: settings の `company_domains`（カンマ区切り。コード上の既定は `eiwa-up.jp`、**本番の現在値は `eiwa-up.jp,eiwa-up.com`**。2026-09-29 に `eiwa-up.com` を追加。283番）。このドメイン発のメールは「自社からの返信」として返信検知に使われるほか、連絡帳の自動作成・CC一覧の対象外にもなる
 - 操作の確認: メイン画面「ログ」→ 操作ログ画面（取得結果・ステータス変更を実行者付きで表示）
 
 ### コスト監視
@@ -1223,9 +1242,12 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 | SESSION_SECRET | JWT 署名鍵 |
 | ANTHROPIC_API_KEY | Claude API |
 | GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN | Gmail OAuth |
-| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | Web Push通知（2026-07-21。**要追加・下記参照**） |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | Web Push通知（2026-07-21。登録済み） |
+| EQUIPMENT_API_KEY / EQUIPMENT_TENANT_SYNC_API_KEY | 備品の FileMaker 連携API（設置実績の提供／テナント同期の受信。2026-08-17。131・132番） |
+| EQUIPMENT_API_ALLOW_IPS | 同APIの接続元IPの許可リスト（任意。空なら制限なし） |
+| SUPABASE_DB_PASSWORD / BACKUP_REPO_TOKEN | 日次DBバックアップ（`backup.yml` だけが使う。2026-08-27。180・181番） |
 
-※ **VAPID_* は本PRで新規追加。マージ前にGitHub Secretsへの登録が必要**（未登録でも通知機能が無効なだけでデプロイ自体は失敗しない）。生成済みの値をこのセッションのチャットで共有済み。`VAPID_SUBJECT` は `mailto:eiwa.public@gmail.com` を設定（無指定でも同じ値にフォールバックするが明示推奨）。
+※ VAPID_* は2026-07-21に追加し、GitHub Secrets へ登録済み（本番で購読が作られており、公開鍵が配信されていることを2026-10-02に確認）。未登録でも通知機能が無効なだけでデプロイ自体は失敗しない。`VAPID_SUBJECT` は `mailto:eiwa.public@gmail.com`。
 
 ※ `SUPABASE_URL` は正しくは `https://pfiogfdnbctunkhslmcp.supabase.co`。過去に不正な値が入っていたため、コード側で「URL として不正なら既知の本番値にフォールバック」する防御を入れてある（`worker/lib/supabase-admin.js`）。Secrets は 2026-07-06 に正しい値へ修正済み（フォールバックは保険として残置）。
 
@@ -1260,8 +1282,27 @@ npm run build && npm run dev:worker   # http://localhost:8787（API込み）
 - 追加列: `fire_inspections.closed`（既定false。「休館日」マーカー用。2026-08-05）
 - 追加 Storage バケット: `report-photos`（非公開・10MB上限・image/jpeg,png,webp と application/pdf のみ許可。`insert into storage.buckets`で作成。schema.sql に含まれる）
 - 追加テーブル: `parking_violations`（違反車両。`daily_reports`とは独立。2026-08-05） / 追加列: `report_photos.parking_id`（違反車両の写真を紐付け。1レコードにつき写真は最大2枚まで対応。2026-08-05）
-- 追加テーブル（ビルメン Phase 1。2026-09-02）: `bilmen_masters`（作業マスタ。`master_no` は現行 FileMaker の作業マスタIDをそのまま継承するため unique・手入力） / `bilmen_schedules`（メンテナンス予定・実績。`work_no`＝作業IDは **nullable な unique**。自動作成した直後は未入力で、NULL は重複と見なされないため「未入力は複数可・入力値は一意」を制約1本で表現している）。いずれも既存方針どおり `anon`/`authenticated` への GRANT なし（service role のみ）。**本番への適用は未実施**（要人手対応）
+- 追加テーブル（ビルメン Phase 1。2026-09-02）: `bilmen_masters`（作業マスタ。`master_no` は現行 FileMaker の作業マスタIDをそのまま継承するため unique・手入力） / `bilmen_schedules`（メンテナンス予定・実績。`work_no`＝作業IDは **nullable な unique**。自動作成した直後は未入力で、NULL は重複と見なされないため「未入力は複数可・入力値は一意」を制約1本で表現している）。いずれも既存方針どおり `anon`/`authenticated` への GRANT なし（service role のみ）。**本番へ適用済み・稼働中**（2026-09-02。当初「未実施」と書いていたが、6章のとおり適用済み）
 - `activity_logs.log_type` の check 制約に `backup` を追加（マイグレーション `allow_backup_activity_log_type`。2026-08-27。日次バックアップの結果を操作ログ画面にも表示するため）
+- **上記の一覧に載せていなかったテーブル（2026-10-02 に追記。いずれも本番へ適用済み・service role のみ。列の詳細は `supabase/schema.sql` が正）**:
+  | テーブル | 用途 | 追加日 | 詳細 |
+  |---|---|---|---|
+  | `push_subscriptions` | Web Push の購読（端末ごと） | 2026-07-21 | `worker/lib/push.js` |
+  | `closed_days` | 休館日（日報一覧・自主検査表で共有） | 2026-08-07 | 設計書4-10〜 |
+  | `chlorine_tests` | 残留塩素等検査 | 2026-08-10 | `docs/daily-report-plan.md` |
+  | `equipment_categories`・`equipment_items`・`equipment_tenants`・`equipment_transactions` | 備品管理（ビュー `equipment_stock` で在庫を出す） | 2026-08-12 | `docs/equipment-plan.md` 4-1 |
+  | `document_templates`（＋Storage バケット `work-templates`） | 雛形ファイル | 2026-08-30 | 189〜192番 |
+  | `contacts` | 連絡帳 | 2026-08-31 | 198〜202番 |
+  | `bilmen_monthly_notes` | ビルメンの注釈と変更表記 | 2026-09-09 | `docs/bilmen-plan.md` 5-4 |
+  | `bilmen_mail_settings`・`bilmen_mail_recipients` | 案内メールの文面・返信先・宛先 | 2026-09-03 | `docs/bilmen-plan.md` 5-6・7-3 |
+  | `waste_scans`・`waste_records` | 廃棄物実測値 | 2026-09-03 | `docs/waste-plan.md` |
+  | `processed_messages` | 業務外と判定したメールの記録（再分類防止） | 2026-09-04 | 219番 |
+  | `api_usage_daily` | 1日ごとのAI利用量（サーキットブレーカー用） | 2026-09-04 | 220番 |
+  | `paper_records` | 古紙回収量 | 2026-09-08 | 設計書 4-18 |
+  | `reminders` | リマインダー | 2026-09-07 | 235番 |
+- **最近追加した列・設定（2026-09-29〜）**: `bilmen_schedules.google_synced_hash`（カレンダー反映内容の指紋。286番）／
+  `settings.bilmen_calendar_start_month`（反映開始月。`2026-11`）／`equipment_transactions.free_exchange`
+  （無償交換。テナント設置のみ true にできる CHECK 制約つき。290番）。**いずれも本番へ直接適用し、schema.sql にも書き戻し済み**
 
 ### タスク・設定・ログ・利用量 API（Worker）
 - **2026-07-16 変更**: 従来はフロントの anon キーが Supabase を直接読み取り、status 列の更新のみ anon に許可していたが、anon キーは公開値で匿名の第三者に全データを読み書きされる脆弱性だったため全廃。**タスク一覧・設定・ログ・利用量の読み取りも含め、すべて Worker の `/api/*`（service role・JWT必須）経由**に統一した。
@@ -1300,6 +1341,12 @@ id はクエリ/ボディ」方式にしてある（計画6章のパスパラメ
 - `POST/PATCH/DELETE /api/bilmen/schedules`: 予定の追加・更新・削除。PATCH はボディに `full:true` があれば詳細モーダルからの全項目保存、無ければ一覧のその場編集（送られてきた列だけの部分更新）
 - `GET /api/bilmen/schedules/generate?month=YYYY-MM`: 自動作成の候補（対象月を実施月に含む有効なマスタ＋作成済みフラグ）
 - `POST /api/bilmen/schedules/generate`: 予定の一括生成（`{ month, master_ids[] }`）。同月・同マスタの重複はAPI側で弾き、結果を `activity_logs` に記録する
+- `GET/PUT /api/bilmen/notes?month=YYYY-MM`: 注釈と変更表記（2026-09-09〜）
+- `GET/PUT /api/bilmen/mail/settings`・`GET/POST/PATCH/DELETE /api/bilmen/mail/recipients`: 案内メールの文面・返信先・宛先。
+  **owner・備品出庫限定ロールには GET も含めて見せない**（`requireMailAccess`）
+- `POST /api/bilmen/mail/draft`: Gmail方式の下書き作成（multipart: `month`・`subject`・`body`・`pdf`。宛先と返信先はサーバー側で DB から読む。2026-09-29〜。`docs/bilmen-plan.md` 7-3-1）
+- `GET /api/bilmen/calendar`（反映開始月・反映先の設定有無）／`POST /api/bilmen/calendar/schedule`（1件の反映・取り消し。`{ id, action: 'sync'|'remove' }`）／
+  `POST /api/bilmen/calendar/sync`（月まとめ。`{ month, skip_ids }`。1回10件ずつで `remaining` を返し、画面が繰り返し呼ぶ）。2026-09-29〜。`docs/bilmen-plan.md` 7-2-1
 
 ### PWA / Service Worker
 - `npm run build` は `node scripts/generate-sw.mjs && vite build`。ビルド時に `public/sw.js`（生成物・gitignore）を作り `SW_VERSION`(git SHA) を刻印する。
