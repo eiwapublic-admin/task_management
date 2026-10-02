@@ -80,3 +80,14 @@ export async function notifyReminder({ id, title, dueDate }) {
     url: `/reminders/${id}`,
   })
 }
+
+// 備品の在庫警告（2026-10-02〜。docs/equipment-plan.md 10-1）。在庫が警告数量を下回った瞬間に1回だけ送る
+// （連続送信の抑止は呼び出し側＝equipment.js の refreshWarning で warned_at を使って行う）。
+// タップで在庫一覧を開く。発注は誰が気づいてもよいため、購読中の全端末へ送る
+export async function notifyStockWarning({ name, qty, warnQty }) {
+  await sendPush({
+    title: '在庫警告',
+    body: `${name} の在庫が ${qty} になりました（警告数量 ${warnQty}）。発注をご検討ください。`,
+    url: '/equipment',
+  })
+}

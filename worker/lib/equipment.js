@@ -7,6 +7,7 @@
 import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
+import { notifyStockWarning } from './push.js'
 
 const ITEM_COLUMNS =
   'id, item_no, category_code, name, short_name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
@@ -275,6 +276,13 @@ export async function handleEquipmentItemUpdate(req) {
       return json({ error: '備品の更新に失敗しました' }, 500)
     }
     if (!data) return json({ error: '備品が見つかりません' }, 404)
+    // 警告数量・在庫管理・無効を変えたときは、その時点の在庫で警告の状態を見直す
+    // （警告数量を現在庫以上に上げた場合などは、ここで在庫警告が1回鳴る）
+    if ('warn_qty' in patch || 'track_stock' in patch || 'disabled' in patch) {
+      await refreshWarning(supabase, id)
+      const { data: fresh } = await supabase.from('equipment_items').select(ITEM_COLUMNS).eq('id', id).maybeSingle()
+      if (fresh) return json({ item: fresh })
+    }
     return json({ item: data })
   } catch (err) {
     console.error('equipment-item-update 失敗:', err)
@@ -738,25 +746,37 @@ export async function handleEquipmentTransactionDelete(req) {
   }
 }
 
-// 在庫が warn_qty 以下になったかどうかを見て warned_at を更新する（Web Push 通知は Phase 3 で実装。
-// ここでは「下回っていない→下回った」の遷移を検知するための状態管理だけ先に用意しておく）。
+// 在庫が warn_qty 以下になったかどうかを見て warned_at を更新し、「下回っていない → 下回った」に
+// 変わった瞬間だけ在庫警告の Web Push を送る（2026-10-02〜。docs/equipment-plan.md 10-1）。
+// warned_at は「警告済み」の印で、在庫が warn_qty を上回ったら（入庫で解消したら）消して次回また鳴らせるようにする。
+// 警告数量が未設定・在庫管理外・無効な備品は対象外（状態も変えない）。
 async function refreshWarning(supabase, itemId) {
   try {
     const { data: item } = await supabase
       .from('equipment_items')
-      .select('id, warn_qty, warned_at, track_stock')
+      .select('id, name, warn_qty, warned_at, track_stock, disabled')
       .eq('id', itemId)
       .maybeSingle()
-    if (!item || !item.track_stock || item.warn_qty == null) return
+    if (!item || !item.track_stock || item.disabled || item.warn_qty == null) return
     const { data: stock } = await supabase.from('equipment_stock').select('stock_qty').eq('item_id', itemId).maybeSingle()
     const qty = stock?.stock_qty ?? 0
     if (qty <= item.warn_qty && !item.warned_at) {
-      await supabase.from('equipment_items').update({ warned_at: new Date().toISOString() }).eq('id', itemId)
+      // 同時に2件の出庫が来ても通知が1回で済むよう、「まだ警告済みでない行」だけを更新し、
+      // 実際に更新できた側だけが通知する
+      const { data: marked } = await supabase
+        .from('equipment_items')
+        .update({ warned_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .is('warned_at', null)
+        .select('id')
+      if (marked && marked.length > 0) {
+        await notifyStockWarning({ name: item.name, qty, warnQty: item.warn_qty })
+      }
     } else if (qty > item.warn_qty && item.warned_at) {
       await supabase.from('equipment_items').update({ warned_at: null }).eq('id', itemId)
     }
   } catch (err) {
-    // 通知状態の更新に失敗しても入出庫の登録自体は成功させる
+    // 通知状態の更新・通知に失敗しても入出庫の登録自体は成功させる
     console.error('equipment refreshWarning 失敗:', err)
   }
 }
