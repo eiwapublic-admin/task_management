@@ -1,5 +1,5 @@
 // Google Calendar API を fetch で直接叩く軽量クライアント（追加依存なし）。
-// Gmail と同じ OAuth アクセストークンを使う（スコープに calendar.readonly が必要）。
+// Gmail と同じ OAuth アクセストークンを使う（読み取りは calendar.readonly、ビルメンの書き込みは calendar.events が必要）。
 
 const API_BASE = 'https://www.googleapis.com/calendar/v3'
 
