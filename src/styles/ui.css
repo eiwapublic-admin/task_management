@@ -906,6 +906,11 @@ input.ui-input[type="datetime-local"] {
   border-radius: var(--radius-control);
   box-shadow: var(--shadow-raised);
 }
+/* 下に余白が無いときは入力欄の上に開く（2026-10-05。Combobox.jsx が判定して付ける） */
+.ui-combobox-list.is-up {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
+}
 .ui-combobox-list li + li { margin-top: var(--space-05); }
 .ui-combobox-list button {
   display: block;
