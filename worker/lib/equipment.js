@@ -606,8 +606,11 @@ export async function handleEquipmentTransactionUpdate(req) {
     // ただし備品出庫限定ロールは「当日入力分の出庫」の訂正猶予として、署名済みでも
     // 当日中（＝limitedOutOnlyが真）なら例外的に修正できる（2026-08-25。それ以外の
     // ロール・翌日以降はこれまでどおり修正不可）
-    if (existing.signed_at && auth.role !== 'admin' && !limitedOutOnly) {
-      return json({ error: '署名済みの記録は修正できません' }, 403)
+    // ただし備考だけの修正は署名済みでも許す（2026-10-05の依頼。署名の対象＝受け取った品目・本数・テナントは
+    // 変わらず、あとから経緯などを書き足したいため）。画面は署名済みの記録では備考だけを送る
+    const noteOnly = Object.keys(payload).every((k) => k === 'id' || k === 'note')
+    if (existing.signed_at && auth.role !== 'admin' && !limitedOutOnly && !noteOnly) {
+      return json({ error: '署名済みの記録は修正できません（備考欄を除く）' }, 403)
     }
 
     const reason = 'reason' in payload ? payload.reason : existing.reason

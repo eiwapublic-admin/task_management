@@ -160,6 +160,17 @@ export default function EquipmentOutForm({
 
   async function handleSave() {
     setError('')
+    // 署名済みの記録は備考だけを直せる（2026-10-05）。ほかの項目は送らない（サーバーも備考だけなら許可する）
+    if (locked) {
+      setSaving(true)
+      try {
+        onSaved(await updateEquipmentTransaction(existing.id, { note: note || null }))
+      } catch (err) {
+        setError(err.message)
+        setSaving(false)
+      }
+      return
+    }
     if (!itemId) return setError('備品を選択してください')
     if (!Number.isFinite(numericQty) || numericQty <= 0) return setError('出庫数量を入力してください')
     if (reason === 'tenant' && !tenantId) return setError('設置先テナントを選択してください')
@@ -227,7 +238,7 @@ export default function EquipmentOutForm({
             </p>
           )}
 
-          {locked && <p className="ui-note">署名済みのため修正できません</p>}
+          {locked && <p className="ui-note">署名済みのため修正できません（備考欄を除く）</p>}
 
           <div className="equipment-reason-field">
             <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
@@ -391,7 +402,6 @@ export default function EquipmentOutForm({
               className="ui-textarea is-compact"
               rows={1}
               value={note}
-              disabled={locked}
               placeholder="備考"
               onChange={(e) => setNote(e.target.value)}
             />
@@ -431,13 +441,11 @@ export default function EquipmentOutForm({
           </div>
           <div className="ui-modal-foot-end">
             <button type="button" className="btn-plain" onClick={onClose}>
-              {locked ? '閉じる' : 'キャンセル'}
+              キャンセル
             </button>
-            {!locked && (
-              <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? '保存中…' : '記録する'}
-              </button>
-            )}
+            <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? '保存中…' : locked ? '備考を保存' : '記録する'}
+            </button>
           </div>
         </div>
       </div>
