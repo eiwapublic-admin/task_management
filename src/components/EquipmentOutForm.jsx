@@ -223,7 +223,7 @@ export default function EquipmentOutForm({
 
   return (
     <div className="ui-overlay is-nested" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="ui-modal is-sm equipment-out-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
           <h3 className="ui-modal-title">{existing ? '出庫・設置記録の修正' : '出庫・設置記録'}</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
@@ -240,197 +240,207 @@ export default function EquipmentOutForm({
 
           {locked && <p className="ui-note">署名済みのため修正できません（備考欄を除く）</p>}
 
-          <div className="equipment-reason-field">
-            <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
-              {EQUIPMENT_OUT_REASONS.map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  className={`btn-plain equipment-reason-btn${reason === r.key ? ' is-active' : ''}`}
-                  aria-pressed={reason === r.key}
-                  disabled={locked}
-                  onClick={() => setReason(r.key)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="ui-field">
-            <span>出庫日時</span>
-            <DateTimeInput value={occurredAt} disabled={locked || dateLocked} onChange={setOccurredAt} />
-          </label>
-
-          <div className="ui-field">
-            <select
-              className="ui-select"
-              value={itemId}
-              disabled={locked}
-              onChange={(e) => {
-                itemTouchedRef.current = true
-                setItemId(e.target.value)
-              }}
-            >
-              {!itemId && (
-                <option value="" disabled>
-                  備品
-                </option>
-              )}
-              {groups.map((g) => (
-                <optgroup key={g.name} label={g.name}>
-                  {g.rows.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
+          {/* PC幅では左＝記録の項目・右＝備考と受領サインの2列にして、モーダル内のスクロールを無くす
+              （2026-10-05の依頼。1列のままだと署名欄込みで約890pxあり、PCの画面に収まらなかった）。
+              狭幅では従来どおり1列（Equipment.css の .equipment-out-cols） */}
+          <div className="equipment-out-cols">
+            <div className="equipment-out-col">
+              <div className="equipment-reason-field">
+                <div className="equipment-reason-toggle" role="group" aria-label="設置先／出庫理由">
+                  {EQUIPMENT_OUT_REASONS.map((r) => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      className={`btn-plain equipment-reason-btn${reason === r.key ? ' is-active' : ''}`}
+                      aria-pressed={reason === r.key}
+                      disabled={locked}
+                      onClick={() => setReason(r.key)}
+                    >
+                      {r.label}
+                    </button>
                   ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {reason === 'tenant' && (
-            <div className="ui-field-row">
-              <div className="ui-field">
-                <Combobox
-                  value={tenantInput}
-                  onChange={handleTenantChange}
-                  onSelect={handleTenantSelect}
-                  options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
-                  placeholder="設置先テナント"
-                  disabled={locked}
-                />
-                {!selectedTenant && tenantInput && (
-                  <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
-                )}
-                {selectedTenant?.moved_out && <p className="equipment-tenant-summary is-danger">退去済み</p>}
-              </div>
-              <div className="ui-field equipment-floor-field">
-                <input
-                  type="text"
-                  className="ui-input"
-                  value={selectedTenant?.floor ? `${selectedTenant.floor}F` : ''}
-                  placeholder="階"
-                  disabled
-                  readOnly
-                />
-              </div>
-            </div>
-          )}
-
-          {reason === 'tenant' && (
-            <label className="equipment-checkbox-field equipment-free-exchange-field">
-              <input
-                type="checkbox"
-                checked={freeExchange}
-                disabled={locked}
-                onChange={(e) => setFreeExchange(e.target.checked)}
-              />
-              <span>
-                無償交換
-                <span className="equipment-free-exchange-hint">（過去の不良品の取替。請求しない）</span>
-              </span>
-            </label>
-          )}
-
-          {reason === 'common' && (
-            <div className="ui-field-row">
-              <div className="ui-field equipment-floor-field">
-                <div className="equipment-floor-inline">
-                  <select
-                    className="ui-select"
-                    value={floor}
-                    disabled={locked}
-                    onChange={(e) => setFloor(e.target.value)}
-                  >
-                    {!floor && (
-                      <option value="" disabled>
-                        階
-                      </option>
-                    )}
-                    {EQUIPMENT_FLOOR_OPTIONS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                  {floor && <span className="equipment-floor-suffix">F</span>}
                 </div>
               </div>
+
+              <label className="ui-field">
+                <span>出庫日時</span>
+                <DateTimeInput value={occurredAt} disabled={locked || dateLocked} onChange={setOccurredAt} />
+              </label>
+
               <div className="ui-field">
-                <Combobox
-                  value={location}
-                  onChange={setLocation}
-                  options={locationOptions}
-                  placeholder="設置場所"
+                <select
+                  className="ui-select"
+                  value={itemId}
                   disabled={locked}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="equipment-qty-staff-row">
-            <input
-              type="number"
-              className="ui-input equipment-qty-input"
-              inputMode="numeric"
-              min="1"
-              value={quantity}
-              disabled={locked}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-            <span className="equipment-qty-unit">本</span>
-            <span className="equipment-staff-prefix">担当</span>
-            <Combobox
-              className="equipment-staff-combobox"
-              value={staffName}
-              onChange={setStaffName}
-              options={staffOptions}
-              disabled={locked}
-            />
-          </div>
-
-          {!existing && beforeQty !== null && (
-            <p className={`ui-note${afterQty !== null && afterQty < 0 ? ' is-danger' : ''}`}>
-              在庫の変化: {beforeQty} → {afterQty !== null ? afterQty : '?'}
-              {afterQty !== null && afterQty < 0 && '（在庫がマイナスになります）'}
-            </p>
-          )}
-
-          <div className="ui-field">
-            <textarea
-              className="ui-textarea is-compact"
-              rows={1}
-              value={note}
-              placeholder="備考"
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-
-          {reason === 'tenant' && (
-            <div className="ui-field">
-              <span className="equipment-signature-label">受領サイン</span>
-              {isSigned ? (
-                <div className="equipment-signature-status">
-                  {signatureUrl ? (
-                    <img className="equipment-signature-thumb" src={signatureUrl} alt="受領サイン" />
-                  ) : signatureLoadError ? (
-                    <span className="ui-note is-danger">署名画像を読み込めませんでした</span>
-                  ) : (
-                    <span className="ui-note">読み込み中…</span>
+                  onChange={(e) => {
+                    itemTouchedRef.current = true
+                    setItemId(e.target.value)
+                  }}
+                >
+                  {!itemId && (
+                    <option value="" disabled>
+                      備品
+                    </option>
                   )}
-                  <span className="ui-badge is-current">署名済み</span>
+                  {groups.map((g) => (
+                    <optgroup key={g.name} label={g.name}>
+                      {g.rows.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {reason === 'tenant' && (
+                <div className="ui-field-row">
+                  <div className="ui-field">
+                    <Combobox
+                      value={tenantInput}
+                      onChange={handleTenantChange}
+                      onSelect={handleTenantSelect}
+                      options={tenantOptions.map((t) => ({ key: t.id, label: tenantLabel(t) }))}
+                      placeholder="設置先テナント"
+                      disabled={locked}
+                    />
+                    {!selectedTenant && tenantInput && (
+                      <p className="equipment-tenant-summary is-danger">候補から選択してください</p>
+                    )}
+                    {selectedTenant?.moved_out && <p className="equipment-tenant-summary is-danger">退去済み</p>}
+                  </div>
+                  <div className="ui-field equipment-floor-field">
+                    <input
+                      type="text"
+                      className="ui-input"
+                      value={selectedTenant?.floor ? `${selectedTenant.floor}F` : ''}
+                      placeholder="階"
+                      disabled
+                      readOnly
+                    />
+                  </div>
                 </div>
-              ) : (
-                <>
-                  <SignaturePad ref={signatureRef} />
-                  <p className="ui-note">
-                    署名は必須ではありません。その場でもらえない場合は空欄のまま保存し、あとでこの記録を開いて署名だけ追加できます。
-                  </p>
-                </>
+              )}
+
+              {reason === 'tenant' && (
+                <label className="equipment-checkbox-field equipment-free-exchange-field">
+                  <input
+                    type="checkbox"
+                    checked={freeExchange}
+                    disabled={locked}
+                    onChange={(e) => setFreeExchange(e.target.checked)}
+                  />
+                  <span>
+                    無償交換
+                    <span className="equipment-free-exchange-hint">（過去の不良品の取替。請求しない）</span>
+                  </span>
+                </label>
+              )}
+
+              {reason === 'common' && (
+                <div className="ui-field-row">
+                  <div className="ui-field equipment-floor-field">
+                    <div className="equipment-floor-inline">
+                      <select
+                        className="ui-select"
+                        value={floor}
+                        disabled={locked}
+                        onChange={(e) => setFloor(e.target.value)}
+                      >
+                        {!floor && (
+                          <option value="" disabled>
+                            階
+                          </option>
+                        )}
+                        {EQUIPMENT_FLOOR_OPTIONS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                      {floor && <span className="equipment-floor-suffix">F</span>}
+                    </div>
+                  </div>
+                  <div className="ui-field">
+                    <Combobox
+                      value={location}
+                      onChange={setLocation}
+                      options={locationOptions}
+                      placeholder="設置場所"
+                      disabled={locked}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="equipment-qty-staff-row">
+                <input
+                  type="number"
+                  className="ui-input equipment-qty-input"
+                  inputMode="numeric"
+                  min="1"
+                  value={quantity}
+                  disabled={locked}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+                <span className="equipment-qty-unit">本</span>
+                <span className="equipment-staff-prefix">担当</span>
+                <Combobox
+                  className="equipment-staff-combobox"
+                  value={staffName}
+                  onChange={setStaffName}
+                  options={staffOptions}
+                  disabled={locked}
+                />
+              </div>
+
+              {!existing && beforeQty !== null && (
+                <p className={`ui-note${afterQty !== null && afterQty < 0 ? ' is-danger' : ''}`}>
+                  在庫の変化: {beforeQty} → {afterQty !== null ? afterQty : '?'}
+                  {afterQty !== null && afterQty < 0 && '（在庫がマイナスになります）'}
+                </p>
+              )}
+
+            </div>
+
+            <div className="equipment-out-col">
+              <div className="ui-field">
+                <textarea
+                  className="ui-textarea"
+                  rows={2}
+                  value={note}
+                  placeholder="備考"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
+
+              {reason === 'tenant' && (
+                <div className="ui-field">
+                  <span className="equipment-signature-label">受領サイン</span>
+                  {isSigned ? (
+                    <div className="equipment-signature-status">
+                      {signatureUrl ? (
+                        <img className="equipment-signature-thumb" src={signatureUrl} alt="受領サイン" />
+                      ) : signatureLoadError ? (
+                        <span className="ui-note is-danger">署名画像を読み込めませんでした</span>
+                      ) : (
+                        <span className="ui-note">読み込み中…</span>
+                      )}
+                      <span className="ui-badge is-current">署名済み</span>
+                    </div>
+                  ) : (
+                    <>
+                      <SignaturePad ref={signatureRef} />
+                      <p className="ui-note">
+                        署名は必須ではありません。その場でもらえない場合は空欄のまま保存し、あとでこの記録を開いて署名だけ追加できます。
+                      </p>
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         <div className="ui-modal-foot">
