@@ -438,3 +438,24 @@
 .equipment-txn-table th:first-child { background: var(--bg-subtle); }
 .equipment-txn-table td:first-child { background: var(--bg-surface); }
 .equipment-txn-table .equipment-history-row:hover td:first-child { background: var(--bg-subtle); }
+
+/* 出庫・設置モーダルの2列レイアウト（2026-10-05）。PC幅では左＝記録の項目・右＝備考と受領サインに分け、
+   署名欄込みでも縦に収まるようにする（1列だと約890pxあり、PCの画面ではモーダル内にスクロールが出ていた）。
+   狭幅（スマホ・iPad縦）は従来どおり1列に積む */
+.equipment-out-cols,
+.equipment-out-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .ui-modal.equipment-out-modal { max-width: 920px; }
+  .equipment-out-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+}

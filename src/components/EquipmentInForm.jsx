@@ -179,8 +179,8 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
 
           <div className="ui-field">
             <textarea
-              className="ui-textarea is-compact"
-              rows={1}
+              className="ui-textarea"
+              rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="在庫調整理由など"
