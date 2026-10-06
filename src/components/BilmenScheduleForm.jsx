@@ -212,6 +212,41 @@ export default function BilmenScheduleForm({
     }
   }
 
+  // フッターの「カレンダーに強制登録／強制更新」（2026-10-06の依頼）。今の入力を保存してから、
+  // 反映開始月より前の月（＝Claris Connect が登録していた10月分など）でも登録・更新する。
+  // 開始月より前でまだ登録していない予定は、Claris Connect の予定と二重になりうるので確認を挟む
+  const [forceConfirm, setForceConfirm] = useState(false)
+  const [footError, setFootError] = useState('')
+  const canForceSync = Boolean(existing && !canceled && planDate)
+
+  async function handleForceSync() {
+    setError('')
+    setFootError('')
+    const invalid = validate()
+    if (invalid) return setFootError(invalid)
+    if (calendarBlocked && !existing.google_event_id && !forceConfirm) {
+      setForceConfirm(true)
+      return
+    }
+    setForceConfirm(false)
+    setCalendarBusy(true)
+    let saved
+    try {
+      saved = await updateBilmenSchedule(existing.id, buildPayload())
+    } catch (err) {
+      setFootError(err.message)
+      setCalendarBusy(false)
+      return
+    }
+    try {
+      const synced = await setBilmenScheduleCalendar(saved.id, 'sync', { force: true })
+      onSaved(synced, `「${synced.title}」をカレンダーに${existing.google_event_id ? '更新' : '登録'}しました`)
+    } catch (err) {
+      setFootError(`保存しましたが、カレンダーへの反映に失敗しました（${err.message}）`)
+      setCalendarBusy(false)
+    }
+  }
+
   async function handleCalendarRemove() {
     setError('')
     setCalendarBusy(true)
@@ -447,10 +482,24 @@ export default function BilmenScheduleForm({
                     )}
                   </p>
                   {calendarBlocked ? (
-                    <p className="ui-note">
-                      {planMonth.replace('-', '年')}月は反映できません（本システムからの反映は{' '}
-                      {calendarStartMonth.replace('-', '年')}月分から）。
-                    </p>
+                    <>
+                      <p className="ui-note">
+                        {planMonth.replace('-', '年')}月は通常の反映の対象外です（本システムからの反映は{' '}
+                        {calendarStartMonth.replace('-', '年')}月分から）。必要なときは下の「カレンダーに強制登録」を使ってください。
+                      </p>
+                      {existing.google_event_id && (
+                        <div className="bilmen-calendar-box-actions">
+                          <button
+                            type="button"
+                            className="btn-plain is-danger"
+                            onClick={handleCalendarRemove}
+                            disabled={calendarBusy || saving}
+                          >
+                            カレンダーから削除
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="bilmen-calendar-box-actions">
                       {!canceled && planDate && (
@@ -565,11 +614,44 @@ export default function BilmenScheduleForm({
           </div>
         </div>
 
+        {forceConfirm && (
+          <div className="ui-modal-alert bilmen-force-confirm" role="alert">
+            <p>
+              {`${planMonth.replace('-', '年')}月の予定は、現行の仕組み（Claris Connect）でカレンダーに登録済みのことがあります。` +
+                '登録済みなら同じ予定が二重になります。カレンダーに無いことを確かめてから登録してください。'}
+            </p>
+            <div className="bilmen-force-confirm-actions">
+              <button type="button" className="btn-plain" onClick={() => setForceConfirm(false)}>
+                やめる
+              </button>
+              <button type="button" className="btn-primary" onClick={handleForceSync} disabled={calendarBusy || saving}>
+                登録する
+              </button>
+            </div>
+          </div>
+        )}
+        {footError && (
+          <p className="ui-modal-alert" role="alert">
+            {footError}
+          </p>
+        )}
+
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
             {existing && (
               <button type="button" className="btn-plain" onClick={() => onDuplicate(existing)}>
                 複製して新規登録
+              </button>
+            )}
+            {canForceSync && (
+              <button
+                type="button"
+                className="btn-plain"
+                onClick={handleForceSync}
+                disabled={calendarBusy || saving || forceConfirm}
+                title="今の入力を保存して、Google カレンダーに登録（登録済みなら内容を更新）します"
+              >
+                {calendarBusy ? '処理中…' : existing.google_event_id ? 'カレンダーを強制更新' : 'カレンダーに強制登録'}
               </button>
             )}
             {existing && <ConfirmDeleteButton onConfirm={handleDelete} label="この予定を削除" size={22} />}

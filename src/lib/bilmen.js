@@ -67,8 +67,12 @@ export async function fetchBilmenCalendarSettings() {
 }
 
 // 1件を反映（action='sync'。未反映なら登録、反映済みなら更新）／取り消す（action='remove'）
-export async function setBilmenScheduleCalendar(id, action = 'sync') {
-  const data = await authFetch('/api/bilmen/calendar/schedule', { method: 'POST', body: JSON.stringify({ id, action }) })
+// force: 反映開始月より前の月でも登録・更新する（詳細画面フッターの強制反映。2026-10-06）
+export async function setBilmenScheduleCalendar(id, action = 'sync', { force = false } = {}) {
+  const data = await authFetch('/api/bilmen/calendar/schedule', {
+    method: 'POST',
+    body: JSON.stringify({ id, action, ...(force ? { force: true } : {}) }),
+  })
   return data.schedule
 }
 
