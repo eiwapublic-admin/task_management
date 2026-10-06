@@ -1230,6 +1230,10 @@ export async function handleBilmenCalendarSchedule(req) {
     const payload = await req.json().catch(() => null)
     const id = typeof payload?.id === 'string' ? payload.id : ''
     const action = payload?.action === 'remove' ? 'remove' : 'sync'
+    // 強制反映（2026-10-06の依頼）。詳細画面フッターの「カレンダーに強制登録／強制更新」から送られ、
+    // 反映開始月より前の月でも登録・更新する（Claris Connect 停止後に追加・変更した10月分などのため）。
+    // 開始月より前は Claris Connect が登録済みのイベントと二重になりうるが、その判断は画面の確認で利用者に委ねる
+    const force = payload?.force === true
     if (!id) return json({ error: 'id は必須です' }, 400)
 
     const supabase = getAdminClient()
@@ -1250,15 +1254,16 @@ export async function handleBilmenCalendarSchedule(req) {
     const settings = await loadCalendarSettings(supabase)
     if (!settings.calendarId) return json({ error: '反映先のカレンダーIDが設定されていません' }, 500)
     const guard = startMonthError(schedule.plan_date.slice(0, 7), settings.startMonth)
-    if (guard) return json({ error: guard }, 400)
+    if (guard && !force) return json({ error: guard }, 400)
 
     const accessToken = await getAccessToken()
     const synced = await syncScheduleEvent(supabase, accessToken, settings.calendarId, schedule)
     await logBilmen(
       supabase,
       actor,
-      `ビルメン: 「${schedule.title}」（${schedule.plan_date}）をカレンダーに${synced.action === 'created' ? '登録' : '反映'}しました`,
-      { id, action: synced.action, google_event_id: synced.schedule?.google_event_id || null },
+      `ビルメン: 「${schedule.title}」（${schedule.plan_date}）をカレンダーに${synced.action === 'created' ? '登録' : '反映'}しました` +
+        (force ? '（強制反映）' : ''),
+      { id, action: synced.action, force, google_event_id: synced.schedule?.google_event_id || null },
     )
     return json({ schedule: withCalendarState(synced.schedule), action: synced.action })
   } catch (err) {
