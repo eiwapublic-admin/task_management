@@ -75,3 +75,14 @@
   flex: 1 1 0;
   min-width: 0;
 }
+
+/* 一覧の会社名の下に添える備考（2026-10-13〜）。長いものは1行で省略する */
+.contact-note {
+  display: block;
+  max-width: 28em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

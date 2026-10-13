@@ -1,0 +1,179 @@
+/* 業務マニュアル（2026-10-13〜）。検索窓は連絡帳と同じ .contacts-search-bar を使う */
+
+.manuals-add-icon-btn { display: none; }
+
+@media (max-width: 768px) {
+  .manuals-add-btn { display: none; }
+  .manuals-add-icon-btn { display: inline-flex; }
+}
+
+.manuals-tabs-row {
+  margin-bottom: var(--space-3);
+  overflow-x: auto;
+}
+
+.manuals-tab-count {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.manuals-group { margin-bottom: var(--space-4); }
+
+.manuals-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.manuals-group-count {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.manuals-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.manuals-item + .manuals-item { border-top: 1px solid var(--border); }
+
+.manuals-item-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.manuals-item-head:hover { background: var(--bg-subtle); }
+
+.manuals-item-no {
+  flex: none;
+  min-width: 2em;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 項目名はカード内タイトルと同じ字（14px・600・濃い文字色） */
+.manuals-item-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.manuals-item-caret {
+  flex: none;
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  padding-top: 0.25em;
+}
+
+.manuals-item-body {
+  padding: 0 var(--space-3) var(--space-3) calc(var(--space-3) + 2em + var(--space-2));
+}
+
+.manuals-field-label {
+  margin: var(--space-2) 0 var(--space-05);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.manuals-field-value {
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: var(--text-base);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.manuals-field-value a { color: var(--color-primary); }
+
+.manuals-item-body mark,
+.manuals-item-title mark {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 2px;
+}
+
+.manuals-related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.manuals-related .manuals-field-label { margin: 0; }
+
+.manuals-related-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.manuals-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+/* 追加・修正画面 */
+.ui-field-row > .ui-field.manuals-form-no { flex: 0 0 6em; }
+
+.manuals-related-picker {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+
+.manuals-related-picker-head {
+  margin: var(--space-1) 0;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.manuals-related-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-05) 0;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .manuals-item-body { padding-left: var(--space-3); }
+}

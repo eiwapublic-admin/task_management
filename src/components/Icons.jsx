@@ -361,3 +361,13 @@ export function IconRecycle(props) {
     </Icon>
   )
 }
+
+// 業務マニュアル（2026-10-13〜）。開いた本の形
+export function IconBook(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 6.5C10.2 5 7.6 4.5 4 4.5v13c3.6 0 6.2.5 8 2 1.8-1.5 4.4-2 8-2v-13c-3.6 0-6.2.5-8 2Z" />
+      <path d="M12 6.5v13" />
+    </Icon>
+  )
+}

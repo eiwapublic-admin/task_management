@@ -24,6 +24,8 @@ export default function ContactForm({ existing, categories, assignees, onClose, 
   const [emailTo, setEmailTo] = useState(existing?.email_to || '')
   const [emailCc, setEmailCc] = useState(existing?.email_cc || '')
   const [websiteUrl, setWebsiteUrl] = useState(existing?.website_url || '')
+  // 備考（2026-10-13〜。対応マニュアル.xlsx の連絡先シート「担当」列の移行先）
+  const [note, setNote] = useState(existing?.note || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,6 +49,7 @@ export default function ContactForm({ existing, categories, assignees, onClose, 
         email_to: emailTo.trim() || null,
         email_cc: emailCc.trim() || null,
         website_url: websiteUrl.trim() || null,
+        note: note.trim() || null,
       }
       const saved = existing ? await updateContact(existing.id, payload) : await createContact(payload)
       onSaved(saved)
@@ -239,6 +242,17 @@ export default function ContactForm({ existing, categories, assignees, onClose, 
               onChange={(e) => setWebsiteUrl(e.target.value)}
             />
           </div>
+
+          <label className="ui-field">
+            <span>備考</span>
+            <textarea
+              className="ui-textarea"
+              rows={2}
+              placeholder="依頼する内容・ログイン情報など"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
         </div>
 
         <div className="ui-modal-foot">

@@ -20,6 +20,7 @@ import BilmenMasters from './pages/BilmenMasters'
 import BilmenMail from './pages/BilmenMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
+import Manuals from './pages/Manuals'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
@@ -268,6 +269,16 @@ function App() {
           element={
             <RequireStaff>
               <Contacts />
+            </RequireStaff>
+          }
+        />
+        {/* 業務マニュアル（日常業務の手引書。2026-10-13〜）。連絡帳と同じく owner・備品出庫限定
+            ロールには見せない（鍵の場所・暗証番号など社内の手順を含むため。依頼元に確認済み） */}
+        <Route
+          path="/manuals"
+          element={
+            <RequireStaff>
+              <Manuals />
             </RequireStaff>
           }
         />

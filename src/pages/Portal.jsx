@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import {
-  IconAddressBook,
+  IconAddressBook, IconBook,
   IconBox,
   IconBuildingWrench,
   IconCar,
@@ -350,6 +350,7 @@ export default function Portal() {
       links: filterLinks([
         { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
         { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
+        { label: '業務マニュアル', icon: <IconBook size={20} />, path: '/manuals', staffOnly: true },
       ]),
     },
     {

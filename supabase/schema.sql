@@ -818,6 +818,43 @@ create trigger contacts_set_updated_at before update on contacts
 
 alter table contacts enable row level security;
 revoke all on contacts from anon, authenticated;
+-- 備考（2026-10-13〜。対応マニュアル.xlsx の連絡先シート「担当」列＝その会社に頼む内容・ログイン情報などの移行先）
+alter table contacts add column if not exists note text;
+
+-- ============================================================
+-- 業務マニュアル（日常業務の手引書。2026-10-13〜）
+-- 依頼元の「対応マニュアル.xlsx」（Numbers から書き出し）の「対応マニュアル」「定例作業」シートと、
+-- 定例作業から参照されている手順のシート（検針・終業前点検・ナニワ商事の請求整理）を取り込んだもの。
+-- 1つの表に種類（kind）で入れ、種類ごとの項目は fields（jsonb）に持つ:
+--   response  … 対応マニュアル。fields: method（対応方法）/ contact（連絡先）/ note（留意事項）
+--   routine   … 定例作業。fields: timing / items（持ち物・準備）/ place（作業場所）/ content（作業内容）/
+--               after（事後）/ remark（備考）
+--   procedure … 関連手順。本文は body（手順の文章）
+-- related_ids は「この項目から参照している別の項目」（例: 定例作業「終業前点検」→ 手順「終業前点検」）。
+-- キーワード検索は件数が少ない（100件未満）ため画面側で全件から絞り込む。
+-- 連絡帳と同じく owner・備品出庫限定ロールには見せない（鍵の場所・暗証番号など社内の手順を含むため）
+-- ============================================================
+create table if not exists work_manuals (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null check (kind in ('response', 'routine', 'procedure')),
+  no          int,                                  -- 元のシートの No（種類ごとの通し番号。並び順にも使う）
+  title       text not null,                        -- 依頼・問い合わせ例 / 作業名 / 手順名
+  fields      jsonb not null default '{}'::jsonb,
+  body        text,
+  related_ids uuid[] not null default '{}',
+  created_by  uuid references users(id),
+  updated_by  uuid references users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists work_manuals_kind_no_idx on work_manuals (kind, no);
+
+drop trigger if exists work_manuals_set_updated_at on work_manuals;
+create trigger work_manuals_set_updated_at before update on work_manuals
+  for each row execute function set_updated_at();
+
+alter table work_manuals enable row level security;
+revoke all on work_manuals from anon, authenticated;
 
 -- ============================================================
 -- ビルメンテナンス管理（ビルメン。Phase 1。2026-09-02〜）

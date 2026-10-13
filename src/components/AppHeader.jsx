@@ -37,6 +37,7 @@ const FEATURE_TITLES = [
   { path: '/reports/templates', title: '作業定型文' },
   { path: '/documents', title: '雛形ファイル' },
   { path: '/contacts', title: '連絡帳' },
+  { path: '/manuals', title: '業務マニュアル' },
   { path: '/reminders', title: 'リマインダー' },
   { path: '/bilmen/masters', title: '作業マスタ', exact: true },
   { path: '/bilmen', title: 'ビルメンテナンス管理' },
@@ -389,6 +390,8 @@ export default function AppHeader({
                   ビルメンを業務メニューに入れる代わり。全画面から1タップで開けるよう、
                   業務別メニューではなく共通領域に置く。docs/bilmen-plan.md 5-0） */}
               {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
+              {/* 業務マニュアル（2026-10-13）: 日常業務の手引書。いつでも参照できるよう連絡帳と並べて共通領域に置く */}
+              {!isOwner && <button onClick={() => goTo('/manuals')}>業務マニュアル</button>}
               {/* リマインダー（2026-09-07）: 従量課金事項・処理ログと同じくシステム運用上の
                   管理機能のため、全画面から1タップで開ける共通領域に置く */}
               {!isOwner && <button onClick={() => goTo('/reminders')}>リマインダー</button>}
