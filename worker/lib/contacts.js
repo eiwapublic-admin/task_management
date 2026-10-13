@@ -7,7 +7,7 @@ import { getAdminClient } from './supabase-admin.js'
 
 const CONTACT_COLUMNS =
   'id, company_name, business_category, contact_person, staff_name, company_phone, mobile_phone, ' +
-  'email_to, email_cc, website_url, created_via, created_at, updated_at'
+  'email_to, email_cc, website_url, note, created_via, created_at, updated_at'
 
 async function requireAuth(req, { write = false } = {}) {
   const auth = await verifyRequestAuth(req)
@@ -91,6 +91,8 @@ function buildContactRow(payload) {
       email_to: emailTo,
       email_cc: trimOrNull(payload?.email_cc, 500),
       website_url: trimOrNull(payload?.website_url, 500),
+      // 備考（2026-10-13〜。その会社に頼む内容・ログイン情報など）
+      note: trimOrNull(payload?.note, 2000),
     },
   }
 }

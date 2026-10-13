@@ -96,7 +96,7 @@ export default function Contacts() {
     const q = query.trim().toLowerCase()
     if (!q) return contacts
     return contacts.filter((c) =>
-      [c.company_name, c.business_category, c.contact_person, c.staff_name, c.email_to]
+      [c.company_name, c.business_category, c.contact_person, c.staff_name, c.email_to, c.note]
         .filter(Boolean)
         .some((s) => s.toLowerCase().includes(q))
     )
@@ -219,7 +219,11 @@ export default function Contacts() {
                       const website = toExternalUrl(c.website_url)
                       return (
                         <tr key={c.id} className="contact-row" onClick={() => setEditingContact(c)}>
-                          <td>{c.company_name}</td>
+                          <td>
+                            {c.company_name}
+                            {/* 備考（2026-10-13〜）。何を頼む会社かが一覧でも分かるよう1行だけ添える */}
+                            {c.note && <span className="contact-note">{c.note}</span>}
+                          </td>
                           <td>{c.contact_person || ''}</td>
                           <td>{c.staff_name || ''}</td>
                           <td className="contact-actions-cell" onClick={(e) => e.stopPropagation()}>

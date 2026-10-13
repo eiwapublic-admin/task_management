@@ -79,6 +79,7 @@ import {
   handleContactDelete,
   handleContactSync,
 } from './lib/contacts.js'
+import { handleManualList, handleManualCreate, handleManualUpdate, handleManualDelete } from './lib/manuals.js'
 import {
   handleReminderList,
   handleReminderGet,
@@ -1152,6 +1153,15 @@ async function route(req, env) {
   }
   if (pathname === '/api/contacts/sync') {
     return req.method === 'POST' ? handleContactSync(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- 業務マニュアル（日常業務の手引書。2026-10-13〜。ハンドラは worker/lib/manuals.js） ---
+  if (pathname === '/api/manuals') {
+    if (req.method === 'GET') return handleManualList(req)
+    if (req.method === 'POST') return handleManualCreate(req)
+    if (req.method === 'PATCH') return handleManualUpdate(req)
+    if (req.method === 'DELETE') return handleManualDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
   }
 
   // --- リマインダー（システム運用上の期限管理。2026-09-07〜。ハンドラは worker/lib/reminders.js） ---
