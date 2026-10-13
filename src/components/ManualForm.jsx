@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
-import { MANUAL_KINDS, MANUAL_KIND_LABELS, MANUAL_FIELD_DEFS, createManual, updateManual, deleteManual } from '../lib/manuals'
+import {
+  MANUAL_KINDS,
+  MANUAL_FIELD_DEFS,
+  convertManualFields,
+  createManual,
+  updateManual,
+  deleteManual,
+} from '../lib/manuals'
 
-// 業務マニュアルの1項目の追加・修正（2026-10-13〜）。種類は新規のときだけ選べる（修正では変えない）。
+// 業務マニュアルの1項目の追加・修正（2026-10-13〜）。分類（対応方法・定例作業）は色付きラベルで選ぶ。
+// 修正でも選び直せ、その場合は中身を近い項目へ移す（convertManualFields）。
 // 「関連」には、この項目から参照する別の項目（例: 定例作業 → 関連手順）をチェックで選ぶ
 export default function ManualForm({ existing, defaultKind = 'response', manuals, onClose, onSaved, onDeleted }) {
   useBodyScrollLock()
@@ -19,6 +27,12 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
 
   const kindDef = MANUAL_KINDS.find((k) => k.key === kind)
   const candidates = useMemo(() => manuals.filter((m) => m.id !== existing?.id), [manuals, existing])
+
+  function changeKind(next) {
+    if (next === kind) return
+    setFields((prev) => convertManualFields(prev, kind, next))
+    setKind(next)
+  }
 
   function toggleRelated(id) {
     setRelated((prev) => {
@@ -56,30 +70,33 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
     <div className="ui-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="ui-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
-          <h3 className="ui-modal-title">{existing ? `${MANUAL_KIND_LABELS[kind]}の修正` : '業務マニュアルに追加'}</h3>
+          <h3 className="ui-modal-title">{existing ? '業務マニュアルの修正' : '業務マニュアルに追加'}</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
         </div>
 
         <div className="ui-modal-body is-stacked">
-          {!existing && (
-            <div className="ui-field">
-              <span>種類</span>
-              <div className="ui-segmented" role="group" aria-label="種類">
-                {MANUAL_KINDS.map((k) => (
-                  <button
-                    key={k.key}
-                    type="button"
-                    className={`ui-segmented-btn${kind === k.key ? ' is-active' : ''}`}
-                    onClick={() => setKind(k.key)}
-                  >
-                    {k.label}
-                  </button>
-                ))}
-              </div>
+          <div className="ui-field">
+            <span>分類</span>
+            <div className="manuals-kind-choices" role="radiogroup" aria-label="分類">
+              {MANUAL_KINDS.map((k) => (
+                <button
+                  key={k.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === k.key}
+                  className={`manuals-kind-label is-${k.key} is-choice${kind === k.key ? ' is-selected' : ''}`}
+                  onClick={() => changeKind(k.key)}
+                >
+                  {k.label}
+                </button>
+              ))}
             </div>
-          )}
+            {existing && kind !== existing.kind && (
+              <p className="ui-note">分類を変えたので、中身を近い項目へ移しました（対応方法⇔作業内容、留意事項・連絡先⇔備考）。保存前に確かめてください。</p>
+            )}
+          </div>
 
           <div className="ui-field-row">
             <label className="ui-field manuals-form-no">
@@ -112,12 +129,10 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
             </label>
           ))}
 
-          {kind === 'procedure' && (
-            <label className="ui-field">
-              <span>手順</span>
-              <textarea className="ui-textarea" rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
-            </label>
-          )}
+          <label className="ui-field">
+            <span>手順（長い手順を書くとき）</span>
+            <textarea className="ui-textarea" rows={body ? 12 : 3} value={body} onChange={(e) => setBody(e.target.value)} />
+          </label>
 
           <div className="ui-field">
             <span>関連（この項目から参照する別の項目）</span>

@@ -9,11 +9,12 @@ import { getAdminClient } from './supabase-admin.js'
 
 const COLUMNS = 'id, kind, no, title, fields, body, related_ids, created_at, updated_at'
 
-// 種類ごとに持てる項目（fields のキー）。画面の見出しの順もこの順
+// 分類ごとに持てる項目（fields のキー）。画面の見出しの順もこの順。
+// 2026-10-13〜 分類は「対応方法（response）」「定例作業（routine）」の2つ（旧「関連手順（procedure）」は定例作業へ統合）。
+// 手順の本文（body）はどちらの分類でも持てる
 export const MANUAL_FIELDS = {
   response: ['method', 'contact', 'note'],
   routine: ['timing', 'items', 'place', 'content', 'after', 'remark'],
-  procedure: [],
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -39,7 +40,7 @@ function normalize(payload, kind) {
     const v = text(payload.fields?.[key], 4000)
     if (v) fields[key] = v
   }
-  const body = kind === 'procedure' ? text(payload.body, 20000) || null : null
+  const body = text(payload.body, 20000) || null
   const related = Array.isArray(payload.related_ids)
     ? [...new Set(payload.related_ids.filter((id) => typeof id === 'string' && UUID_RE.test(id)))].slice(0, 20)
     : []
@@ -103,7 +104,7 @@ export async function handleManualCreate(req) {
   }
 }
 
-// PATCH /api/manuals — 更新（種類は変えない）
+// PATCH /api/manuals — 更新。分類（kind）も変えられる（2026-10-13〜。修正画面のラベルから選び直す）
 export async function handleManualUpdate(req) {
   const { auth, error } = await requireStaff(req)
   if (error) return error
@@ -114,8 +115,10 @@ export async function handleManualUpdate(req) {
     const supabase = getAdminClient()
     const { data: existing } = await supabase.from('work_manuals').select('id, kind').eq('id', id).maybeSingle()
     if (!existing) return json({ error: '項目が見つかりません' }, 404)
-    const { row, error: invalid } = normalize(payload, existing.kind)
+    const kind = MANUAL_FIELDS[payload.kind] ? payload.kind : existing.kind
+    const { row, error: invalid } = normalize(payload, kind)
     if (invalid) return json({ error: invalid }, 400)
+    row.kind = kind
     row.related_ids = row.related_ids.filter((r) => r !== id)
     const { data, error: err } = await supabase
       .from('work_manuals')

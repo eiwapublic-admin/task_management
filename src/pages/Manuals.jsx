@@ -9,7 +9,8 @@ import './Contacts.css'
 import './Manuals.css'
 
 // 業務マニュアル（日常業務の手引書。2026-10-13〜）。依頼元の「対応マニュアル.xlsx」を取り込んだもの。
-// 種類（対応マニュアル・定例作業・関連手順）で切り替えて一覧し、キーワードで全種類から絞り込める。
+// 分類（対応方法・定例作業。2026-10-13 に3種類から2つへ整理）で切り替えて一覧し、キーワードで全件から絞り込める。
+// 明細の先頭には分類の色付きラベルを付ける。
 // 項目をタップすると中身が開く。検索中は該当した項目を最初から開き、該当箇所に色を付ける。
 // 本文中の URL はリンク、電話番号は発信リンクにする。定例作業から関連手順へは「関連」から移れる。
 
@@ -226,6 +227,7 @@ export default function Manuals() {
                       ref={(el) => (el ? itemRefs.current.set(m.id, el) : itemRefs.current.delete(m.id))}
                     >
                       <button type="button" className="manuals-item-head" onClick={() => toggle(m.id)} aria-expanded={open}>
+                        <span className={`manuals-kind-label is-${m.kind}`}>{MANUAL_KIND_LABELS[m.kind]}</span>
                         {m.no != null && <span className="manuals-item-no">{m.no}</span>}
                         <span className="manuals-item-title">
                           <Highlight text={m.title} query={query} />
@@ -245,6 +247,9 @@ export default function Manuals() {
                                 </p>
                               </Fragment>
                             ) : null
+                          )}
+                          {m.body && (
+                            <p className="manuals-field-label">手順</p>
                           )}
                           {m.body && (
                             <p className="manuals-field-value">
