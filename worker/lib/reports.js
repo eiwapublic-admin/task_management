@@ -1499,6 +1499,12 @@ export async function handleChlorineCreate(req) {
         ? new Date(payload.tested_at).toISOString()
         : new Date().toISOString()
 
+    // 色・濁り・臭気・味は必須（2026-10-14の依頼）
+    const JUDGEMENT_KEYS = ['color_ok', 'turbidity_ok', 'odor_ok', 'taste_ok']
+    if (JUDGEMENT_KEYS.some((k) => sanitizeJudgement(payload?.[k]) === null)) {
+      return json({ error: '色・濁り・臭気・味はOKかNGを選んでください' }, 400)
+    }
+
     const supabase = getAdminClient()
     const reportId = await resolveReportIdForDate(supabase, toJstDate(testedAt), auth)
 
@@ -1556,6 +1562,10 @@ export async function handleChlorineUpdate(req) {
     if ('turbidity_ok' in payload) patch.turbidity_ok = sanitizeJudgement(payload.turbidity_ok)
     if ('odor_ok' in payload) patch.odor_ok = sanitizeJudgement(payload.odor_ok)
     if ('taste_ok' in payload) patch.taste_ok = sanitizeJudgement(payload.taste_ok)
+    // 色・濁り・臭気・味は必須（2026-10-14〜）。送られてきた項目を空にする更新は受け付けない
+    if (['color_ok', 'turbidity_ok', 'odor_ok', 'taste_ok'].some((k) => k in payload && patch[k] === null)) {
+      return json({ error: '色・濁り・臭気・味はOKかNGを選んでください' }, 400)
+    }
     if ('inspector' in payload) patch.inspector = trimOrNull(payload.inspector, 50)
     if ('note' in payload) patch.note = trimOrNull(payload.note, 1000)
 

@@ -64,6 +64,10 @@ export default function ChlorineForm({
     taste_ok: existing?.taste_ok ?? null,
   }))
   const [note, setNote] = useState(existing?.note || '')
+  // 写真ライブラリから選んだ写真の撮影日時を測定日時にしたときの知らせ（2026-10-14〜）
+  const [dateNotice, setDateNotice] = useState('')
+  // 必須項目の未入力。本文の先頭ではスクロールしていると見えないため、フッターの真上に出す
+  const [requiredError, setRequiredError] = useState('')
   // 新規登録中に選んだ写真（保存時にまとめてアップロードする）
   const [pendingPhotos, setPendingPhotos] = useState([])
   const [saving, setSaving] = useState(false)
@@ -104,9 +108,24 @@ export default function ChlorineForm({
   const belowStandard =
     numericConcentration !== null && Number.isFinite(numericConcentration) && numericConcentration < CHLORINE_STANDARD_MIN
 
+  // 写真ライブラリから選んだ写真の撮影日時（無ければファイルの作成日時）を測定日時にする（2026-10-14の依頼）
+  function handleLibraryPhotoDate(shot) {
+    setTestedAt(shot.local)
+    setDateNotice(
+      `写真の${shot.source === 'exif' ? '撮影' : '作成'}日時（${shot.local.replace('T', ' ').replace(/-/g, '/')}）を測定日時にしました。`
+    )
+  }
+
   async function handleSave() {
-    setSaving(true)
     setError('')
+    // 色・濁り・臭気・味は必須（2026-10-14の依頼。サーバー側でも確認する）
+    const missing = CHLORINE_JUDGEMENT_ITEMS.filter((item) => judgements[item.key] === null).map((item) => item.label)
+    if (missing.length > 0) {
+      setRequiredError(`${missing.join('・')}をOKかNGで選んでください（必須）`)
+      return
+    }
+    setRequiredError('')
+    setSaving(true)
     try {
       const payload = {
         building,
@@ -151,6 +170,7 @@ export default function ChlorineForm({
 
   function setJudgement(key, value) {
     setJudgements((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }))
+    setRequiredError('')
   }
 
   return (
@@ -224,6 +244,7 @@ export default function ChlorineForm({
             reportId={existing?.report_id || null}
             pending={pendingPhotos}
             onPendingChange={setPendingPhotos}
+            onLibraryPhotoDate={handleLibraryPhotoDate}
           />
 
           <div className="report-fields">
@@ -232,9 +253,13 @@ export default function ChlorineForm({
               <input
                 type="datetime-local"
                 value={testedAt}
-                onChange={(e) => setTestedAt(e.target.value)}
+                onChange={(e) => {
+                  setTestedAt(e.target.value)
+                  setDateNotice('')
+                }}
                 className="chlorine-datetime"
               />
+              {dateNotice && <span className="chlorine-date-notice">{dateNotice}</span>}
             </label>
             <label className="report-field">
               <span>残留塩素濃度（mg/L）</span>
@@ -262,7 +287,10 @@ export default function ChlorineForm({
             <div className="chlorine-judgements">
               {CHLORINE_JUDGEMENT_ITEMS.map((item) => (
                 <div className="chlorine-judgement-row" key={item.key}>
-                  <span className="chlorine-judgement-label">{item.label}</span>
+                  <span className="chlorine-judgement-label">
+                    {item.label}
+                    <span className="chlorine-required" aria-label="必須">*</span>
+                  </span>
                   <div className="chlorine-judgement-buttons" role="group" aria-label={item.label}>
                     <button
                       type="button"
@@ -291,6 +319,12 @@ export default function ChlorineForm({
             </label>
           </div>
         </div>
+
+        {requiredError && (
+          <p className="ui-modal-alert" role="alert">
+            {requiredError}
+          </p>
+        )}
 
         <div className="ui-modal-foot">
           <div className="ui-modal-foot-start">
