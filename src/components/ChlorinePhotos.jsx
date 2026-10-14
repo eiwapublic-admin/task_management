@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchChlorinePhotos, uploadPhoto, deletePhoto, fetchPhotoObjectUrl } from '../lib/reports'
 import { prepareImage, formatMB } from '../lib/imageResize'
+import { readPhotoDate } from '../lib/photoDate'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import { IconCamera, IconFolder } from './Icons'
@@ -19,7 +20,9 @@ const MOBILE_QUERY = '(max-width: 640px)'
 //   chlorineId / reportId … 保存済みレコードのとき。null なら新規登録中
 //   pending                … 新規登録中に選んだ写真（[{ key, file, url, size }]）
 //   onPendingChange        … pending の更新（新規登録中のみ使う）
-export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending, onPendingChange }) {
+//   onLibraryPhotoDate     … 写真ライブラリ（ファイル選択）から選んだとき、1枚目の撮影日時を親へ渡す
+//                            （2026-10-14〜。親が測定日時に使う。カメラで撮った場合は呼ばない＝今が測定日時）
+export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending, onPendingChange, onLibraryPhotoDate }) {
   const [photos, setPhotos] = useState([])
   const [urls, setUrls] = useState({}) // photo.id -> Blob URL
   const [busy, setBusy] = useState(false)
@@ -83,15 +86,18 @@ export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending
     }
   }, [])
 
-  async function handleFiles(fileList) {
+  async function handleFiles(fileList, { fromLibrary = false } = {}) {
     const files = Array.from(fileList || [])
     if (files.length === 0) return
     setError('')
     setBusy(true)
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
       try {
+        // 撮影日時は縮小前の元ファイルの EXIF から読む（縮小すると EXIF が消えるため）
+        const shot = await readPhotoDate(file)
+        if (fromLibrary && index === 0 && shot) onLibraryPhotoDate?.(shot)
         const prepared = await prepareImage(file, 'chlorine')
-        const takenAt = file.lastModified ? new Date(file.lastModified).toISOString() : null
+        const takenAt = shot?.iso || null
         if (chlorineId && reportId) {
           const photo = await uploadPhoto({
             reportId,
@@ -198,7 +204,7 @@ export default function ChlorinePhotos({ chlorineId, reportId, readOnly, pending
         multiple
         hidden
         onChange={(e) => {
-          handleFiles(e.target.files)
+          handleFiles(e.target.files, { fromLibrary: true })
           e.target.value = ''
         }}
       />

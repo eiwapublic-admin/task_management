@@ -2875,3 +2875,15 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   color: var(--text-strong);
   width: 34%;
 }
+
+/* 残留塩素等検査（2026-10-14〜）。写真ライブラリの撮影日時を測定日時にしたときの知らせと、必須の印 */
+.chlorine-date-notice {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.chlorine-required {
+  margin-left: 2px;
+  color: var(--color-danger);
+}
