@@ -15,6 +15,8 @@ import { createSubrequestBudget } from './subrequests.js'
 
 // 1回の取得で処理するメッセージ上限（コスト・実行時間の保護）
 const MAX_MESSAGES = 40
+// 取得窓の重なり（2026-10-14）。Gmail の検索反映の遅れで巡回の直前に届いたメールを落とさないため
+const FETCH_OVERLAP_MS = 15 * 60 * 1000
 
 // 1回の巡回で返信検知（スレッド読み取り）を行う進行中タスクの上限（2026-09-04）。
 // 返信検知は「未処理・返信済み」のタスク1件につきGmailスレッドを1回読むため、
@@ -430,7 +432,14 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // される心配は無い（分類コストは増えるが、現状の件数であれば許容範囲とユーザー確認済み）
   let query = '{in:inbox in:spam}'
   if (lastFetchAt) {
-    query += ` after:${Math.floor(lastFetchAt.getTime() / 1000)}`
+    // 取得窓を前回の完走時刻から FETCH_OVERLAP_MS だけさかのぼって重ねる（2026-10-14）。
+    // Gmail は届いたメールが検索に出るまで数分遅れることがあり、前回の巡回の直前に届いた
+    // メール（受信時刻は前回より前）が「前回の検索には未反映・今回の after: からは外れる」
+    // 隙間に落ちて永久に取りこぼされていた（實守紙業の数量報告 10/14 10:42着、10:46の巡回で未反映。
+    // 2026-08-06 の87番と同じ型）。重なった分は、タスク化済み・業務外判定済みのメッセージなら
+    // 本文を取りに行く前にIDだけで飛ばすので、Gmail・Claude の負担はほとんど増えない
+    const since = new Date(lastFetchAt.getTime() - FETCH_OVERLAP_MS)
+    query += ` after:${Math.floor(since.getTime() / 1000)}`
   } else {
     // 初回は直近1日分だけを対象にする（過去の大量メールを一気に取り込まない）
     query += ' newer_than:1d'
@@ -599,6 +608,9 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
     // --- 既に返信済みのタスクへの、さらなる返信（本文の上書き） ---
     if (task.status === '返信済み') {
+      // 取り込み済みの返信をもう一度見ただけなら何もしない（2026-10-14。取得窓を重ねたため、
+      // 前回の巡回で取り込んだ返信が次の巡回でも取得に入ることがある）
+      if (replyId && replyId === task.last_reply_message_id) return false
       // 同じ返信を再検知しただけ（本文が変わらない）なら、毎サイクルの再適用を避けるため
       // last_reply_message_id だけ静かに控えて終了する（ログも件数も増やさない）。
       if (!newBody || newBody === task.body_preview) {
