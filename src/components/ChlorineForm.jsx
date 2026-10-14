@@ -118,10 +118,13 @@ export default function ChlorineForm({
 
   async function handleSave() {
     setError('')
-    // 色・濁り・臭気・味は必須（2026-10-14の依頼。サーバー側でも確認する）
-    const missing = CHLORINE_JUDGEMENT_ITEMS.filter((item) => judgements[item.key] === null).map((item) => item.label)
+    // 残留塩素濃度・色・濁り・臭気・味は必須（2026-10-14の依頼。サーバー側でも確認する）
+    const missing = [
+      ...(concentration === '' ? ['残留塩素濃度'] : []),
+      ...CHLORINE_JUDGEMENT_ITEMS.filter((item) => judgements[item.key] === null).map((item) => item.label),
+    ]
     if (missing.length > 0) {
-      setRequiredError(`${missing.join('・')}をOKかNGで選んでください（必須）`)
+      setRequiredError(`${missing.join('・')}を選んでください（必須）`)
       return
     }
     setRequiredError('')
@@ -262,9 +265,18 @@ export default function ChlorineForm({
               {dateNotice && <span className="chlorine-date-notice">{dateNotice}</span>}
             </label>
             <label className="report-field">
-              <span>残留塩素濃度（mg/L）</span>
+              <span>
+                残留塩素濃度（mg/L）
+                <span className="chlorine-required" aria-label="必須">*</span>
+              </span>
               {/* リスト選択のみ（2026-08-18。自由入力欄は廃止。入力ミスを防ぐため） */}
-              <select value={concentration} onChange={(e) => setConcentration(e.target.value)}>
+              <select
+                value={concentration}
+                onChange={(e) => {
+                  setConcentration(e.target.value)
+                  setRequiredError('')
+                }}
+              >
                 <option value="">選択…</option>
                 {CHLORINE_CONCENTRATION_OPTIONS.map((v) => (
                   <option key={v} value={v}>
