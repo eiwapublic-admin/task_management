@@ -1499,7 +1499,10 @@ export async function handleChlorineCreate(req) {
         ? new Date(payload.tested_at).toISOString()
         : new Date().toISOString()
 
-    // 色・濁り・臭気・味は必須（2026-10-14の依頼）
+    // 残留塩素濃度・色・濁り・臭気・味は必須（2026-10-14の依頼）
+    if (sanitizeConcentration(payload?.concentration) === null) {
+      return json({ error: '残留塩素濃度を選んでください' }, 400)
+    }
     const JUDGEMENT_KEYS = ['color_ok', 'turbidity_ok', 'odor_ok', 'taste_ok']
     if (JUDGEMENT_KEYS.some((k) => sanitizeJudgement(payload?.[k]) === null)) {
       return json({ error: '色・濁り・臭気・味はOKかNGを選んでください' }, 400)
@@ -1557,7 +1560,11 @@ export async function handleChlorineUpdate(req) {
       patch.building = String(payload.building)
     }
     if ('location' in payload) patch.location = trimOrNull(payload.location, 100)
-    if ('concentration' in payload) patch.concentration = sanitizeConcentration(payload.concentration)
+    if ('concentration' in payload) {
+      patch.concentration = sanitizeConcentration(payload.concentration)
+      // 残留塩素濃度は必須（2026-10-14〜）。空にする更新は受け付けない
+      if (patch.concentration === null) return json({ error: '残留塩素濃度を選んでください' }, 400)
+    }
     if ('color_ok' in payload) patch.color_ok = sanitizeJudgement(payload.color_ok)
     if ('turbidity_ok' in payload) patch.turbidity_ok = sanitizeJudgement(payload.turbidity_ok)
     if ('odor_ok' in payload) patch.odor_ok = sanitizeJudgement(payload.odor_ok)
