@@ -58,8 +58,14 @@ export default function KanbanBoard({
     return list
   }, [tasks, hiddenAssignees, searchQuery])
 
+  // 全員表示中に押したときは「その人だけ表示」に切り替える（2026-10-15。一人だけに
+  // 絞りたいことが多いため）。一部だけ表示中は従来どおりその担当者の表示を切り替える
   function toggleAssignee(name) {
     setHiddenAssignees((prev) => {
+      const options = [...assignees, UNASSIGNED]
+      if (options.every((n) => !prev.has(n))) {
+        return new Set(options.filter((n) => n !== name))
+      }
       const next = new Set(prev)
       if (next.has(name)) next.delete(name)
       else next.add(name)
