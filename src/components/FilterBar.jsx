@@ -17,6 +17,8 @@ function chipLabel(name) {
 // 担当者ごとの独立トグル（2026-08-18。旧「すべて」＋単一選択から変更）。
 // 既定は全員オン＝従来の「すべて」と同じ表示。押すとその担当者だけ表示から外れるため、
 // 他を全部オフにすれば「未割当」だけを表示する、といった組み合わせもできる。
+// ただし全員オンの状態で押した場合は「その担当者だけ表示」になる（2026-10-15。
+// 切り替え処理は KanbanBoard.jsx の toggleAssignee）。
 export default function FilterBar({ assignees, hiddenAssignees, onToggle }) {
   const options = [...assignees, UNASSIGNED]
   return (
