@@ -24,10 +24,11 @@ export default function MeterPhotoSheet({ month, items, pageIndex, pageCount }) 
               <p className="mps-no">{row.meter.meter_no}</p>
               <p>{row.meter.seal_label || row.meter.room_name || ''}</p>
               <p>{row.tenant?.short_name || row.tenant?.name || ''}</p>
-              <p className="mps-value">
-                {row.entered ? formatValue(row.reading.value) : '未入力'}
-                {row.meter.is_oa_meter && row.reading?.value2 != null ? ` / ${formatValue(row.reading.value2)}` : ''}
-              </p>
+              <p className="mps-value">{row.entered ? formatValue(row.reading.value) : '未入力'}</p>
+              {/* 外調機の2つ目の値は改行して2行目に出す（2026-10-20 依頼） */}
+              {row.meter.is_oa_meter && row.reading?.value2 != null && (
+                <p className="mps-value">{formatValue(row.reading.value2)}</p>
+              )}
               <p className="mps-taken">{row.photo ? `撮影 ${formatTaken(row.photo.taken_at)}` : ''}</p>
             </div>
           </div>

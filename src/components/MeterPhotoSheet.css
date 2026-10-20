@@ -63,7 +63,7 @@ body.pdf-capture-mode .mps-sheet {
 .mps-info p { margin: 0 0 1mm; word-break: break-all; }
 .mps-no { font-size: 12pt; font-weight: 700; }
 .mps-value {
-  display: inline-block;
+  display: table;
   margin-top: 2mm !important;
   padding: 0.5mm 1.5mm;
   background: #fde047;
@@ -71,3 +71,4 @@ body.pdf-capture-mode .mps-sheet {
   font-weight: 700;
 }
 .mps-taken { margin-top: 2mm !important; color: #444; }
+.mps-value + .mps-value { margin-top: 1mm !important; }
