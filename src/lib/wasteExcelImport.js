@@ -1,4 +1,5 @@
 import { daysInMonth } from './reports'
+import { listZipEntries, readZipEntry, parseSharedStrings, parseSheetRows, listSheetPaths } from './xlsxRead'
 
 // 廃棄物実測集計表のExcel取込（2026-09-09〜。docs/waste-plan.md 5-2改訂）。
 // 手書きシートのスキャン読み取り（Claude Vision）が実際の筆跡でうまく読み取れなかったため、
@@ -8,10 +9,9 @@ import { daysInMonth } from './reports'
 // `xlsx`パッケージは未修正の高リスク脆弱性（プロトタイプ汚染・ReDoS）を抱えており、
 // 修正版はSheetJS自社CDN配布のみでこの環境からは取得できない。読み取る値は「日×1〜7階の
 // 実測値（kg）」だけで形式もdocs/waste-plan.md 2章のとおり固定のため、依存追加を避け、
-// 必要な範囲（ZIP展開・シートXMLの数値セル読み取り）だけを自前実装する。
+// 必要な範囲（ZIP展開・シートXMLの数値セル読み取り）だけを自前実装する（2026-10-20 に検針の照合でも
+// 使うため、ZIP・シートの読み取り部分は src/lib/xlsxRead.js へ切り出した）。
 
-const CENTRAL_DIR_SIG = 0x02014b50
-const EOCD_SIG = 0x06054b50
 // 「1F」だけでなく「1階」「１階」「１Ｆ」も受け付ける（2026-09-30。AIチャットがGoogle
 // スプレッドシートで作った表は見出しが「1階」〜「7階」だったため読み取れなかった）。
 // 全角は normalizeLabel（NFKC）で半角にそろえてから判定する
@@ -27,103 +27,6 @@ function assertBrowserSupport() {
   }
 }
 
-function findEndOfCentralDirectory(view) {
-  const maxCommentLen = 65535
-  const minPos = Math.max(0, view.byteLength - 22 - maxCommentLen)
-  for (let i = view.byteLength - 22; i >= minPos; i--) {
-    if (view.getUint32(i, true) === EOCD_SIG) return i
-  }
-  throw new Error('ZIP形式として読み取れませんでした（.xlsxファイルではない可能性があります）')
-}
-
-// 中央ディレクトリを走査してエントリ一覧（ファイル名→圧縮方式・サイズ・ローカルヘッダ位置）を作る
-function listZipEntries(buffer) {
-  const view = new DataView(buffer)
-  const eocdOffset = findEndOfCentralDirectory(view)
-  const cdOffset = view.getUint32(eocdOffset + 16, true)
-  const cdSize = view.getUint32(eocdOffset + 12, true)
-  const bytes = new Uint8Array(buffer)
-  const decoder = new TextDecoder('utf-8')
-  const entries = new Map()
-
-  let offset = cdOffset
-  const end = cdOffset + cdSize
-  while (offset < end && view.getUint32(offset, true) === CENTRAL_DIR_SIG) {
-    const method = view.getUint16(offset + 10, true)
-    const compSize = view.getUint32(offset + 20, true)
-    const nameLen = view.getUint16(offset + 28, true)
-    const extraLen = view.getUint16(offset + 30, true)
-    const commentLen = view.getUint16(offset + 32, true)
-    const localHeaderOffset = view.getUint32(offset + 42, true)
-    const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLen))
-    entries.set(name, { method, compSize, localHeaderOffset })
-    offset += 46 + nameLen + extraLen + commentLen
-  }
-  return entries
-}
-
-// ローカルヘッダの実サイズ（filename・extraの長さ）は中央ディレクトリと異なる場合があるため、
-// データ開始位置はローカルヘッダ自身から読み直す（圧縮後サイズ・方式は中央ディレクトリを信用する。
-// ストリーミング書き込み時にローカルヘッダ側のサイズが0になるケースがあるため）
-async function readZipEntry(buffer, entry) {
-  const view = new DataView(buffer)
-  const nameLen = view.getUint16(entry.localHeaderOffset + 26, true)
-  const extraLen = view.getUint16(entry.localHeaderOffset + 28, true)
-  const dataStart = entry.localHeaderOffset + 30 + nameLen + extraLen
-  const compressed = new Uint8Array(buffer, dataStart, entry.compSize)
-
-  if (entry.method === 0) return compressed.slice()
-  if (entry.method === 8) {
-    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-    return new Uint8Array(await new Response(stream).arrayBuffer())
-  }
-  throw new Error('対応していない圧縮方式のExcelファイルです')
-}
-
-function parseSharedStrings(xmlText) {
-  if (!xmlText) return []
-  const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
-  return [...doc.getElementsByTagName('si')].map((si) =>
-    [...si.getElementsByTagName('t')].map((t) => t.textContent || '').join('')
-  )
-}
-
-function colIndexOf(ref) {
-  const letters = /^([A-Z]+)\d+$/.exec(ref)?.[1] || ''
-  let n = 0
-  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64)
-  return n
-}
-
-// シートXMLを { 行番号 -> Map(列番号 -> 値) } に変換する（数値セルはNumberに、
-// 文字列セル（共有文字列・インライン文字列）はstringのまま返す）
-function parseSheetRows(xmlText, sharedStrings) {
-  const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
-  const rows = new Map()
-  for (const rowEl of doc.getElementsByTagName('row')) {
-    const rowNum = Number(rowEl.getAttribute('r'))
-    const cells = new Map()
-    for (const c of rowEl.getElementsByTagName('c')) {
-      const colIdx = colIndexOf(c.getAttribute('r') || '')
-      if (!colIdx) continue
-      const type = c.getAttribute('t')
-      let value = null
-      if (type === 'inlineStr') {
-        value = c.getElementsByTagName('is')[0]?.textContent || ''
-      } else {
-        const raw = c.getElementsByTagName('v')[0]?.textContent
-        if (raw == null) value = null
-        else if (type === 's') value = sharedStrings[Number(raw)] ?? ''
-        else if (type === 'str' || type === 'b') value = raw
-        else value = Number(raw)
-      }
-      cells.set(colIdx, value)
-    }
-    rows.set(rowNum, cells)
-  }
-  return rows
-}
-
 // 「日・曜日・1F〜7F・合計」の見出し行を探し、1F〜7F列の位置を返す
 // （docs/waste-plan.md 2章のとおり列の並びは固定。日列は1F列の2つ左、曜日列はその右隣）
 function findFloorHeader(rows) {
@@ -137,36 +40,6 @@ function findFloorHeader(rows) {
     if (found.size >= 7) return { headerRowNum: rowNum, floorCols: found }
   }
   return null
-}
-
-// ブック内のシートXMLのパスを、Excel上のタブの並び順で返す（workbook.xml と
-// そのリレーション定義から引く）。以前は xl/worksheets/sheet1.xml 決め打ちだったが、
-// タブが複数ある・並べ替えたブックでは sheet1.xml が先頭タブとは限らないため
-async function listSheetPaths(buffer, entries, decoder) {
-  const wbEntry = entries.get('xl/workbook.xml')
-  const relsEntry = entries.get('xl/_rels/workbook.xml.rels')
-  const fallback = [...entries.keys()].filter((n) => /^xl\/worksheets\/[^/]+\.xml$/.test(n)).sort()
-  if (!wbEntry || !relsEntry) return fallback
-
-  const [wbBytes, relsBytes] = await Promise.all([readZipEntry(buffer, wbEntry), readZipEntry(buffer, relsEntry)])
-  const parser = new DOMParser()
-  const relsDoc = parser.parseFromString(decoder.decode(relsBytes), 'application/xml')
-  const targets = new Map()
-  for (const rel of relsDoc.getElementsByTagName('Relationship')) {
-    const target = rel.getAttribute('Target') || ''
-    // Target は xl/ からの相対パス（例: worksheets/sheet1.xml）か、/xl/... の絶対パス
-    targets.set(rel.getAttribute('Id'), target.startsWith('/') ? target.slice(1) : `xl/${target}`)
-  }
-  const wbDoc = parser.parseFromString(decoder.decode(wbBytes), 'application/xml')
-  const paths = []
-  for (const sheet of wbDoc.getElementsByTagName('sheet')) {
-    const rid =
-      sheet.getAttribute('r:id') ||
-      sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
-    const path = targets.get(rid)
-    if (path && entries.has(path)) paths.push(path)
-  }
-  return paths.length ? paths : fallback
 }
 
 /**

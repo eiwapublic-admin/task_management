@@ -38,6 +38,7 @@ const FEATURE_TITLES = [
   { path: '/documents', title: '雛形ファイル' },
   { path: '/contacts', title: '連絡帳' },
   { path: '/manuals', title: '業務マニュアル' },
+  { path: '/meter/masters', title: '検針マスタ', exact: true },
   { path: '/reminders', title: 'リマインダー' },
   { path: '/bilmen/masters', title: '作業マスタ', exact: true },
   { path: '/bilmen', title: 'ビルメンテナンス管理' },

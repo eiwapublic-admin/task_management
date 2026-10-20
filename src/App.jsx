@@ -21,6 +21,7 @@ import BilmenMail from './pages/BilmenMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import Manuals from './pages/Manuals'
+import MeterMasters from './pages/MeterMasters'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
@@ -279,6 +280,15 @@ function App() {
           element={
             <RequireStaff>
               <Manuals />
+            </RequireStaff>
+          }
+        />
+        {/* 検針マスタ（FileMaker「検針記録」の移植。2026-10-20〜。docs/meter-plan.md） */}
+        <Route
+          path="/meter/masters"
+          element={
+            <RequireStaff>
+              <MeterMasters />
             </RequireStaff>
           }
         />

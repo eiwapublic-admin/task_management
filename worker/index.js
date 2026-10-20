@@ -81,6 +81,15 @@ import {
 } from './lib/contacts.js'
 import { handleManualList, handleManualCreate, handleManualUpdate, handleManualDelete } from './lib/manuals.js'
 import {
+  handleMeterMasters,
+  handleMeterTenantUpdate,
+  handleMeterSave,
+  handleMeterAcUnitUpdate,
+  handleMeterConstantsUpdate,
+  handleMeterImport,
+  handleMeterOutputData,
+} from './lib/meter.js'
+import {
   handleReminderList,
   handleReminderGet,
   handleReminderCreate,
@@ -1162,6 +1171,29 @@ async function route(req, env) {
     if (req.method === 'PATCH') return handleManualUpdate(req)
     if (req.method === 'DELETE') return handleManualDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+
+  // --- 検針管理（FileMaker「検針記録」の移植。2026-10-20〜。ハンドラは worker/lib/meter.js。社員のみ） ---
+  if (pathname === '/api/meter/masters') {
+    return req.method === 'GET' ? handleMeterMasters(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/tenants') {
+    return req.method === 'PATCH' ? handleMeterTenantUpdate(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/meters') {
+    return req.method === 'POST' || req.method === 'PATCH' ? handleMeterSave(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/ac-units') {
+    return req.method === 'PATCH' ? handleMeterAcUnitUpdate(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/constants') {
+    return req.method === 'PUT' ? handleMeterConstantsUpdate(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/import') {
+    return req.method === 'POST' ? handleMeterImport(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/output') {
+    return req.method === 'GET' ? handleMeterOutputData(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   // --- リマインダー（システム運用上の期限管理。2026-09-07〜。ハンドラは worker/lib/reminders.js） ---

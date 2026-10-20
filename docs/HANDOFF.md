@@ -1,6 +1,17 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-10-20（**Google の「OAuth クライアントのエージェント設定（`is_agentic`）」の案内について、対応不要と判断して記録した**（依頼）。
+最終更新: 2026-10-20（**検針（FileMaker「検針記録」の移植）Phase 1「マスタと移行」を入れた**（依頼。計画は `docs/meter-plan.md`）。
+テーブル `meters`・`meter_readings`・`meter_ac_units`・`meter_ac_usage` を新設し、`equipment_tenants` に `moved_in_on`・`first_month_billable`・`profile`（防火・緊急連絡先などの基本情報）を足した
+（本番には MCP で適用済み。トリガーは MCP が `execute function` でタイムアウトするため本番は `execute procedure` で作成。どれも service role 専用）。定数は `settings` の `meter_oa_coefficient`=40・`meter_total_area`・`meter_oa_target_area`。
+画面は **ダッシュボード → マスタ →「検針マスタ」（`/meter/masters`、社員のみ）**：テナント・メータ・空調機（どのメータに付くか）・定数・取込・照合の5タブ。
+API は `/api/meter/{masters,tenants,meters,ac-units,constants,import,output}`（`worker/lib/meter.js`）。
+**取込**: FileMaker の CSV 5本（テナントマスタ・メータマスタ・検針データ・空調データ・空調機マスタ。中身で種類を判定、`src/lib/meterCsv.js`・`meterMigration.js`）を500件ずつ upsert。何度流しても重複せず、アプリで入力した月（`legacy_id` が空）は上書きしない。
+メータ番号が空・マスタに無い検針値201件は取り込まない。同じメータ・同じ月度の重複4件（2019〜2020年）は後から作られた方を残す。
+**照合**: 「検針データ_yyyy年mm月分」（47列）を `src/lib/meterOutput.js` で組み立て、FileMaker の xlsx と全セル比較できる（`src/lib/xlsxRead.js` は廃棄物の Excel 取込から切り出した共通部品）。
+CSV だけで組んだ10月分は **3055セル中3054セル一致**。残る1セルは 11-A の「退去済み」で、静岡県（73050011）を10/15に退去済みにしたのが10月分出力の後だったため（データの時点差でロジックの差ではない）。
+過去月の前月値・差分は FileMaker の保存値（`legacy_prev`・`legacy_diff` 等）をそのまま持つ（11-B の2024〜2025-06 のように差分0で保存されている月があり、再計算では一致しないため）。2025-07以降はアプリの計算でも一致することを確認済み。
+外調機電気量_請求用は「当月×係数×比率」を四捨五入と仮定（10月は全て0で確かめようがない）。Node での照合は `scripts/verify-meter-output.mjs`。次は Phase 2（写真の取込・入力）。306番）。
+2026-10-20（**Google の「OAuth クライアントのエージェント設定（`is_agentic`）」の案内について、対応不要と判断して記録した**（依頼）。
 Worker は Gmail・カレンダー・ドライブの REST API を直接使っているだけで Workspace MCP サーバーは使わないため影響なし。
 エージェントにはマークしない（11/12 以降は戻せず、別のアクセス制御がかかるため）。`docs/google-oauth-scope-update.md` 8章。305番）。
 2026-10-14（**メールの取りこぼしを直した（取得窓を15分重ねる）**（依頼元の「實守紙業の数量報告はタスク化できているか」の問い合わせで発覚）。
@@ -1491,6 +1502,9 @@ id はクエリ/ボディ」方式にしてある（計画6章のパスパラメ
 
 ## 6. 残タスク・改善候補
 
+- [ ] **検針（FileMaker「検針記録」の移植。`docs/meter-plan.md`。306番〜）**: Phase 1（マスタと移行）は入れた。
+  **依頼元が「検針マスタ」→「取込・照合」で CSV 5本を取り込み、10月分の xlsx と照合する**（11-A の退去済み1セルだけ違うのが正しい）。
+  続けて Phase 2（写真取込＝バーコード読取・360×480 JPEG品質55で保存、数値入力・読み上げ、写真PDF）、Phase 3（出力 xlsx の書き出し・空調CSV取込・Gmail 下書き）。12/1 から並行運用が目標
 - [x] **廃棄物のGoogleドライブ取込を使えるようにする（2026-09-30。`docs/waste-plan.md` 10-7。287番）**:
   依頼元が Drive API の有効化と `drive.readonly` を加えたトークンの再発行を実施し、本番で取込を確認済み。
   **Playground のリダイレクトURIの削除（`docs/google-oauth-scope-update.md` 手順7）は実施未確認**（残っていても実害は無い）

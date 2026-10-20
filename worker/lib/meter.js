@@ -1,0 +1,633 @@
+// 検針管理（FileMaker「検針記録」の移植）の API ハンドラ（Phase 1。2026-10-20〜。docs/meter-plan.md）。
+//
+// 権限: 社員（staff/admin）だけ。小泉産業様（owner）・備品出庫限定ロールには閲覧も許さない（Q9）。
+// テナントの基本情報（profile。防火管理者・緊急連絡先など個人情報を含む）もここでだけ返す。
+//
+// Phase 1 はマスタ（テナント・メータ・空調機の割当て・定数）の参照と修正、FileMaker の CSV の取込、
+// 出力の照合用に月度のデータを返すところまで。取込は画面（src/pages/MeterMasters.jsx）が CSV を
+// 読んで種類ごと・数百件ずつ送ってくる（Workers の1回あたりの外部リクエスト数の上限があるため、
+// 1回の呼び出しの中では件数によらず数回の upsert で済むようにしてある）。
+
+import { json, verifyRequestAuth, canWrite } from './http.js'
+import { getAdminClient } from './supabase-admin.js'
+
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const TIME_PATTERN = /^\d{2}:\d{2}:\d{2}$/
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const METER_KINDS = new Set(['電気', 'ガス', '水道'])
+
+const TENANT_COLUMNS =
+  'id, billing_code, name, short_name, floor, moved_out, note, source, moved_in_on, first_month_billable, profile, synced_at, updated_at'
+const METER_COLUMNS =
+  'id, meter_no, room_no, tenant_id, seq, floor, room_name, seal_label, detail_note, kind, sort_order, digits, ' +
+  'max_value, expires_on, measured, removed, area_m2, area_tsubo, oa_share, oa_ratio, is_oa_meter, note, legacy_id, created_at, updated_at'
+const READING_COLUMNS =
+  'id, meter_id, month, read_on, read_time, value, value2, prev_override, diff_override, legacy_prev, legacy_prev2, ' +
+  'legacy_diff, legacy_diff2, billing_code, note, recorded_by, verified_by, verified_at'
+
+// 定数（settings のキー）。画面の項目名と既定値
+const CONSTANTS = {
+  oa_coefficient: { key: 'meter_oa_coefficient', fallback: 40 },
+  total_area: { key: 'meter_total_area', fallback: 3300.07 },
+  oa_target_area: { key: 'meter_oa_target_area', fallback: 2578.28 },
+}
+
+// 1回の取込で受け付ける件数（画面はこれより小さく区切って送る）
+const MAX_IMPORT_RECORDS = 1000
+
+async function requireStaff(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return { error: json({ error: '認証が必要です' }, 401) }
+  if (!canWrite(auth)) return { error: json({ error: 'この画面を使う権限がありません' }, 403) }
+  return { auth }
+}
+
+// ---------- 値の整え ----------
+
+function text(value, max = 500) {
+  if (typeof value !== 'string') return null
+  const t = value.replace(/\r\n?/g, '\n').trim()
+  return t ? t.slice(0, max) : null
+}
+
+function num(value) {
+  if (value === '' || value == null) return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function int(value) {
+  const n = num(value)
+  return n == null ? null : Math.trunc(n)
+}
+
+function dateOrNull(value) {
+  return typeof value === 'string' && DATE_PATTERN.test(value) ? value : null
+}
+
+function timeOrNull(value) {
+  return typeof value === 'string' && TIME_PATTERN.test(value) ? value : null
+}
+
+function isoOrNull(value) {
+  if (typeof value !== 'string') return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+const PROFILE_TEXT_KEYS = [
+  'security_block',
+  'representative',
+  'phone',
+  'email',
+  'usage',
+  'fire_manager',
+  'fire_manager_title',
+  'fire_manager_note',
+  'legacy_tenant_code',
+  'fix_note',
+]
+
+// テナントの基本情報（profile）を、決まったキーだけの形に整える
+function cleanProfile(p) {
+  if (!p || typeof p !== 'object') return {}
+  const out = {}
+  for (const key of PROFILE_TEXT_KEYS) {
+    const v = text(p[key], 500)
+    if (v) out[key] = v
+  }
+  const capacity = int(p.capacity)
+  if (capacity != null) out.capacity = capacity
+  const appointed = dateOrNull(p.fire_manager_appointed_on)
+  if (appointed) out.fire_manager_appointed_on = appointed
+  if (Array.isArray(p.emergency_contacts)) {
+    const contacts = p.emergency_contacts
+      .slice(0, 5)
+      .map((c) => ({
+        name: text(c?.name, 100),
+        kana: text(c?.kana, 100),
+        phone: text(c?.phone, 50),
+        mobile: text(c?.mobile, 50),
+      }))
+      .filter((c) => c.name || c.kana || c.phone || c.mobile)
+    if (contacts.length) out.emergency_contacts = contacts
+  }
+  return out
+}
+
+function meterFields(p, tenantIdByCode) {
+  const row = {
+    room_no: text(p.room_no, 50),
+    seq: int(p.seq),
+    floor: text(p.floor, 10),
+    room_name: text(p.room_name, 100),
+    seal_label: text(p.seal_label, 100),
+    detail_note: text(p.detail_note, 100),
+    kind: METER_KINDS.has(p.kind) ? p.kind : null,
+    sort_order: int(p.sort_order),
+    digits: (() => {
+      const d = int(p.digits)
+      return d != null && d >= 1 && d <= 9 ? d : null
+    })(),
+    max_value: int(p.max_value),
+    expires_on: dateOrNull(p.expires_on),
+    measured: p.measured === true,
+    removed: p.removed === true,
+    area_m2: num(p.area_m2),
+    area_tsubo: num(p.area_tsubo),
+    oa_share: p.oa_share === true,
+    oa_ratio: num(p.oa_ratio),
+    is_oa_meter: p.is_oa_meter === true,
+    note: text(p.note, 2000),
+  }
+  if (tenantIdByCode) {
+    row.tenant_id = p.billing_code ? tenantIdByCode.get(String(p.billing_code)) || null : null
+  } else if ('tenant_id' in p) {
+    row.tenant_id = typeof p.tenant_id === 'string' && UUID_RE.test(p.tenant_id) ? p.tenant_id : null
+  }
+  return row
+}
+
+async function loadConstants(supabase) {
+  const keys = Object.values(CONSTANTS).map((c) => c.key)
+  const { data, error } = await supabase.from('settings').select('key, value').in('key', keys)
+  if (error) throw new Error(error.message)
+  const map = new Map((data || []).map((r) => [r.key, r.value]))
+  const out = {}
+  for (const [name, { key, fallback }] of Object.entries(CONSTANTS)) {
+    const n = Number(map.get(key))
+    out[name] = Number.isFinite(n) ? n : fallback
+  }
+  return out
+}
+
+// ============================================================
+// マスタ
+// ============================================================
+
+// GET /api/meter/masters — テナント（退去済みも）・メータ・空調機・定数と、取り込んだ件数
+export async function handleMeterMasters(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const [tenants, meters, units, constants, readingCount, latestReading, usageCount, latestUsage] = await Promise.all([
+      supabase.from('equipment_tenants').select(TENANT_COLUMNS).order('floor').order('billing_code'),
+      supabase.from('meters').select(METER_COLUMNS).order('floor').order('sort_order').order('meter_no'),
+      supabase.from('meter_ac_units').select('unit_no, address, meter_id').order('unit_no'),
+      loadConstants(supabase),
+      supabase.from('meter_readings').select('id', { count: 'exact', head: true }),
+      supabase.from('meter_readings').select('month').order('month', { ascending: false }).limit(1),
+      supabase.from('meter_ac_usage').select('id', { count: 'exact', head: true }),
+      supabase.from('meter_ac_usage').select('month').order('month', { ascending: false }).limit(1),
+    ])
+    const failed = [tenants, meters, units, readingCount, latestReading, usageCount, latestUsage].find((r) => r.error)
+    if (failed) {
+      console.error('meter-masters:', failed.error.message)
+      return json({ error: 'マスタの取得に失敗しました' }, 500)
+    }
+    return json({
+      tenants: tenants.data || [],
+      meters: meters.data || [],
+      acUnits: units.data || [],
+      constants,
+      counts: {
+        readings: readingCount.count || 0,
+        latestReadingMonth: latestReading.data?.[0]?.month || null,
+        acUsage: usageCount.count || 0,
+        latestAcUsageMonth: latestUsage.data?.[0]?.month || null,
+      },
+    })
+  } catch (err) {
+    console.error('meter-masters 失敗:', err)
+    return json({ error: 'マスタの取得に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/meter/tenants — 入居年月日・初月無料にしない・基本情報（profile）と、
+// 名称など FileMaker と共通の項目。並行運用の間は FileMaker からの同期が名称・略称・階・備考を上書きする
+export async function handleMeterTenantUpdate(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    const id = typeof p?.id === 'string' && UUID_RE.test(p.id) ? p.id : null
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    const patch = {}
+    if ('name' in p) {
+      const name = text(p.name, 200)
+      if (!name) return json({ error: '正式名称を入力してください' }, 400)
+      patch.name = name
+    }
+    if ('short_name' in p) patch.short_name = text(p.short_name, 100)
+    if ('floor' in p) patch.floor = text(p.floor, 10)
+    if ('note' in p) patch.note = text(p.note, 500)
+    if ('moved_out' in p) patch.moved_out = p.moved_out === true
+    if ('moved_in_on' in p) patch.moved_in_on = dateOrNull(p.moved_in_on)
+    if ('first_month_billable' in p) patch.first_month_billable = p.first_month_billable === true
+    if ('profile' in p) patch.profile = cleanProfile(p.profile)
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+
+    const { data, error: err } = await getAdminClient()
+      .from('equipment_tenants')
+      .update(patch)
+      .eq('id', id)
+      .select(TENANT_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('meter-tenant-update:', err.message)
+      return json({ error: 'テナントの更新に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: 'テナントが見つかりません' }, 404)
+    return json({ tenant: data })
+  } catch (err) {
+    console.error('meter-tenant-update 失敗:', err)
+    return json({ error: 'テナントの更新に失敗しました' }, 500)
+  }
+}
+
+// POST /api/meter/meters（追加）・PATCH /api/meter/meters（修正。id 必須）
+export async function handleMeterSave(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    if (!p || typeof p !== 'object') return json({ error: '内容が読み取れませんでした' }, 400)
+    const row = meterFields(p)
+    const supabase = getAdminClient()
+    if (req.method === 'POST') {
+      const meterNo = text(p.meter_no, 50)
+      if (!meterNo) return json({ error: 'メータ番号を入力してください' }, 400)
+      const { data, error: err } = await supabase
+        .from('meters')
+        .insert({ ...row, meter_no: meterNo })
+        .select(METER_COLUMNS)
+        .single()
+      if (err) {
+        const dup = err.code === '23505'
+        if (!dup) console.error('meter-create:', err.message)
+        return json({ error: dup ? 'そのメータ番号はすでにあります' : 'メータの追加に失敗しました' }, dup ? 409 : 500)
+      }
+      return json({ meter: data })
+    }
+    const id = typeof p.id === 'string' && UUID_RE.test(p.id) ? p.id : null
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    if ('meter_no' in p) {
+      const meterNo = text(p.meter_no, 50)
+      if (!meterNo) return json({ error: 'メータ番号を入力してください' }, 400)
+      row.meter_no = meterNo
+    }
+    const { data, error: err } = await supabase
+      .from('meters')
+      .update(row)
+      .eq('id', id)
+      .select(METER_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      const dup = err.code === '23505'
+      if (!dup) console.error('meter-update:', err.message)
+      return json({ error: dup ? 'そのメータ番号はすでにあります' : 'メータの更新に失敗しました' }, dup ? 409 : 500)
+    }
+    if (!data) return json({ error: 'メータが見つかりません' }, 404)
+    return json({ meter: data })
+  } catch (err) {
+    console.error('meter-save 失敗:', err)
+    return json({ error: 'メータの保存に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/meter/ac-units — 室内機の割当てメータを変える { unit_no, meter_id }
+export async function handleMeterAcUnitUpdate(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    const unitNo = int(p?.unit_no)
+    if (unitNo == null) return json({ error: 'unit_no は必須です' }, 400)
+    const meterId = typeof p?.meter_id === 'string' && UUID_RE.test(p.meter_id) ? p.meter_id : null
+    const { data, error: err } = await getAdminClient()
+      .from('meter_ac_units')
+      .update({ meter_id: meterId })
+      .eq('unit_no', unitNo)
+      .select('unit_no, address, meter_id')
+      .maybeSingle()
+    if (err) {
+      console.error('meter-ac-unit-update:', err.message)
+      return json({ error: '空調機の割当ての保存に失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '空調機が見つかりません' }, 404)
+    return json({ unit: data })
+  } catch (err) {
+    console.error('meter-ac-unit-update 失敗:', err)
+    return json({ error: '空調機の割当ての保存に失敗しました' }, 500)
+  }
+}
+
+// PUT /api/meter/constants — 外調データ係数・総面積・按分対象面積
+export async function handleMeterConstantsUpdate(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    const rows = []
+    for (const [name, { key }] of Object.entries(CONSTANTS)) {
+      if (!(name in (p || {}))) continue
+      const n = num(p[name])
+      if (n == null || n < 0) return json({ error: '定数は0以上の数で入力してください' }, 400)
+      rows.push({ key, value: String(n) })
+    }
+    if (rows.length === 0) return json({ error: '更新する項目がありません' }, 400)
+    const supabase = getAdminClient()
+    const { error: err } = await supabase.from('settings').upsert(rows, { onConflict: 'key' })
+    if (err) {
+      console.error('meter-constants:', err.message)
+      return json({ error: '定数の保存に失敗しました' }, 500)
+    }
+    return json({ constants: await loadConstants(supabase) })
+  } catch (err) {
+    console.error('meter-constants 失敗:', err)
+    return json({ error: '定数の保存に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// FileMaker の CSV の取込（POST /api/meter/import { kind, records }）
+// 種類ごとに送る。順番は tenants → meters → ac_units → readings → ac_usage
+// （後の種類は前の種類で入ったテナント・メータを引くため）。何度流し直しても同じ結果になる。
+// ============================================================
+
+async function importTenants(supabase, records) {
+  const { data: existing, error } = await supabase.from('equipment_tenants').select('id, billing_code, name')
+  if (error) throw new Error(error.message)
+  const byCode = new Map(existing.filter((t) => t.billing_code).map((t) => [t.billing_code, t]))
+  const squash = (s) => (s || '').replace(/\s+/g, '')
+  const byName = new Map(existing.map((t) => [squash(t.name), t]))
+
+  const withCode = []
+  const updates = []
+  const inserts = []
+  for (const r of records) {
+    const row = {
+      name: text(r.name, 200),
+      short_name: text(r.short_name, 100),
+      floor: text(r.floor, 10),
+      note: text(r.note, 500),
+      moved_out: r.moved_out === true,
+      moved_in_on: dateOrNull(r.moved_in_on),
+      first_month_billable: r.first_month_billable === true,
+      profile: cleanProfile(r.profile),
+    }
+    if (!row.name) continue
+    const code = text(r.billing_code, 20)
+    if (code) {
+      withCode.push({ ...row, billing_code: code })
+      continue
+    }
+    // 請求先コードの無いテナント（退去済みの2件）は名称で突き合わせる
+    const hit = byName.get(squash(row.name))
+    if (hit && !hit.billing_code) updates.push({ id: hit.id, row })
+    else inserts.push({ ...row, source: 'filemaker' })
+  }
+  const inserted = withCode.filter((r) => !byCode.has(r.billing_code)).length + inserts.length
+  if (withCode.length) {
+    const { error: err } = await supabase.from('equipment_tenants').upsert(withCode, { onConflict: 'billing_code' })
+    if (err) throw new Error(err.message)
+  }
+  if (inserts.length) {
+    const { error: err } = await supabase.from('equipment_tenants').insert(inserts)
+    if (err) throw new Error(err.message)
+  }
+  for (const u of updates.slice(0, 20)) {
+    const { error: err } = await supabase.from('equipment_tenants').update(u.row).eq('id', u.id)
+    if (err) throw new Error(err.message)
+  }
+  return { saved: withCode.length + inserts.length + Math.min(updates.length, 20), inserted }
+}
+
+async function tenantIdMap(supabase) {
+  const { data, error } = await supabase.from('equipment_tenants').select('id, billing_code').not('billing_code', 'is', null)
+  if (error) throw new Error(error.message)
+  return new Map(data.map((t) => [t.billing_code, t.id]))
+}
+
+async function meterIdMap(supabase) {
+  const { data, error } = await supabase.from('meters').select('id, meter_no')
+  if (error) throw new Error(error.message)
+  return new Map(data.map((m) => [m.meter_no, m.id]))
+}
+
+async function importMeters(supabase, records) {
+  const tenantIdByCode = await tenantIdMap(supabase)
+  const rows = []
+  const unknownCodes = new Set()
+  for (const r of records) {
+    const meterNo = text(r.meter_no, 50)
+    if (!meterNo) continue
+    if (r.billing_code && !tenantIdByCode.has(String(r.billing_code))) unknownCodes.add(String(r.billing_code))
+    const row = { ...meterFields(r, tenantIdByCode), meter_no: meterNo, legacy_id: text(r.legacy_id, 64) }
+    const created = isoOrNull(r.created_at)
+    if (created) row.created_at = created
+    rows.push(row)
+  }
+  if (rows.length) {
+    const { error } = await supabase.from('meters').upsert(rows, { onConflict: 'meter_no' })
+    if (error) throw new Error(error.message)
+  }
+  return { saved: rows.length, warnings: [...unknownCodes].map((c) => `請求先コード ${c} のテナントがありません`) }
+}
+
+async function importAcUnits(supabase, records) {
+  const meterIdByNo = await meterIdMap(supabase)
+  const rows = records
+    .map((r) => ({
+      unit_no: int(r.unit_no),
+      address: text(r.address, 50),
+      meter_id: r.meter_no ? meterIdByNo.get(String(r.meter_no)) || null : null,
+    }))
+    .filter((r) => r.unit_no != null && r.address)
+  if (rows.length) {
+    const { error } = await supabase.from('meter_ac_units').upsert(rows, { onConflict: 'unit_no' })
+    if (error) throw new Error(error.message)
+  }
+  return { saved: rows.length }
+}
+
+async function importReadings(supabase, records) {
+  const meterIdByNo = await meterIdMap(supabase)
+  const rows = []
+  let skippedMeter = 0
+  for (const r of records) {
+    const meterId = r.meter_no ? meterIdByNo.get(String(r.meter_no)) : null
+    const month = typeof r.month === 'string' && MONTH_PATTERN.test(r.month) ? r.month : null
+    const readOn = dateOrNull(r.read_on)
+    if (!meterId || !month || !readOn) {
+      skippedMeter++
+      continue
+    }
+    const row = {
+      meter_id: meterId,
+      month,
+      read_on: readOn,
+      read_time: timeOrNull(r.read_time),
+      value: num(r.value),
+      value2: num(r.value2),
+      prev_override: num(r.prev_override),
+      diff_override: num(r.diff_override),
+      legacy_prev: num(r.legacy_prev),
+      legacy_prev2: num(r.legacy_prev2),
+      legacy_diff: num(r.legacy_diff),
+      legacy_diff2: num(r.legacy_diff2),
+      billing_code: text(r.billing_code, 20),
+      note: text(r.note, 2000),
+      recorded_by: text(r.recorded_by, 100),
+      legacy_id: text(r.legacy_id, 64),
+    }
+    const created = isoOrNull(r.created_at)
+    if (created) row.created_at = created
+    rows.push(row)
+  }
+
+  // アプリで入力した検針値（legacy_id が空）は FileMaker の値で上書きしない（並行運用の月）
+  const months = [...new Set(rows.map((r) => r.month))]
+  let keptApp = 0
+  let toSave = rows
+  if (months.length) {
+    const { data: appRows, error } = await supabase
+      .from('meter_readings')
+      .select('meter_id, month')
+      .is('legacy_id', null)
+      .in('month', months)
+    if (error) throw new Error(error.message)
+    const appKeys = new Set((appRows || []).map((r) => `${r.meter_id}|${r.month}`))
+    toSave = rows.filter((r) => !appKeys.has(`${r.meter_id}|${r.month}`))
+    keptApp = rows.length - toSave.length
+  }
+  if (toSave.length) {
+    const { error } = await supabase.from('meter_readings').upsert(toSave, { onConflict: 'meter_id,month' })
+    if (error) throw new Error(error.message)
+  }
+  const warnings = []
+  if (skippedMeter) warnings.push(`メータが見つからない検針値 ${skippedMeter}件を飛ばしました`)
+  if (keptApp) warnings.push(`アプリで入力済みの検針値 ${keptApp}件は上書きしませんでした`)
+  return { saved: toSave.length, warnings }
+}
+
+async function importAcUsage(supabase, records) {
+  const rows = records
+    .map((r) => ({
+      month: typeof r.month === 'string' && MONTH_PATTERN.test(r.month) ? r.month : null,
+      unit_no: int(r.unit_no),
+      address: text(r.address, 50),
+      hp_code: text(r.hp_code, 20),
+      day_wh: int(r.day_wh),
+      night_wh: int(r.night_wh),
+      day_stop_wh: int(r.day_stop_wh),
+      night_stop_wh: int(r.night_stop_wh),
+      gas: int(r.gas),
+      meter_no: text(r.meter_no, 50),
+    }))
+    .filter((r) => r.month && r.unit_no != null)
+  if (rows.length) {
+    const { error } = await supabase.from('meter_ac_usage').upsert(rows, { onConflict: 'month,unit_no' })
+    if (error) throw new Error(error.message)
+  }
+  return { saved: rows.length }
+}
+
+const IMPORTERS = {
+  tenants: importTenants,
+  meters: importMeters,
+  ac_units: importAcUnits,
+  readings: importReadings,
+  ac_usage: importAcUsage,
+}
+
+export async function handleMeterImport(req) {
+  const { auth, error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    const importer = IMPORTERS[p?.kind]
+    if (!importer) return json({ error: '取込の種類が不正です' }, 400)
+    if (!Array.isArray(p.records) || p.records.length === 0) return json({ error: '取り込む行がありません' }, 400)
+    if (p.records.length > MAX_IMPORT_RECORDS) return json({ error: `1回に送れるのは${MAX_IMPORT_RECORDS}件までです` }, 400)
+    const supabase = getAdminClient()
+    const result = await importer(supabase, p.records)
+    if (p.last === true) {
+      await supabase
+        .from('activity_logs')
+        .insert({
+          log_type: 'status_change',
+          actor: auth.display_name || auth.username || '検針',
+          message: `検針: FileMaker の${p.label || p.kind}を取り込みました（${p.total ?? result.saved}件）`,
+        })
+        .then(
+          () => {},
+          (err) => console.error('meter-import(log):', err)
+        )
+    }
+    return json({ ok: true, ...result })
+  } catch (err) {
+    console.error('meter-import 失敗:', err)
+    return json({ error: `取込に失敗しました（${err.message}）` }, 500)
+  }
+}
+
+// ============================================================
+// GET /api/meter/output?month=YYYY-MM — 出力（検針データ_yyyy年mm月分）を組み立てるための材料。
+// 組み立て自体は画面側の src/lib/meterOutput.js（照合・xlsx 出力と同じ関数）で行う
+// ============================================================
+export async function handleMeterOutputData(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const month = new URL(req.url).searchParams.get('month') || ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM で指定してください' }, 400)
+    const [y, m] = month.split('-').map(Number)
+    const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
+    const supabase = getAdminClient()
+    const [tenants, meters, readings, usage, constants] = await Promise.all([
+      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out, moved_in_on'),
+      supabase.from('meters').select(METER_COLUMNS),
+      supabase.from('meter_readings').select(READING_COLUMNS).in('month', [month, prevMonth]),
+      supabase.from('meter_ac_usage').select('unit_no, day_wh, meter_no').eq('month', month),
+      loadConstants(supabase),
+    ])
+    const failed = [tenants, meters, readings, usage].find((r) => r.error)
+    if (failed) {
+      console.error('meter-output:', failed.error.message)
+      return json({ error: '出力の材料の取得に失敗しました' }, 500)
+    }
+    // numeric 列は文字列で返ることがあるので数値にそろえる
+    const toNum = (v) => (v == null ? null : Number(v))
+    const numericReading = (r) => ({
+      ...r,
+      value: toNum(r.value),
+      value2: toNum(r.value2),
+      prev_override: toNum(r.prev_override),
+      diff_override: toNum(r.diff_override),
+      legacy_prev: toNum(r.legacy_prev),
+      legacy_prev2: toNum(r.legacy_prev2),
+      legacy_diff: toNum(r.legacy_diff),
+      legacy_diff2: toNum(r.legacy_diff2),
+    })
+    const numericMeter = (mt) => ({
+      ...mt,
+      area_m2: toNum(mt.area_m2),
+      area_tsubo: toNum(mt.area_tsubo),
+      oa_ratio: toNum(mt.oa_ratio),
+    })
+    return json({
+      month,
+      tenants: tenants.data || [],
+      meters: (meters.data || []).map(numericMeter),
+      readings: (readings.data || []).map(numericReading),
+      acUsage: (usage.data || []).map((u) => ({ ...u, day_wh: toNum(u.day_wh) })),
+      constants,
+    })
+  } catch (err) {
+    console.error('meter-output 失敗:', err)
+    return json({ error: '出力の材料の取得に失敗しました' }, 500)
+  }
+}
