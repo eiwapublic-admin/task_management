@@ -24,7 +24,7 @@ import { fetchTasks } from '../lib/tasks'
 import { fetchEquipmentItems } from '../lib/equipment'
 import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
 import { fetchWasteRecords } from '../lib/waste'
-import { currentFiscalYear, fetchPaperRecords, paperRowTotal } from '../lib/paper'
+import { fetchPaperRecords, fiscalYearOf, paperRowTotal } from '../lib/paper'
 import { fetchMeterSummary, meterMonthLabel } from '../lib/meter'
 import { electricChange } from '../lib/meterMonth'
 import {
@@ -59,6 +59,46 @@ import './Portal.css'
 // 他のカードは数字を出せるようにする（失敗したカードだけ「—」になる）。
 
 // JST の「今日」を「8月12日（火）」形式で表す
+// 'YYYY-MM' を delta か月ずらす
+function shiftMonth(month, delta) {
+  const [y, m] = month.split('-').map(Number)
+  const total = y * 12 + (m - 1) + delta
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
+}
+
+function lastDayOfMonth(month) {
+  const [y, m] = month.split('-').map(Number)
+  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`
+}
+
+// endMonth（'YYYY-MM'）までの年度累計（4月始まり）の期間と、前年の同じ期間
+function fiscalYtd(endMonth) {
+  const fy = fiscalYearOf(endMonth)
+  const prevEnd = shiftMonth(endMonth, -12)
+  return {
+    from: `${fy}-04-01`,
+    to: lastDayOfMonth(endMonth),
+    prevFrom: `${fy - 1}-04-01`,
+    prevTo: lastDayOfMonth(prevEnd),
+    label: `${fy}年度${endMonth.endsWith('-04') ? '4月' : `4〜${Number(endMonth.slice(5, 7))}月`}`,
+  }
+}
+
+function sumBetween(rows, dateKey, valueOf, from, to) {
+  return rows.reduce((sum, r) => (r[dateKey] >= from && r[dateKey] <= to ? sum + valueOf(r) : sum), 0)
+}
+
+// 増減比率（%）。'+4.8' / '-2.4' の形。前年が0なら出さない
+function changePercent(now, prev) {
+  if (now == null || !prev) return undefined
+  const p = Math.round(((now - prev) / prev) * 1000) / 10
+  return `${p > 0 ? '+' : ''}${p.toFixed(1)}`
+}
+
+function formatKgTotal(kg) {
+  return kg == null ? '—' : `${Math.round(kg).toLocaleString('ja-JP')}kg`
+}
+
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 function todayLabel() {
@@ -104,6 +144,7 @@ export default function Portal() {
     let alive = true
     const month = currentMonthJST()
     const year = currentYearJST()
+    const ytdFiscalYear = fiscalYearOf(shiftMonth(month, -1))
 
     async function load() {
       const results = await Promise.allSettled([
@@ -117,10 +158,10 @@ export default function Portal() {
         // ビルメン（2026-09-02）。当月を起点に3ヶ月分だけ引く（カードに出すのは当月の件数と
         // 未確定件数のみで、全期間を読む必要がないため）
         fetchBilmenSchedules({ month, months: 3 }),
-        // 廃棄物実測値（2026-09-03）。カードに出すのは当月分の合計・未確認件数のみ
-        fetchWasteRecords({ month }),
-        // 古紙回収（2026-09-08）。年度単位の運用のため、カードにも当年度の合計を出す
-        fetchPaperRecords(currentFiscalYear()),
+        // 廃棄物・古紙回収（2026-10-20 依頼で変更）: 前月までの年度累計（4月始まり）を前年の同じ期間と比べるため、
+        // 前月が属する年度とその前年度を引く（廃棄物は当月の未確認件数もこの中から数える）
+        Promise.all([fetchWasteRecords({ fiscalYear: ytdFiscalYear }), fetchWasteRecords({ fiscalYear: ytdFiscalYear - 1 })]),
+        Promise.all([fetchPaperRecords(ytdFiscalYear), fetchPaperRecords(ytdFiscalYear - 1)]),
         // 検針（2026-10-20）。社員だけ（owner には検針を見せない。Q9）
         isOwner ? Promise.resolve(null) : fetchMeterSummary(),
       ])
@@ -192,16 +233,17 @@ export default function Portal() {
     const monthBilmen = bilmen?.filter((s) => s.target_month === month)
     const bilmenUnsettled = monthBilmen?.filter(isUnsettled).length
 
-    // --- 廃棄物：当月の実測合計（kg）と、スキャン取込のまま未確認の件数（2026-09-03） ---
+    // --- 廃棄物・古紙回収：前月までの年度累計（4月始まり）と、前年の同じ期間の累計の増減比率（2026-10-20 依頼）。
+    // 例: 10月に見ると、今年度4〜9月の合計を前年度4〜9月の合計と比べる ---
+    const ytdEnd = shiftMonth(month, -1)
+    const ytd = fiscalYtd(ytdEnd)
     const waste = stats?.waste
-    const wasteTotal = waste?.reduce((sum, r) => sum + Number(r.weight_kg), 0)
-    const wasteUnconfirmed = waste?.filter((r) => !r.is_confirmed).length
-
-    // --- 古紙回収：当年度の合計（kg）と、実績のある回数（2026-09-08）。
-    // 年度単位（4月〜翌3月）の運用のため、他のカードと違い当月ではなく年度で集計する ---
+    const wasteNow = waste ? sumBetween(waste[0], 'record_date', (r) => Number(r.weight_kg), ytd.from, ytd.to) : null
+    const wastePrev = waste ? sumBetween(waste[1], 'record_date', (r) => Number(r.weight_kg), ytd.prevFrom, ytd.prevTo) : null
+    const wasteUnconfirmed = waste?.[0].filter((r) => r.record_date.startsWith(month) && !r.is_confirmed).length
     const paper = stats?.paper
-    const paperTotal = paper?.reduce((sum, r) => sum + paperRowTotal(r), 0)
-    const paperCount = paper?.filter((r) => paperRowTotal(r) > 0).length
+    const paperNow = paper ? sumBetween(paper[0], 'collect_date', paperRowTotal, ytd.from, ytd.to) : null
+    const paperPrev = paper ? sumBetween(paper[1], 'collect_date', paperRowTotal, ytd.prevFrom, ytd.prevTo) : null
 
     // --- 検針：検針の済んだ最新の月度の電気の使用量が、その前の月度より何%増減したか（2026-10-20） ---
     const meter = stats?.meter
@@ -341,15 +383,15 @@ export default function Portal() {
         label: '廃棄物',
         icon: <IconScale size={24} />,
         path: '/waste',
-        value: wasteTotal != null ? Math.round(wasteTotal * 10) / 10 : undefined,
-        unit: 'kg',
-        caption: `${monthLabel}の合計`,
+        value: changePercent(wasteNow, wastePrev),
+        unit: '%',
+        caption: `${ytd.label}の累計（前年同期比）`,
         sub:
           waste == null
             ? '取得できませんでした'
-            : wasteUnconfirmed > 0
-              ? `未確認 ${wasteUnconfirmed} 件（スキャン取込の確認待ち）`
-              : '確認済み',
+            : `${formatKgTotal(wasteNow)}（前年 ${formatKgTotal(wastePrev)}）${
+                wasteUnconfirmed > 0 ? `・未確認 ${wasteUnconfirmed} 件` : ''
+              }`,
         alert: wasteUnconfirmed > 0,
       },
       {
@@ -357,10 +399,10 @@ export default function Portal() {
         label: '古紙回収',
         icon: <IconRecycle size={24} />,
         path: '/paper',
-        value: paperTotal != null ? Math.round(paperTotal) : undefined,
-        unit: 'kg',
-        caption: `${currentFiscalYear()}年度の合計`,
-        sub: paper == null ? '取得できませんでした' : `記録${paperCount}回`,
+        value: changePercent(paperNow, paperPrev),
+        unit: '%',
+        caption: `${ytd.label}の累計（前年同期比）`,
+        sub: paper == null ? '取得できませんでした' : `${formatKgTotal(paperNow)}（前年 ${formatKgTotal(paperPrev)}）`,
       },
     ]
 

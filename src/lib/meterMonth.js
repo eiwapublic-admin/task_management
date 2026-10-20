@@ -110,10 +110,11 @@ export function formatRatio(r) {
   return `${Math.round(r * 100)}%`
 }
 
-// 月度の電気の使用量の合計（外調機は2つの値の合計）。未入力の電気メータがあれば complete: false
+// 月度の電気の使用量の合計。外調機（共用の空調）は含めない（2026-10-20 依頼）。
+// 未入力の電気メータがあれば complete: false
 function electricTotal(summary, month) {
   const rows = buildMonthRows({ month, tenants: [], meters: summary.meters, readings: summary.readings, photos: [] }).filter(
-    (r) => r.meter.kind === '電気'
+    (r) => r.meter.kind === '電気' && !r.meter.is_oa_meter
   )
   return {
     month,
