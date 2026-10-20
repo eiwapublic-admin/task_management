@@ -1,0 +1,73 @@
+/* 検針写真一覧（PDF用シート。2026-10-20）。A4縦に2列×4段＝8枚。
+   画面には出さず、PDF化のあいだだけ画面外に描画して html2canvas で撮る。
+   html2canvas は新しい色関数を解釈できないため、色は hex、寸法は mm で組む（ChlorineSheet.css と同じ） */
+
+.mps-sheet { display: none; }
+
+body.pdf-capture-mode .mps-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  padding: 8mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, system-ui, sans-serif;
+}
+
+.mps-sheet * { box-sizing: border-box; }
+
+.mps-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3mm;
+  font-size: 10pt;
+}
+
+.mps-head h1 { margin: 0; font-size: 14pt; font-weight: 700; }
+
+.mps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(4, 66mm);
+  gap: 2mm;
+}
+
+.mps-cell {
+  display: flex;
+  gap: 2mm;
+  padding: 1.5mm;
+  border: 0.3mm solid #999;
+}
+
+.mps-photo {
+  flex: 0 0 47mm;
+  height: 62mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eee;
+  color: #666;
+  font-size: 9pt;
+}
+
+.mps-photo img { width: 100%; height: 100%; object-fit: contain; }
+
+.mps-info { flex: 1; min-width: 0; font-size: 9pt; line-height: 1.4; }
+.mps-info p { margin: 0 0 1mm; word-break: break-all; }
+.mps-no { font-size: 12pt; font-weight: 700; }
+.mps-value {
+  display: inline-block;
+  margin-top: 2mm !important;
+  padding: 0.5mm 1.5mm;
+  background: #fde047;
+  font-size: 13pt;
+  font-weight: 700;
+}
+.mps-taken { margin-top: 2mm !important; color: #444; }

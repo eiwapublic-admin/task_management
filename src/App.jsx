@@ -22,6 +22,8 @@ import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import Manuals from './pages/Manuals'
 import MeterMasters from './pages/MeterMasters'
+import MeterMonth from './pages/MeterMonth'
+import MeterPhotos from './pages/MeterPhotos'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
@@ -289,6 +291,26 @@ function App() {
           element={
             <RequireStaff>
               <MeterMasters />
+            </RequireStaff>
+          }
+        />
+        {/* 検針の月度の作業（Phase 2）。一覧と値の入力は同じ部品（メータを移ってもデータを読み直さない） */}
+        {['/meter', '/meter/:month', '/meter/:month/:meterNo'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <RequireStaff>
+                <MeterMonth />
+              </RequireStaff>
+            }
+          />
+        ))}
+        <Route
+          path="/meter/:month/photos"
+          element={
+            <RequireStaff>
+              <MeterPhotos />
             </RequireStaff>
           }
         />

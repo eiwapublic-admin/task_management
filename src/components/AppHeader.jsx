@@ -39,6 +39,7 @@ const FEATURE_TITLES = [
   { path: '/contacts', title: '連絡帳' },
   { path: '/manuals', title: '業務マニュアル' },
   { path: '/meter/masters', title: '検針マスタ', exact: true },
+  { path: '/meter', title: '検針' },
   { path: '/reminders', title: 'リマインダー' },
   { path: '/bilmen/masters', title: '作業マスタ', exact: true },
   { path: '/bilmen', title: 'ビルメンテナンス管理' },
@@ -393,6 +394,8 @@ export default function AppHeader({
               {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
               {/* 業務マニュアル（2026-10-13）: 日常業務の手引書。いつでも参照できるよう連絡帳と並べて共通領域に置く */}
               {!isOwner && <button onClick={() => goTo('/manuals')}>業務マニュアル</button>}
+              {/* 検針（2026-10-20〜）: 月に一度の作業なので業務メニューの7項目には入れず、ここに置く */}
+              {!isOwner && <button onClick={() => goTo('/meter')}>検針</button>}
               {/* リマインダー（2026-09-07）: 従量課金事項・処理ログと同じくシステム運用上の
                   管理機能のため、全画面から1タップで開ける共通領域に置く */}
               {!isOwner && <button onClick={() => goTo('/reminders')}>リマインダー</button>}

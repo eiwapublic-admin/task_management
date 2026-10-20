@@ -944,6 +944,7 @@ const VALID_PDF_KINDS = new Set([
   'bilmen-schedule',
   'bilmen-notice',
   'waste-sheet',
+  'meter-photos', // 検針の写真一覧（2026-10-20）
 ])
 
 function pdfPreviewKey(userId, kind) {

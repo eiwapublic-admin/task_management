@@ -128,3 +128,133 @@
 
 .meter-constants .ui-field,
 .meter-constants .ui-note { max-width: 420px; }
+
+/* ---------- 月度の作業（Phase 2） ---------- */
+
+.meter-progress { font-size: var(--fs-sm); color: var(--text-base); }
+.meter-progress strong { font-size: var(--fs-md); color: var(--text-strong); }
+
+.meter-sub { font-size: var(--fs-xs); color: var(--text-muted); }
+
+.meter-month-table td { vertical-align: middle; }
+.meter-row.is-unusual td { background: var(--color-warn-surface); }
+.meter-unusual { color: var(--color-warn-ink); font-weight: 700; }
+.meter-month-table .ui-badge + .ui-badge { margin-left: var(--space-1); }
+
+.meter-thumb-cell { width: 52px; padding-top: var(--space-1); padding-bottom: var(--space-1); }
+
+/* 写真（MeterPhoto）。保存している写真は 360×480 の縦長 */
+.meter-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  aspect-ratio: 3 / 4;
+  width: 100%;
+}
+button.meter-photo { cursor: zoom-in; }
+.meter-photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.meter-photo.is-thumb { width: 42px; font-size: var(--fs-2xs); text-align: center; line-height: 1.2; }
+.meter-photo.is-zoom {
+  width: auto;
+  height: min(92vh, 960px);
+  max-width: 96vw;
+  border: none;
+  background: transparent;
+}
+
+.meter-zoom { cursor: zoom-out; display: flex; align-items: center; justify-content: center; }
+
+/* 値の入力 */
+.meter-entry-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 400px) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.meter-entry-photo { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.meter-entry-form { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.meter-entry-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.meter-value-input {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.meter-entry-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+.meter-entry-figures dt { font-size: var(--fs-xs); color: var(--text-muted); }
+.meter-entry-figures dd { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+
+.meter-position { font-size: var(--fs-sm); color: var(--text-muted); }
+
+@media (max-width: 768px) {
+  .meter-entry-body { grid-template-columns: 1fr; }
+  .meter-entry-photo { max-width: 360px; }
+  .meter-entry-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 写真の取込 */
+.meter-file-btn.is-disabled { opacity: 0.5; pointer-events: none; }
+
+.meter-queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: var(--fs-sm);
+}
+.meter-queue-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+.meter-queue-name { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter-queue-list li.is-unassigned span:last-child { color: var(--color-warn-ink); font-weight: 600; }
+.meter-queue-list li.is-error span:last-child { color: var(--color-danger); font-weight: 600; }
+
+.meter-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.meter-photo-card { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.meter-photo-card.is-unused { opacity: 0.55; }
+.meter-photo-card figcaption { display: flex; flex-direction: column; gap: var(--space-1); position: relative; }
+.meter-photo-card .icon-btn-delete { align-self: flex-end; }
+
+.meter-missing-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.meter-stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.meter-stack > .ui-note { margin: 0; }
