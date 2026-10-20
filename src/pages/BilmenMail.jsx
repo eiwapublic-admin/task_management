@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
@@ -19,12 +20,15 @@ const EMPTY_RECIPIENT = { name: '', email: '', note: '', disabled: false }
 // 外部に出る操作の一部のため owner・備品出庫限定ロールには画面ごと見せない（App.jsx で
 // RequireStaff を掛けているが、API側（worker/lib/bilmen.js）でも同じ判定を持つ）。
 // 現行の雛形は1本のみのため複数テンプレート管理はせず、件名・本文だけの単純な設定にした。
+// 宛先（2026-10-20〜）: テナントの宛先はテナントマスタの「案内メールの宛先」に移した（未退去のテナントだけ。
+// ここでは見るだけ）。この画面で直すのは、テナントではない「その他の宛先」だけ
 export default function BilmenMail() {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [replyTo, setReplyTo] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
-  const [recipients, setRecipients] = useState([])
+  const [recipients, setRecipients] = useState([]) // その他の宛先（ここで直す）
+  const [tenantRecipients, setTenantRecipients] = useState([]) // テナントマスタから（見るだけ）
   const [drafts, setDrafts] = useState({}) // id -> 編集中の値（保存前）
   const [newRecipient, setNewRecipient] = useState(EMPTY_RECIPIENT)
   const [adding, setAdding] = useState(false)
@@ -40,7 +44,8 @@ export default function BilmenMail() {
       setSubject(settings.subject)
       setBody(settings.body)
       setReplyTo(settings.reply_to || '')
-      setRecipients(recipientRows)
+      setRecipients(recipientRows.others)
+      setTenantRecipients(recipientRows.tenants)
       setDrafts({})
     } catch (err) {
       setError(err.message)
@@ -175,7 +180,44 @@ export default function BilmenMail() {
             </section>
 
             <section className="bilmen-fieldset">
-              <h2 className="ui-page-title">宛先</h2>
+              <h2 className="ui-page-title">テナントの宛先（{tenantRecipients.length}件）</h2>
+              <p className="ui-note">
+                <Link to="/equipment/tenants">テナントマスタ</Link>で「案内メールの宛先」を登録した、未退去のテナントです。
+                追加・修正はテナントマスタで行ってください（退去日を過ぎたテナントには送りません）。
+              </p>
+              <div className="ui-table-wrap">
+                <table className="ui-table bilmen-mail-recipients-table">
+                  <thead>
+                    <tr>
+                      <th>階</th>
+                      <th>テナント</th>
+                      <th>メールアドレス</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tenantRecipients.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="ui-note">
+                          案内メールの宛先を登録したテナントがありません。
+                        </td>
+                      </tr>
+                    ) : (
+                      tenantRecipients.map((r) => (
+                        <tr key={`${r.tenant_id}-${r.email}`}>
+                          <td>{r.floor ? (r.floor === 'B' ? 'B1F' : `${r.floor}F`) : ''}</td>
+                          <td>{r.tenant_name}</td>
+                          <td>{r.email}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="bilmen-fieldset">
+              <h2 className="ui-page-title">その他の宛先</h2>
+              <p className="ui-note">テナントではない宛先（小泉産業様のご担当者・栄和ML など）です。</p>
               <div className="ui-table-wrap">
                 <table className="ui-table bilmen-mail-recipients-table">
                   <thead>

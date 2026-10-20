@@ -13,7 +13,9 @@ function floorHead(floor) {
 export default function TenantTable({ tenants, includeMovedOut, meterCount = null, onEdit = null }) {
   const today = jstToday()
   const groups = useMemo(() => groupTenantsByFloor(tenants, { includeMovedOut, today }), [tenants, includeMovedOut, today])
-  const columns = 7 + (meterCount ? 1 : 0)
+  // 案内メールの宛先（社員が読むときだけ届く項目）
+  const showMail = tenants.some((t) => Array.isArray(t.notice_emails))
+  const columns = 7 + (meterCount ? 1 : 0) + (showMail ? 1 : 0)
 
   if (groups.length === 0) return <p className="ui-empty">テナントがありません。</p>
 
@@ -28,6 +30,7 @@ export default function TenantTable({ tenants, includeMovedOut, meterCount = nul
             <th>入居年月日</th>
             <th>退去日</th>
             {meterCount && <th className="is-numeric">メータ</th>}
+            {showMail && <th>案内メール</th>}
             <th>状態</th>
             <th>備考</th>
           </tr>
@@ -50,6 +53,7 @@ export default function TenantTable({ tenants, includeMovedOut, meterCount = nul
                   <td>{formatDate(t.moved_in_on)}</td>
                   <td>{formatDate(t.moved_out_on)}</td>
                   {meterCount && <td className="is-numeric">{meterCount.get(t.id) || ''}</td>}
+                  {showMail && <td className="tenant-mail-cell">{(t.notice_emails || []).join(', ')}</td>}
                   <td>
                     {movedOut && <span className="ui-badge">退去済み</span>}
                     {movingOut && <span className="ui-badge is-warn">退去予定</span>}

@@ -35,3 +35,4 @@
   }
   .tenant-table th { top: 0; }
 }
+.tenant-mail-cell { font-size: var(--fs-sm); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
