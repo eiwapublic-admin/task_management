@@ -908,3 +908,32 @@ export async function cleanupMeterPhotos() {
   if (delErr) throw new Error(delErr.message)
   return data.length
 }
+
+// GET /api/meter/summary — ダッシュボードの「検針」カード用（2026-10-20〜）。
+// 検針値のある最新の月度と、その前3か月分の検針値・メータを返す（電気の使用量の前月比は画面で計算する）
+export async function handleMeterSummary(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data: latest, error: e1 } = await supabase
+      .from('meter_readings')
+      .select('month')
+      .order('month', { ascending: false })
+      .limit(1)
+    if (e1) throw new Error(e1.message)
+    const latestMonth = latest?.[0]?.month || null
+    if (!latestMonth) return json({ latestMonth: null, meters: [], readings: [] })
+    const months = [0, -1, -2, -3].map((d) => shiftMonth(latestMonth, d))
+    const [meters, readings] = await Promise.all([
+      supabase.from('meters').select('id, meter_no, tenant_id, floor, seq, kind, digits, measured, removed, is_oa_meter'),
+      supabase.from('meter_readings').select(READING_COLUMNS).in('month', months),
+    ])
+    const failed = [meters, readings].find((r) => r.error)
+    if (failed) throw new Error(failed.error.message)
+    return json({ latestMonth, meters: meters.data || [], readings: (readings.data || []).map(numericReading) })
+  } catch (err) {
+    console.error('meter-summary 失敗:', err)
+    return json({ error: '検針の集計に失敗しました' }, 500)
+  }
+}

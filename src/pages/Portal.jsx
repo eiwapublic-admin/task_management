@@ -25,6 +25,8 @@ import { fetchEquipmentItems } from '../lib/equipment'
 import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
 import { fetchWasteRecords } from '../lib/waste'
 import { currentFiscalYear, fetchPaperRecords, paperRowTotal } from '../lib/paper'
+import { fetchMeterSummary, meterMonthLabel } from '../lib/meter'
+import { electricChange } from '../lib/meterMonth'
 import {
   CHLORINE_STANDARD_MIN,
   currentMonthJST,
@@ -119,16 +121,18 @@ export default function Portal() {
         fetchWasteRecords({ month }),
         // 古紙回収（2026-09-08）。年度単位の運用のため、カードにも当年度の合計を出す
         fetchPaperRecords(currentFiscalYear()),
+        // 検針（2026-10-20）。社員だけ（owner には検針を見せない。Q9）
+        isOwner ? Promise.resolve(null) : fetchMeterSummary(),
       ])
       if (!alive) return
-      const [tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper] = results.map((r) =>
+      const [tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper, meter] = results.map((r) =>
         r.status === 'fulfilled' ? r.value : null,
       )
       // 全滅したときだけ画面上部にエラーを出す（一部失敗はそのカードの「—」で表現）
       if (results.every((r) => r.status === 'rejected')) {
         setError(results[0].reason?.message || 'データを取得できませんでした。')
       }
-      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper, month, year })
+      setStats({ tasks, reports, items, parking, chlorine, closedDays, bilmen, waste, paper, meter, month, year })
       setLoading(false)
     }
 
@@ -198,6 +202,10 @@ export default function Portal() {
     const paper = stats?.paper
     const paperTotal = paper?.reduce((sum, r) => sum + paperRowTotal(r), 0)
     const paperCount = paper?.filter((r) => paperRowTotal(r) > 0).length
+
+    // --- 検針：検針の済んだ最新の月度の電気の使用量が、その前の月度より何%増減したか（2026-10-20） ---
+    const meter = stats?.meter
+    const meterChange = electricChange(meter)
 
     const monthLabel = `${Number(month.slice(5, 7))}月`
 
@@ -308,6 +316,27 @@ export default function Portal() {
             },
       },
       {
+        key: 'meter',
+        label: '検針',
+        icon: <IconGauge size={24} />,
+        path: '/meter',
+        value:
+          meterChange?.percent != null ? `${meterChange.percent > 0 ? '+' : ''}${meterChange.percent.toFixed(1)}` : undefined,
+        unit: '%',
+        caption: meterChange?.current
+          ? `${Number(meterChange.current.month.slice(5, 7))}月度の電気（前月度比）`
+          : '電気（前月度比）',
+        sub:
+          meter == null
+            ? '取得できませんでした'
+            : !meter.latestMonth
+              ? 'まだ記録がありません'
+              : `最新 ${meterMonthLabel(meter.latestMonth)}${
+                  meterChange.latest.complete ? '' : `（入力中 ${meterChange.latest.entered}/${meterChange.latest.count}）`
+                }`,
+        staffOnly: true,
+      },
+      {
         key: 'waste',
         label: '廃棄物',
         icon: <IconScale size={24} />,
@@ -352,7 +381,6 @@ export default function Portal() {
         { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
         { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
         { label: '業務マニュアル', icon: <IconBook size={20} />, path: '/manuals', staffOnly: true },
-        { label: '検針', icon: <IconGauge size={20} />, path: '/meter', staffOnly: true },
       ]),
     },
     {

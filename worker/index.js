@@ -89,6 +89,7 @@ import {
   handleMeterImport,
   handleMeterOutputData,
   handleMeterMonth,
+  handleMeterSummary,
   handleMeterReadingSave,
   handleMeterPhotoUpload,
   handleMeterPhotoAssign,
@@ -1203,6 +1204,9 @@ async function route(req, env) {
     return req.method === 'GET' ? handleMeterOutputData(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   // 月度の作業（Phase 2）: 一覧・入力の材料、検針値の保存、写真の取込・割当て・削除・本体
+  if (pathname === '/api/meter/summary') {
+    return req.method === 'GET' ? handleMeterSummary(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
   if (pathname === '/api/meter/month') {
     return req.method === 'GET' ? handleMeterMonth(req) : json({ error: 'Method Not Allowed' }, 405)
   }

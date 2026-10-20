@@ -109,3 +109,35 @@ export function formatRatio(r) {
   if (r == null) return ''
   return `${Math.round(r * 100)}%`
 }
+
+// 月度の電気の使用量の合計（外調機は2つの値の合計）。未入力の電気メータがあれば complete: false
+function electricTotal(summary, month) {
+  const rows = buildMonthRows({ month, tenants: [], meters: summary.meters, readings: summary.readings, photos: [] }).filter(
+    (r) => r.meter.kind === '電気'
+  )
+  return {
+    month,
+    total: rows.reduce((sum, r) => sum + (r.total || 0), 0),
+    entered: rows.filter((r) => r.entered).length,
+    count: rows.length,
+    complete: rows.length > 0 && rows.every((r) => r.entered),
+  }
+}
+
+/**
+ * ダッシュボードの「検針」カード（2026-10-20 依頼）: 前月（検針の済んだ最新の月度）の電気の使用量の合計が、
+ * 前々月（その前の月度）より何%増減したか。最新の月度が入力途中なら、その前の月度で比べる
+ * （入力途中の合計で比べると大きく減って見えるため）。
+ * @param {{ latestMonth: string|null, meters: object[], readings: object[] }} summary /api/meter/summary の結果
+ */
+export function electricChange(summary) {
+  if (!summary?.latestMonth) return null
+  const latest = electricTotal(summary, summary.latestMonth)
+  const current = latest.complete ? latest : electricTotal(summary, shiftMonth(summary.latestMonth, -1))
+  const previous = electricTotal(summary, shiftMonth(current.month, -1))
+  const percent =
+    current.complete && previous.complete && previous.total > 0
+      ? Math.round(((current.total - previous.total) / previous.total) * 1000) / 10
+      : null
+  return { latest, current, previous, percent }
+}
