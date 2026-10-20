@@ -4,6 +4,7 @@ import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   fetchBilmenMailSettings,
   fetchBilmenMailRecipients,
+  activeBilmenRecipients,
   notifyTargets,
   expandMailVariables,
   buildBilmenNoticeMailto,
@@ -29,7 +30,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   useBodyScrollLock()
 
   const [settings, setSettings] = useState(null)
-  const [recipients, setRecipients] = useState([])
+  const [recipients, setRecipients] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // Gmail方式の進み具合: idle → pdf（連絡票PDFを作成中）→ draft（Gmailに登録中）→ done
@@ -55,7 +56,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   }, [])
 
   const targets = notifyTargets(schedules)
-  const activeRecipients = recipients.filter((r) => !r.disabled)
+  const activeRecipients = activeBilmenRecipients(recipients || undefined)
   const cannotSend = targets.length === 0 || activeRecipients.length === 0
 
   const replyTo = settings?.reply_to || ''
@@ -100,7 +101,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
         <div className="ui-modal-body is-stacked">
           {/* 宛先・返信先をここで変えられないことを先に伝える（2026-09-29の依頼で右上に置いた） */}
           <p className="bilmen-notify-settings-note">
-            ※ 宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
+            ※ テナントの宛先は<Link to="/equipment/tenants">テナントマスタ</Link>の「案内メールの宛先」、その他の宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
           </p>
 
           {error && (
@@ -121,7 +122,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
               )}
               {activeRecipients.length === 0 && (
                 <p className="bilmen-undecided">
-                  有効な宛先が登録されていません。ハンバーガーメニューの「メール設定」から登録してください。
+                  宛先がありません。テナントマスタの「案内メールの宛先」か、メール設定の「その他の宛先」に登録してください。
                 </p>
               )}
 

@@ -890,23 +890,55 @@ export async function handleBilmenMailSettingsUpdate(req) {
   }
 }
 
-// GET /api/bilmen/mail/recipients — 宛先一覧（有効→無効、表示順）
+// テナントの案内メールの宛先（2026-10-20〜）。テナントマスタ（equipment_tenants.notice_emails）に
+// アドレスがある未退去のテナントへ送る（退去日が今日以前なら、毎日の反映を待たずに外す）。
+// 1テナントに複数のアドレスを持てるので、アドレスごとに1行で返す。宛先名はテナントの略称（無ければ正式名称）
+async function loadTenantRecipients(supabase) {
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('equipment_tenants')
+    .select('id, billing_code, name, short_name, floor, moved_out_on, notice_emails')
+    .eq('moved_out', false)
+    .neq('notice_emails', '{}')
+  if (error) throw new Error(error.message)
+  return (data || [])
+    .filter((t) => !t.moved_out_on || t.moved_out_on > today)
+    .flatMap((t) =>
+      (t.notice_emails || [])
+        .filter((e) => e && e.includes('@'))
+        .map((email) => ({
+          tenant_id: t.id,
+          billing_code: t.billing_code,
+          floor: t.floor,
+          name: t.short_name || t.name,
+          tenant_name: t.name,
+          email,
+        }))
+    )
+}
+
+// GET /api/bilmen/mail/recipients — 宛先一覧。
+//   tenants … テナントマスタから（上の loadTenantRecipients。ここでは直せない）
+//   recipients … その他の宛先（小泉産業様の担当者・栄和ML など、テナントではない宛先。有効→無効、表示順）
 export async function handleBilmenMailRecipientList(req) {
   const { error } = await requireMailAccess(req)
   if (error) return error
   try {
     const supabase = getAdminClient()
-    const { data, error: err } = await supabase
-      .from('bilmen_mail_recipients')
-      .select(MAIL_RECIPIENT_COLUMNS)
-      .order('disabled', { ascending: true })
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
+    const [{ data, error: err }, tenants] = await Promise.all([
+      supabase
+        .from('bilmen_mail_recipients')
+        .select(MAIL_RECIPIENT_COLUMNS)
+        .order('disabled', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+      loadTenantRecipients(supabase),
+    ])
     if (err) {
       console.error('bilmen-mail-recipient-list:', err.message)
       return json({ error: '宛先の取得に失敗しました' }, 500)
     }
-    return json({ recipients: data || [] })
+    return json({ recipients: data || [], tenants })
   } catch (err) {
     console.error('bilmen-mail-recipient-list 失敗:', err)
     return json({ error: '宛先の取得に失敗しました' }, 500)
@@ -1043,12 +1075,14 @@ export async function handleBilmenMailDraftCreate(req) {
     if (pdf.size > DRAFT_PDF_MAX_BYTES) return json({ error: '連絡票PDFが大きすぎます（20MBまで）' }, 400)
 
     const supabase = getAdminClient()
-    const [{ data: recipients, error: recErr }, { data: shared }, { data: mailSettings }] = await Promise.all([
+    const [{ data: recipients, error: recErr }, tenantRecipients, { data: shared }, { data: mailSettings }] = await Promise.all([
       supabase
         .from('bilmen_mail_recipients')
         .select('name, email')
         .eq('disabled', false)
         .order('sort_order', { ascending: true }),
+      // テナントの宛先はテナントマスタから（2026-10-20〜）
+      loadTenantRecipients(supabase),
       supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
       // 返信先（Reply-To）はメール設定から。画面からは受け取らない（宛先と同じ理由）
       supabase.from('bilmen_mail_settings').select('reply_to').eq('id', MAIL_SETTINGS_ID).maybeSingle(),
@@ -1057,9 +1091,16 @@ export async function handleBilmenMailDraftCreate(req) {
       console.error('bilmen-mail-draft recipients:', recErr.message)
       return json({ error: '宛先の取得に失敗しました' }, 500)
     }
-    const bcc = (recipients || []).filter((r) => r.email && r.email.trim())
+    // 同じアドレスがテナントとその他の両方にあっても1回だけ入れる
+    const seen = new Set()
+    const bcc = [...tenantRecipients, ...(recipients || [])].filter((r) => {
+      const key = (r.email || '').trim().toLowerCase()
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     if (bcc.length === 0) {
-      return json({ error: '有効な宛先が登録されていません。メール設定から登録してください' }, 400)
+      return json({ error: '宛先がありません。テナントマスタの「案内メールの宛先」かメール設定の「その他の宛先」に登録してください' }, 400)
     }
 
     const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`

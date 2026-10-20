@@ -21,7 +21,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const METER_KINDS = new Set(['電気', 'ガス', '水道'])
 
 const TENANT_COLUMNS =
-  'id, billing_code, name, short_name, floor, moved_out, moved_out_on, note, source, moved_in_on, first_month_billable, profile, synced_at, updated_at'
+  'id, billing_code, name, short_name, floor, moved_out, moved_out_on, note, source, moved_in_on, first_month_billable, profile, notice_emails, synced_at, updated_at'
 const METER_COLUMNS =
   'id, meter_no, room_no, tenant_id, seq, floor, room_name, seal_label, detail_note, kind, sort_order, digits, ' +
   'max_value, expires_on, measured, removed, area_m2, area_tsubo, oa_share, oa_ratio, is_oa_meter, note, legacy_id, created_at, updated_at'
@@ -270,6 +270,15 @@ function tenantFields(p) {
     patch.moved_out = movedOutFor(movedOutOn, p.moved_out)
   }
   if ('moved_in_on' in p) patch.moved_in_on = dateOrNull(p.moved_in_on)
+  if ('notice_emails' in p) {
+    // ビルメン案内メールの宛先（2026-10-20〜）。配列か、改行・カンマ区切りの文字列で受ける
+    const list = Array.isArray(p.notice_emails) ? p.notice_emails : String(p.notice_emails ?? '').split(/[\s,、;]+/)
+    const emails = [...new Set(list.map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
+    const bad = emails.find((e) => !/^[^\s@<>",]+@[^\s@<>",]+\.[^\s@<>",]+$/.test(e))
+    if (bad) return { error: `案内メールの宛先「${bad}」の形式が正しくありません` }
+    if (emails.length > 10) return { error: '案内メールの宛先は10件までです' }
+    patch.notice_emails = emails
+  }
   if ('first_month_billable' in p) patch.first_month_billable = p.first_month_billable === true
   if ('profile' in p) patch.profile = cleanProfile(p.profile)
   return { patch }

@@ -38,6 +38,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
     moved_out: legacyMovedOut,
     moved_out_on: tenant.moved_out_on || '',
     moved_in_on: tenant.moved_in_on || '',
+    notice_emails: (tenant.notice_emails || []).join('\n'),
     first_month_billable: !!tenant.first_month_billable,
   }))
   const [profile, setProfile] = useState(() => {
@@ -153,6 +154,18 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
               label="初月無料にしない"
             />
           </div>
+          <label className="ui-field">
+            <span>案内メールの宛先</span>
+            <textarea
+              className="ui-textarea"
+              rows={2}
+              inputMode="email"
+              value={form.notice_emails}
+              onChange={set('notice_emails')}
+              placeholder="1行に1つ（複数可）"
+            />
+          </label>
+          <p className="ui-note">ビルメンの案内メールを送るアドレスです。未退去の間だけ送ります（基本情報の「連絡先メールアドレス」とは別です）。</p>
           <label className="ui-field">
             <span>備考</span>
             <textarea className="ui-textarea" rows={2} value={form.note} onChange={set('note')} />

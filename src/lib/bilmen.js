@@ -175,9 +175,29 @@ export async function updateBilmenMailSettings(patch) {
 // ここで並べ替える。Postgres の order by より localeCompare('ja') のほうが
 // 日本語の並びが自然（かなを読みの順に並べられる。漢字は読みが分からないため
 // コードポイント順のままになる点は変わらない）
+// 2026-10-20〜: テナントの宛先はテナントマスタ（案内メールの宛先）から来る（tenants。ここでは直せない）。
+// others はそれ以外の宛先（小泉産業様の担当者・栄和ML など）で、メール設定の画面で直す
 export async function fetchBilmenMailRecipients() {
   const data = await authFetch('/api/bilmen/mail/recipients')
-  return [...(data.recipients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'))
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ja')
+  const floorRank = (f) => ['B', '1', '2', '3', '4', '5', '6', '7'].indexOf(f || '') >>> 0
+  return {
+    tenants: [...(data.tenants || [])].sort(
+      (a, b) => floorRank(a.floor) - floorRank(b.floor) || (a.billing_code || '').localeCompare(b.billing_code || '')
+    ),
+    others: [...(data.recipients || [])].sort(byName),
+  }
+}
+
+// 実際に送る宛先（テナント＋有効なその他。同じアドレスは1回だけ）。下書き（サーバー側）と同じ考え方
+export function activeBilmenRecipients({ tenants = [], others = [] } = {}) {
+  const seen = new Set()
+  return [...tenants, ...others.filter((r) => !r.disabled)].filter((r) => {
+    const key = (r.email || '').trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export async function createBilmenMailRecipient(payload) {

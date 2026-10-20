@@ -1301,3 +1301,9 @@ revoke all on meter_photos from anon, authenticated;
 -- この日を過ぎたら moved_out=true（保存のとき・毎日3時の定期実行・FileMaker からの同期のあとに反映）
 alter table equipment_tenants add column if not exists moved_out_on date;
 comment on column equipment_tenants.moved_out_on is '退去日（2026-10-20〜）。この日を過ぎたら moved_out=true（毎日3時の定期実行と保存時に反映）';
+
+-- ビルメン案内メールの宛先をテナントマスタへ（2026-10-20〜）。メール設定の宛先のうちテナントのもの（26アドレス・23テナント）を
+-- ここへ移し、bilmen_mail_recipients には「その他の宛先」（テナントではない宛先）だけを残した。
+-- 移す前の宛先は bilmen_mail_recipients_bak_20261020 に丸ごと控えてある（RLS 有効・anon/authenticated 不可）
+alter table equipment_tenants add column if not exists notice_emails text[] not null default '{}';
+comment on column equipment_tenants.notice_emails is 'ビルメン案内メールの宛先（2026-10-20〜。メール設定の宛先から移行）。未退去のテナントのこのアドレスへ BCC で送る';
