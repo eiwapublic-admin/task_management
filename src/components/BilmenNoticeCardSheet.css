@@ -231,7 +231,7 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
   color: #2b3833;
 }
 
-/* 作業ごとの留意事項。今月の注釈より一段弱く見せる */
+/* 作業ごとの留意事項。見落とされないよう赤字にする */
 .bnc-caution {
   margin-top: 2.4mm;
   padding: 1.6mm 2.6mm;
@@ -239,7 +239,7 @@ body.pdf-capture-mode .bnc-sheet.is-measuring {
   border-radius: 1mm;
   background: #f0f4f2;
   font-size: 8.5pt;
-  color: #3b4a43;
+  color: #c00;
   white-space: pre-wrap;
 }
 
