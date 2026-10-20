@@ -82,7 +82,8 @@ import {
 import { handleManualList, handleManualCreate, handleManualUpdate, handleManualDelete } from './lib/manuals.js'
 import {
   handleMeterMasters,
-  handleMeterTenantUpdate,
+  handleMeterTenants,
+  applyTenantMoveOuts,
   handleMeterSave,
   handleMeterAcUnitUpdate,
   handleMeterConstantsUpdate,
@@ -1186,7 +1187,7 @@ async function route(req, env) {
     return req.method === 'GET' ? handleMeterMasters(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/meter/tenants') {
-    return req.method === 'PATCH' ? handleMeterTenantUpdate(req) : json({ error: 'Method Not Allowed' }, 405)
+    return ['GET', 'POST', 'PATCH'].includes(req.method) ? handleMeterTenants(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/meter/meters') {
     return req.method === 'POST' || req.method === 'PATCH' ? handleMeterSave(req) : json({ error: 'Method Not Allowed' }, 405)
@@ -1366,11 +1367,19 @@ async function runReminderCheck() {
   }
 }
 
-// 2年を過ぎた検針写真の削除（2026-10-20〜。docs/meter-plan.md 7章）。1日1回、日本時間3:00〜3:04の巡回でだけ動かす
+// 毎日1回、日本時間3:00〜3:04の巡回でだけ動かす作業（2026-10-20〜）
 // （メール取得が止まっている深夜なら、Workers の1回あたりの外部リクエスト数に余裕がある）
-async function runMeterPhotoCleanup() {
+//   ・退去日を過ぎたテナントを退去済みにする
+//   ・2年を過ぎた検針写真の削除（docs/meter-plan.md 7章）
+async function runDailyJobs() {
   const jst = new Date(Date.now() + 9 * 3600 * 1000)
   if (jst.getUTCHours() !== 3 || jst.getUTCMinutes() >= 5) return
+  try {
+    const movedOut = await applyTenantMoveOuts()
+    if (movedOut) console.log(`tenant-move-out: ${movedOut}件を退去済みに`)
+  } catch (err) {
+    console.error('tenant-move-out 失敗:', err)
+  }
   try {
     const removed = await cleanupMeterPhotos()
     if (removed) console.log(`meter-photo-cleanup: ${removed}枚を削除`)
@@ -1394,6 +1403,6 @@ export default {
     // メール取得の稼働時間帯ゲートとは独立（リマインダーは業務メール以外の運用作業も
     // 対象のため、メールの稼働設定に引きずられるべきではない）
     ctx.waitUntil(runReminderCheck())
-    ctx.waitUntil(runMeterPhotoCleanup())
+    ctx.waitUntil(runDailyJobs())
   },
 }

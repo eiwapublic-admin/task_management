@@ -8,11 +8,12 @@ import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.j
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { notifyStockWarning } from './push.js'
+import { applyTenantMoveOuts } from './meter.js'
 
 const ITEM_COLUMNS =
   'id, item_no, category_code, name, short_name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
 const CATEGORY_COLUMNS = 'code, name, sort_order, note, created_at, updated_at'
-const TENANT_COLUMNS = 'id, billing_code, name, short_name, floor, moved_out, default_item_id, note, synced_at'
+const TENANT_COLUMNS = 'id, billing_code, name, short_name, floor, moved_out, moved_out_on, default_item_id, note, synced_at'
 const TXN_COLUMNS =
   'id, txn_no, item_id, kind, reason, occurred_at, quantity, supplier, tenant_id, tenant_code, tenant_name, ' +
   'tenant_short_name, floor, location, staff_name, signature_key, signed_at, free_exchange, note, created_by, updated_by, ' +
@@ -1163,6 +1164,13 @@ export async function handleEquipmentTenantSync(req, env) {
     if (upsertErr) {
       console.error('equipment-tenant-sync(upsert):', upsertErr.message)
       return json({ error: '同期に失敗しました' }, 500)
+    }
+
+    // 当システムで退去日を入れてあるテナントは、FileMaker 側でまだ入居中でも、その日を過ぎていれば退去済みに戻す
+    try {
+      await applyTenantMoveOuts(supabase)
+    } catch (err) {
+      console.error('equipment-tenant-sync(move-out):', err.message)
     }
 
     const toRetire = [...existingCodes].filter((code) => code && !incomingCodes.has(code))

@@ -1296,3 +1296,8 @@ create index if not exists meter_photos_month_idx on meter_photos (month, meter_
 create index if not exists meter_photos_delete_idx on meter_photos (delete_after);
 alter table meter_photos enable row level security;
 revoke all on meter_photos from anon, authenticated;
+
+-- テナントの退去日（2026-10-20〜）。退去は今後この日付で表す。前もって入れておけば、その日が来るまでは入居中のまま。
+-- この日を過ぎたら moved_out=true（保存のとき・毎日3時の定期実行・FileMaker からの同期のあとに反映）
+alter table equipment_tenants add column if not exists moved_out_on date;
+comment on column equipment_tenants.moved_out_on is '退去日（2026-10-20〜）。この日を過ぎたら moved_out=true（毎日3時の定期実行と保存時に反映）';
