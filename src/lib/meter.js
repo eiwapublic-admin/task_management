@@ -161,3 +161,8 @@ export function latestPhotoByMeter(photos) {
 export function activeMeters(meters) {
   return meters.filter((m) => m.measured && !m.removed && m.kind)
 }
+
+// ダッシュボードの「検針」カード用（2026-10-20〜）
+export function fetchMeterSummary() {
+  return authFetch('/api/meter/summary')
+}
