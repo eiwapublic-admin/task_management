@@ -3,6 +3,8 @@
 // 権限: 社員（staff/admin）だけ。小泉産業様（owner）・備品出庫限定ロールには閲覧も許さない（Q9）。
 // テナントの基本情報（profile。防火管理者・緊急連絡先など個人情報を含む）もここでだけ返す。
 //
+// Phase 2（写真の取込・値の入力・検証）は下の方の「月度の作業」。
+//
 // Phase 1 はマスタ（テナント・メータ・空調機の割当て・定数）の参照と修正、FileMaker の CSV の取込、
 // 出力の照合用に月度のデータを返すところまで。取込は画面（src/pages/MeterMasters.jsx）が CSV を
 // 読んで種類ごと・数百件ずつ送ってくる（Workers の1回あたりの外部リクエスト数の上限があるため、
@@ -10,6 +12,7 @@
 
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
+import { putObject, getObject, deleteObject, deleteObjects } from './storage.js'
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -24,7 +27,7 @@ const METER_COLUMNS =
   'max_value, expires_on, measured, removed, area_m2, area_tsubo, oa_share, oa_ratio, is_oa_meter, note, legacy_id, created_at, updated_at'
 const READING_COLUMNS =
   'id, meter_id, month, read_on, read_time, value, value2, prev_override, diff_override, legacy_prev, legacy_prev2, ' +
-  'legacy_diff, legacy_diff2, billing_code, note, recorded_by, verified_by, verified_at'
+  'legacy_diff, legacy_diff2, billing_code, note, recorded_by, verified_by, verified_at, legacy_id'
 
 // 定数（settings のキー）。画面の項目名と既定値
 const CONSTANTS = {
@@ -160,6 +163,27 @@ async function loadConstants(supabase) {
     out[name] = Number.isFinite(n) ? n : fallback
   }
   return out
+}
+
+// numeric 列は文字列で返ることがあるので数値にそろえる
+const toNum = (v) => (v == null ? null : Number(v))
+
+function numericReading(r) {
+  return {
+    ...r,
+    value: toNum(r.value),
+    value2: toNum(r.value2),
+    prev_override: toNum(r.prev_override),
+    diff_override: toNum(r.diff_override),
+    legacy_prev: toNum(r.legacy_prev),
+    legacy_prev2: toNum(r.legacy_prev2),
+    legacy_diff: toNum(r.legacy_diff),
+    legacy_diff2: toNum(r.legacy_diff2),
+  }
+}
+
+function numericMeter(mt) {
+  return { ...mt, area_m2: toNum(mt.area_m2), area_tsubo: toNum(mt.area_tsubo), oa_ratio: toNum(mt.oa_ratio) }
 }
 
 // ============================================================
@@ -599,25 +623,6 @@ export async function handleMeterOutputData(req) {
       console.error('meter-output:', failed.error.message)
       return json({ error: '出力の材料の取得に失敗しました' }, 500)
     }
-    // numeric 列は文字列で返ることがあるので数値にそろえる
-    const toNum = (v) => (v == null ? null : Number(v))
-    const numericReading = (r) => ({
-      ...r,
-      value: toNum(r.value),
-      value2: toNum(r.value2),
-      prev_override: toNum(r.prev_override),
-      diff_override: toNum(r.diff_override),
-      legacy_prev: toNum(r.legacy_prev),
-      legacy_prev2: toNum(r.legacy_prev2),
-      legacy_diff: toNum(r.legacy_diff),
-      legacy_diff2: toNum(r.legacy_diff2),
-    })
-    const numericMeter = (mt) => ({
-      ...mt,
-      area_m2: toNum(mt.area_m2),
-      area_tsubo: toNum(mt.area_tsubo),
-      oa_ratio: toNum(mt.oa_ratio),
-    })
     return json({
       month,
       tenants: tenants.data || [],
@@ -630,4 +635,276 @@ export async function handleMeterOutputData(req) {
     console.error('meter-output 失敗:', err)
     return json({ error: '出力の材料の取得に失敗しました' }, 500)
   }
+}
+
+// ============================================================
+// 月度の作業（Phase 2。2026-10-20〜。docs/meter-plan.md 5章）
+// 写真の取込（端末で Code39 を読んで縮小した写真が1枚ずつ届く）・検針一覧・値の入力
+// ============================================================
+
+const PHOTO_COLUMNS = 'id, month, meter_id, barcode, filename, width, height, size_bytes, taken_at, uploaded_by, created_at'
+const PHOTO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+// 縮小済み（約20KB）が届く前提。縮小できなかった写真（HEIC など）も受けられるよう余裕を持たせる
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024
+
+function actorName(auth) {
+  return auth.display_name || auth.username || null
+}
+
+function shiftMonth(month, delta) {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+// 日本時間の今日と今の時刻（検針日付・時刻を写真から取れないとき）
+function jstNow() {
+  const d = new Date(Date.now() + 9 * 3600 * 1000).toISOString()
+  return { date: d.slice(0, 10), time: d.slice(11, 19) }
+}
+
+// GET /api/meter/month?month=YYYY-MM — 検針一覧・値の入力の材料。
+// 前月値・前月比を出すため、当月と前2か月の検針値を返す。写真は情報だけ（本体は /api/meter/photo）
+export async function handleMeterMonth(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const month = new URL(req.url).searchParams.get('month') || ''
+    if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM で指定してください' }, 400)
+    const supabase = getAdminClient()
+    const [tenants, meters, readings, photos] = await Promise.all([
+      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out'),
+      supabase.from('meters').select(METER_COLUMNS),
+      supabase
+        .from('meter_readings')
+        .select(READING_COLUMNS)
+        .in('month', [month, shiftMonth(month, -1), shiftMonth(month, -2)]),
+      supabase.from('meter_photos').select(PHOTO_COLUMNS).eq('month', month).order('taken_at', { ascending: true }),
+    ])
+    const failed = [tenants, meters, readings, photos].find((r) => r.error)
+    if (failed) {
+      console.error('meter-month:', failed.error.message)
+      return json({ error: '検針データの取得に失敗しました' }, 500)
+    }
+    return json({
+      month,
+      tenants: tenants.data || [],
+      meters: (meters.data || []).map(numericMeter),
+      readings: (readings.data || []).map(numericReading),
+      photos: photos.data || [],
+    })
+  } catch (err) {
+    console.error('meter-month 失敗:', err)
+    return json({ error: '検針データの取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/meter/readings — 1メータ・1か月度の検針値を保存する（無ければ作る）。
+// 移行した月の値を直したときは、FileMaker の保存値（legacy_*）を捨ててアプリの計算に切り替える
+export async function handleMeterReadingSave(req) {
+  const { auth, error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    if (!p || typeof p !== 'object') return json({ error: '内容が読み取れませんでした' }, 400)
+    const month = String(p.month || '')
+    if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM で指定してください' }, 400)
+    if (typeof p.meter_id !== 'string' || !UUID_RE.test(p.meter_id)) return json({ error: 'meter_id が不正です' }, 400)
+    const supabase = getAdminClient()
+    const [{ data: meter }, { data: existing }] = await Promise.all([
+      supabase.from('meters').select('id, tenant_id').eq('id', p.meter_id).maybeSingle(),
+      supabase.from('meter_readings').select(READING_COLUMNS).eq('meter_id', p.meter_id).eq('month', month).maybeSingle(),
+    ])
+    if (!meter) return json({ error: 'メータが見つかりません' }, 404)
+    let billingCode = existing?.billing_code ?? null
+    if (!existing && meter.tenant_id) {
+      const { data: tenant } = await supabase.from('equipment_tenants').select('billing_code').eq('id', meter.tenant_id).maybeSingle()
+      billingCode = tenant?.billing_code ?? null
+    }
+
+    const now = jstNow()
+    const row = {
+      meter_id: meter.id,
+      month,
+      read_on: dateOrNull(p.read_on) || existing?.read_on || now.date,
+      read_time: timeOrNull(p.read_time) || existing?.read_time || now.time,
+      value: num(p.value),
+      value2: num(p.value2),
+      prev_override: num(p.prev_override),
+      diff_override: num(p.diff_override),
+      note: text(p.note, 2000),
+      billing_code: billingCode,
+    }
+    const same = (a, b) => (a == null ? null : Number(a)) === (b == null ? null : Number(b))
+    const valueChanged = !existing || !same(existing.value, row.value) || !same(existing.value2, row.value2)
+    if (valueChanged) row.recorded_by = actorName(auth)
+    if (existing && valueChanged) {
+      row.legacy_prev = null
+      row.legacy_prev2 = null
+      row.legacy_diff = null
+      row.legacy_diff2 = null
+    }
+    if (p.verified === true) {
+      // 値を変えたら確認し直し（ただし同じ保存で確認済みにした場合はそのまま）
+      row.verified_by = actorName(auth)
+      row.verified_at = new Date().toISOString()
+    } else if (p.verified === false || valueChanged) {
+      row.verified_by = null
+      row.verified_at = null
+    }
+    const { data, error: err } = await supabase
+      .from('meter_readings')
+      .upsert(row, { onConflict: 'meter_id,month' })
+      .select(READING_COLUMNS)
+      .single()
+    if (err) {
+      console.error('meter-reading-save:', err.message)
+      return json({ error: '検針値の保存に失敗しました' }, 500)
+    }
+    return json({ reading: numericReading(data) })
+  } catch (err) {
+    console.error('meter-reading-save 失敗:', err)
+    return json({ error: '検針値の保存に失敗しました' }, 500)
+  }
+}
+
+// POST /api/meter/photos（multipart）— 写真を1枚保存し、読めたバーコードでメータへ割り当てる
+export async function handleMeterPhotoUpload(req) {
+  const { auth, error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const form = await req.formData().catch(() => null)
+    if (!form) return json({ error: 'ファイルの受け取りに失敗しました' }, 400)
+    const month = String(form.get('month') || '')
+    const file = form.get('file')
+    if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM で指定してください' }, 400)
+    if (!file || typeof file === 'string') return json({ error: 'file は必須です' }, 400)
+    if (file.size > MAX_PHOTO_BYTES) return json({ error: '写真が大きすぎます' }, 413)
+    if (!PHOTO_MIME.has(file.type)) return json({ error: '対応していない形式です（JPEG で取り込んでください）' }, 415)
+
+    const supabase = getAdminClient()
+    const barcode = text(String(form.get('barcode') || ''), 50)
+    let meterId = null
+    if (barcode) {
+      const { data: meter } = await supabase.from('meters').select('id').eq('meter_no', barcode).maybeSingle()
+      meterId = meter?.id || null
+    }
+    const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+    const key = `meter/${month}/${crypto.randomUUID()}.${ext}`
+    await putObject(key, file.stream(), file.type)
+
+    const row = {
+      month,
+      meter_id: meterId,
+      barcode,
+      storage_key: key,
+      mime: file.type,
+      filename: text(String(form.get('filename') || ''), 200),
+      width: int(form.get('width')),
+      height: int(form.get('height')),
+      size_bytes: file.size,
+      taken_at: isoOrNull(String(form.get('taken_at') || '')),
+      uploaded_by: actorName(auth),
+    }
+    const { data, error: err } = await supabase.from('meter_photos').insert(row).select(PHOTO_COLUMNS).single()
+    if (err) {
+      console.error('meter-photo-upload:', err.message)
+      await deleteObject(key)
+      return json({ error: '写真の保存に失敗しました' }, 500)
+    }
+    return json({ photo: data })
+  } catch (err) {
+    console.error('meter-photo-upload 失敗:', err)
+    return json({ error: '写真の保存に失敗しました' }, 500)
+  }
+}
+
+// PATCH /api/meter/photos — 読めなかった写真を手でメータへ割り当てる（meter_id: null で外す）
+export async function handleMeterPhotoAssign(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    if (typeof p?.id !== 'string' || !UUID_RE.test(p.id)) return json({ error: 'id が不正です' }, 400)
+    const meterId = typeof p.meter_id === 'string' && UUID_RE.test(p.meter_id) ? p.meter_id : null
+    const { data, error: err } = await getAdminClient()
+      .from('meter_photos')
+      .update({ meter_id: meterId })
+      .eq('id', p.id)
+      .select(PHOTO_COLUMNS)
+      .maybeSingle()
+    if (err) {
+      console.error('meter-photo-assign:', err.message)
+      return json({ error: '写真の割り当てに失敗しました' }, 500)
+    }
+    if (!data) return json({ error: '写真が見つかりません' }, 404)
+    return json({ photo: data })
+  } catch (err) {
+    console.error('meter-photo-assign 失敗:', err)
+    return json({ error: '写真の割り当てに失敗しました' }, 500)
+  }
+}
+
+// DELETE /api/meter/photos?id= — 写真を消す（撮り直した・別の建物を写した など）
+export async function handleMeterPhotoDelete(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!UUID_RE.test(id)) return json({ error: 'id が不正です' }, 400)
+    const supabase = getAdminClient()
+    const { data: photo } = await supabase.from('meter_photos').select('storage_key').eq('id', id).maybeSingle()
+    if (!photo) return json({ error: '写真が見つかりません' }, 404)
+    const { error: err } = await supabase.from('meter_photos').delete().eq('id', id)
+    if (err) {
+      console.error('meter-photo-delete:', err.message)
+      return json({ error: '写真の削除に失敗しました' }, 500)
+    }
+    await deleteObject(photo.storage_key)
+    return json({ ok: true })
+  } catch (err) {
+    console.error('meter-photo-delete 失敗:', err)
+    return json({ error: '写真の削除に失敗しました' }, 500)
+  }
+}
+
+// GET /api/meter/photo?id= — 写真の本体（バケットは非公開なので必ずここを通す）
+export async function handleMeterPhotoGet(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const id = new URL(req.url).searchParams.get('id') || ''
+    if (!UUID_RE.test(id)) return json({ error: 'id が不正です' }, 400)
+    const { data: photo } = await getAdminClient().from('meter_photos').select('storage_key, mime').eq('id', id).maybeSingle()
+    if (!photo) return json({ error: '写真が見つかりません' }, 404)
+    const res = await getObject(photo.storage_key)
+    if (!res.ok) {
+      console.error('meter-photo-get: storage が', res.status, 'を返した')
+      return json({ error: '写真の取得に失敗しました' }, 404)
+    }
+    return new Response(res.body, {
+      status: 200,
+      headers: { 'Content-Type': photo.mime || 'image/jpeg', 'Cache-Control': 'private, max-age=86400' },
+    })
+  } catch (err) {
+    console.error('meter-photo-get 失敗:', err)
+    return json({ error: '写真の取得に失敗しました' }, 500)
+  }
+}
+
+// 2年を過ぎた検針写真を消す（Q10）。毎日1回、定期実行から呼ぶ。
+// Workers の1回あたりの外部リクエスト数に収まるよう、1回50枚まで・ストレージは一括削除（計3回の通信）
+export async function cleanupMeterPhotos() {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from('meter_photos')
+    .select('id, storage_key')
+    .lt('delete_after', jstNow().date)
+    .limit(50)
+  if (error) throw new Error(error.message)
+  if (!data?.length) return 0
+  await deleteObjects(data.map((p) => p.storage_key))
+  const { error: delErr } = await supabase.from('meter_photos').delete().in('id', data.map((p) => p.id))
+  if (delErr) throw new Error(delErr.message)
+  return data.length
 }

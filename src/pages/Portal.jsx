@@ -352,6 +352,7 @@ export default function Portal() {
         { label: '雛形ファイル', icon: <IconFolder size={20} />, path: '/documents', staffOnly: true },
         { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
         { label: '業務マニュアル', icon: <IconBook size={20} />, path: '/manuals', staffOnly: true },
+        { label: '検針', icon: <IconGauge size={20} />, path: '/meter', staffOnly: true },
       ]),
     },
     {

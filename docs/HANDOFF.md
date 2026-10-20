@@ -1,6 +1,16 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
-最終更新: 2026-10-20（**検針（FileMaker「検針記録」の移植）Phase 1「マスタと移行」を入れた**（依頼。計画は `docs/meter-plan.md`）。
+最終更新: 2026-10-20（**検針 Phase 2「写真の取込・値の入力・検証」を入れた**（依頼。`docs/meter-plan.md` 3・5章）。
+入口は **ハンバーガーメニュー →「検針」／ダッシュボード → その他機能 →「検針」**（`/meter`。社員のみ）。月の半ば以降は翌月度を開く（ガス・水道は翌月度扱いのため）。
+- **写真の取込**（`/meter/:month/photos`）: iPhone 標準カメラの写真をまとめて選ぶ → 端末で元画像のまま Code39 を読む（`src/lib/barcode.js`。ZXing の Code39 部品だけを深いパスで読み込み47KB、画面で写真を選んだときだけ読む）→ 360×480・画質55（`imageResize.js` の `meter`）に縮小 → `POST /api/meter/photos`。
+  サーバーがバーコード＝メータ番号でメータへ割り当てる。読めない写真は画面で手で割り当て。同じメータに複数あれば撮影日時（EXIF）の新しい方を使う。受領した実写真2枚（21-1・79）は読めた（90度回転させても可）。
+- **検針一覧**（`/meter/:month`）: 検針対象＝計測対象かつ撤去済みでなく検針内容があるメータ（10月度は54台＝FileMaker の件数と一致）。並びは出力と同じ。前月比が150%以上・50%以下の行は黄色（閾値は仮で `src/lib/meterMonth.js`）。「要確認だけ」で絞れる。
+- **値の入力**（`/meter/:month/:meterNo`）: 左に写真（押すと拡大）、右に当月値（外調機は2つ）・前月の修正・修正差分値・備考。Enter で保存→一桁ずつ読み上げ（`src/lib/speech.js`、Web Speech API）→次のメータ。検針日付・時刻は写真の撮影日時。
+  「写真と読み上げで値を確かめた」（既定オン）で確認者を記録（Q12）。移行した月の値を直すと FileMaker の保存値（legacy_*）を捨ててアプリの計算に切り替える。移行分は確認済みとして扱う。
+- **写真一覧PDF**: 一覧の「写真一覧PDF」。1ページ8枚、値は黄色（FileMaker の「メータ写真の印刷」）。写真は2年で消えるので月ごとに保存する運用。
+- **自動削除**: `meter_photos.delete_after`（作成日＋2年）を過ぎた写真を、毎日 日本時間3:00〜3:04 の巡回で50枚ずつ削除（ストレージは一括削除で通信3回）。
+- テーブル `meter_photos` を本番に追加済み（service role 専用）。API は `/api/meter/{month,readings,photos,photo}`。Phase 3（空調CSV・xlsx 出力・Gmail 下書き）が次。307番）。
+2026-10-20（**検針（FileMaker「検針記録」の移植）Phase 1「マスタと移行」を入れた**（依頼。計画は `docs/meter-plan.md`）。
 テーブル `meters`・`meter_readings`・`meter_ac_units`・`meter_ac_usage` を新設し、`equipment_tenants` に `moved_in_on`・`first_month_billable`・`profile`（防火・緊急連絡先などの基本情報）を足した
 （本番には MCP で適用済み。トリガーは MCP が `execute function` でタイムアウトするため本番は `execute procedure` で作成。どれも service role 専用）。定数は `settings` の `meter_oa_coefficient`=40・`meter_total_area`・`meter_oa_target_area`。
 画面は **ダッシュボード → マスタ →「検針マスタ」（`/meter/masters`、社員のみ）**：テナント・メータ・空調機（どのメータに付くか）・定数・取込・照合の5タブ。
@@ -1503,8 +1513,9 @@ id はクエリ/ボディ」方式にしてある（計画6章のパスパラメ
 ## 6. 残タスク・改善候補
 
 - [ ] **検針（FileMaker「検針記録」の移植。`docs/meter-plan.md`。306番〜）**: Phase 1（マスタと移行）は入れた。
-  **依頼元が「検針マスタ」→「取込・照合」で CSV 5本を取り込み、10月分の xlsx と照合する**（11-A の退去済み1セルだけ違うのが正しい）。
-  続けて Phase 2（写真取込＝バーコード読取・360×480 JPEG品質55で保存、数値入力・読み上げ、写真PDF）、Phase 3（出力 xlsx の書き出し・空調CSV取込・Gmail 下書き）。12/1 から並行運用が目標
+  Phase 1 は本番で取込・照合済み（2026-10-20。11-A 退去済みの1セル差のみ）。Phase 2（写真取込・入力・写真PDF。307番）も入れた。
+  **【要確認】Phase 2 は iPhone・Mac の実機で、写真の取込（バーコード読取）と読み上げを試してもらう**。11/2 の検針写真で試すのがよい。
+  次は Phase 3（出力 xlsx の書き出し・空調CSV取込・Gmail 下書き）。12/1 から並行運用が目標
 - [x] **廃棄物のGoogleドライブ取込を使えるようにする（2026-09-30。`docs/waste-plan.md` 10-7。287番）**:
   依頼元が Drive API の有効化と `drive.readonly` を加えたトークンの再発行を実施し、本番で取込を確認済み。
   **Playground のリダイレクトURIの削除（`docs/google-oauth-scope-update.md` 手順7）は実施未確認**（残っていても実害は無い）

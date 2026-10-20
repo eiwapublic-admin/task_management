@@ -88,6 +88,13 @@ import {
   handleMeterConstantsUpdate,
   handleMeterImport,
   handleMeterOutputData,
+  handleMeterMonth,
+  handleMeterReadingSave,
+  handleMeterPhotoUpload,
+  handleMeterPhotoAssign,
+  handleMeterPhotoDelete,
+  handleMeterPhotoGet,
+  cleanupMeterPhotos,
 } from './lib/meter.js'
 import {
   handleReminderList,
@@ -1195,6 +1202,22 @@ async function route(req, env) {
   if (pathname === '/api/meter/output') {
     return req.method === 'GET' ? handleMeterOutputData(req) : json({ error: 'Method Not Allowed' }, 405)
   }
+  // 月度の作業（Phase 2）: 一覧・入力の材料、検針値の保存、写真の取込・割当て・削除・本体
+  if (pathname === '/api/meter/month') {
+    return req.method === 'GET' ? handleMeterMonth(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/readings') {
+    return req.method === 'POST' ? handleMeterReadingSave(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/photos') {
+    if (req.method === 'POST') return handleMeterPhotoUpload(req)
+    if (req.method === 'PATCH') return handleMeterPhotoAssign(req)
+    if (req.method === 'DELETE') return handleMeterPhotoDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/photo') {
+    return req.method === 'GET' ? handleMeterPhotoGet(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
 
   // --- リマインダー（システム運用上の期限管理。2026-09-07〜。ハンドラは worker/lib/reminders.js） ---
   if (pathname === '/api/reminders') {
@@ -1339,6 +1362,19 @@ async function runReminderCheck() {
   }
 }
 
+// 2年を過ぎた検針写真の削除（2026-10-20〜。docs/meter-plan.md 7章）。1日1回、日本時間3:00〜3:04の巡回でだけ動かす
+// （メール取得が止まっている深夜なら、Workers の1回あたりの外部リクエスト数に余裕がある）
+async function runMeterPhotoCleanup() {
+  const jst = new Date(Date.now() + 9 * 3600 * 1000)
+  if (jst.getUTCHours() !== 3 || jst.getUTCMinutes() >= 5) return
+  try {
+    const removed = await cleanupMeterPhotos()
+    if (removed) console.log(`meter-photo-cleanup: ${removed}枚を削除`)
+  } catch (err) {
+    console.error('meter-photo-cleanup 失敗:', err)
+  }
+}
+
 export default {
   async fetch(req, env) {
     const res = await route(req, env)
@@ -1354,5 +1390,6 @@ export default {
     // メール取得の稼働時間帯ゲートとは独立（リマインダーは業務メール以外の運用作業も
     // 対象のため、メールの稼働設定に引きずられるべきではない）
     ctx.waitUntil(runReminderCheck())
+    ctx.waitUntil(runMeterPhotoCleanup())
   },
 }

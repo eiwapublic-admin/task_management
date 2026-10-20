@@ -76,6 +76,23 @@ export async function deleteObject(key, bucket = PHOTO_BUCKET) {
   }
 }
 
+// 複数のオブジェクトを1回の通信で削除する（検針写真の自動削除。Workers の外部リクエスト数を抑えるため）
+export async function deleteObjects(keys, bucket = PHOTO_BUCKET) {
+  if (!keys.length) return
+  const res = await fetch(`${storageBase()}/object/${bucket}`, {
+    method: 'DELETE',
+    headers: {
+      ...authHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prefixes: keys }),
+  })
+  if (!res.ok && res.status !== 404) {
+    const detail = await res.text().catch(() => '')
+    throw new Error(`storage delete 失敗 (${res.status}): ${detail.slice(0, 200)}`)
+  }
+}
+
 // バケット全体の使用量を集計する（「従量課金事項」画面のストレージ使用量表示に使う）。
 // storage.objects の metadata から size を合計する方式は SQL 側で行うため、
 // ここでは提供しない（reports.js が Supabase 経由で集計する）。

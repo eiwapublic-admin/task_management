@@ -1271,3 +1271,28 @@ insert into settings (key, value) values
   ('meter_total_area', '3300.07'),       -- 総面積（㎡）
   ('meter_oa_target_area', '2578.28')    -- 外調機按分対象の面積（㎡）
 on conflict (key) do nothing;
+
+-- 検針写真（Phase 2。2026-10-20〜）。iPhone 標準カメラで撮った写真をまとめて取り込み、
+-- 端末で Code39 を読んでメータへ割り当てる。本体は report-photos バケットの meter/ 以下に
+-- 360×480・JPEG画質55（約20KB）で保存し、2年で自動削除する（docs/meter-plan.md 3-1・7章）。
+-- 同じメータ・同じ月度に複数あれば撮影日時の新しい方を使う
+create table if not exists meter_photos (
+  id           uuid primary key default gen_random_uuid(),
+  month        text not null check (month ~ '^\d{4}-(0[1-9]|1[0-2])$'),
+  meter_id     uuid references meters(id) on delete set null,  -- 割り当て先（読めなかった写真は null）
+  barcode      text,                            -- 写真から読めたバーコードの中身
+  storage_key  text not null,
+  mime         text not null default 'image/jpeg',
+  filename     text,
+  width        int,
+  height       int,
+  size_bytes   int,
+  taken_at     timestamptz,                     -- 撮影日時（EXIF。無ければファイルの日時）
+  uploaded_by  text,
+  delete_after date not null default (current_date + interval '2 years'),  -- 自動削除の日
+  created_at   timestamptz not null default now()
+);
+create index if not exists meter_photos_month_idx on meter_photos (month, meter_id);
+create index if not exists meter_photos_delete_idx on meter_photos (delete_after);
+alter table meter_photos enable row level security;
+revoke all on meter_photos from anon, authenticated;
