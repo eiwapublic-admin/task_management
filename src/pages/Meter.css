@@ -1,0 +1,130 @@
+/* 検針（FileMaker「検針記録」の移植。2026-10-20〜。docs/meter-plan.md） */
+
+.meter-list-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.meter-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-15);
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+  cursor: pointer;
+}
+
+.meter-table td,
+.meter-table th { white-space: nowrap; }
+
+.meter-row { cursor: pointer; }
+.meter-row:hover td { background: var(--color-brand-softer); }
+.meter-row.is-removed td { color: var(--text-muted); }
+
+.meter-no {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.meter-expired {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* 定数・取込のカード */
+.meter-constants,
+.meter-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.meter-import-counts {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+}
+
+.meter-file-btn {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.meter-import-warnings {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--color-warn-ink);
+  background: var(--color-warn-surface);
+  border: 1px solid var(--color-warn-border);
+  border-radius: var(--radius-control);
+}
+
+.meter-import-warnings.is-danger {
+  color: var(--color-danger);
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger-border);
+}
+
+.meter-import-table { max-width: 480px; }
+
+.meter-import-actions,
+.meter-check-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.meter-import-result p,
+.meter-check-result p { margin: 0 0 var(--space-2); }
+
+.meter-check-ok {
+  color: var(--status-done);
+  font-weight: 700;
+}
+
+.meter-check-ng {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.meter-check-table td { white-space: nowrap; }
+
+/* フォーム（テナント・メータの修正） */
+.meter-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+}
+
+.meter-form-section {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.meter-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.meter-form-grid .is-wide { grid-column: span 2; }
+
+.meter-form-grid.is-contact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 768px) {
+  .meter-form-grid .is-wide { grid-column: 1 / -1; }
+  .meter-form-grid.is-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.meter-no > .ui-badge { margin-left: var(--space-15); }
+
+.meter-constants .ui-field,
+.meter-constants .ui-note { max-width: 420px; }

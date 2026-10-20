@@ -371,3 +371,14 @@ export function IconBook(props) {
     </Icon>
   )
 }
+
+// 検針（2026-10-20〜）。メーターの丸い文字盤と針
+export function IconGauge(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 13l4-4" />
+      <path d="M8 17h8" />
+    </Icon>
+  )
+}

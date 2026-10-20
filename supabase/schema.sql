@@ -1141,3 +1141,133 @@ create trigger reminders_set_updated_at before update on reminders
 
 alter table reminders enable row level security;
 revoke all on reminders from anon, authenticated;
+
+-- ============================================================
+-- 検針管理（FileMaker「検針記録」の移植。Phase 1。2026-10-20〜。docs/meter-plan.md 4章）
+-- テナントは備品と共有する equipment_tenants を使い、検針に要る列だけ足す。
+-- 並行運用の間は FileMaker からのテナント同期（name・short_name・floor・note だけを上書き）が
+-- 続くが、ここで足す列は同期の対象外なので上書きされない。
+-- ============================================================
+-- 入居年月日（出力の「c_入居月度」の元）。FileMaker の 1999/1/1 は「古くからの入居」の意味でそのまま持つ
+alter table equipment_tenants add column if not exists moved_in_on date;
+-- 初月無料にしない（FileMaker の同名項目。請求書Excel側の判断材料）
+alter table equipment_tenants add column if not exists first_month_billable boolean not null default false;
+-- 防火・連絡先などテナントの基本情報（FileMaker のテナントマスタの残りの項目。9-3 Q13）。
+-- 個人情報を含むため、備品のテナントAPI（owner も見られる）では返さず、検針のAPI（社員のみ）だけが返す。
+-- キー: security_block, representative, phone, email, usage, capacity, fire_manager, fire_manager_title,
+--       fire_manager_appointed_on, fire_manager_note, emergency_contacts[{name, kana, phone, mobile}], legacy_tenant_code, fix_note
+alter table equipment_tenants add column if not exists profile jsonb not null default '{}'::jsonb;
+
+-- メータ（FileMaker のメータマスタ。メータ番号＝バーコードの中身）
+create table if not exists meters (
+  id           uuid primary key default gen_random_uuid(),
+  meter_no     text not null unique,            -- メータ番号（例 11-A。バーコードは *11-A*）
+  room_no      text,                            -- 部屋番号（21〜23 のような表記もある）
+  tenant_id    uuid references equipment_tenants(id),  -- 所属テナント（空室・未割当は null）
+  seq          int,                             -- テナント内連番（出力の「請求先コード_連番」の後ろ）
+  floor        text,                            -- 階（メータの設置階。B・1〜7）
+  room_name    text,                            -- 貸室名
+  seal_label   text,                            -- メータシール表記
+  detail_note  text,                            -- 請求明細補足（例 21号室）
+  kind         text check (kind in ('電気', 'ガス', '水道')),  -- 検針内容。空は検針しない区画
+  sort_order   int,                             -- 表示順
+  digits       int check (digits between 1 and 9),  -- メーター桁数（桁あふれの計算に使う。Q5）
+  max_value    int,                             -- メーター最大値（参考）
+  expires_on   date,                            -- メータ有効期限（検定切れ）
+  measured     boolean not null default false,  -- 計測対象（空調の割当て・外調按分の対象）
+  removed      boolean not null default false,  -- 検針機撤去済み（出力から外す）
+  area_m2      numeric,                         -- 部屋面積（㎡）
+  area_tsubo   numeric,                         -- 部屋面積（坪）
+  oa_share     boolean not null default false,  -- 外調機電気量の按分有無
+  oa_ratio     numeric,                         -- 外調機電気量の按分比率
+  is_oa_meter  boolean not null default false,  -- 外調機メータ（メータ番号 00。値を2つ持つ）
+  note         text,                            -- 備考
+  legacy_id    text unique,                     -- FileMaker の主キー（再取込の突合用）
+  created_at   timestamptz not null default now(),  -- 移行分は FileMaker の作成日時（出力の並びの最後の決め手）
+  updated_at   timestamptz not null default now()
+);
+create index if not exists meters_tenant_idx on meters (tenant_id, seq);
+drop trigger if exists meters_set_updated_at on meters;
+create trigger meters_set_updated_at before update on meters
+  for each row execute function set_updated_at();
+
+-- 検針値（1メータ・1か月度に1件）
+create table if not exists meter_readings (
+  id            uuid primary key default gen_random_uuid(),
+  meter_id      uuid not null references meters(id),
+  month         text not null check (month ~ '^\d{4}-(0[1-9]|1[0-2])$'),  -- 検針月度 'YYYY-MM'（10/1 の検針＝10月度）
+  read_on       date not null,                  -- 検針日付（ガス・水道は月の半ばで翌月度）
+  read_time     time,                           -- 検針時刻
+  value         numeric,                        -- メーター値
+  value2        numeric,                        -- メーター値_2（外調機のピーク時）
+  prev_override numeric,                        -- 前月の修正（あれば前月値の代わりに使う）
+  diff_override numeric,                        -- 修正差分値（メータ交換など。あれば差分の代わりに使う）
+  -- FileMaker から移した値（前月値・差分）。FileMaker は計算結果を記録時点の状態で保存しており、
+  -- 後から同じ式で計算し直しても一致しない月がある（2019〜2020年など）ため、移行分は保存値をそのまま持つ。
+  -- アプリで入力した月はここが null で、前月の検針値から計算する（docs/meter-plan.md 4章）
+  legacy_prev   numeric,
+  legacy_prev2  numeric,
+  legacy_diff   numeric,
+  legacy_diff2  numeric,
+  billing_code  text,                           -- 記録した時点の請求先コード（入退去後も過去の月が変わらないように）
+  note          text,                           -- 備考
+  recorded_by   text,                           -- 記録者
+  verified_by   text,                           -- 検証者（読み上げで確かめた人。Q12）
+  verified_at   timestamptz,
+  legacy_id     text unique,                    -- FileMaker の主キー
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (meter_id, month)
+);
+create index if not exists meter_readings_month_idx on meter_readings (month);
+drop trigger if exists meter_readings_set_updated_at on meter_readings;
+create trigger meter_readings_set_updated_at before update on meter_readings
+  for each row execute function set_updated_at();
+
+-- 空調機（室内機。空調機番号は集中コントローラの番号）
+create table if not exists meter_ac_units (
+  unit_no    int primary key,                   -- 空調機番号（0〜108）
+  address    text not null,                     -- アドレス番号（例 1:1-00）
+  meter_id   uuid references meters(id),        -- 割当てメータ（その室内機の電力を足し込むメータ）
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+drop trigger if exists meter_ac_units_set_updated_at on meter_ac_units;
+create trigger meter_ac_units_set_updated_at before update on meter_ac_units
+  for each row execute function set_updated_at();
+
+-- 空調データ（集中コントローラの CSV。1か月度×1室内機に1件）
+create table if not exists meter_ac_usage (
+  id             uuid primary key default gen_random_uuid(),
+  month          text not null check (month ~ '^\d{4}-(0[1-9]|1[0-2])$'),  -- 年月度（9月の使用分＝10月度）
+  unit_no        int not null,
+  address        text,
+  hp_code        text,                          -- 馬力コード（&H2d など）
+  day_wh         bigint,                        -- 昼間電力使用量（Wh）。出力に使うのはこれだけ
+  night_wh       bigint,
+  day_stop_wh    bigint,
+  night_stop_wh  bigint,
+  gas            bigint,                        -- ガス使用量（1/1000m3）
+  meter_no       text,                          -- その時点の割当てメータ番号（マスタを直しても過去の月が変わらないように）
+  period_start   date,                          -- CSV の開始日（アプリで取り込んだ分だけ）
+  period_days    int,                           -- CSV の日数
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  unique (month, unit_no)
+);
+drop trigger if exists meter_ac_usage_set_updated_at on meter_ac_usage;
+create trigger meter_ac_usage_set_updated_at before update on meter_ac_usage
+  for each row execute function set_updated_at();
+
+alter table meters         enable row level security;
+alter table meter_readings enable row level security;
+alter table meter_ac_units enable row level security;
+alter table meter_ac_usage enable row level security;
+revoke all on meters, meter_readings, meter_ac_units, meter_ac_usage from anon, authenticated;
+
+-- 定数（FileMaker のコンスタントマスタ）
+insert into settings (key, value) values
+  ('meter_oa_coefficient', '40'),        -- 外調データ係数
+  ('meter_total_area', '3300.07'),       -- 総面積（㎡）
+  ('meter_oa_target_area', '2578.28')    -- 外調機按分対象の面積（㎡）
+on conflict (key) do nothing;

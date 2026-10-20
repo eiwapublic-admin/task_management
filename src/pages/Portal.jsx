@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import {
   IconAddressBook, IconBook,
+  IconGauge,
   IconBox,
   IconBuildingWrench,
   IconCar,
@@ -361,6 +362,7 @@ export default function Portal() {
         { label: '日報用作業定型文', icon: <IconClipboard size={20} />, path: '/reports/templates', staffOnly: true },
         { label: '備品マスタ', icon: <IconBox size={20} />, path: '/equipment/items', staffOnly: true },
         { label: '備品用テナントマスタ', icon: <IconHome size={20} />, path: '/equipment/tenants', staffOnly: true },
+        { label: '検針マスタ', icon: <IconGauge size={20} />, path: '/meter/masters', staffOnly: true },
         // ビルメン作業マスタは owner（小泉産業様）も閲覧できる（docs/bilmen-plan.md 10章）
         { label: 'ビルメン作業マスタ', icon: <IconBuildingWrench size={20} />, path: '/bilmen/masters' },
       ]),
