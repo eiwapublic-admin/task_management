@@ -3,6 +3,7 @@ import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import MeterForm from '../components/MeterForm'
 import MeterTenantForm from '../components/MeterTenantForm'
+import TenantTable from '../components/TenantTable'
 import MeterImportPanel from '../components/MeterImportPanel'
 import { fetchMeterMasters, floorLabel, saveMeterConstants, updateMeterAcUnit } from '../lib/meter'
 import './Dashboard.css'
@@ -67,22 +68,6 @@ export default function MeterMasters() {
     return map
   }, [meters])
 
-  const tenantGroups = useMemo(() => {
-    const list = tenants.filter((t) => showMovedOut || !t.moved_out)
-    const map = new Map()
-    for (const t of list) {
-      const key = t.floor || ''
-      if (!map.has(key)) map.set(key, [])
-      map.get(key).push(t)
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => floorRank(a) - floorRank(b))
-      .map(([floor, rows]) => ({
-        floor,
-        rows: rows.sort((a, b) => (a.billing_code || '~').localeCompare(b.billing_code || '~')),
-      }))
-  }, [tenants, showMovedOut])
-
   // メータはテナントごと（テナントの階→請求先コード→連番）、テナントの無いメータは最後
   const meterGroups = useMemo(() => {
     const list = meters.filter((m) => showRemoved || !m.removed)
@@ -112,7 +97,10 @@ export default function MeterMasters() {
   }, [meters])
 
   function replaceTenant(saved) {
-    setData((d) => ({ ...d, tenants: d.tenants.map((t) => (t.id === saved.id ? saved : t)) }))
+    setData((d) => {
+      const exists = d.tenants.some((t) => t.id === saved.id)
+      return { ...d, tenants: exists ? d.tenants.map((t) => (t.id === saved.id ? saved : t)) : [...d.tenants, saved] }
+    })
     setEditingTenant(null)
   }
 
@@ -146,7 +134,17 @@ export default function MeterMasters() {
             </div>
           }
           actions={
-            tab === 'meters' ? (
+            tab === 'tenants' ? (
+              <button
+                type="button"
+                className="icon-btn-add"
+                onClick={() => setEditingTenant('new')}
+                aria-label="テナントを追加"
+                title="テナントを追加"
+              >
+                ＋
+              </button>
+            ) : tab === 'meters' ? (
               <button
                 type="button"
                 className="icon-btn-add"
@@ -173,45 +171,15 @@ export default function MeterMasters() {
             <div className="meter-list-options">
               <label className="meter-check">
                 <input type="checkbox" checked={showMovedOut} onChange={(e) => setShowMovedOut(e.target.checked)} />
-                退去済みも表示
+                退去済みを含む
               </label>
             </div>
-            <div className="ui-table-wrap">
-              <table className="ui-table meter-table">
-                <thead>
-                  <tr>
-                    <th>請求先コード</th>
-                    <th>正式名称</th>
-                    <th>略称</th>
-                    <th>入居年月日</th>
-                    <th className="is-numeric">メータ</th>
-                    <th>状態</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tenantGroups.map((g) => (
-                    <Fragment key={g.floor}>
-                      <tr className="ui-table-group-head">
-                        <td colSpan={6}>{g.floor ? floorLabel(g.floor) : '階なし（共用エリアなど）'}</td>
-                      </tr>
-                      {g.rows.map((t) => (
-                        <tr key={t.id} className="meter-row" onClick={() => setEditingTenant(t)}>
-                          <td>{t.billing_code || '—'}</td>
-                          <td>{t.name}</td>
-                          <td>{t.short_name}</td>
-                          <td>{formatDate(t.moved_in_on)}</td>
-                          <td className="is-numeric">{meterCountByTenant.get(t.id) || ''}</td>
-                          <td>
-                            {t.moved_out && <span className="ui-badge">退去済み</span>}
-                            {t.first_month_billable && <span className="ui-badge is-warn">初月無料にしない</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TenantTable
+              tenants={tenants}
+              includeMovedOut={showMovedOut}
+              meterCount={meterCountByTenant}
+              onEdit={setEditingTenant}
+            />
           </>
         ) : tab === 'meters' ? (
           <>
@@ -294,7 +262,7 @@ export default function MeterMasters() {
       </div>
 
       {editingTenant && (
-        <MeterTenantForm tenant={editingTenant} onClose={() => setEditingTenant(null)} onSaved={replaceTenant} />
+        <MeterTenantForm tenant={editingTenant === 'new' ? null : editingTenant} onClose={() => setEditingTenant(null)} onSaved={replaceTenant} />
       )}
       {editingMeter && (
         <MeterForm

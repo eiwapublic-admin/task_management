@@ -1,0 +1,37 @@
+/* テナントマスタの一覧（TenantTable.jsx。2026-10-20〜） */
+
+.tenant-table { min-width: 860px; }
+.tenant-table td,
+.tenant-table th { white-space: nowrap; }
+.tenant-table .ui-badge + .ui-badge { margin-left: var(--space-1); }
+.tenant-name-cell { font-weight: 700; color: var(--text-strong); }
+.tenant-note-cell { white-space: normal; min-width: 160px; color: var(--text-muted); font-size: var(--fs-sm); }
+
+.tenant-row.is-clickable { cursor: pointer; }
+.tenant-row.is-clickable:hover td { background: var(--color-brand-softer); }
+
+/* 退去済み: 各階の末尾に灰色の地で */
+.tenant-row.is-moved-out td { background: color-mix(in srgb, var(--text-muted) 16%, var(--bg-surface)); color: var(--text-muted); }
+.tenant-row.is-moved-out .tenant-name-cell { color: var(--text-muted); font-weight: 600; }
+
+/* 列見出しの固定表示。.ui-table-wrap の overflow-x: auto は overflow-y も auto にしてしまい、
+   見出しがページ（.app-scroll）基準で固定されなくなる（sticky-header-overflow-trap）。
+   PC: 枠の overflow を外し、機能ヘッダ（--sticky2-h）のすぐ下に固定する */
+.tenant-table-wrap { overflow: visible; }
+.tenant-table th {
+  position: sticky;
+  top: var(--sticky2-h, 0px);
+  z-index: 1;
+  /* border-collapse では罫線が見出しと一緒に動かないので、下線は影で描く */
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+/* スマートフォン: 表は横にもスクロールするので、枠そのものを高さ上限つきのスクロール領域にし、
+   見出しはその枠の上端に固定する（対策B） */
+@media (max-width: 768px) {
+  .tenant-table-wrap {
+    overflow: auto;
+    max-height: calc(100dvh - var(--app-header-h, 56px) - var(--sticky2-h, 0px) - var(--space-6));
+  }
+  .tenant-table th { top: 0; }
+}

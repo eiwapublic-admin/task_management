@@ -195,7 +195,7 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* テナントマスタ（参照専用。2026-08-26）。docs/equipment-plan.md 2-6・7-1参照 */}
+        {/* テナントマスタ（2026-08-26〜。2026-10-20 から社員は追加・修正もできる。owner は参照だけ） */}
         <Route
           path="/equipment/tenants"
           element={

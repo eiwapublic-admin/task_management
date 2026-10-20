@@ -21,7 +21,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const METER_KINDS = new Set(['電気', 'ガス', '水道'])
 
 const TENANT_COLUMNS =
-  'id, billing_code, name, short_name, floor, moved_out, note, source, moved_in_on, first_month_billable, profile, synced_at, updated_at'
+  'id, billing_code, name, short_name, floor, moved_out, moved_out_on, note, source, moved_in_on, first_month_billable, profile, synced_at, updated_at'
 const METER_COLUMNS =
   'id, meter_no, room_no, tenant_id, seq, floor, room_name, seal_label, detail_note, kind, sort_order, digits, ' +
   'max_value, expires_on, measured, removed, area_m2, area_tsubo, oa_share, oa_ratio, is_oa_meter, note, legacy_id, created_at, updated_at'
@@ -229,45 +229,106 @@ export async function handleMeterMasters(req) {
   }
 }
 
-// PATCH /api/meter/tenants — 入居年月日・初月無料にしない・基本情報（profile）と、
-// 名称など FileMaker と共通の項目。並行運用の間は FileMaker からの同期が名称・略称・階・備考を上書きする
-export async function handleMeterTenantUpdate(req) {
+// テナントの退去（2026-10-20〜）: 退去日（moved_out_on）を入れて表す。前もって入れておけば、その日が来るまでは
+// 入居中のまま。その日になったら moved_out=true にする（保存のとき・毎日3時の定期実行・FileMaker からの同期のあと）。
+// 退去日の無い退去済み（それより前に FileMaker で退去になったもの）は moved_out をそのまま使う
+function movedOutFor(movedOutOn, legacyMovedOut) {
+  return movedOutOn ? movedOutOn <= jstNow().date : legacyMovedOut === true
+}
+
+// 退去日を過ぎたテナントを退去済みにする。1回の通信で済む
+export async function applyTenantMoveOuts(supabase = getAdminClient()) {
+  const { data, error } = await supabase
+    .from('equipment_tenants')
+    .update({ moved_out: true })
+    .lte('moved_out_on', jstNow().date)
+    .eq('moved_out', false)
+    .select('id')
+  if (error) throw new Error(error.message)
+  return data?.length || 0
+}
+
+// テナントの項目（追加・修正で共通）。p に無い項目は触らない
+function tenantFields(p) {
+  const patch = {}
+  if ('name' in p) {
+    const name = text(p.name, 200)
+    if (!name) return { error: '正式名称を入力してください' }
+    patch.name = name
+  }
+  if ('billing_code' in p) {
+    const code = text(p.billing_code, 50)
+    if (!code) return { error: '請求先コードを入力してください' }
+    patch.billing_code = code
+  }
+  if ('short_name' in p) patch.short_name = text(p.short_name, 100)
+  if ('floor' in p) patch.floor = text(p.floor, 10)
+  if ('note' in p) patch.note = text(p.note, 500)
+  if ('moved_out_on' in p || 'moved_out' in p) {
+    const movedOutOn = dateOrNull(p.moved_out_on)
+    patch.moved_out_on = movedOutOn
+    patch.moved_out = movedOutFor(movedOutOn, p.moved_out)
+  }
+  if ('moved_in_on' in p) patch.moved_in_on = dateOrNull(p.moved_in_on)
+  if ('first_month_billable' in p) patch.first_month_billable = p.first_month_billable === true
+  if ('profile' in p) patch.profile = cleanProfile(p.profile)
+  return { patch }
+}
+
+function tenantSaveError(err, label) {
+  if (err.code === '23505') return json({ error: 'この請求先コードは、ほかのテナントで使われています' }, 409)
+  console.error(`${label}:`, err.message)
+  return json({ error: 'テナントの保存に失敗しました' }, 500)
+}
+
+// GET /api/meter/tenants — テナントマスタ（退去済みも。基本情報 profile を含む）
+// POST /api/meter/tenants — テナントの追加（source='manual'）
+// PATCH /api/meter/tenants — 修正。並行運用の間は FileMaker からの同期が名称・略称・階・備考を上書きする
+export async function handleMeterTenants(req) {
   const { error } = await requireStaff(req)
   if (error) return error
   try {
-    const p = await req.json().catch(() => null)
-    const id = typeof p?.id === 'string' && UUID_RE.test(p.id) ? p.id : null
-    if (!id) return json({ error: 'id は必須です' }, 400)
-    const patch = {}
-    if ('name' in p) {
-      const name = text(p.name, 200)
-      if (!name) return json({ error: '正式名称を入力してください' }, 400)
-      patch.name = name
+    const supabase = getAdminClient()
+    if (req.method === 'GET') {
+      const { data, error: err } = await supabase.from('equipment_tenants').select(TENANT_COLUMNS).order('floor').order('billing_code')
+      if (err) {
+        console.error('meter-tenants:', err.message)
+        return json({ error: 'テナントの取得に失敗しました' }, 500)
+      }
+      return json({ tenants: data || [] })
     }
-    if ('short_name' in p) patch.short_name = text(p.short_name, 100)
-    if ('floor' in p) patch.floor = text(p.floor, 10)
-    if ('note' in p) patch.note = text(p.note, 500)
-    if ('moved_out' in p) patch.moved_out = p.moved_out === true
-    if ('moved_in_on' in p) patch.moved_in_on = dateOrNull(p.moved_in_on)
-    if ('first_month_billable' in p) patch.first_month_billable = p.first_month_billable === true
-    if ('profile' in p) patch.profile = cleanProfile(p.profile)
-    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
 
-    const { data, error: err } = await getAdminClient()
+    const p = await req.json().catch(() => null)
+    if (!p || typeof p !== 'object') return json({ error: '内容が正しくありません' }, 400)
+    const { patch, error: fieldErr } = tenantFields(p)
+    if (fieldErr) return json({ error: fieldErr }, 400)
+
+    if (req.method === 'POST') {
+      if (!patch.name || !patch.billing_code) return json({ error: '請求先コードと正式名称は必須です' }, 400)
+      const { data, error: err } = await supabase
+        .from('equipment_tenants')
+        .insert({ ...patch, source: 'manual' })
+        .select(TENANT_COLUMNS)
+        .single()
+      if (err) return tenantSaveError(err, 'meter-tenant-create')
+      return json({ tenant: data })
+    }
+
+    const id = typeof p.id === 'string' && UUID_RE.test(p.id) ? p.id : null
+    if (!id) return json({ error: 'id は必須です' }, 400)
+    if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+    const { data, error: err } = await supabase
       .from('equipment_tenants')
       .update(patch)
       .eq('id', id)
       .select(TENANT_COLUMNS)
       .maybeSingle()
-    if (err) {
-      console.error('meter-tenant-update:', err.message)
-      return json({ error: 'テナントの更新に失敗しました' }, 500)
-    }
+    if (err) return tenantSaveError(err, 'meter-tenant-update')
     if (!data) return json({ error: 'テナントが見つかりません' }, 404)
     return json({ tenant: data })
   } catch (err) {
-    console.error('meter-tenant-update 失敗:', err)
-    return json({ error: 'テナントの更新に失敗しました' }, 500)
+    console.error('meter-tenants 失敗:', err)
+    return json({ error: 'テナントの保存に失敗しました' }, 500)
   }
 }
 

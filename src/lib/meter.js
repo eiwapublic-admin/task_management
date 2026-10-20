@@ -7,8 +7,17 @@ export function fetchMeterMasters() {
   return authFetch('/api/meter/masters')
 }
 
-export function updateMeterTenant(patch) {
-  return authFetch('/api/meter/tenants', { method: 'PATCH', body: JSON.stringify(patch) }).then((d) => d.tenant)
+// テナントマスタ（備品と共有）。社員だけ。基本情報（profile）を含む
+export function fetchMeterTenants() {
+  return authFetch('/api/meter/tenants').then((d) => d.tenants || [])
+}
+
+// id があれば修正、無ければ追加
+export function saveMeterTenant(tenant) {
+  return authFetch('/api/meter/tenants', {
+    method: tenant.id ? 'PATCH' : 'POST',
+    body: JSON.stringify(tenant),
+  }).then((d) => d.tenant)
 }
 
 export function saveMeter(meter) {
