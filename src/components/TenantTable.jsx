@@ -47,14 +47,14 @@ export default function TenantTable({ tenants, includeMovedOut, meterCount = nul
                   className={`tenant-row${onEdit ? ' is-clickable' : ''}${movedOut ? ' is-moved-out' : ''}`}
                   onClick={onEdit ? () => onEdit(t) : undefined}
                 >
-                  <td>{t.billing_code || '—'}</td>
+                  <td className="is-nowrap">{t.billing_code || '—'}</td>
                   <td className="tenant-name-cell">{t.name}</td>
                   <td>{t.short_name || ''}</td>
-                  <td>{formatDate(t.moved_in_on)}</td>
-                  <td>{formatDate(t.moved_out_on)}</td>
+                  <td className="is-nowrap">{formatDate(t.moved_in_on)}</td>
+                  <td className="is-nowrap">{formatDate(t.moved_out_on)}</td>
                   {meterCount && <td className="is-numeric">{meterCount.get(t.id) || ''}</td>}
                   {showMail && <td className="tenant-mail-cell">{(t.notice_emails || []).join(', ')}</td>}
-                  <td>
+                  <td className="is-nowrap">
                     {movedOut && <span className="ui-badge">退去済み</span>}
                     {movingOut && <span className="ui-badge is-warn">退去予定</span>}
                     {t.first_month_billable && <span className="ui-badge is-warn">初月無料にしない</span>}

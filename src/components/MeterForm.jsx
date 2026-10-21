@@ -1,15 +1,8 @@
 import { useMemo, useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { saveMeter } from '../lib/meter'
-import {
-  firstOfMonth,
-  m2ToTsubo,
-  meterNoProblem,
-  normalizeMeterNo,
-  plainText,
-  roomDetailKey,
-  tsuboToM2,
-} from '../lib/meterInput'
+import { firstOfMonth, m2ToTsubo, meterNoProblem, normalizeMeterNo, plainText, roomDetailKey, tsuboToM2 } from '../lib/meterInput'
+import MeterHistoryList from './MeterHistoryList'
 
 function Switch({ checked, onChange, label }) {
   return (
@@ -36,7 +29,7 @@ const round4 = (n) => Math.round(n * 10000) / 10000
 // メータ最大値（10の桁数乗）と外調機の按分比率（部屋面積 ÷ 按分対象の面積の合計）は自動で計算し、入力しない。
 // 入力補助（FileMaker と同じ規則。src/lib/meterInput.js）: 部屋番号からメータ番号・請求明細補足・メータシール表記を、
 // テナントから貸室名を、㎡と坪を互いに換算して、入れ先が空欄のときだけ入れる
-export default function MeterForm({ meter, tenants, meters = [], onClose, onSaved }) {
+export default function MeterForm({ meter, tenants, meters = [], onClose, onSaved, onReverted }) {
   useBodyScrollLock()
   const [form, setForm] = useState(() => ({
     meter_no: toText(meter?.meter_no),
@@ -60,15 +53,14 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
     removed: !!meter?.removed,
   }))
   const [saving, setSaving] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const isNew = !meter
   const [error, setError] = useState('')
   // 新しいメータで「按分する」を手で切り替えていなければ、面積の有無に合わせて自動で入れる（FileMaker の按分有無の既定）
   const [oaTouched, setOaTouched] = useState(!!meter)
 
   // 退去済みのテナントは、いま割り当たっているときだけ選択肢に出す
-  const tenantOptions = useMemo(
-    () => tenants.filter((t) => !t.moved_out || t.id === meter?.tenant_id),
-    [tenants, meter]
-  )
+  const tenantOptions = useMemo(() => tenants.filter((t) => !t.moved_out || t.id === meter?.tenant_id), [tenants, meter])
 
   // 自動で計算する値（保存するとサーバーが同じ式で計算し直す）
   const digits = toNum(form.digits)
@@ -136,7 +128,13 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
     if (form.room_name.trim() || form.detail_note.trim()) {
       const key = roomDetailKey(form.room_name, form.detail_note)
       const dup = others.find((m) => roomDetailKey(m.room_name, m.detail_note) === key)
-      if (dup && !window.confirm(`「貸室名＋請求明細補足」（${key}）がメータ ${dup.meter_no} と同じです。\n請求書で区別できなくなります。それでも保存しますか？`)) return
+      if (
+        dup &&
+        !window.confirm(
+          `「貸室名＋請求明細補足」（${key}）がメータ ${dup.meter_no} と同じです。\n請求書で区別できなくなります。それでも保存しますか？`,
+        )
+      )
+        return
     }
     setSaving(true)
     try {
@@ -223,8 +221,9 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
             </label>
           </div>
           <p className="ui-note">
-            按分比率は「部屋面積（㎡）÷ 按分対象の部屋面積の合計（{oaTargetArea.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}㎡）」を
-            小数第4位で四捨五入した値です。保存すると、ほかのメータの比率も計算し直します。
+            按分比率は「部屋面積（㎡）÷ 按分対象の部屋面積の合計（
+            {oaTargetArea.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}
+            ㎡）」を 小数第4位で四捨五入した値です。保存すると、ほかのメータの比率も計算し直します。
           </p>
           <label className="ui-field">
             <span>備考</span>
@@ -249,19 +248,26 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
                   type="date"
                   className="ui-input"
                   value={form.expires_on}
-                  onChange={(e) => setForm((f) => ({ ...f, expires_on: firstOfMonth(e.target.value) }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      expires_on: firstOfMonth(e.target.value),
+                    }))
+                  }
                 />
               </label>
             </div>
             <p className="ui-note">
-              最大値は 10 の桁数乗です。当月値が前月値より小さいとき（一巡して0に戻ったとき）は、差分にこの値を足します
-              （例: 桁数4・前月 9999・当月 1 → 1 − 9999 + 10000 ＝ 2）。有効期限は月の1日にそろえます。
+              最大値は 10 の桁数乗です。当月値が前月値より小さいとき（一巡して0に戻ったとき）は、差分にこの値を足します （例: 桁数4・前月
+              9999・当月 1 → 1 − 9999 + 10000 ＝ 2）。有効期限は月の1日にそろえます。
             </p>
           </fieldset>
 
           <fieldset className="meter-form-box is-fixed">
             <legend>固定情報</legend>
-            <p className="ui-note">基本的に変わらない項目です。原則として直さないでください（メータ番号を変えるとバーコードの貼り替えが要ります）。</p>
+            <p className="ui-note">
+              基本的に変わらない項目です。原則として直さないでください（メータ番号を変えるとバーコードの貼り替えが要ります）。
+            </p>
             <p className="ui-note">
               部屋番号を入れると、空欄のメータ番号・請求明細補足（〇〇号室）・メータシール表記（部屋番号 貸室名）を自動で入れます。
               メータ番号は英数・スペースと「+-*/$.%」で7文字以内です（括弧は「$」に置き換えます）。
@@ -291,14 +297,34 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
               </label>
               <label className="ui-field">
                 <span>部屋面積（㎡）</span>
-                <input className="ui-input" inputMode="decimal" value={form.area_m2} onChange={set('area_m2')} onBlur={() => blurArea('area_m2')} />
+                <input
+                  className="ui-input"
+                  inputMode="decimal"
+                  value={form.area_m2}
+                  onChange={set('area_m2')}
+                  onBlur={() => blurArea('area_m2')}
+                />
               </label>
               <label className="ui-field">
                 <span>部屋面積（坪）</span>
-                <input className="ui-input" inputMode="decimal" value={form.area_tsubo} onChange={set('area_tsubo')} onBlur={() => blurArea('area_tsubo')} />
+                <input
+                  className="ui-input"
+                  inputMode="decimal"
+                  value={form.area_tsubo}
+                  onChange={set('area_tsubo')}
+                  onBlur={() => blurArea('area_tsubo')}
+                />
               </label>
             </div>
           </fieldset>
+          {!isNew && (
+            <details className="meter-form-history" onToggle={(e) => setHistoryOpen(e.currentTarget.open)}>
+              <summary>このメータの変更履歴</summary>
+              {historyOpen && (
+                <MeterHistoryList table="meters" rowKey={meter.id} tenants={tenants} meters={meters} onReverted={onReverted} limit={50} />
+              )}
+            </details>
+          )}
           {error && <p className="ui-note is-danger">{error}</p>}
         </div>
         <div className="ui-modal-foot">

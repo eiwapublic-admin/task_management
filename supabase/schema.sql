@@ -1356,3 +1356,77 @@ alter table equipment_tenants alter column first_month_billable set default true
 grant usage on schema public to service_role;
 grant select, insert, update, delete on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;
+
+-- ============================================================
+-- 検針マスタ（テナント・メータ・空調機）の変更履歴（2026-10-21〜）
+-- テナントの入れ替えの経緯を残し、誤りを「取り消す」で戻せるようにする。
+-- 記録はトリガーで行う（画面・CSV取込・FileMaker同期・退去日の自動処理のどれでも残る）。
+-- 誰が変えたかは各表の updated_by（Worker が書き込みのたびに入れる）から取る。
+-- updated_at・synced_at・updated_by と、自動で計算し直す oa_ratio・max_value だけが変わったときは残さない
+-- ============================================================
+alter table equipment_tenants add column if not exists updated_by text;
+alter table meters add column if not exists updated_by text;
+alter table meter_ac_units add column if not exists updated_by text;
+
+create table if not exists meter_master_history (
+  id bigint generated always as identity primary key,
+  table_name text not null,            -- equipment_tenants / meters / meter_ac_units
+  row_key text not null,               -- id（空調機は unit_no）
+  op text not null,                    -- insert / update / delete
+  old_row jsonb,
+  new_row jsonb,
+  changed_fields text[],
+  changed_by text,
+  changed_at timestamptz not null default now()
+);
+create index if not exists meter_master_history_row_idx on meter_master_history (table_name, row_key, changed_at desc);
+create index if not exists meter_master_history_at_idx on meter_master_history (changed_at desc);
+alter table meter_master_history enable row level security;
+revoke all on meter_master_history from anon, authenticated;
+grant select, insert, update, delete on meter_master_history to service_role;
+
+create or replace function meter_master_history_log() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  o jsonb;
+  n jsonb;
+  k text;
+  changed text[] := '{}';
+  ignored text[] := array['updated_at', 'created_at', 'synced_at', 'updated_by', 'oa_ratio', 'max_value'];
+begin
+  if tg_op = 'INSERT' then
+    n := to_jsonb(new);
+  elsif tg_op = 'DELETE' then
+    o := to_jsonb(old);
+  else
+    o := to_jsonb(old);
+    n := to_jsonb(new);
+    for k in select jsonb_object_keys(n) loop
+      if not (k = any(ignored)) and (o -> k) is distinct from (n -> k) then
+        changed := changed || k;
+      end if;
+    end loop;
+    if cardinality(changed) = 0 then
+      return null;
+    end if;
+  end if;
+  insert into meter_master_history (table_name, row_key, op, old_row, new_row, changed_fields, changed_by)
+  values (
+    tg_table_name,
+    coalesce(n, o) ->> (case when tg_table_name = 'meter_ac_units' then 'unit_no' else 'id' end),
+    lower(tg_op), o, n, nullif(changed, '{}'),
+    coalesce(n, o) ->> 'updated_by'
+  );
+  return null;
+end $$;
+revoke all on function meter_master_history_log() from public, anon, authenticated;
+
+drop trigger if exists equipment_tenants_history on equipment_tenants;
+create trigger equipment_tenants_history after insert or update or delete on equipment_tenants
+  for each row execute function meter_master_history_log();
+drop trigger if exists meters_history on meters;
+create trigger meters_history after insert or update or delete on meters
+  for each row execute function meter_master_history_log();
+drop trigger if exists meter_ac_units_history on meter_ac_units;
+create trigger meter_ac_units_history after insert or update or delete on meter_ac_units
+  for each row execute function meter_master_history_log();

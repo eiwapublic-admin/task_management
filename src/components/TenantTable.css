@@ -1,11 +1,14 @@
 /* テナントマスタの一覧（TenantTable.jsx。2026-10-20〜） */
 
-.tenant-table { min-width: 860px; }
-.tenant-table td,
-.tenant-table th { white-space: nowrap; }
+/* PC: 表を枠の幅に収める（収まらずはみ出すと、はみ出た列に枠の背景が無く、固定した見出しの右にも行が透けて見えた。
+   2026-10-21 指摘）。名称・略称・案内メール・備考は折り返し、コード・日付・状態は折り返さない */
+.tenant-table { width: 100%; }
+.tenant-table th,
+.tenant-table .is-nowrap { white-space: nowrap; }
+.tenant-table td { overflow-wrap: anywhere; }
 .tenant-table .ui-badge + .ui-badge { margin-left: var(--space-1); }
 .tenant-name-cell { font-weight: 700; color: var(--text-strong); }
-.tenant-note-cell { white-space: normal; min-width: 160px; color: var(--text-muted); font-size: var(--fs-sm); }
+.tenant-note-cell { min-width: 120px; color: var(--text-muted); font-size: var(--fs-sm); }
 
 .tenant-row.is-clickable { cursor: pointer; }
 .tenant-row.is-clickable:hover td { background: var(--color-brand-softer); }
@@ -26,13 +29,16 @@
   box-shadow: inset 0 -1px 0 var(--border);
 }
 
-/* スマートフォン: 表は横にもスクロールするので、枠そのものを高さ上限つきのスクロール領域にし、
+/* スマートフォン・狭い PC: 表は横にもスクロールするので、枠そのものを高さ上限つきのスクロール領域にし、
    見出しはその枠の上端に固定する（対策B） */
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
+  .tenant-table { min-width: 860px; }
+  .tenant-table td { white-space: nowrap; overflow-wrap: normal; }
+  .tenant-table .tenant-note-cell { white-space: normal; min-width: 160px; }
   .tenant-table-wrap {
     overflow: auto;
     max-height: calc(100dvh - var(--app-header-h, 56px) - var(--sticky2-h, 0px) - var(--space-6));
   }
   .tenant-table th { top: 0; }
 }
-.tenant-mail-cell { font-size: var(--fs-sm); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.tenant-mail-cell { font-size: var(--fs-sm); min-width: 140px; }

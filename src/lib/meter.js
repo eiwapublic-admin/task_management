@@ -61,13 +61,16 @@ export const TENANT_PROFILE_FIELDS = [
   { key: 'capacity', label: '収容人数', type: 'number' },
   { key: 'representative', label: '代表者名' },
   { key: 'phone', label: '代表電話番号' },
-  { key: 'email', label: '連絡先メールアドレス' },
+  // 連絡先メールアドレスは案内メールの宛先にまとめた（2026-10-21）。データは残し、画面には出さない
+  { key: 'email', label: '連絡先メールアドレス', hidden: true },
   { key: 'fire_manager', label: '火元責任者' },
   { key: 'fire_manager_title', label: '火元責任者の職名' },
   { key: 'fire_manager_appointed_on', label: '火元責任者の選任日', type: 'date' },
   { key: 'fire_manager_note', label: '火元責任者の補足' },
-  { key: 'legacy_tenant_code', label: 'テナントコード（旧）' },
-  { key: 'fix_note', label: '修正に関する備考' },
+  // テナントコード（旧）はデータだけ残し、画面には出さない（2026-10-21）
+  { key: 'legacy_tenant_code', label: 'テナントコード（旧）', hidden: true },
+  // 修正に関する備考は、画面の最下部に横長で出す（2026-10-21）
+  { key: 'fix_note', label: '修正に関する備考', wide: true },
 ]
 
 // ---------- 月度の作業（Phase 2。2026-10-20〜） ----------
@@ -174,4 +177,21 @@ export function activeMeters(meters) {
 // ダッシュボードの「検針」カード用（2026-10-20〜）
 export function fetchMeterSummary() {
   return authFetch('/api/meter/summary')
+}
+
+// ---------- 検針マスタの変更履歴（2026-10-21〜） ----------
+
+// table・key を渡すとその1件の履歴だけ（table: equipment_tenants / meters / meter_ac_units）
+export function fetchMeterHistory({ table, key, limit } = {}) {
+  const q = new URLSearchParams()
+  if (table) q.set('table', table)
+  if (key != null) q.set('key', String(key))
+  if (limit) q.set('limit', String(limit))
+  return authFetch(`/api/meter/history?${q}`).then((d) => d.history || [])
+}
+
+export const HISTORY_CONFLICT_MESSAGE = 'この変更のあとでさらに変わっています'
+
+export function revertMeterHistory(id, { force = false } = {}) {
+  return authFetch('/api/meter/history/revert', { method: 'POST', body: JSON.stringify({ id, force }) })
 }
