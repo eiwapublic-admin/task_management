@@ -36,6 +36,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          # 22系の最新パッチを毎回取る（ランナーに入っている古い22系のままだと
+          # Node.js のセキュリティ修正が反映されない。2026-10-21 の修正版は 22.23.4）
+          check-latest: true
           cache: npm
 
       - name: Install dependencies
