@@ -69,6 +69,14 @@ export const TENANT_PROFILE_FIELDS = [
   { key: 'fire_manager_note', label: '火元責任者の補足' },
   // テナントコード（旧）はデータだけ残し、画面には出さない（2026-10-21）
   { key: 'legacy_tenant_code', label: 'テナントコード（旧）', hidden: true },
+  // ここから4つはテナント一覧表・緊急連絡先一覧表（Excel 出力）の列（2026-10-21〜）。
+  // 部屋番号は空なら旧テナントコード → メータの部屋番号の順で補う。会社電話番号は空なら代表電話番号
+  { key: 'room_label', label: '部屋番号（一覧表）' },
+  { key: 'plate_name', label: 'プレート表示名' },
+  { key: 'company_phone', label: '会社電話番号（緊急連絡先一覧）' },
+  { key: 'entry_date', label: '記入日', type: 'date' },
+  { key: 'update_info', label: '更新情報（一覧表）', wide: true },
+  { key: 'list_exclude', label: 'テナント一覧表・緊急連絡先一覧表に載せない', type: 'checkbox' },
   // 修正に関する備考は、画面の最下部に横長で出す（2026-10-21）
   { key: 'fix_note', label: '修正に関する備考', wide: true },
 ]
