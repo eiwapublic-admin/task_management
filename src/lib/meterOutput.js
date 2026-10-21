@@ -87,12 +87,35 @@ function tidy(n) {
   return Math.round(n * 1e6) / 1e6
 }
 
+// 小数第 n 位で四捨五入（FileMaker の Round と同じく、0.5 は絶対値の大きい方へ。浮動小数の誤差を避けて指数表記で丸める）
+export function roundTo(n, digits) {
+  const v = tidy(n)
+  const r = Math.round(Number(`${Math.abs(v)}e${digits}`))
+  return Math.sign(v) * Number(`${r}e-${digits}`) || 0
+}
+
+/**
+ * 入居した月の扱い（FileMaker の「メーター値_差分_自動計算値」「空調外調_合計」。2026-10-21 デザインレポートで確認）。
+ * 入居前の分を請求しないよう、検針月度の前月（請求対象の月）より後に入居したテナントの差分と空調外調を0にする。
+ * 「初月無料にしない」でないテナントは、入居した月（＝請求対象の月が入居月）も0にする（旧来の初月無料）。
+ * 入居年月日の無いテナント・テナントの無いメータは対象外
+ * @returns {boolean} 0にする月か
+ */
+export function isMoveInFreeMonth(tenant, month) {
+  if (!tenant?.moved_in_on) return false
+  const movedIn = tenant.moved_in_on.slice(0, 7)
+  const billed = shiftMonth(month, -1)
+  return tenant.first_month_billable ? movedIn > billed : movedIn >= billed
+}
+
 // 1件の検針値の「前月値・差分」（2系統）。FileMaker から移した月は保存値をそのまま使い、
 // アプリで入力した月は前月の検針値から計算する（docs/meter-plan.md 4章）。
 // 差分は「当月値 − 前月値」。当月値の方が小さければ一巡して0に戻ったとみなし、メータ最大値（10の桁数乗）を足す
 // （Q5。例: 桁数4・前月9999・当月1 → 1 − 9999 + 10000 ＝ 2）。最大値が無ければ桁数から求める。
-// 「前月の修正」があればそれを前月値に、「修正差分値」があればそれを差分にする
-export function readingUsage(reading, prevReading, meter) {
+// 「前月の修正」があればそれを前月値に、「修正差分値」があればそれを差分にする。
+// freeMonth（isMoveInFreeMonth）なら、自動で計算する差分を0にする（修正差分値は手で入れた値なのでそのまま）。
+// 差分_2（外調機の2つめ）は FileMaker では一巡の補正も入居の扱いも無いが、一巡の補正だけはこちらでも掛ける
+export function readingUsage(reading, prevReading, meter, { freeMonth = false } = {}) {
   const maxValue = Number(meter?.max_value) || (meter?.digits ? 10 ** meter.digits : null)
   const wrap = (d) => (d < 0 && maxValue ? d + maxValue : d)
   const prev =
@@ -101,6 +124,7 @@ export function readingUsage(reading, prevReading, meter) {
   let diff = reading.legacy_diff
   if (diff == null) {
     if (reading.diff_override != null) diff = reading.diff_override
+    else if (freeMonth) diff = 0
     else diff = reading.value == null ? 0 : tidy(wrap(reading.value - prev))
   }
   let diff2 = reading.legacy_diff2
@@ -109,6 +133,8 @@ export function readingUsage(reading, prevReading, meter) {
 }
 
 // 出力の並び: テナントの階（空欄が先）→ 請求先コード → メータの階 → テナント内連番 → メータ番号。
+// FileMaker の「検針データ_Excel出力_V3」は連番の次に部屋番号でも並べるが、漢字の部屋番号（玄関・再生）を
+// FileMaker は読みの順に並べるため、ここでは入れない（同じ連番の行はメータ番号の順で FileMaker と一致する）。
 // テナントに属さないメータは最後
 function compareMeters(a, b) {
   const key = (x) => [
@@ -158,12 +184,15 @@ export function buildMeterOutput({ month, tenants, meters, readings, acUsage, oa
     acByMeter.set(u.meter_no, acc)
   }
 
-  // 外調機の当月の電力量（外調機メータの差分＋差分_2）
-  const oaMeter = meters.find((m) => m.is_oa_meter && !m.removed)
+  // 外調機の当月の電力量（その月に検針値のある外調機メータすべての 差分＋差分_2 の合計。
+  // FileMaker の「廃止_外調機電気量_当月」＝ Sum(同じ月度の検針記録の 外調機電気量)。名前は「廃止」だが現役）
   let oaTotal = 0
-  if (oaMeter && current.has(oaMeter.id)) {
-    const u = readingUsage(current.get(oaMeter.id), previous.get(oaMeter.id), oaMeter)
-    oaTotal = tidy(u.diff + u.diff2)
+  for (const oaMeter of meters.filter((m) => m.is_oa_meter && current.has(m.id))) {
+    const tenant = oaMeter.tenant_id ? tenantById.get(oaMeter.tenant_id) : null
+    const u = readingUsage(current.get(oaMeter.id), previous.get(oaMeter.id), oaMeter, {
+      freeMonth: isMoveInFreeMonth(tenant, month),
+    })
+    oaTotal = tidy(oaTotal + u.diff + u.diff2)
   }
 
   const items = meters
@@ -175,7 +204,8 @@ export function buildMeterOutput({ month, tenants, meters, readings, acUsage, oa
   const built = items.map(({ meter, tenant }) => {
     const reading = current.get(meter.id) || null
     const prevReading = previous.get(meter.id) || null
-    const usage = reading ? readingUsage(reading, prevReading, meter) : null
+    const freeMonth = isMoveInFreeMonth(tenant, month)
+    const usage = reading ? readingUsage(reading, prevReading, meter, { freeMonth }) : null
     const code = tenant?.billing_code || null
 
     const ac = acByMeter.get(meter.meter_no)
@@ -183,12 +213,14 @@ export function buildMeterOutput({ month, tenants, meters, readings, acUsage, oa
     const acBilling = ac ? Math.floor(ac.wh / 1000) : null
 
     // 外調機: その月の検針値があるメータだけ当月値を持つ（無ければ空欄）。
-    // 按分量は「当月値も比率も空」なら空欄、請求用は係数が常にあるので常に数値
+    // 按分量は「当月値も比率も空」なら空欄、請求用は係数が常にあるので常に数値。
+    // FileMaker と同じく 按分量 ＝ Round(当月 × 比率; 3)、請求用 ＝ Round(按分量 × 係数; 0) の2段で丸める
     const oaMonth = reading ? oaTotal : null
     const oaRatio = meter.oa_ratio ?? null
-    const oaShare = oaMonth == null && oaRatio == null ? null : tidy((oaMonth || 0) * (oaRatio || 0))
-    const oaBilling = Math.round((oaMonth || 0) * oaCoefficient * (oaRatio || 0))
-    const acOaTotal = oaBilling + (acBilling || 0)
+    const oaShare = oaMonth == null && oaRatio == null ? null : roundTo((oaMonth || 0) * (oaRatio || 0), 3)
+    const oaBilling = roundTo((oaShare || 0) * oaCoefficient, 0)
+    // 空調外調_合計: 入居前（と初月無料のテナントの入居月）は0
+    const acOaTotal = freeMonth ? 0 : oaBilling + (acBilling || 0)
 
     const readOn = reading?.read_on || null
     const periodMonth = readOn ? shiftMonth(readOn.slice(0, 7), -1) : null

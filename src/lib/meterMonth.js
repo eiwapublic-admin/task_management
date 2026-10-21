@@ -1,6 +1,6 @@
 // 検針一覧・値の入力で使う、月度ごとの行の組み立て（2026-10-20〜。docs/meter-plan.md 5章）。
 // 並びは出力（検針データ_yyyy年mm月分）と同じ: テナントの階 → 請求先コード → メータの階 → 連番 → メータ番号
-import { readingUsage, shiftMonth } from './meterOutput'
+import { isMoveInFreeMonth, readingUsage, shiftMonth } from './meterOutput'
 import { activeMeters, latestPhotoByMeter } from './meter'
 
 // 前月比（当月の使用量 ÷ 前月の使用量）がこの範囲の外なら、一覧で黄色にして確かめてもらう
@@ -41,20 +41,24 @@ export function buildMonthRows(data) {
 
   return activeMeters(data.meters)
     .map((meter) => {
+      const tenant = meter.tenant_id ? tenantById.get(meter.tenant_id) || null : null
       const reading = readingOf.get(`${meter.id}|${month}`) || null
       const prevReading = readingOf.get(`${meter.id}|${prevMonth}`) || null
       const prev2Reading = readingOf.get(`${meter.id}|${prev2Month}`) || null
       const entered = reading?.value != null
       // 当月が未入力でも前月値は見せる（入力の目安になる）
-      const usage = readingUsage(reading || { value: null }, prevReading, meter)
-      const prevUsage = prevReading ? readingUsage(prevReading, prev2Reading, meter) : null
+      // 入居前の月は差分を0にする（出力と同じ。isMoveInFreeMonth）
+      const usage = readingUsage(reading || { value: null }, prevReading, meter, { freeMonth: isMoveInFreeMonth(tenant, month) })
+      const prevUsage = prevReading
+        ? readingUsage(prevReading, prev2Reading, meter, { freeMonth: isMoveInFreeMonth(tenant, prevMonth) })
+        : null
       const total = entered ? usage.diff + (meter.is_oa_meter ? usage.diff2 : 0) : null
       const prevTotal = prevUsage ? prevUsage.diff + (meter.is_oa_meter ? prevUsage.diff2 : 0) : null
       const ratio = total != null && prevTotal ? total / prevTotal : null
       const unusual = ratio != null && (ratio >= RATIO_WARN_HIGH || ratio <= RATIO_WARN_LOW)
       return {
         meter,
-        tenant: meter.tenant_id ? tenantById.get(meter.tenant_id) || null : null,
+        tenant,
         reading,
         prevReading,
         usage,

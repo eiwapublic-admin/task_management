@@ -39,7 +39,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
     moved_out_on: tenant.moved_out_on || '',
     moved_in_on: tenant.moved_in_on || '',
     notice_emails: (tenant.notice_emails || []).join('\n'),
-    first_month_billable: !!tenant.first_month_billable,
+    first_month_billable: isNew ? true : !!tenant.first_month_billable, // 新規は「初月無料にしない」（FileMaker の現在の既定）
   }))
   const [profile, setProfile] = useState(() => {
     const p = { ...(tenant.profile || {}) }
