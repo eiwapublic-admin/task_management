@@ -177,8 +177,9 @@ export async function updateBilmenMailSettings(patch) {
 // コードポイント順のままになる点は変わらない）
 // 2026-10-20〜: テナントの宛先はテナントマスタ（案内メールの宛先）から来る（tenants。ここでは直せない）。
 // others はそれ以外の宛先（小泉産業様の担当者・栄和ML など）で、メール設定の画面で直す
-export async function fetchBilmenMailRecipients() {
-  const data = await authFetch('/api/bilmen/mail/recipients')
+// month（'YYYY-MM'）を渡すと、その月の1日の時点で退去済みのテナントを省く（テナントへ報知の画面）
+export async function fetchBilmenMailRecipients(month = null) {
+  const data = await authFetch(`/api/bilmen/mail/recipients${month ? `?month=${encodeURIComponent(month)}` : ''}`)
   const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'ja')
   const floorRank = (f) => ['B', '1', '2', '3', '4', '5', '6', '7'].indexOf(f || '') >>> 0
   return {
@@ -187,6 +188,27 @@ export async function fetchBilmenMailRecipients() {
     ),
     others: [...(data.recipients || [])].sort(byName),
   }
+}
+
+// 一覧表示用: テナントは1社1行にまとめる（アドレスが複数あっても）。その他は1宛先1行
+export function groupBilmenRecipients(list) {
+  const rows = []
+  const byTenant = new Map()
+  for (const r of list) {
+    if (r.tenant_id) {
+      const row = byTenant.get(r.tenant_id)
+      if (row) {
+        row.emails.push(r.email)
+        continue
+      }
+      const created = { key: r.tenant_id, name: r.tenant_name || r.name, emails: [r.email] }
+      byTenant.set(r.tenant_id, created)
+      rows.push(created)
+    } else {
+      rows.push({ key: r.id || r.email, name: r.name, emails: [r.email] })
+    }
+  }
+  return rows
 }
 
 // 実際に送る宛先（テナント＋有効なその他。同じアドレスは1回だけ）。下書き（サーバー側）と同じ考え方
