@@ -382,3 +382,13 @@ export function IconGauge(props) {
     </Icon>
   )
 }
+
+// 鉛筆（書く・直す。2026-10-21 検針マスタの変更理由）
+export function IconPencil(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </Icon>
+  )
+}

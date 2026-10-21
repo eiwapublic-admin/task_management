@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { IconPencil } from './Icons'
 import {
   HISTORY_CONFLICT_MESSAGE,
   TENANT_PROFILE_FIELDS,
@@ -239,8 +240,15 @@ export default function MeterHistoryList({ table = null, rowKey = null, tenants 
                 <div className="meter-history-reason">
                   <span className="meter-history-label">変更理由</span>
                   {h.reason ? <span>{h.reason}</span> : <span className="meter-history-none">（なし）</span>}
-                  <button type="button" className="meter-history-reason-btn" onClick={() => editReason(h)} disabled={busyId != null}>
-                    {h.reason ? '直す' : '書く'}
+                  <button
+                    type="button"
+                    className="meter-history-reason-btn"
+                    onClick={() => editReason(h)}
+                    disabled={busyId != null}
+                    aria-label={h.reason ? '変更理由を直す' : '変更理由を書く'}
+                    title={h.reason ? '変更理由を直す' : '変更理由を書く'}
+                  >
+                    <IconPencil size={16} />
                   </button>
                 </div>
                 {lines.length > 0 && (
