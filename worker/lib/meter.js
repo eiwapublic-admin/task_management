@@ -1102,7 +1102,10 @@ export async function handleMeterHistory(req) {
     const url = new URL(req.url)
     const table = url.searchParams.get('table')
     const key = url.searchParams.get('key')
-    const limit = Math.min(Math.max(int(url.searchParams.get('limit')) || 200, 1), 500)
+    // since（YYYY-MM-DD。日本時間のその日の0時から）を渡すと、それ以降の変更だけ（緊急連絡先一覧表 PDF の更新情報。2026-10-21〜）
+    const since = url.searchParams.get('since')
+    if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) return json({ error: 'since が不正です' }, 400)
+    const limit = Math.min(Math.max(int(url.searchParams.get('limit')) || 200, 1), since ? 2000 : 500)
     let q = getAdminClient()
       .from('meter_master_history')
       .select('id, table_name, row_key, op, old_row, new_row, changed_fields, changed_by, changed_at, reason')
@@ -1114,6 +1117,7 @@ export async function handleMeterHistory(req) {
       q = q.eq('table_name', table)
       if (key) q = q.eq('row_key', key.slice(0, 64))
     }
+    if (since) q = q.gte('changed_at', `${since}T00:00:00+09:00`)
     const { data, error: err } = await q
     if (err) {
       console.error('meter-history:', err.message)

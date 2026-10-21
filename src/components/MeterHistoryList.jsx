@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { IconPencil } from './Icons'
 import {
   HISTORY_CONFLICT_MESSAGE,
-  TENANT_PROFILE_FIELDS,
+  TENANT_FIELD_LABELS,
+  TENANT_PROFILE_LABELS,
   askChangeReason,
   fetchMeterHistory,
   revertMeterHistory,
@@ -21,21 +22,7 @@ const TABLE_LABELS = {
 }
 
 const FIELD_LABELS = {
-  equipment_tenants: {
-    billing_code: '請求先コード',
-    name: '正式名称',
-    short_name: '略称',
-    floor: '階',
-    moved_in_on: '入居年月日',
-    moved_out_on: '退去日',
-    moved_out: '退去済み',
-    first_month_billable: '初月無料にしない',
-    notice_emails: '案内メールの宛先',
-    note: '備考',
-    profile: '基本情報',
-    default_item_id: '既定の備品',
-    source: '登録元',
-  },
+  equipment_tenants: TENANT_FIELD_LABELS,
   meters: {
     meter_no: 'メータ番号',
     tenant_id: 'テナント',
@@ -59,7 +46,7 @@ const FIELD_LABELS = {
   },
   meter_ac_units: { address: 'アドレス', meter_id: '割当てメータ' },
 }
-const PROFILE_LABELS = Object.fromEntries([...TENANT_PROFILE_FIELDS.map((f) => [f.key, f.label]), ['emergency_contacts', '緊急連絡先']])
+const PROFILE_LABELS = TENANT_PROFILE_LABELS
 const HIDDEN = new Set(['id', 'unit_no', 'created_at', 'updated_at', 'updated_by', 'synced_at', 'oa_ratio', 'max_value', 'legacy_id'])
 
 function formatAt(iso) {
