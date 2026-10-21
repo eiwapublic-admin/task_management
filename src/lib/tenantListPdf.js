@@ -88,35 +88,9 @@ const COLUMNS = {
   ],
 }
 
-const STYLE = `
-@page { size: A4 landscape; margin: 0; }
-* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { margin: 0; padding: 0; background: #fff; }
-body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif; color: #1f2937; }
-.page { width: 297mm; height: 210mm; padding: 8mm 9mm; overflow: hidden; }
-.fit { transform-origin: 0 0; }
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
-h1 { margin: 0; font-size: 17pt; font-weight: bold; color: #0f766e; padding-left: 10px; border-left: 6px solid #14b8a6; letter-spacing: .04em; }
-.kpis { display: flex; gap: 8px; }
-.kpis div { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 3px 12px; font-size: 7pt; color: #115e59; text-align: center; min-width: 25mm; }
-.kpis b { display: block; font-size: 13pt; color: #0f766e; }
-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 8pt; line-height: 1.3; }
-th, td { padding: 2px 5px; vertical-align: middle; text-align: left; }
-th { background: #0f766e; color: #fff; font-size: 7.4pt; font-weight: bold; white-space: nowrap; }
-th:first-child { border-radius: 6px 0 0 0; } th:last-child { border-radius: 0 6px 0 0; }
-td { border-bottom: 1px solid #e2e8f0; }
-tr.last td { border-bottom: 2px solid #99f6e4; }
-.floor { background: #f0fdfa; color: #0f766e; font-weight: bold; font-size: 11pt; text-align: center; white-space: nowrap;
-  border-left: 4px solid #14b8a6; border-bottom: 2px solid #99f6e4 !important; }
-.c { text-align: center; } .r { text-align: right; } .nw { white-space: nowrap; }
-.name { font-weight: bold; }
-.mail { font-size: 7pt; word-break: break-all; }
-.sub { font-size: 6.6pt; color: #6b7280; }
-.contact { white-space: nowrap; } .contact b { display: block; }
-.tel { display: block; font-size: 7pt; color: #374151; }
-.upd { font-size: 7pt; color: #0f766e; min-width: 50mm; }
-footer { margin-top: 5px; font-size: 6.8pt; color: #9ca3af; text-align: right; }
-`
+// 書式は public/print/tenant-list.css。アプリの CSP（style-src 'self'）では iframe に埋め込んだ <style> が無視されるため、
+// 同じオリジンのファイルとして読み込む（2026-10-21。埋め込みにしていたら本番で書式が全く効かなかった）
+const STYLE_URL = '/print/tenant-list.css'
 
 function sheetHtml(kind, groups, { since, today }) {
   const label = TENANT_PDF_KINDS[kind].label
@@ -173,7 +147,7 @@ export function fitToPage(doc) {
 }
 
 /** 印刷用の HTML を作る（kind: 'tenants' | 'emergency'。since は緊急連絡先一覧表の更新情報の起点 YYYY-MM-DD） */
-export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], since = '', today = jstToday() }) {
+export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], since = '', today = jstToday(), styleHref = STYLE_URL }) {
   const updatesByTenant = new Map()
   for (const h of [...history].sort((a, b) => String(a.changed_at).localeCompare(String(b.changed_at)))) {
     if (h.table_name && h.table_name !== 'equipment_tenants') continue
@@ -189,7 +163,7 @@ export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], si
   const title = `${TENANT_PDF_KINDS[kind].label}_${today.replaceAll('-', '')}`
   return {
     title,
-    html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${STYLE}</style></head><body>${sheetHtml(kind, groups, { since, today })}</body></html>`,
+    html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><link rel="stylesheet" href="${esc(styleHref)}"></head><body>${sheetHtml(kind, groups, { since, today })}</body></html>`,
   }
 }
 
@@ -219,7 +193,15 @@ export async function printTenantListPdf(kind, { since = '' } = {}) {
     fetchMeterMasters(),
     kind === 'emergency' ? fetchMeterHistory({ table: 'equipment_tenants', since, limit: 2000 }) : [],
   ])
-  const { title, html } = buildTenantListPdfHtml(kind, { tenants: data.tenants || [], meters: data.meters || [], history, since })
+  // iframe（about:blank）の中では相対パスが解決されないことがあるので、絶対 URL で渡す
+  const styleHref = new URL(STYLE_URL, window.location.origin).href
+  const { title, html } = buildTenantListPdfHtml(kind, {
+    tenants: data.tenants || [],
+    meters: data.meters || [],
+    history,
+    since,
+    styleHref,
+  })
 
   const frame = document.createElement('iframe')
   frame.setAttribute('aria-hidden', 'true')
@@ -230,6 +212,19 @@ export async function printTenantListPdf(kind, { since = '' } = {}) {
   doc.open()
   doc.write(html)
   doc.close()
+  // 書式のファイルを読み終えてから大きさを合わせる（読み込めなければ崩れた表を印刷しないよう止める）
+  const link = doc.querySelector('link[rel="stylesheet"]')
+  if (!link.sheet) {
+    const ok = await new Promise((resolve) => {
+      link.addEventListener('load', () => resolve(true), { once: true })
+      link.addEventListener('error', () => resolve(false), { once: true })
+      setTimeout(() => resolve(!!link.sheet), 10000)
+    })
+    if (!ok) {
+      frame.remove()
+      throw new Error('印刷用の書式を読み込めませんでした。画面を再読み込みしてからもう一度お試しください')
+    }
+  }
   await (doc.fonts?.ready ?? Promise.resolve())
   fitToPage(doc)
 
