@@ -1,0 +1,29 @@
+/* テナント一覧表・緊急連絡先一覧表の印刷用 PDF の書式（src/lib/tenantListPdf.js が iframe に読み込む。2026-10-21〜）。
+   アプリの CSP（style-src 'self'）で埋め込みの <style> が効かないため、別ファイルにしている */
+@page { size: A4 landscape; margin: 0; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif; color: #1f2937; }
+.page { width: 297mm; height: 208mm; padding: 8mm 9mm; overflow: hidden; }
+.fit { transform-origin: 0 0; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+h1 { margin: 0; font-size: 17pt; font-weight: bold; color: #0f766e; padding-left: 10px; border-left: 6px solid #14b8a6; letter-spacing: .04em; }
+.kpis { display: flex; gap: 8px; }
+.kpis div { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 3px 12px; font-size: 7pt; color: #115e59; text-align: center; min-width: 25mm; }
+.kpis b { display: block; font-size: 13pt; color: #0f766e; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 8pt; line-height: 1.3; }
+th, td { padding: 2px 5px; vertical-align: middle; text-align: left; }
+th { background: #0f766e; color: #fff; font-size: 7.4pt; font-weight: bold; white-space: nowrap; }
+th:first-child { border-radius: 6px 0 0 0; } th:last-child { border-radius: 0 6px 0 0; }
+td { border-bottom: 1px solid #e2e8f0; }
+tr.last td { border-bottom: 2px solid #99f6e4; }
+.floor { background: #f0fdfa; color: #0f766e; font-weight: bold; font-size: 11pt; text-align: center; white-space: nowrap;
+  border-left: 4px solid #14b8a6; border-bottom: 2px solid #99f6e4 !important; }
+.c { text-align: center; } .r { text-align: right; } .nw { white-space: nowrap; }
+.name { font-weight: bold; }
+.mail { font-size: 7pt; word-break: break-all; }
+.sub { font-size: 6.6pt; color: #6b7280; }
+.contact { white-space: nowrap; } .contact b { display: block; }
+.tel { display: block; font-size: 7pt; color: #374151; }
+td.upd { font-size: 7pt; color: #0f766e; min-width: 50mm; }
+footer { margin-top: 5px; font-size: 6.8pt; color: #9ca3af; text-align: right; }
