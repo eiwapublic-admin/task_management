@@ -200,9 +200,10 @@ export default function MeterMasters() {
                       <th>階</th>
                       <th>請求明細補足</th>
                       <th>検針内容</th>
-                      <th className="is-numeric">桁数</th>
                       <th>有効期限</th>
                       <th>計測対象</th>
+                      <th className="is-numeric">坪</th>
+                      <th className="is-numeric">㎡</th>
                       <th className="is-numeric">按分比率</th>
                     </tr>
                   </thead>
@@ -210,7 +211,7 @@ export default function MeterMasters() {
                     {meterGroups.map((g) => (
                       <Fragment key={g.tenant?.id || 'none'}>
                         <tr className="ui-table-group-head">
-                          <td colSpan={10}>
+                          <td colSpan={11}>
                             {g.tenant
                               ? `${g.tenant.billing_code || '—'} ${g.tenant.short_name || g.tenant.name}${g.tenant.moved_out ? '（退去済み）' : ''}`
                               : 'テナントなし（空室・未割当）'}
@@ -230,9 +231,10 @@ export default function MeterMasters() {
                               <td>{m.floor ? floorLabel(m.floor) : ''}</td>
                               <td>{m.detail_note}</td>
                               <td>{m.kind || '—'}</td>
-                              <td className="is-numeric">{m.digits ?? ''}</td>
                               <td className={expired ? 'meter-expired' : ''}>{formatDate(m.expires_on)}</td>
                               <td>{m.measured ? '○' : ''}</td>
+                              <td className="is-numeric">{m.area_tsubo ?? ''}</td>
+                              <td className="is-numeric">{m.area_m2 ?? ''}</td>
                               <td className="is-numeric">{m.oa_share ? (m.oa_ratio ?? '') : ''}</td>
                             </tr>
                           )
