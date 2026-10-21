@@ -190,13 +190,36 @@ export function fetchMeterSummary() {
 // ---------- 検針マスタの変更履歴（2026-10-21〜） ----------
 
 // table・key を渡すとその1件の履歴だけ（table: equipment_tenants / meters / meter_ac_units）
-export function fetchMeterHistory({ table, key, limit } = {}) {
+// since（YYYY-MM-DD）を渡すとその日以降の変更だけ
+export function fetchMeterHistory({ table, key, limit, since } = {}) {
   const q = new URLSearchParams()
   if (table) q.set('table', table)
   if (key != null) q.set('key', String(key))
+  if (since) q.set('since', since)
   if (limit) q.set('limit', String(limit))
   return authFetch(`/api/meter/history?${q}`).then((d) => d.history || [])
 }
+
+// テナントの項目名（変更履歴の表示と、緊急連絡先一覧表 PDF の更新情報で使う）
+export const TENANT_FIELD_LABELS = {
+  billing_code: '請求先コード',
+  name: '正式名称',
+  short_name: '略称',
+  floor: '階',
+  moved_in_on: '入居年月日',
+  moved_out_on: '退去日',
+  moved_out: '退去済み',
+  first_month_billable: '初月無料にしない',
+  notice_emails: '案内メールの宛先',
+  note: '備考',
+  profile: '基本情報',
+  default_item_id: '既定の備品',
+  source: '登録元',
+}
+export const TENANT_PROFILE_LABELS = Object.fromEntries([
+  ...TENANT_PROFILE_FIELDS.map((f) => [f.key, f.label]),
+  ['emergency_contacts', '緊急連絡先'],
+])
 
 export const HISTORY_CONFLICT_MESSAGE = 'この変更のあとでさらに変わっています'
 
