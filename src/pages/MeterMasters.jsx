@@ -104,12 +104,10 @@ export default function MeterMasters() {
     setEditingTenant(null)
   }
 
-  function replaceMeter(saved) {
-    setData((d) => {
-      const exists = d.meters.some((m) => m.id === saved.id)
-      return { ...d, meters: exists ? d.meters.map((m) => (m.id === saved.id ? saved : m)) : [...d.meters, saved] }
-    })
+  // メータを保存すると、ほかのメータの按分比率と按分対象の面積（定数）も変わるので読み直す
+  function replaceMeter() {
     setEditingMeter(null)
+    load()
   }
 
   return (
@@ -195,7 +193,7 @@ export default function MeterMasters() {
             {meters.length === 0 ? (
               <p className="ui-empty">メータがまだありません。「取込・照合」から FileMaker の CSV を取り込んでください。</p>
             ) : (
-              <div className="ui-table-wrap">
+              <div className="ui-table-wrap meter-sticky-wrap">
                 <table className="ui-table meter-table">
                   <thead>
                     <tr>
@@ -268,6 +266,7 @@ export default function MeterMasters() {
         <MeterForm
           meter={editingMeter === 'new' ? null : editingMeter}
           tenants={tenants}
+          meters={meters}
           onClose={() => setEditingMeter(null)}
           onSaved={replaceMeter}
         />
@@ -311,7 +310,7 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
         直した割当ては、次に取り込む空調データから効きます（取込済みの月は取り込んだ時点の割当てのまま）。
       </p>
       {error && <p className="ui-note is-danger">{error}</p>}
-      <div className="ui-table-wrap">
+      <div className="ui-table-wrap meter-sticky-wrap">
         <table className="ui-table meter-table">
           <thead>
             <tr>
@@ -340,6 +339,7 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
                       {options.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.meter_no}
+                          {m.detail_note ? `　${m.detail_note}` : ''}
                         </option>
                       ))}
                     </select>
@@ -358,7 +358,12 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
 const CONSTANT_FIELDS = [
   { key: 'oa_coefficient', label: '外調データ係数', note: '外調機電気量_請求用 ＝ 外調機の当月の電力量 × 係数 × 按分比率' },
   { key: 'total_area', label: '総面積（㎡）', note: '' },
-  { key: 'oa_target_area', label: '外調機按分対象の面積（㎡）', note: '按分比率を決めるときの分母' },
+  {
+    key: 'oa_target_area',
+    label: '総面積_外調機按分対象（㎡）',
+    note: '按分比率の分母。メータマスタで「外調機電気量を按分する」にしているメータの部屋面積の合計を自動で計算します（入力しません）',
+    auto: true,
+  },
 ]
 
 function ConstantsTab({ constants, onSaved }) {
@@ -372,7 +377,9 @@ function ConstantsTab({ constants, onSaved }) {
     setSaving(true)
     setMessage('')
     try {
-      const saved = await saveMeterConstants(form)
+      const saved = await saveMeterConstants(
+        Object.fromEntries(Object.entries(form).filter(([k]) => !CONSTANT_FIELDS.find((f) => f.key === k)?.auto))
+      )
       onSaved(saved)
       setMessage('保存しました')
     } catch (err) {
@@ -390,8 +397,10 @@ function ConstantsTab({ constants, onSaved }) {
           <input
             className="ui-input"
             inputMode="decimal"
-            value={form[f.key]}
+            value={f.auto ? String(constants?.[f.key] ?? '') : form[f.key]}
             onChange={(e) => setForm((v) => ({ ...v, [f.key]: e.target.value }))}
+            readOnly={f.auto}
+            disabled={f.auto}
           />
           {f.note && <small className="ui-note">{f.note}</small>}
         </label>

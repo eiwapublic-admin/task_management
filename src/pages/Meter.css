@@ -258,3 +258,39 @@ button.meter-photo { cursor: zoom-in; }
 
 .meter-stack { display: flex; flex-direction: column; gap: var(--space-4); }
 .meter-stack > .ui-note { margin: 0; }
+
+/* メータの入力画面の枠（2026-10-21〜。「メータ機器」「固定情報」） */
+.meter-form-box {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.meter-form-box > legend {
+  padding: 0 var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.meter-form-box > .ui-note { margin: 0; }
+.meter-form-box.is-fixed { background: var(--bg-muted); }
+
+/* 一覧の列見出しの固定表示（メータ・空調機。2026-10-21〜）。TenantTable.css と同じ考え方
+   （sticky-header-overflow-trap）: PC は枠の overflow を外して機能ヘッダの下に、スマホは枠の中で固定 */
+.meter-sticky-wrap { overflow: visible; }
+.meter-sticky-wrap th {
+  position: sticky;
+  top: var(--sticky2-h, 0px);
+  z-index: 1;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+@media (max-width: 768px) {
+  .meter-sticky-wrap {
+    overflow: auto;
+    max-height: calc(100dvh - var(--app-header-h, 56px) - var(--sticky2-h, 0px) - var(--space-6));
+  }
+  .meter-sticky-wrap th { top: 0; }
+}

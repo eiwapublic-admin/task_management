@@ -89,10 +89,12 @@ function tidy(n) {
 
 // 1件の検針値の「前月値・差分」（2系統）。FileMaker から移した月は保存値をそのまま使い、
 // アプリで入力した月は前月の検針値から計算する（docs/meter-plan.md 4章）。
-// 差分は「当月値 − 前月値」。当月値の方が小さければ桁数で一周したとみなす（Q5）。
+// 差分は「当月値 − 前月値」。当月値の方が小さければ一巡して0に戻ったとみなし、メータ最大値（10の桁数乗）を足す
+// （Q5。例: 桁数4・前月9999・当月1 → 1 − 9999 + 10000 ＝ 2）。最大値が無ければ桁数から求める。
 // 「前月の修正」があればそれを前月値に、「修正差分値」があればそれを差分にする
 export function readingUsage(reading, prevReading, meter) {
-  const wrap = (d) => (d < 0 && meter?.digits ? d + 10 ** meter.digits : d)
+  const maxValue = Number(meter?.max_value) || (meter?.digits ? 10 ** meter.digits : null)
+  const wrap = (d) => (d < 0 && maxValue ? d + maxValue : d)
   const prev =
     reading.legacy_prev ?? reading.prev_override ?? prevReading?.value ?? 0
   const prev2 = reading.legacy_prev2 ?? prevReading?.value2 ?? 0
