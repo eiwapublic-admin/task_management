@@ -6,6 +6,7 @@ import MeterTenantForm from '../components/MeterTenantForm'
 import TenantTable from '../components/TenantTable'
 import MeterImportPanel from '../components/MeterImportPanel'
 import MeterHistoryList from '../components/MeterHistoryList'
+import TenantListExportButtons from '../components/TenantListExportButtons'
 import { askChangeReason, fetchMeterMasters, floorLabel, saveMeterConstants, updateMeterAcUnit } from '../lib/meter'
 import './Dashboard.css'
 import './Meter.css'
@@ -137,15 +138,18 @@ export default function MeterMasters() {
           }
           actions={
             tab === 'tenants' ? (
-              <button
-                type="button"
-                className="icon-btn-add"
-                onClick={() => setEditingTenant('new')}
-                aria-label="テナントを追加"
-                title="テナントを追加"
-              >
-                ＋
-              </button>
+              <>
+                <TenantListExportButtons onError={setError} />
+                <button
+                  type="button"
+                  className="icon-btn-add"
+                  onClick={() => setEditingTenant('new')}
+                  aria-label="テナントを追加"
+                  title="テナントを追加"
+                >
+                  ＋
+                </button>
+              </>
             ) : tab === 'meters' ? (
               <button
                 type="button"

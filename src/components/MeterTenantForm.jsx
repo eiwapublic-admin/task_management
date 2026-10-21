@@ -164,7 +164,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
 
           <h4 className="meter-form-section">基本情報（社員のみ）</h4>
           <div className="meter-form-grid">
-            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide).map((f) => (
+            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide && f.type !== 'checkbox').map((f) => (
               <label key={f.key} className="ui-field">
                 <span>{f.label}</span>
                 <input
@@ -177,6 +177,16 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
               </label>
             ))}
           </div>
+          {TENANT_PROFILE_FIELDS.filter((f) => f.type === 'checkbox').map((f) => (
+            <label key={f.key} className="meter-check">
+              <input
+                type="checkbox"
+                checked={!!profile[f.key]}
+                onChange={(e) => setProfile((p) => ({ ...p, [f.key]: e.target.checked }))}
+              />
+              {f.label}
+            </label>
+          ))}
 
           <h4 className="meter-form-section">緊急連絡先</h4>
           {profile.emergency_contacts.map((c, i) => (

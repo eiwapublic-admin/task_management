@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import MeterTenantForm from '../components/MeterTenantForm'
+import TenantListExportButtons from '../components/TenantListExportButtons'
 import TenantTable from '../components/TenantTable'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import { fetchEquipmentTenants } from '../lib/equipment'
@@ -55,15 +56,18 @@ export default function EquipmentTenants() {
           }
           actions={
             canEdit ? (
-              <button
-                type="button"
-                className="icon-btn-add"
-                onClick={() => setEditing('new')}
-                aria-label="テナントを追加"
-                title="テナントを追加"
-              >
-                ＋
-              </button>
+              <>
+                <TenantListExportButtons onError={setError} />
+                <button
+                  type="button"
+                  className="icon-btn-add"
+                  onClick={() => setEditing('new')}
+                  aria-label="テナントを追加"
+                  title="テナントを追加"
+                >
+                  ＋
+                </button>
+              </>
             ) : null
           }
         />

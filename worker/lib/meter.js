@@ -116,6 +116,11 @@ const PROFILE_TEXT_KEYS = [
   'fire_manager_note',
   'legacy_tenant_code',
   'fix_note',
+  // テナント一覧表・緊急連絡先一覧表（Excel 出力）のための項目（2026-10-21〜）
+  'room_label',
+  'plate_name',
+  'company_phone',
+  'update_info',
 ]
 
 // テナントの基本情報（profile）を、決まったキーだけの形に整える
@@ -130,6 +135,9 @@ function cleanProfile(p) {
   if (capacity != null) out.capacity = capacity
   const appointed = dateOrNull(p.fire_manager_appointed_on)
   if (appointed) out.fire_manager_appointed_on = appointed
+  const entryDate = dateOrNull(p.entry_date)
+  if (entryDate) out.entry_date = entryDate
+  if (p.list_exclude === true) out.list_exclude = true
   if (Array.isArray(p.emergency_contacts)) {
     const contacts = p.emergency_contacts
       .slice(0, 5)
