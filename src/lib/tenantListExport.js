@@ -1,7 +1,8 @@
 // テナント一覧表・緊急連絡先一覧表の Excel 出力（2026-10-21〜）。
 // 元は手作業の「火元責任者・緊急連絡先一覧表.xlsx」の「最新」シート。1枚の表の左半分（F〜P列）がテナント一覧表、
 // 右半分（R〜AC列）が緊急連絡先一覧（セコム提出用）で、列のグループの片方を隠して使い分けていた。
-// ここでも同じ1枚の表を作り、出力の種類に応じて片方の列グループを隠す（雛形は public/templates/tenant-list.xlsx。
+// ここでも同じ1枚の表を作り、緊急連絡先の列グループ（R〜AC）を隠した状態で出す（グループの「＋」で開けば緊急連絡先一覧表になる。
+// 2026-10-21 の依頼で出力は「テナント一覧表」の1ファイルに整理。雛形は public/templates/tenant-list.xlsx。
 // 元の「最新」シートから見出し4行と、データ行・階の区切り行・合計行の書式見本を残したもの）。
 // 行はテナントマスタの入居中のテナント（退去日を過ぎたもの・「一覧表に載せない」・階の無いものを除く）を、
 // 7F → 1F → B1 の順、各階の中は部屋番号の順に並べる
@@ -12,10 +13,9 @@ import { cellXml, colName, downloadBlob, unzipXlsx, zipFiles } from './xlsxWrite
 
 export const TENANT_LIST_KINDS = {
   tenants: { label: 'テナント一覧表' },
-  emergency: { label: '緊急連絡先一覧表' },
 }
-// 隠すほうの列グループ（テナント一覧表は R〜AC、緊急連絡先一覧表は F〜P を隠す）
-const OTHER_GROUP = { tenants: [18, 29], emergency: [6, 16] }
+// 隠すほうの列グループ（緊急連絡先の R〜AC）
+const OTHER_GROUP = { tenants: [18, 29] }
 
 const FIRST_ROW = 5 // 雛形の見出しは4行
 const COLS = 29 // A〜AC
@@ -124,7 +124,7 @@ function rowXml(r, tpl, values = {}) {
   return `<row r="${r}"${tpl.attrs}>${cells.join('')}</row>`
 }
 
-/** 出力する（kind: 'tenants' | 'emergency'）。ファイルを保存させ、出力した件数を返す */
+/** 出力する（kind: 'tenants'）。ファイルを保存させ、出力した件数を返す */
 export async function exportTenantList(kind) {
   const def = TENANT_LIST_KINDS[kind]
   if (!def) throw new Error('出力の種類が正しくありません')

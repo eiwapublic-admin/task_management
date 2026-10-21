@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { IconDownload } from './Icons'
 import { TENANT_LIST_KINDS, exportTenantList } from '../lib/tenantListExport'
 
-// テナント一覧表・緊急連絡先一覧表（Excel）の出力ボタン（2026-10-21〜。社員だけ。基本情報を含むため）
+// テナント一覧表（Excel）の出力ボタン（2026-10-21〜。社員だけ。基本情報を含むため。緊急連絡先は隠した列グループに入る）
 export default function TenantListExportButtons({ onError }) {
   const [busy, setBusy] = useState(null)
 
