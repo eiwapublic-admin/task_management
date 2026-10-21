@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
-import { saveMeter } from '../lib/meter'
+import { askChangeReason, saveMeter } from '../lib/meter'
 import { firstOfMonth, m2ToTsubo, meterNoProblem, normalizeMeterNo, plainText, roomDetailKey, tsuboToM2 } from '../lib/meterInput'
 import MeterHistoryList from './MeterHistoryList'
 
@@ -136,11 +136,14 @@ export default function MeterForm({ meter, tenants, meters = [], onClose, onSave
       )
         return
     }
+    const reason = askChangeReason()
+    if (reason === null) return
     setSaving(true)
     try {
       const saved = await saveMeter({
         ...(meter?.id ? { id: meter.id } : {}),
         ...form,
+        reason,
         meter_no: meterNo,
         tenant_id: form.tenant_id || null,
         kind: form.kind || null,

@@ -6,7 +6,7 @@ import MeterTenantForm from '../components/MeterTenantForm'
 import TenantTable from '../components/TenantTable'
 import MeterImportPanel from '../components/MeterImportPanel'
 import MeterHistoryList from '../components/MeterHistoryList'
-import { fetchMeterMasters, floorLabel, saveMeterConstants, updateMeterAcUnit } from '../lib/meter'
+import { askChangeReason, fetchMeterMasters, floorLabel, saveMeterConstants, updateMeterAcUnit } from '../lib/meter'
 import './Dashboard.css'
 import './Meter.css'
 
@@ -295,10 +295,12 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
   )
 
   async function change(unit, meterId) {
+    const reason = askChangeReason()
+    if (reason === null) return
     setSavingUnit(unit.unit_no)
     setError('')
     try {
-      await updateMeterAcUnit(unit.unit_no, meterId)
+      await updateMeterAcUnit(unit.unit_no, meterId, reason)
       await onChanged()
     } catch (err) {
       setError(err.message)

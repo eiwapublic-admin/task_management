@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { HISTORY_CONFLICT_MESSAGE, TENANT_PROFILE_FIELDS, fetchMeterHistory, revertMeterHistory } from '../lib/meter'
+import {
+  HISTORY_CONFLICT_MESSAGE,
+  TENANT_PROFILE_FIELDS,
+  askChangeReason,
+  fetchMeterHistory,
+  revertMeterHistory,
+  saveMeterHistoryReason,
+} from '../lib/meter'
 
 // 検針マスタ（テナント・メータ・空調機）の変更履歴（2026-10-21〜。記録は DB のトリガー）。
 // テナントの入れ替えの経緯を残し、誤った修正は「取り消す」で変更前の値に戻す（変わった項目だけ）。
+// 変更理由は保存のときにダイアログで入れるか、ここで後から書き足す（2026-10-21〜）。
 // table・rowKey を渡すとその1件の履歴だけ（入力画面の下）、渡さなければ全件の新しい順（検針マスタの「変更履歴」タブ）
 
 const TABLE_LABELS = {
@@ -150,19 +158,37 @@ export default function MeterHistoryList({ table = null, rowKey = null, tenants 
   }
 
   async function revert(h) {
-    if (!window.confirm(`${formatAt(h.changed_at)} の変更を取り消して、変わった項目を変更前の値に戻します。よろしいですか？`)) return
+    const reason = askChangeReason(
+      `${formatAt(h.changed_at)} の変更を取り消して、変わった項目を変更前の値に戻します。\n取り消す理由を入力して OK を押してください（任意）`,
+    )
+    if (reason === null) return
     setBusyId(h.id)
     setError('')
     try {
       try {
-        await revertMeterHistory(h.id)
+        await revertMeterHistory(h.id, { reason })
       } catch (err) {
         if (!err.message.startsWith(HISTORY_CONFLICT_MESSAGE)) throw err
         if (!window.confirm('この変更のあとで、同じ項目がさらに変わっています。それでも変更前の値に戻しますか？')) return
-        await revertMeterHistory(h.id, { force: true })
+        await revertMeterHistory(h.id, { force: true, reason })
       }
       await load()
       onReverted?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function editReason(h) {
+    const r = window.prompt('変更理由（空にすると消します）', h.reason || '')
+    if (r == null) return
+    setBusyId(h.id)
+    setError('')
+    try {
+      const saved = await saveMeterHistoryReason(h.id, r.trim())
+      setItems((list) => list.map((x) => (x.id === h.id ? { ...x, reason: saved.reason } : x)))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -209,6 +235,13 @@ export default function MeterHistoryList({ table = null, rowKey = null, tenants 
                       {busyId === h.id ? '取り消し中…' : '取り消す'}
                     </button>
                   )}
+                </div>
+                <div className="meter-history-reason">
+                  <span className="meter-history-label">変更理由</span>
+                  {h.reason ? <span>{h.reason}</span> : <span className="meter-history-none">（なし）</span>}
+                  <button type="button" className="meter-history-reason-btn" onClick={() => editReason(h)} disabled={busyId != null}>
+                    {h.reason ? '直す' : '書く'}
+                  </button>
                 </div>
                 {lines.length > 0 && (
                   <ul className="meter-history-diff">
