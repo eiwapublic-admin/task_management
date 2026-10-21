@@ -1,5 +1,14 @@
 -- タスク管理システム DBスキーマ
 -- Supabase SQL Editor で実行してください
+--
+-- 【新しいテーブルを作るときの決まり（2026-10-21〜）】
+-- Supabase は 2026-10-30 から、public に新しく作ったテーブルへ API の権限を自動では付けなくなった。
+-- このアプリは Worker が service_role だけで読み書きする（画面から Supabase へ直接はつながない）ので、
+-- テーブルを作るたびに次の3行をセットで書く（anon/authenticated には権限を付けない）:
+--   grant select, insert, update, delete on <テーブル> to service_role;
+--   alter table <テーブル> enable row level security;
+--   revoke all on <テーブル> from anon, authenticated;
+-- 付け忘れると Worker の読み書きが permission denied になる。このファイルの末尾でも全テーブルにまとめて付けている
 
 create extension if not exists pgcrypto;
 
@@ -325,6 +334,8 @@ create trigger trg_tasks_updated_at
 alter table tasks enable row level security;
 alter table settings enable row level security;
 alter table users enable row level security;
+-- 2026-10-21: users だけ anon/authenticated に権限が残っていた（RLS でポリシー無しのため実害なし）。ほかと揃えて外した
+revoke all on users from anon, authenticated;
 alter table api_usage enable row level security;
 alter table activity_logs enable row level security;
 alter table push_subscriptions enable row level security;
@@ -1307,3 +1318,12 @@ comment on column equipment_tenants.moved_out_on is '退去日（2026-10-20〜�
 -- 移す前の宛先は bilmen_mail_recipients_bak_20261020 に丸ごと控えてある（RLS 有効・anon/authenticated 不可）
 alter table equipment_tenants add column if not exists notice_emails text[] not null default '{}';
 comment on column equipment_tenants.notice_emails is 'ビルメン案内メールの宛先（2026-10-20〜。メール設定の宛先から移行）。未退去のテナントのこのアドレスへ BCC で送る';
+
+-- ============================================================
+-- service_role の権限（2026-10-21〜。ファイル冒頭の「新しいテーブルを作るときの決まり」）。
+-- 2026-10-30 以降の Supabase では、このファイルで作り直したテーブルにも権限が自動で付かないため、
+-- 最後にまとめて付ける（何度実行してもよい）。Worker は service_role で全テーブルを読み書きする
+-- ============================================================
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
