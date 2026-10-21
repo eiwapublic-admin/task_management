@@ -7,7 +7,7 @@ import { IconCamera, IconChevronLeft, IconChevronRight, IconDownload } from '../
 import useMeterPhotoPdfExport from '../hooks/useMeterPhotoPdfExport'
 import { defaultMeterMonth, fetchMeterMonth, floorLabel, meterMonthLabel, saveMeterReading } from '../lib/meter'
 import { buildMonthRows, formatRatio, formatTaken, formatValue, jstDateTime, monthProgress } from '../lib/meterMonth'
-import { readingUsage, shiftMonth } from '../lib/meterOutput'
+import { isMoveInFreeMonth, readingUsage, shiftMonth } from '../lib/meterOutput'
 import { speakValue, speechSupported } from '../lib/speech'
 import './Dashboard.css'
 import './Meter.css'
@@ -299,8 +299,8 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
     }
     if (Number.isNaN(r.prev_override)) r.prev_override = null
     if (Number.isNaN(r.diff_override)) r.diff_override = null
-    return readingUsage(r, prevReading, meter)
-  }, [form, reading, prevReading, meter])
+    return readingUsage(r, prevReading, meter, { freeMonth: isMoveInFreeMonth(row.tenant, month) })
+  }, [form, reading, prevReading, meter, row.tenant, month])
 
   const spokenValues = meter.is_oa_meter ? [form.value, form.value2] : [form.value]
 

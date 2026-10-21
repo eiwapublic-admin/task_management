@@ -1345,6 +1345,9 @@ $$;
 revoke all on function meter_recompute_oa_ratios() from public, anon, authenticated;
 grant execute on function meter_recompute_oa_ratios() to service_role;
 
+-- 「初月無料にしない」の既定を true に（2026-10-21〜。FileMaker の現在の既定=1 に合わせた。デザインレポートで確認）
+alter table equipment_tenants alter column first_month_billable set default true;
+
 -- ============================================================
 -- service_role の権限（2026-10-21〜。ファイル冒頭の「新しいテーブルを作るときの決まり」）。
 -- 2026-10-30 以降の Supabase では、このファイルで作り直したテーブルにも権限が自動で付かないため、

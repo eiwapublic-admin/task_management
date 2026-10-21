@@ -705,7 +705,7 @@ export async function handleMeterOutputData(req) {
     const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
     const supabase = getAdminClient()
     const [tenants, meters, readings, usage, constants] = await Promise.all([
-      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out, moved_in_on'),
+      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out, moved_in_on, first_month_billable'),
       supabase.from('meters').select(METER_COLUMNS),
       supabase.from('meter_readings').select(READING_COLUMNS).in('month', [month, prevMonth]),
       supabase.from('meter_ac_usage').select('unit_no, day_wh, meter_no').eq('month', month),
@@ -766,7 +766,7 @@ export async function handleMeterMonth(req) {
     if (!MONTH_PATTERN.test(month)) return json({ error: 'month は YYYY-MM で指定してください' }, 400)
     const supabase = getAdminClient()
     const [tenants, meters, readings, photos] = await Promise.all([
-      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out'),
+      supabase.from('equipment_tenants').select('id, billing_code, name, short_name, floor, moved_out, moved_in_on, first_month_billable'),
       supabase.from('meters').select(METER_COLUMNS),
       supabase
         .from('meter_readings')
