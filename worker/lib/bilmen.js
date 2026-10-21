@@ -891,18 +891,22 @@ export async function handleBilmenMailSettingsUpdate(req) {
 }
 
 // テナントの案内メールの宛先（2026-10-20〜）。テナントマスタ（equipment_tenants.notice_emails）に
-// アドレスがある未退去のテナントへ送る（退去日が今日以前なら、毎日の反映を待たずに外す）。
+// アドレスがあるテナントへ送る。退去は次のとおり判定する（2026-10-21 依頼）:
+//   month（案内の対象年月 'YYYY-MM'）を渡したとき … その月の1日の時点で退去済みなら外す
+//     （退去日がその月の1日以降なら含める。1日が退去日でも含める）
+//   渡さないとき（メール設定の画面）… 今日の時点で退去済みなら外す
+// 退去日の無い退去済み（moved_out=true）はいつでも外す。
 // 1テナントに複数のアドレスを持てるので、アドレスごとに1行で返す。宛先名はテナントの略称（無ければ正式名称）
-async function loadTenantRecipients(supabase) {
+async function loadTenantRecipients(supabase, month = null) {
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const stillIn = month ? (on) => on >= `${month}-01` : (on) => on > today
   const { data, error } = await supabase
     .from('equipment_tenants')
-    .select('id, billing_code, name, short_name, floor, moved_out_on, notice_emails')
-    .eq('moved_out', false)
+    .select('id, billing_code, name, short_name, floor, moved_out, moved_out_on, notice_emails')
     .neq('notice_emails', '{}')
   if (error) throw new Error(error.message)
   return (data || [])
-    .filter((t) => !t.moved_out_on || t.moved_out_on > today)
+    .filter((t) => (t.moved_out_on ? stillIn(t.moved_out_on) : !t.moved_out))
     .flatMap((t) =>
       (t.notice_emails || [])
         .filter((e) => e && e.includes('@'))
@@ -917,13 +921,15 @@ async function loadTenantRecipients(supabase) {
     )
 }
 
-// GET /api/bilmen/mail/recipients — 宛先一覧。
+// GET /api/bilmen/mail/recipients?month=YYYY-MM — 宛先一覧（month はテナントへ報知の画面から。退去の判定に使う）。
 //   tenants … テナントマスタから（上の loadTenantRecipients。ここでは直せない）
 //   recipients … その他の宛先（小泉産業様の担当者・栄和ML など、テナントではない宛先。有効→無効、表示順）
 export async function handleBilmenMailRecipientList(req) {
   const { error } = await requireMailAccess(req)
   if (error) return error
   try {
+    const monthParam = new URL(req.url).searchParams.get('month') || ''
+    const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam) ? monthParam : null
     const supabase = getAdminClient()
     const [{ data, error: err }, tenants] = await Promise.all([
       supabase
@@ -932,7 +938,7 @@ export async function handleBilmenMailRecipientList(req) {
         .order('disabled', { ascending: true })
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true }),
-      loadTenantRecipients(supabase),
+      loadTenantRecipients(supabase, month),
     ])
     if (err) {
       console.error('bilmen-mail-recipient-list:', err.message)
@@ -1082,7 +1088,7 @@ export async function handleBilmenMailDraftCreate(req) {
         .eq('disabled', false)
         .order('sort_order', { ascending: true }),
       // テナントの宛先はテナントマスタから（2026-10-20〜）
-      loadTenantRecipients(supabase),
+      loadTenantRecipients(supabase, month),
       supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
       // 返信先（Reply-To）はメール設定から。画面からは受け取らない（宛先と同じ理由）
       supabase.from('bilmen_mail_settings').select('reply_to').eq('id', MAIL_SETTINGS_ID).maybeSingle(),

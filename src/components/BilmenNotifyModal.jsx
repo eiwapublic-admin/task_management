@@ -5,6 +5,7 @@ import {
   fetchBilmenMailSettings,
   fetchBilmenMailRecipients,
   activeBilmenRecipients,
+  groupBilmenRecipients,
   notifyTargets,
   expandMailVariables,
   buildBilmenNoticeMailto,
@@ -42,7 +43,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
     let alive = true
     setLoading(true)
     setError('')
-    Promise.all([fetchBilmenMailSettings(), fetchBilmenMailRecipients()])
+    Promise.all([fetchBilmenMailSettings(), fetchBilmenMailRecipients(month)])
       .then(([s, r]) => {
         if (!alive) return
         setSettings(s)
@@ -53,10 +54,12 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
     return () => {
       alive = false
     }
-  }, [])
+  }, [month])
 
   const targets = notifyTargets(schedules)
   const activeRecipients = activeBilmenRecipients(recipients || undefined)
+  const recipientRows = groupBilmenRecipients(activeRecipients)
+  const [openKey, setOpenKey] = useState(null) // 押してアドレスを出している宛先（タッチ端末用）
   const cannotSend = targets.length === 0 || activeRecipients.length === 0
 
   const replyTo = settings?.reply_to || ''
@@ -94,16 +97,17 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
       <div className="ui-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
           <h2>{month.replace('-', '年')}月のテナントへ報知</h2>
+          {/* 宛先・返信先をここで変えられないことを先に伝える（2026-10-21 の依頼でヘッダの右の余白へ移した） */}
+          <p className="bilmen-notify-settings-note">
+            ※ テナントの宛先は<Link to="/equipment/tenants">テナントマスタ</Link>の「案内メールの宛先」、
+            <br />
+            その他の宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
+          </p>
           <button type="button" className="icon-btn-close" onClick={onClose} disabled={drafting} aria-label="閉じる">
             ×
           </button>
         </div>
         <div className="ui-modal-body is-stacked">
-          {/* 宛先・返信先をここで変えられないことを先に伝える（2026-09-29の依頼で右上に置いた） */}
-          <p className="bilmen-notify-settings-note">
-            ※ テナントの宛先は<Link to="/equipment/tenants">テナントマスタ</Link>の「案内メールの宛先」、その他の宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
-          </p>
-
           {error && (
             <p className="dashboard-error dashboard-banner" role="alert">
               {error}
@@ -113,10 +117,6 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
             <p className="dashboard-loading">読み込み中…</p>
           ) : (
             <>
-              <p>
-                対象件数（報知☑・予定日付あり・中止でない）: <strong>{targets.length}</strong>件 ／ 宛先:{' '}
-                <strong>{activeRecipients.length}</strong>件
-              </p>
               {targets.length === 0 && (
                 <p className="bilmen-undecided">この月には報知対象の予定がありません。</p>
               )}
@@ -126,21 +126,48 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
                 </p>
               )}
 
-              <div className="ui-field">
-                <label>返信先</label>
-                <input
-                  className="ui-input"
-                  value={replyTo || '（未設定：送信元のアドレスに返信されます）'}
-                  readOnly
-                />
-              </div>
-              <div className="ui-field">
-                <label>件名（プレビュー）</label>
-                <input className="ui-input" value={subject} readOnly />
-              </div>
-              <div className="ui-field">
-                <label>本文（プレビュー）</label>
-                <textarea className="ui-textarea" rows={6} value={body} readOnly />
+              {/* 左＝返信先・件名・本文、右＝宛先の一覧（2026-10-21 の依頼） */}
+              <div className="bilmen-notify-preview">
+                <div className="bilmen-notify-fields">
+                  <div className="ui-field">
+                    <label>返信先</label>
+                    <input
+                      className="ui-input"
+                      value={replyTo || '（未設定：送信元のアドレスに返信されます）'}
+                      readOnly
+                    />
+                  </div>
+                  <div className="ui-field">
+                    <label>件名（プレビュー）</label>
+                    <input className="ui-input" value={subject} readOnly />
+                  </div>
+                  <div className="ui-field">
+                    <label>本文（プレビュー）</label>
+                    <textarea className="ui-textarea" rows={6} value={body} readOnly />
+                  </div>
+                </div>
+                <section className="bilmen-notify-recipients" aria-label="宛先">
+                  <div className="bilmen-notify-recipients-inner">
+                    <h3 className="bilmen-notify-recipients-title">宛先 {recipientRows.length}件</h3>
+                    <p className="bilmen-notify-recipients-note">当月時点で退去済みを省いています。</p>
+                    <ol className="bilmen-notify-recipient-list">
+                      {recipientRows.map((r, i) => (
+                        <li key={r.key}>
+                          <span className="bilmen-notify-recipient-no">{i + 1}</span>
+                          <button
+                            type="button"
+                            className="bilmen-notify-recipient-name"
+                            title={r.emails.join('\n')}
+                            onClick={() => setOpenKey((k) => (k === r.key ? null : r.key))}
+                          >
+                            {r.name}
+                          </button>
+                          {openKey === r.key && <span className="bilmen-notify-recipient-mail">{r.emails.join(', ')}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </section>
               </div>
 
               {(draftError || noticeError) && (

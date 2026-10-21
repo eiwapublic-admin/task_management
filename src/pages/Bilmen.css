@@ -275,10 +275,99 @@ a.btn-plain.is-disabled {
    iPhone幅でも左右に並べる（依頼が「左右に分けて」のため）。1列が約160pxになるので、
    ボタンは列幅いっぱいにして文言を折り返させる */
 .bilmen-notify-settings-note {
-  margin: 0;
+  margin: 0 0 0 auto;
   text-align: right;
   font-size: var(--fs-sm);
+  line-height: var(--leading-tight, 1.4);
   color: var(--text-muted);
+}
+/* 説明文がヘッダの右に入ったので、閉じるボタンは説明文のすぐ右に置く */
+.ui-modal-head .bilmen-notify-settings-note + .icon-btn-close { margin-left: 0; }
+
+/* 返信先・件名・本文（左）と宛先の一覧（右）。2026-10-21 の依頼 */
+.bilmen-notify-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.bilmen-notify-fields { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bilmen-notify-fields .ui-field { margin: 0; }
+
+/* 右の一覧は左の欄と同じ高さにして、はみ出す分は中でスクロールさせる
+   （内側を absolute で敷き詰めると、行の高さは左の欄だけで決まる） */
+.bilmen-notify-recipients { position: relative; min-height: 240px; }
+.bilmen-notify-recipients-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+}
+.bilmen-notify-recipients-title {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.bilmen-notify-recipients-note {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.bilmen-notify-recipient-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.bilmen-notify-recipient-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+.bilmen-notify-recipient-no {
+  min-width: 2em;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bilmen-notify-recipient-name {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text-strong);
+  text-align: left;
+  cursor: help;
+}
+.bilmen-notify-recipient-name:hover { text-decoration: underline dotted; }
+.bilmen-notify-recipient-mail {
+  flex-basis: 100%;
+  padding-left: calc(2em + var(--space-2));
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .bilmen-notify-preview { grid-template-columns: 1fr; }
+  .bilmen-notify-recipients { min-height: 0; }
+  .bilmen-notify-recipients-inner { position: static; max-height: 240px; }
+  /* スマートフォンでは説明文をタイトルの下の行へ */
+  .ui-modal-head:has(.bilmen-notify-settings-note) { flex-wrap: wrap; }
+  .ui-modal-head:has(.bilmen-notify-settings-note) > h2 { flex: 1; min-width: 0; }
+  .ui-modal-head .bilmen-notify-settings-note { order: 3; flex-basis: 100%; text-align: left; font-size: var(--fs-xs); }
+  .ui-modal-head .bilmen-notify-settings-note + .icon-btn-close { margin-left: auto; }
 }
 
 .bilmen-notify-lead {
