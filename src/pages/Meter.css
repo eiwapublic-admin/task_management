@@ -294,3 +294,24 @@ button.meter-photo { cursor: zoom-in; }
   }
   .meter-sticky-wrap th { top: 0; }
 }
+
+/* テナントの修正画面: 請求先コード・階・入居年月日・退去日を PC では1行に（2026-10-21） */
+.meter-form-grid.tenant-form-head { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 768px) {
+  .meter-form-grid.tenant-form-head { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 検針マスタの変更履歴（MeterHistoryList.jsx。2026-10-21〜） */
+.meter-history-kind { width: auto; }
+.meter-history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.meter-history-item { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: var(--space-2) var(--space-3); }
+.meter-history-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.meter-history-at { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: var(--fs-sm); }
+.meter-history-by { color: var(--text-muted); font-size: var(--fs-sm); }
+.meter-history-revert { margin-left: auto; }
+.meter-history-diff { list-style: none; margin: var(--space-1) 0 0; padding: 0; font-size: var(--fs-sm); }
+.meter-history-diff li { overflow-wrap: anywhere; }
+.meter-history-label { color: var(--text-muted); margin-right: var(--space-2); }
+.meter-history-from { text-decoration: line-through; color: var(--text-muted); }
+.meter-history-to { font-weight: 600; color: var(--text-strong); }
+.meter-form-history > summary { cursor: pointer; font-weight: 600; padding: var(--space-1) 0; }

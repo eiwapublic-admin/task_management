@@ -46,6 +46,12 @@ async function requireStaff(req) {
   return { auth }
 }
 
+// 検針マスタ（テナント・メータ・空調機）を書き換えた人。変更履歴（meter_master_history。DB のトリガーが記録）の
+// 「変更者」になるので、これらの表に書き込むときは必ず updated_by に入れる（2026-10-21〜）
+export function actorOf(auth) {
+  return (auth?.display_name || auth?.username || '社員').slice(0, 100)
+}
+
 // ---------- 値の整え ----------
 
 function text(value, max = 500) {
@@ -251,7 +257,7 @@ function movedOutFor(movedOutOn, legacyMovedOut) {
 export async function applyTenantMoveOuts(supabase = getAdminClient()) {
   const { data, error } = await supabase
     .from('equipment_tenants')
-    .update({ moved_out: true })
+    .update({ moved_out: true, updated_by: '自動（退去日の到来）' })
     .lte('moved_out_on', jstNow().date)
     .eq('moved_out', false)
     .select('id')
@@ -305,7 +311,7 @@ function tenantSaveError(err, label) {
 // POST /api/meter/tenants — テナントの追加（source='manual'）
 // PATCH /api/meter/tenants — 修正。並行運用の間は FileMaker からの同期が名称・略称・階・備考を上書きする
 export async function handleMeterTenants(req) {
-  const { error } = await requireStaff(req)
+  const { auth, error } = await requireStaff(req)
   if (error) return error
   try {
     const supabase = getAdminClient()
@@ -322,12 +328,13 @@ export async function handleMeterTenants(req) {
     if (!p || typeof p !== 'object') return json({ error: '内容が正しくありません' }, 400)
     const { patch, error: fieldErr } = tenantFields(p)
     if (fieldErr) return json({ error: fieldErr }, 400)
+    const by = actorOf(auth)
 
     if (req.method === 'POST') {
       if (!patch.name || !patch.billing_code) return json({ error: '請求先コードと正式名称は必須です' }, 400)
       const { data, error: err } = await supabase
         .from('equipment_tenants')
-        .insert({ ...patch, source: 'manual' })
+        .insert({ ...patch, source: 'manual', updated_by: by })
         .select(TENANT_COLUMNS)
         .single()
       if (err) return tenantSaveError(err, 'meter-tenant-create')
@@ -339,7 +346,7 @@ export async function handleMeterTenants(req) {
     if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
     const { data, error: err } = await supabase
       .from('equipment_tenants')
-      .update(patch)
+      .update({ ...patch, updated_by: by })
       .eq('id', id)
       .select(TENANT_COLUMNS)
       .maybeSingle()
@@ -361,12 +368,12 @@ async function reloadMeter(supabase, saved) {
 // POST /api/meter/meters（追加）・PATCH /api/meter/meters（修正。id 必須）。
 // 保存のあと、すべてのメータの按分比率と按分対象の面積を計算し直す（画面は一覧を読み直す）
 export async function handleMeterSave(req) {
-  const { error } = await requireStaff(req)
+  const { auth, error } = await requireStaff(req)
   if (error) return error
   try {
     const p = await req.json().catch(() => null)
     if (!p || typeof p !== 'object') return json({ error: '内容が読み取れませんでした' }, 400)
-    const row = meterFields(p)
+    const row = { ...meterFields(p), updated_by: actorOf(auth) }
     const supabase = getAdminClient()
     if (req.method === 'POST') {
       const meterNo = text(p.meter_no, 50)
@@ -413,7 +420,7 @@ export async function handleMeterSave(req) {
 
 // PATCH /api/meter/ac-units — 室内機の割当てメータを変える { unit_no, meter_id }
 export async function handleMeterAcUnitUpdate(req) {
-  const { error } = await requireStaff(req)
+  const { auth, error } = await requireStaff(req)
   if (error) return error
   try {
     const p = await req.json().catch(() => null)
@@ -422,7 +429,7 @@ export async function handleMeterAcUnitUpdate(req) {
     const meterId = typeof p?.meter_id === 'string' && UUID_RE.test(p.meter_id) ? p.meter_id : null
     const { data, error: err } = await getAdminClient()
       .from('meter_ac_units')
-      .update({ meter_id: meterId })
+      .update({ meter_id: meterId, updated_by: actorOf(auth) })
       .eq('unit_no', unitNo)
       .select('unit_no, address, meter_id')
       .maybeSingle()
@@ -473,7 +480,7 @@ export async function handleMeterConstantsUpdate(req) {
 // （後の種類は前の種類で入ったテナント・メータを引くため）。何度流し直しても同じ結果になる。
 // ============================================================
 
-async function importTenants(supabase, records) {
+async function importTenants(supabase, records, by) {
   const { data: existing, error } = await supabase.from('equipment_tenants').select('id, billing_code, name')
   if (error) throw new Error(error.message)
   const byCode = new Map(existing.filter((t) => t.billing_code).map((t) => [t.billing_code, t]))
@@ -493,6 +500,7 @@ async function importTenants(supabase, records) {
       moved_in_on: dateOrNull(r.moved_in_on),
       first_month_billable: r.first_month_billable === true,
       profile: cleanProfile(r.profile),
+      updated_by: by,
     }
     if (!row.name) continue
     const code = text(r.billing_code, 20)
@@ -533,7 +541,7 @@ async function meterIdMap(supabase) {
   return new Map(data.map((m) => [m.meter_no, m.id]))
 }
 
-async function importMeters(supabase, records) {
+async function importMeters(supabase, records, by) {
   const tenantIdByCode = await tenantIdMap(supabase)
   const rows = []
   const unknownCodes = new Set()
@@ -541,7 +549,7 @@ async function importMeters(supabase, records) {
     const meterNo = text(r.meter_no, 50)
     if (!meterNo) continue
     if (r.billing_code && !tenantIdByCode.has(String(r.billing_code))) unknownCodes.add(String(r.billing_code))
-    const row = { ...meterFields(r, tenantIdByCode), meter_no: meterNo, legacy_id: text(r.legacy_id, 64) }
+    const row = { ...meterFields(r, tenantIdByCode), meter_no: meterNo, legacy_id: text(r.legacy_id, 64), updated_by: by }
     const created = isoOrNull(r.created_at)
     if (created) row.created_at = created
     rows.push(row)
@@ -554,13 +562,14 @@ async function importMeters(supabase, records) {
   return { saved: rows.length, warnings: [...unknownCodes].map((c) => `請求先コード ${c} のテナントがありません`) }
 }
 
-async function importAcUnits(supabase, records) {
+async function importAcUnits(supabase, records, by) {
   const meterIdByNo = await meterIdMap(supabase)
   const rows = records
     .map((r) => ({
       unit_no: int(r.unit_no),
       address: text(r.address, 50),
       meter_id: r.meter_no ? meterIdByNo.get(String(r.meter_no)) || null : null,
+      updated_by: by,
     }))
     .filter((r) => r.unit_no != null && r.address)
   if (rows.length) {
@@ -670,7 +679,7 @@ export async function handleMeterImport(req) {
     if (!Array.isArray(p.records) || p.records.length === 0) return json({ error: '取り込む行がありません' }, 400)
     if (p.records.length > MAX_IMPORT_RECORDS) return json({ error: `1回に送れるのは${MAX_IMPORT_RECORDS}件までです` }, 400)
     const supabase = getAdminClient()
-    const result = await importer(supabase, p.records)
+    const result = await importer(supabase, p.records, `FileMaker取込（${actorOf(auth)}）`)
     if (p.last === true) {
       await supabase
         .from('activity_logs')
@@ -1028,5 +1037,93 @@ export async function handleMeterSummary(req) {
   } catch (err) {
     console.error('meter-summary 失敗:', err)
     return json({ error: '検針の集計に失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 検針マスタの変更履歴（2026-10-21〜）。記録は DB のトリガー（meter_master_history_log）が行う。
+// GET  /api/meter/history?table=&key=&limit= — 新しい順。table・key を渡すとその1件の履歴だけ
+// POST /api/meter/history/revert { id, force } — その変更を取り消す（変わった項目だけを変更前の値に戻す）。
+//   取り消しも1件の変更として履歴に残る。変更のあとで同じ項目がさらに変わっていれば、force なしでは 409 を返す
+// ============================================================
+
+const HISTORY_TABLES = {
+  equipment_tenants: { key: 'id' },
+  meters: { key: 'id' },
+  meter_ac_units: { key: 'unit_no' },
+}
+// 取り消しで戻さない列（識別子・自動で入る列）
+const HISTORY_FIXED = new Set(['id', 'unit_no', 'created_at', 'updated_at', 'updated_by', 'synced_at', 'source', 'legacy_id', 'oa_ratio', 'max_value'])
+
+export async function handleMeterHistory(req) {
+  const { error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const url = new URL(req.url)
+    const table = url.searchParams.get('table')
+    const key = url.searchParams.get('key')
+    const limit = Math.min(Math.max(int(url.searchParams.get('limit')) || 200, 1), 500)
+    let q = getAdminClient()
+      .from('meter_master_history')
+      .select('id, table_name, row_key, op, old_row, new_row, changed_fields, changed_by, changed_at')
+      .order('changed_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit)
+    if (table) {
+      if (!HISTORY_TABLES[table]) return json({ error: 'table が不正です' }, 400)
+      q = q.eq('table_name', table)
+      if (key) q = q.eq('row_key', key.slice(0, 64))
+    }
+    const { data, error: err } = await q
+    if (err) {
+      console.error('meter-history:', err.message)
+      return json({ error: '変更履歴の取得に失敗しました' }, 500)
+    }
+    return json({ history: data || [] })
+  } catch (err) {
+    console.error('meter-history 失敗:', err)
+    return json({ error: '変更履歴の取得に失敗しました' }, 500)
+  }
+}
+
+const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+export async function handleMeterHistoryRevert(req) {
+  const { auth, error } = await requireStaff(req)
+  if (error) return error
+  try {
+    const p = await req.json().catch(() => null)
+    const id = int(p?.id)
+    if (id == null) return json({ error: 'id は必須です' }, 400)
+    const supabase = getAdminClient()
+    const { data: h, error: hErr } = await supabase.from('meter_master_history').select('*').eq('id', id).maybeSingle()
+    if (hErr) throw new Error(hErr.message)
+    if (!h) return json({ error: '変更履歴が見つかりません' }, 404)
+    if (h.op !== 'update') return json({ error: '追加・削除の記録は取り消せません（修正の記録だけ取り消せます）' }, 400)
+    const def = HISTORY_TABLES[h.table_name]
+    if (!def) return json({ error: '取り消せない記録です' }, 400)
+    const fields = (h.changed_fields || []).filter((f) => !HISTORY_FIXED.has(f))
+    if (fields.length === 0) return json({ error: '戻す項目がありません' }, 400)
+
+    const keyValue = def.key === 'unit_no' ? Number(h.row_key) : h.row_key
+    const { data: current, error: cErr } = await supabase.from(h.table_name).select('*').eq(def.key, keyValue).maybeSingle()
+    if (cErr) throw new Error(cErr.message)
+    if (!current) return json({ error: '対象がもうありません' }, 404)
+    const changedSince = fields.filter((f) => !sameValue(current[f], h.new_row?.[f]))
+    if (changedSince.length && p.force !== true) return json({ error: 'この変更のあとでさらに変わっています', changedSince }, 409)
+
+    const patch = { updated_by: `${actorOf(auth)}（取り消し）` }
+    for (const f of fields) patch[f] = h.old_row?.[f] ?? null
+    const { error: uErr } = await supabase.from(h.table_name).update(patch).eq(def.key, keyValue)
+    if (uErr) {
+      if (uErr.code === '23505') return json({ error: '戻すと番号・コードがほかと重なるため取り消せません' }, 409)
+      throw new Error(uErr.message)
+    }
+    if (h.table_name === 'meters') await recomputeOaRatios(supabase)
+    if (h.table_name === 'equipment_tenants') await applyTenantMoveOuts(supabase)
+    return json({ ok: true })
+  } catch (err) {
+    console.error('meter-history-revert 失敗:', err)
+    return json({ error: '取り消しに失敗しました' }, 500)
   }
 }

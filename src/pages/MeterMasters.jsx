@@ -5,6 +5,7 @@ import MeterForm from '../components/MeterForm'
 import MeterTenantForm from '../components/MeterTenantForm'
 import TenantTable from '../components/TenantTable'
 import MeterImportPanel from '../components/MeterImportPanel'
+import MeterHistoryList from '../components/MeterHistoryList'
 import { fetchMeterMasters, floorLabel, saveMeterConstants, updateMeterAcUnit } from '../lib/meter'
 import './Dashboard.css'
 import './Meter.css'
@@ -14,6 +15,7 @@ const TABS = [
   { key: 'meters', label: 'メータ' },
   { key: 'ac', label: '空調機' },
   { key: 'constants', label: '定数' },
+  { key: 'history', label: '変更履歴' },
   { key: 'import', label: '取込・照合' },
 ]
 
@@ -85,8 +87,7 @@ export default function MeterMasters() {
       .sort((a, b) => {
         if (!a.tenant || !b.tenant) return a.tenant ? -1 : b.tenant ? 1 : 0
         return (
-          floorRank(a.tenant.floor) - floorRank(b.tenant.floor) ||
-          (a.tenant.billing_code || '').localeCompare(b.tenant.billing_code || '')
+          floorRank(a.tenant.floor) - floorRank(b.tenant.floor) || (a.tenant.billing_code || '').localeCompare(b.tenant.billing_code || '')
         )
       })
   }, [meters, showRemoved, tenantById])
@@ -99,7 +100,10 @@ export default function MeterMasters() {
   function replaceTenant(saved) {
     setData((d) => {
       const exists = d.tenants.some((t) => t.id === saved.id)
-      return { ...d, tenants: exists ? d.tenants.map((t) => (t.id === saved.id ? saved : t)) : [...d.tenants, saved] }
+      return {
+        ...d,
+        tenants: exists ? d.tenants.map((t) => (t.id === saved.id ? saved : t)) : [...d.tenants, saved],
+      }
     })
     setEditingTenant(null)
   }
@@ -172,12 +176,7 @@ export default function MeterMasters() {
                 退去済みを含む
               </label>
             </div>
-            <TenantTable
-              tenants={tenants}
-              includeMovedOut={showMovedOut}
-              meterCount={meterCountByTenant}
-              onEdit={setEditingTenant}
-            />
+            <TenantTable tenants={tenants} includeMovedOut={showMovedOut} meterCount={meterCountByTenant} onEdit={setEditingTenant} />
           </>
         ) : tab === 'meters' ? (
           <>
@@ -186,9 +185,7 @@ export default function MeterMasters() {
                 <input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} />
                 撤去済みも表示
               </label>
-              {expiredCount > 0 && (
-                <span className="ui-badge is-danger">有効期限切れ {expiredCount}台</span>
-              )}
+              {expiredCount > 0 && <span className="ui-badge is-danger">有効期限切れ {expiredCount}台</span>}
             </div>
             {meters.length === 0 ? (
               <p className="ui-empty">メータがまだありません。「取込・照合」から FileMaker の CSV を取り込んでください。</p>
@@ -236,7 +233,7 @@ export default function MeterMasters() {
                               <td className="is-numeric">{m.digits ?? ''}</td>
                               <td className={expired ? 'meter-expired' : ''}>{formatDate(m.expires_on)}</td>
                               <td>{m.measured ? '○' : ''}</td>
-                              <td className="is-numeric">{m.oa_share ? m.oa_ratio ?? '' : ''}</td>
+                              <td className="is-numeric">{m.oa_share ? (m.oa_ratio ?? '') : ''}</td>
                             </tr>
                           )
                         })}
@@ -250,17 +247,24 @@ export default function MeterMasters() {
         ) : tab === 'ac' ? (
           <AcUnitsTab units={data.acUnits} meters={meters} meterById={meterById} tenantById={tenantById} onChanged={load} />
         ) : tab === 'constants' ? (
-          <ConstantsTab
-            constants={data.constants}
-            onSaved={(constants) => setData((d) => ({ ...d, constants }))}
-          />
+          <ConstantsTab constants={data.constants} onSaved={(constants) => setData((d) => ({ ...d, constants }))} />
+        ) : tab === 'history' ? (
+          <MeterHistoryList tenants={tenants} meters={meters} onReverted={load} />
         ) : (
           <MeterImportPanel counts={data.counts} onImported={load} />
         )}
       </div>
 
       {editingTenant && (
-        <MeterTenantForm tenant={editingTenant === 'new' ? null : editingTenant} onClose={() => setEditingTenant(null)} onSaved={replaceTenant} />
+        <MeterTenantForm
+          tenant={editingTenant === 'new' ? null : editingTenant}
+          onClose={() => setEditingTenant(null)}
+          onSaved={replaceTenant}
+          onReverted={() => {
+            setEditingTenant(null)
+            load()
+          }}
+        />
       )}
       {editingMeter && (
         <MeterForm
@@ -269,6 +273,10 @@ export default function MeterMasters() {
           meters={meters}
           onClose={() => setEditingMeter(null)}
           onSaved={replaceMeter}
+          onReverted={() => {
+            setEditingMeter(null)
+            load()
+          }}
         />
       )}
     </div>
@@ -280,11 +288,8 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
   const [savingUnit, setSavingUnit] = useState(null)
   const [error, setError] = useState('')
   const options = useMemo(
-    () =>
-      meters
-        .filter((m) => !m.removed)
-        .sort((a, b) => a.meter_no.localeCompare(b.meter_no, 'ja', { numeric: true })),
-    [meters]
+    () => meters.filter((m) => !m.removed).sort((a, b) => a.meter_no.localeCompare(b.meter_no, 'ja', { numeric: true })),
+    [meters],
   )
 
   async function change(unit, meterId) {
@@ -356,7 +361,11 @@ function AcUnitsTab({ units, meters, meterById, tenantById, onChanged }) {
 }
 
 const CONSTANT_FIELDS = [
-  { key: 'oa_coefficient', label: '外調データ係数', note: '外調機電気量_請求用 ＝ 外調機の当月の電力量 × 係数 × 按分比率' },
+  {
+    key: 'oa_coefficient',
+    label: '外調データ係数',
+    note: '外調機電気量_請求用 ＝ 外調機の当月の電力量 × 係数 × 按分比率',
+  },
   { key: 'total_area', label: '総面積（㎡）', note: '' },
   {
     key: 'oa_target_area',
@@ -367,9 +376,7 @@ const CONSTANT_FIELDS = [
 ]
 
 function ConstantsTab({ constants, onSaved }) {
-  const [form, setForm] = useState(() =>
-    Object.fromEntries(CONSTANT_FIELDS.map((f) => [f.key, String(constants?.[f.key] ?? '')]))
-  )
+  const [form, setForm] = useState(() => Object.fromEntries(CONSTANT_FIELDS.map((f) => [f.key, String(constants?.[f.key] ?? '')])))
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -378,7 +385,7 @@ function ConstantsTab({ constants, onSaved }) {
     setMessage('')
     try {
       const saved = await saveMeterConstants(
-        Object.fromEntries(Object.entries(form).filter(([k]) => !CONSTANT_FIELDS.find((f) => f.key === k)?.auto))
+        Object.fromEntries(Object.entries(form).filter(([k]) => !CONSTANT_FIELDS.find((f) => f.key === k)?.auto)),
       )
       onSaved(saved)
       setMessage('保存しました')

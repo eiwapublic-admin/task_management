@@ -8,7 +8,7 @@ import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.j
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { notifyStockWarning } from './push.js'
-import { applyTenantMoveOuts } from './meter.js'
+import { actorOf, applyTenantMoveOuts } from './meter.js'
 
 const ITEM_COLUMNS =
   'id, item_no, category_code, name, short_name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
@@ -851,7 +851,7 @@ export async function handleEquipmentTenantList(req) {
 // PATCH /api/equipment/tenants — default_item_id（当システム独自項目。FileMaker同期の対象外）の
 // 設定、および billing_code 空欄テナントの手動修正（8-4(3)）用（2026-08-17）
 export async function handleEquipmentTenantUpdate(req) {
-  const { error } = await requireAuth(req, { write: true })
+  const { auth, error } = await requireAuth(req, { write: true })
   if (error) return error
   try {
     const payload = await req.json().catch(() => null)
@@ -863,6 +863,7 @@ export async function handleEquipmentTenantUpdate(req) {
     if ('billing_code' in payload) patch.billing_code = trimOrNull(payload.billing_code, 20)
     if ('note' in payload) patch.note = trimOrNull(payload.note, 500)
     if (Object.keys(patch).length === 0) return json({ error: '更新する項目がありません' }, 400)
+    patch.updated_by = actorOf(auth)
 
     const supabase = getAdminClient()
     const { data, error: err } = await supabase
@@ -1158,6 +1159,7 @@ export async function handleEquipmentTenantSync(req, env) {
       moved_out: false,
       source: 'filemaker',
       synced_at: now,
+      updated_by: 'FileMaker同期',
     }))
     // default_item_id は当システム独自項目のため、upsert 対象の列に含めない＝上書きされない
     const { error: upsertErr } = await supabase.from('equipment_tenants').upsert(toUpsert, { onConflict: 'billing_code' })
@@ -1177,7 +1179,7 @@ export async function handleEquipmentTenantSync(req, env) {
     if (toRetire.length > 0) {
       const { error: retireErr } = await supabase
         .from('equipment_tenants')
-        .update({ moved_out: true })
+        .update({ moved_out: true, updated_by: 'FileMaker同期' })
         .in('billing_code', toRetire)
       if (retireErr) {
         console.error('equipment-tenant-sync(retire):', retireErr.message)

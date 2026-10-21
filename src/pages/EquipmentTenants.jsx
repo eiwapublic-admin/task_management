@@ -82,7 +82,15 @@ export default function EquipmentTenants() {
       </div>
 
       {editing && (
-        <MeterTenantForm tenant={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={replaceTenant} />
+        <MeterTenantForm
+          tenant={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={replaceTenant}
+          onReverted={() => {
+            setEditing(null)
+            load()
+          }}
+        />
       )}
     </div>
   )

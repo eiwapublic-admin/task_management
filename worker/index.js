@@ -87,6 +87,8 @@ import {
   handleMeterSave,
   handleMeterAcUnitUpdate,
   handleMeterConstantsUpdate,
+  handleMeterHistory,
+  handleMeterHistoryRevert,
   handleMeterImport,
   handleMeterOutputData,
   handleMeterMonth,
@@ -1194,6 +1196,12 @@ async function route(req, env) {
   }
   if (pathname === '/api/meter/ac-units') {
     return req.method === 'PATCH' ? handleMeterAcUnitUpdate(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/history') {
+    return req.method === 'GET' ? handleMeterHistory(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/history/revert') {
+    return req.method === 'POST' ? handleMeterHistoryRevert(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/meter/constants') {
     return req.method === 'PUT' ? handleMeterConstantsUpdate(req) : json({ error: 'Method Not Allowed' }, 405)

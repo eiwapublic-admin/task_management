@@ -2,6 +2,7 @@ import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { TENANT_PROFILE_FIELDS, saveMeterTenant } from '../lib/meter'
 import { jstToday } from '../lib/tenants'
+import MeterHistoryList from './MeterHistoryList'
 
 function Switch({ checked, onChange, label }) {
   return (
@@ -22,7 +23,7 @@ const EMPTY_CONTACT = { name: '', kana: '', phone: '', mobile: '' }
 // 並行運用の間は、名称・略称・階・備考が FileMaker からの同期で上書きされる。
 // 退去は退去日で表す（前もって入れておけば、その日が来るまでは入居中のまま）。
 // 請求先コードは FileMaker からの同期の突き合わせに使うので、FileMaker から来たテナントでは変えられない
-export default function MeterTenantForm({ tenant: original, onClose, onSaved }) {
+export default function MeterTenantForm({ tenant: original, onClose, onSaved, onReverted }) {
   useBodyScrollLock()
   const isNew = !original
   const tenant = original || {}
@@ -38,7 +39,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
     moved_out: legacyMovedOut,
     moved_out_on: tenant.moved_out_on || '',
     moved_in_on: tenant.moved_in_on || '',
-    notice_emails: (tenant.notice_emails || []).join('\n'),
+    notice_emails: (tenant.notice_emails || []).join(', '),
     first_month_billable: isNew ? true : !!tenant.first_month_billable, // 新規は「初月無料にしない」（FileMaker の現在の既定）
   }))
   const [profile, setProfile] = useState(() => {
@@ -49,6 +50,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
     return p
   })
   const [saving, setSaving] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState('')
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -83,18 +85,14 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
     <div className="ui-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="ui-modal is-lg" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
-          <h3 className="ui-modal-title">
-            {isNew ? 'テナントの追加' : `テナントの修正（${tenant.billing_code || 'コードなし'}）`}
-          </h3>
+          <h3 className="ui-modal-title">{isNew ? 'テナントの追加' : `テナントの修正（${tenant.billing_code || 'コードなし'}）`}</h3>
           <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
             ×
           </button>
         </div>
         <div className="ui-modal-body is-stacked">
-          <p className="ui-note">
-            FileMaker と並行して使っている間は、正式名称・略称・階・備考は FileMaker からの同期で上書きされます。
-          </p>
-          <div className="ui-field-row">
+          <p className="ui-note">FileMaker と並行して使っている間は、正式名称・略称・階・備考は FileMaker からの同期で上書きされます。</p>
+          <div className="meter-form-grid tenant-form-head">
             <label className="ui-field">
               <span>請求先コード</span>
               <input
@@ -107,20 +105,8 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
             </label>
             <label className="ui-field">
               <span>階</span>
-              <input className="ui-input" value={form.floor} onChange={set('floor')} placeholder="B・1〜7（共用エリアは空）" />
+              <input className="ui-input" value={form.floor} onChange={set('floor')} placeholder="B・1〜7（共用は空）" />
             </label>
-          </div>
-          <div className="ui-field-row">
-            <label className="ui-field">
-              <span>正式名称</span>
-              <input className="ui-input" value={form.name} onChange={set('name')} />
-            </label>
-            <label className="ui-field">
-              <span>略称</span>
-              <input className="ui-input" value={form.short_name} onChange={set('short_name')} />
-            </label>
-          </div>
-          <div className="ui-field-row">
             <label className="ui-field">
               <span>入居年月日</span>
               <input type="date" className="ui-input" value={form.moved_in_on} onChange={set('moved_in_on')} />
@@ -139,14 +125,20 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
           </p>
           {legacyMovedOut && !form.moved_out_on && (
             <label className="meter-check">
-              <input
-                type="checkbox"
-                checked={form.moved_out}
-                onChange={(e) => setForm((f) => ({ ...f, moved_out: e.target.checked }))}
-              />
+              <input type="checkbox" checked={form.moved_out} onChange={(e) => setForm((f) => ({ ...f, moved_out: e.target.checked }))} />
               退去済み（退去日の記録なし）。外すと入居中に戻ります
             </label>
           )}
+          <div className="ui-field-row">
+            <label className="ui-field">
+              <span>正式名称</span>
+              <input className="ui-input" value={form.name} onChange={set('name')} />
+            </label>
+            <label className="ui-field">
+              <span>略称</span>
+              <input className="ui-input" value={form.short_name} onChange={set('short_name')} />
+            </label>
+          </div>
           <div className="meter-switch-row">
             <Switch
               checked={form.first_month_billable}
@@ -156,24 +148,20 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
           </div>
           <label className="ui-field">
             <span>案内メールの宛先</span>
-            <textarea
-              className="ui-textarea"
-              rows={2}
+            <input
+              type="text"
+              className="ui-input"
               inputMode="email"
               value={form.notice_emails}
               onChange={set('notice_emails')}
-              placeholder="1行に1つ（複数可）"
+              placeholder="複数のときは「,」で区切る"
             />
           </label>
-          <p className="ui-note">ビルメンの案内メールを送るアドレスです。未退去の間だけ送ります（基本情報の「連絡先メールアドレス」とは別です）。</p>
-          <label className="ui-field">
-            <span>備考</span>
-            <textarea className="ui-textarea" rows={2} value={form.note} onChange={set('note')} />
-          </label>
+          <p className="ui-note">ビルメンの案内メールを送るアドレスです。未退去の間だけ送ります。</p>
 
           <h4 className="meter-form-section">基本情報（社員のみ）</h4>
           <div className="meter-form-grid">
-            {TENANT_PROFILE_FIELDS.map((f) => (
+            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide).map((f) => (
               <label key={f.key} className="ui-field">
                 <span>{f.label}</span>
                 <input
@@ -208,6 +196,22 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved }) 
               </label>
             </div>
           ))}
+          {TENANT_PROFILE_FIELDS.filter((f) => f.wide).map((f) => (
+            <label key={f.key} className="ui-field">
+              <span>{f.label}（社員のみ）</span>
+              <textarea className="ui-textarea" rows={2} value={profile[f.key] ?? ''} onChange={setP(f.key)} />
+            </label>
+          ))}
+          <label className="ui-field">
+            <span>備考</span>
+            <textarea className="ui-textarea" rows={2} value={form.note} onChange={set('note')} />
+          </label>
+          {!isNew && (
+            <details className="meter-form-history" onToggle={(e) => setHistoryOpen(e.currentTarget.open)}>
+              <summary>このテナントの変更履歴</summary>
+              {historyOpen && <MeterHistoryList table="equipment_tenants" rowKey={tenant.id} onReverted={onReverted} limit={50} />}
+            </details>
+          )}
           {error && <p className="ui-note is-danger">{error}</p>}
         </div>
         <div className="ui-modal-foot">
