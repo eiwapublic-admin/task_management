@@ -1319,6 +1319,32 @@ comment on column equipment_tenants.moved_out_on is '退去日（2026-10-20〜�
 alter table equipment_tenants add column if not exists notice_emails text[] not null default '{}';
 comment on column equipment_tenants.notice_emails is 'ビルメン案内メールの宛先（2026-10-20〜。メール設定の宛先から移行）。未退去のテナントのこのアドレスへ BCC で送る';
 
+-- 外調機の按分の自動計算（2026-10-21〜）。按分対象の面積（settings.meter_oa_target_area）＝ oa_share のメータの部屋面積の合計、
+-- 各メータの oa_ratio ＝ 部屋面積 ÷ その合計（小数第4位で丸め。面積の無いメータは0、按分しないメータは null）。
+-- Worker がメータの保存・取込のあとに呼ぶ（worker/lib/meter.js の recomputeOaRatios）。メータ最大値は Worker が 10^桁数 にする
+create or replace function meter_recompute_oa_ratios() returns numeric
+language plpgsql set search_path = public as $$
+declare
+  total numeric;
+begin
+  select coalesce(sum(area_m2), 0) into total from meters where oa_share;
+  insert into settings (key, value) values ('meter_oa_target_area', total::text)
+    on conflict (key) do update set value = excluded.value;
+  update meters m set oa_ratio = calc.ratio
+  from (
+    select id,
+      case when not oa_share then null
+           when total > 0 and area_m2 is not null then round(area_m2 / total, 4)
+           else 0 end as ratio
+    from meters
+  ) calc
+  where calc.id = m.id and m.oa_ratio is distinct from calc.ratio;
+  return total;
+end
+$$;
+revoke all on function meter_recompute_oa_ratios() from public, anon, authenticated;
+grant execute on function meter_recompute_oa_ratios() to service_role;
+
 -- ============================================================
 -- service_role の権限（2026-10-21〜。ファイル冒頭の「新しいテーブルを作るときの決まり」）。
 -- 2026-10-30 以降の Supabase では、このファイルで作り直したテーブルにも権限が自動で付かないため、

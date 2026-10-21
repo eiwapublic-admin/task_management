@@ -133,17 +133,21 @@ function meterFields(p, tenantIdByCode) {
       const d = int(p.digits)
       return d != null && d >= 1 && d <= 9 ? d : null
     })(),
-    max_value: int(p.max_value),
+    // メータ最大値は桁数から決まる（10の桁数乗。2026-10-21〜 入力しない）。
+    // 当月値が前月値より小さいとき、差分に足して一巡を戻すのに使う（src/lib/meterOutput.js の readingUsage）
+    max_value: null,
     expires_on: dateOrNull(p.expires_on),
     measured: p.measured === true,
     removed: p.removed === true,
     area_m2: num(p.area_m2),
     area_tsubo: num(p.area_tsubo),
     oa_share: p.oa_share === true,
-    oa_ratio: num(p.oa_ratio),
+    // 外調機電気量の按分比率（oa_ratio）は入力しない。保存のたびに meter_recompute_oa_ratios で
+    // 部屋面積 ÷ 按分対象の面積の合計（小数第4位まで）に計算し直す（2026-10-21〜）
     is_oa_meter: p.is_oa_meter === true,
     note: text(p.note, 2000),
   }
+  row.max_value = row.digits != null ? 10 ** row.digits : null
   if (tenantIdByCode) {
     row.tenant_id = p.billing_code ? tenantIdByCode.get(String(p.billing_code)) || null : null
   } else if ('tenant_id' in p) {
@@ -163,6 +167,13 @@ async function loadConstants(supabase) {
     out[name] = Number.isFinite(n) ? n : fallback
   }
   return out
+}
+
+// 外調機の按分（2026-10-21〜）: 按分対象の面積（定数 meter_oa_target_area）＝ oa_share のメータの部屋面積の合計、
+// 各メータの按分比率 ＝ 部屋面積 ÷ その合計（小数第4位で丸め。面積の無いメータは0）。DB の関数1回で済ませる
+async function recomputeOaRatios(supabase) {
+  const { error } = await supabase.rpc('meter_recompute_oa_ratios')
+  if (error) throw new Error(`按分比率の計算に失敗しました: ${error.message}`)
 }
 
 // numeric 列は文字列で返ることがあるので数値にそろえる
@@ -341,7 +352,14 @@ export async function handleMeterTenants(req) {
   }
 }
 
-// POST /api/meter/meters（追加）・PATCH /api/meter/meters（修正。id 必須）
+// 按分比率を計算し直したあとの値で返す（読み直せなければ保存直後の値）
+async function reloadMeter(supabase, saved) {
+  const { data } = await supabase.from('meters').select(METER_COLUMNS).eq('id', saved.id).maybeSingle()
+  return data || saved
+}
+
+// POST /api/meter/meters（追加）・PATCH /api/meter/meters（修正。id 必須）。
+// 保存のあと、すべてのメータの按分比率と按分対象の面積を計算し直す（画面は一覧を読み直す）
 export async function handleMeterSave(req) {
   const { error } = await requireStaff(req)
   if (error) return error
@@ -363,7 +381,8 @@ export async function handleMeterSave(req) {
         if (!dup) console.error('meter-create:', err.message)
         return json({ error: dup ? 'そのメータ番号はすでにあります' : 'メータの追加に失敗しました' }, dup ? 409 : 500)
       }
-      return json({ meter: data })
+      await recomputeOaRatios(supabase)
+      return json({ meter: await reloadMeter(supabase, data) })
     }
     const id = typeof p.id === 'string' && UUID_RE.test(p.id) ? p.id : null
     if (!id) return json({ error: 'id は必須です' }, 400)
@@ -384,7 +403,8 @@ export async function handleMeterSave(req) {
       return json({ error: dup ? 'そのメータ番号はすでにあります' : 'メータの更新に失敗しました' }, dup ? 409 : 500)
     }
     if (!data) return json({ error: 'メータが見つかりません' }, 404)
-    return json({ meter: data })
+    await recomputeOaRatios(supabase)
+    return json({ meter: await reloadMeter(supabase, data) })
   } catch (err) {
     console.error('meter-save 失敗:', err)
     return json({ error: 'メータの保存に失敗しました' }, 500)
@@ -426,6 +446,8 @@ export async function handleMeterConstantsUpdate(req) {
     const p = await req.json().catch(() => null)
     const rows = []
     for (const [name, { key }] of Object.entries(CONSTANTS)) {
+      // 按分対象の面積はメータから計算する（recomputeOaRatios）ので受け付けない
+      if (name === 'oa_target_area') continue
       if (!(name in (p || {}))) continue
       const n = num(p[name])
       if (n == null || n < 0) return json({ error: '定数は0以上の数で入力してください' }, 400)
@@ -527,6 +549,7 @@ async function importMeters(supabase, records) {
   if (rows.length) {
     const { error } = await supabase.from('meters').upsert(rows, { onConflict: 'meter_no' })
     if (error) throw new Error(error.message)
+    await recomputeOaRatios(supabase)
   }
   return { saved: rows.length, warnings: [...unknownCodes].map((c) => `請求先コード ${c} のテナントがありません`) }
 }
@@ -996,7 +1019,7 @@ export async function handleMeterSummary(req) {
     if (!latestMonth) return json({ latestMonth: null, meters: [], readings: [] })
     const months = [0, -1, -2, -3].map((d) => shiftMonth(latestMonth, d))
     const [meters, readings] = await Promise.all([
-      supabase.from('meters').select('id, meter_no, tenant_id, floor, seq, kind, digits, measured, removed, is_oa_meter'),
+      supabase.from('meters').select('id, meter_no, tenant_id, floor, seq, kind, digits, max_value, measured, removed, is_oa_meter'),
       supabase.from('meter_readings').select(READING_COLUMNS).in('month', months),
     ])
     const failed = [meters, readings].find((r) => r.error)
