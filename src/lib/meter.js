@@ -27,10 +27,10 @@ export function saveMeter(meter) {
   }).then((d) => d.meter)
 }
 
-export function updateMeterAcUnit(unitNo, meterId) {
+export function updateMeterAcUnit(unitNo, meterId, reason = '') {
   return authFetch('/api/meter/ac-units', {
     method: 'PATCH',
-    body: JSON.stringify({ unit_no: unitNo, meter_id: meterId || null }),
+    body: JSON.stringify({ unit_no: unitNo, meter_id: meterId || null, reason }),
   }).then((d) => d.unit)
 }
 
@@ -192,6 +192,18 @@ export function fetchMeterHistory({ table, key, limit } = {}) {
 
 export const HISTORY_CONFLICT_MESSAGE = 'この変更のあとでさらに変わっています'
 
-export function revertMeterHistory(id, { force = false } = {}) {
-  return authFetch('/api/meter/history/revert', { method: 'POST', body: JSON.stringify({ id, force }) })
+export function revertMeterHistory(id, { force = false, reason = '' } = {}) {
+  return authFetch('/api/meter/history/revert', { method: 'POST', body: JSON.stringify({ id, force, reason }) })
+}
+
+// 変更理由をあとから書く（空にすると消す）
+export function saveMeterHistoryReason(id, reason) {
+  return authFetch('/api/meter/history', { method: 'PATCH', body: JSON.stringify({ id, reason }) }).then((d) => d.item)
+}
+
+// 検針マスタ（テナント・メータ・空調機）を保存する直前に、変更理由（任意）をダイアログで聞く（2026-10-21〜）。
+// キャンセルなら null（保存しない）。空のまま OK なら ''
+export function askChangeReason(message = '変更理由を入力してください（任意。空のままでも保存できます）') {
+  const r = window.prompt(message, '')
+  return r == null ? null : r.trim()
 }

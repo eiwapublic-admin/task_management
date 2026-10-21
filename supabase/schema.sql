@@ -1430,3 +1430,5 @@ create trigger meters_history after insert or update or delete on meters
 drop trigger if exists meter_ac_units_history on meter_ac_units;
 create trigger meter_ac_units_history after insert or update or delete on meter_ac_units
   for each row execute function meter_master_history_log();
+-- 変更理由（2026-10-21〜）。保存のときに任意で入れるか、変更履歴の画面から後で書き足す
+alter table meter_master_history add column if not exists reason text;

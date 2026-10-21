@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
-import { TENANT_PROFILE_FIELDS, saveMeterTenant } from '../lib/meter'
+import { TENANT_PROFILE_FIELDS, askChangeReason, saveMeterTenant } from '../lib/meter'
 import { jstToday } from '../lib/tenants'
 import MeterHistoryList from './MeterHistoryList'
 
@@ -65,6 +65,8 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
     setError('')
     if (!form.billing_code.trim()) return setError('請求先コードを入力してください')
     if (!form.name.trim()) return setError('正式名称を入力してください')
+    const reason = askChangeReason()
+    if (reason === null) return
     setSaving(true)
     try {
       const { billing_code: code, ...rest } = form
@@ -73,6 +75,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
         ...(codeLocked ? {} : { billing_code: code }),
         ...rest,
         profile,
+        reason,
       })
       onSaved(saved)
     } catch (err) {
