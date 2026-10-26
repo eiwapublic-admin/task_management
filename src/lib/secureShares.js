@@ -19,7 +19,7 @@ export const SHARE_STATUS = {
 }
 
 export const SHARE_LOG_RESULT = {
-  opened: '開いた',
+  opened: 'ダウンロード',
   wrong_passcode: 'パスコード誤り',
   expired: '期限切れで開けず',
   revoked: '取り消し後に開こうとした',

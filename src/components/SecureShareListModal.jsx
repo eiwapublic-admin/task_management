@@ -91,7 +91,7 @@ export default function SecureShareListModal({ onClose }) {
                     <th>作成</th>
                     <th>書類・送り先</th>
                     <th>期限</th>
-                    <th className="is-numeric">開いた</th>
+                    <th className="is-numeric">ダウンロード</th>
                     <th>状態</th>
                     <th />
                   </tr>
