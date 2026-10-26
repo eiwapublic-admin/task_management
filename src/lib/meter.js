@@ -77,6 +77,9 @@ export const TENANT_PROFILE_FIELDS = [
   { key: 'entry_date', label: '記入日', type: 'date' },
   { key: 'update_info', label: '更新情報（一覧表）', wide: true },
   { key: 'list_exclude', label: 'テナント一覧表・緊急連絡先一覧表に載せない', type: 'checkbox' },
+  // セコムに出す緊急連絡先一覧表（PDF）の「最終変更日付」「最終変更事項」（2026-10-26〜）。入力画面では緊急連絡先の下に出す
+  { key: 'contact_changed_on', label: '最終変更日付（連絡用）', type: 'date', contact: true },
+  { key: 'contact_change_note', label: '最終変更事項（連絡用）', contact: true },
   // 修正に関する備考は、画面の最下部に横長で出す（2026-10-21）
   { key: 'fix_note', label: '修正に関する備考', wide: true },
 ]

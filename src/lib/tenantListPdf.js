@@ -3,9 +3,10 @@
 // 日本語フォントを読み込まずに済み、追加の費用もかからない）。どちらも A4 横1枚に収まるよう、表の大きさを縮めて合わせる。
 // 行（入居中のテナント・階の順・部屋番号）は Excel 出力と同じ buildTenantListGroups で作る。
 // テナント一覧表は出力前に聞く時点の日付で退去済みのテナントを、どちらも警備番号が空のテナントを除く（2026-10-26〜）。
-// 緊急連絡先一覧表の「更新情報」は、指定した日以降のテナントマスタの変更履歴（変更理由があればそれ、無ければ変わった項目名）
+// 緊急連絡先一覧表の「最終変更日付・事項」は、テナントマスタの連絡用の2項目のうち指定した日以降のもの（2026-10-26〜。
+// それまでは変更履歴から作った「更新情報」）
 
-import { TENANT_FIELD_LABELS, TENANT_PROFILE_LABELS, fetchMeterHistory, fetchMeterMasters } from './meter'
+import { fetchMeterMasters } from './meter'
 import { isMovedOut, jstToday } from './tenants'
 import { buildTenantListGroups } from './tenantListExport'
 import { escapeXml as esc } from './xlsxWrite'
@@ -15,36 +16,15 @@ export const TENANT_PDF_KINDS = {
   emergency: { label: '緊急連絡先一覧表' },
 }
 
-// 変更履歴のうち、更新情報に載せない項目（記録用の列と、一覧表の作成用のメモ）
-const SKIP_FIELDS = new Set(['updated_at', 'created_at', 'updated_by', 'synced_at', 'legacy_id'])
-const SKIP_PROFILE = new Set(['update_info', 'fix_note', 'list_exclude', 'entry_date'])
-
 const slash = (d) => (d ? String(d).replaceAll('-', '/') : '')
 const dash = (s) => (s == null || s === '' || s === '-' ? '' : String(s))
-const jstDate = (iso) => new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10)
 const floorName = (f) => (f === 'B' ? 'B1F' : `${f}F`)
 
-// 1件の変更履歴を「2026/10/21 変更理由」または「2026/10/21 火元責任者・緊急連絡先を変更」の1行にする（載せるものが無ければ null）
-export function historyLine(h) {
-  const date = slash(jstDate(h.changed_at))
-  if (h.reason) return `${date} ${h.reason}`
-  if (h.op === 'insert') return `${date} 新規登録`
-  if (h.op === 'delete') return `${date} 削除`
-  const labels = []
-  for (const f of h.changed_fields || []) {
-    if (SKIP_FIELDS.has(f)) continue
-    if (f !== 'profile') {
-      labels.push(TENANT_FIELD_LABELS[f] || f)
-      continue
-    }
-    const o = h.old_row?.profile || {}
-    const n = h.new_row?.profile || {}
-    for (const k of new Set([...Object.keys(o), ...Object.keys(n)])) {
-      if (SKIP_PROFILE.has(k) || JSON.stringify(o[k] ?? null) === JSON.stringify(n[k] ?? null)) continue
-      labels.push(TENANT_PROFILE_LABELS[k] || k)
-    }
-  }
-  return labels.length ? `${date} ${[...new Set(labels)].join('・')}を変更` : null
+// 最終変更日付・事項（連絡用）。日付が起点（since）より前なら出さない。日付が無く事項だけのものも出さない
+export function contactChange(p, since = '') {
+  const date = p?.contact_changed_on || ''
+  if (!date || (since && date < since)) return null
+  return { date, note: p.contact_change_note || '' }
 }
 
 const mails = (t) => (t.notice_emails?.length ? t.notice_emails : t.profile?.email ? [t.profile.email] : [])
@@ -85,7 +65,8 @@ const COLUMNS = {
     ['緊急連絡先 2', (r) => contactCell(r.p.emergency_contacts?.[1]), 'contact'],
     ['緊急連絡先 3', (r) => contactCell(r.p.emergency_contacts?.[2]), 'contact'],
     ['記入日', (r) => slash(r.p.entry_date), 'c nw'],
-    ['更新情報', (r) => r.updates.map(esc).join('<br>'), 'upd'],
+    ['最終変更日付', (r) => slash(r.change?.date), 'c nw'],
+    ['最終変更事項', (r) => [r.change?.note, r.moveOut].filter(Boolean).map(esc).join('<br>'), 'upd'],
   ],
 }
 
@@ -106,7 +87,7 @@ function sheetHtml(kind, groups, { since, asOf, today }) {
         ]
       : [
           [rows.length, 'テナント'],
-          [rows.filter((r) => r.updates.length).length, `更新あり（${slash(since)}〜）`],
+          [rows.filter((r) => r.change).length, `変更あり（${slash(since)}〜）`],
           [slash(today), '作成日'],
         ]
   let body = ''
@@ -121,7 +102,7 @@ function sheetHtml(kind, groups, { since, asOf, today }) {
   const head = `<tr><th class="c">階</th>${cols.map(([h, , cls]) => `<th class="${cls}">${esc(h)}</th>`).join('')}</tr>`
   const note =
     kind === 'emergency'
-      ? `更新情報は ${slash(since)} 以降のテナントマスタの変更（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
+      ? `最終変更日付・事項は ${slash(since)} 以降のもの（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
       : `${slash(asOf)} 時点で入居中のテナント　／　`
   return `<div class="page"><div class="fit">
 <header><h1>${esc(label)}</h1><div class="kpis">${kpis.map(([v, l]) => `<div><b>${esc(v)}</b>${esc(l)}</div>`).join('')}</div></header>
@@ -153,27 +134,23 @@ export function fitToPage(doc) {
 
 /** 印刷用の HTML を作る（kind: 'tenants' | 'emergency'。since は緊急連絡先一覧表の更新情報の起点 YYYY-MM-DD） */
 // asOf はテナント一覧表の時点の日付（その日に退去済みのテナントを除く。2026-10-26〜）
-export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], since = '', asOf = '', today = jstToday(), styleHref = STYLE_URL }) {
-  const updatesByTenant = new Map()
-  for (const h of [...history].sort((a, b) => String(a.changed_at).localeCompare(String(b.changed_at)))) {
-    if (h.table_name && h.table_name !== 'equipment_tenants') continue
-    const line = historyLine(h)
-    if (!line) continue
-    if (!updatesByTenant.has(h.row_key)) updatesByTenant.set(h.row_key, [])
-    updatesByTenant.get(h.row_key).push(line)
-  }
+export function buildTenantListPdfHtml(kind, { tenants, meters, since = '', asOf = '', today = jstToday(), styleHref = STYLE_URL }) {
   // 緊急連絡先一覧表は、起点の日付の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せ、
-  // 更新情報の先頭に退去日を出す（2026-10-26 依頼）
+  // 最終変更事項の末尾に退去日を出す（2026-10-26 依頼）。
+  // 最終変更日付・事項はテナントマスタの「最終変更日付（連絡用）」「最終変更事項（連絡用）」。日付が起点より前なら出さない
+  // （2026-10-26 依頼。それまでは変更履歴から作った「更新情報」を出していた）
   const emergency = kind === 'emergency'
   const groups = buildTenantListGroups(tenants, meters, today, { activeOn: emergency ? since : asOf }).map((g) => ({
     ...g,
     rows: g.rows.map((r) => {
       const t = r.tenant
+      const p = t.profile || {}
       const moveOut =
         emergency && t.moved_out_on && (!since || t.moved_out_on > since)
-          ? [`${slash(t.moved_out_on)} ${isMovedOut(t, today) ? '退去' : '退去予定'}`]
-          : []
-      return { ...r, p: t.profile || {}, movedOut: isMovedOut(t, today), updates: [...moveOut, ...(updatesByTenant.get(t.id) || [])] }
+          ? `${slash(t.moved_out_on)} ${isMovedOut(t, today) ? '退去' : '退去予定'}`
+          : ''
+      const change = contactChange(p, since)
+      return { ...r, p, movedOut: isMovedOut(t, today), moveOut, change }
     }),
   }))
   const title = `${TENANT_PDF_KINDS[kind].label}_${today.replaceAll('-', '')}`
@@ -210,16 +187,12 @@ export function parseSinceDate(s) {
 /** 出力する。見えない iframe に描いてブラウザの印刷を開く（「PDFに保存」で PDF になる）。載せた件数を返す */
 export async function printTenantListPdf(kind, { since = '', asOf = '' } = {}) {
   if (!TENANT_PDF_KINDS[kind]) throw new Error('出力の種類が正しくありません')
-  const [data, history] = await Promise.all([
-    fetchMeterMasters(),
-    kind === 'emergency' ? fetchMeterHistory({ table: 'equipment_tenants', since, limit: 2000 }) : [],
-  ])
+  const data = await fetchMeterMasters()
   // iframe（about:blank）の中では相対パスが解決されないことがあるので、絶対 URL で渡す
   const styleHref = new URL(STYLE_URL, window.location.origin).href
   const { title, html } = buildTenantListPdfHtml(kind, {
     tenants: data.tenants || [],
     meters: data.meters || [],
-    history,
     since,
     asOf,
     styleHref,
