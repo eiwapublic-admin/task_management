@@ -4,6 +4,7 @@ import './SecureShare.css'
 import {
   SHARE_LOG_RESULT,
   SHARE_STATUS,
+  buildPasscodeSms,
   copyText,
   fetchSecureShares,
   formatShareDateTime,
@@ -110,6 +111,7 @@ export default function SecureShareListModal({ onClose }) {
                           {s.title}
                           <div>{s.recipient_name} 様</div>
                           {s.recipient_email && <div className="ui-note">{s.recipient_email}</div>}
+                          {s.recipient_mobile && <div className="ui-note">{s.recipient_mobile}</div>}
                           {s.log?.length > 0 && (
                             <details className="secure-share-log">
                               <summary>記録（{s.log.length}件）</summary>
@@ -129,6 +131,21 @@ export default function SecureShareListModal({ onClose }) {
                               <button type="button" className="btn-plain" onClick={() => copyText(reissued.passcode)}>
                                 コピー
                               </button>
+                              {s.recipient_mobile && (
+                                <a
+                                  className="btn-plain"
+                                  href={
+                                    buildPasscodeSms({
+                                      mobile: s.recipient_mobile,
+                                      title: s.title,
+                                      passcode: reissued.passcode,
+                                      expiresAt: s.expires_at,
+                                    }).href
+                                  }
+                                >
+                                  SMS を作る
+                                </a>
+                              )}
                             </div>
                           )}
                         </td>

@@ -27,7 +27,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/
 const EMAIL_RE = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]+$/
 
 const LIST_COLUMNS =
-  'id, title, filename, size_bytes, recipient_name, recipient_email, expires_at, max_opens, open_count, failed_attempts, locked_at, revoked_at, file_deleted_at, last_opened_at, created_by, created_at'
+  'id, title, filename, size_bytes, contact_id, recipient_name, recipient_email, recipient_mobile, expires_at, max_opens, open_count, failed_attempts, locked_at, revoked_at, file_deleted_at, last_opened_at, created_by, created_at'
 
 async function requireStaff(req) {
   const auth = await verifyRequestAuth(req)
@@ -122,7 +122,7 @@ function draftBody({ recipientName, title, url, expiresAt, maxOpens }) {
     '',
     url,
     '',
-    '・パスコードは、このメールとは別にお電話等でお知らせします。',
+    '・パスコードは、このメールとは別に携帯電話のショートメッセージ（SMS）またはお電話でお知らせします。',
     `・有効期限: ${slashDateTime(expiresAt)} まで（開ける回数: ${maxOpens}回まで）`,
     '・個人情報を含むため、受け取ったファイルの取り扱いにはご注意ください。',
     '',
@@ -130,7 +130,9 @@ function draftBody({ recipientName, title, url, expiresAt, maxOpens }) {
 }
 
 // POST /api/secure-shares（multipart）— 共有を作る。
-// フォーム: pdf（ファイル）・title（書類名）・recipient_name・recipient_email（任意）・days・max_opens・draft（'1' なら Gmail の下書きも作る）
+// フォーム: pdf（ファイル）・title（書類名）・contact_id（連絡帳の id）・days・max_opens・draft（'1' なら Gmail の下書きも作る）。
+// 送り先は連絡帳から選ぶ（2026-10-26 依頼。携帯電話番号とメールアドレスの両方があるものだけ）。名前・アドレス・携帯番号は
+// 画面から受け取らず、サーバーが連絡帳から引き直す（ビルメンの案内メールの宛先と同じ考え方）
 // 返す: { share, url, passcode, draft_url? }。url と passcode はこの応答でしか分からない
 export async function handleSecureShareCreate(req) {
   const { auth, error } = await requireStaff(req)
@@ -140,8 +142,7 @@ export async function handleSecureShareCreate(req) {
     if (!form) return json({ error: 'フォームの受け取りに失敗しました' }, 400)
     const pdf = form.get('pdf')
     const title = text(form.get('title'), 100)
-    const recipientName = text(form.get('recipient_name'), 100)
-    const recipientEmail = text(form.get('recipient_email'), 254)
+    const contactId = String(form.get('contact_id') || '')
     const days = intIn(form.get('days'), SHARE_DEFAULT_DAYS, 1, SHARE_MAX_DAYS)
     const maxOpens = intIn(form.get('max_opens'), SHARE_DEFAULT_OPENS, 1, SHARE_MAX_OPENS)
     const wantDraft = form.get('draft') === '1'
@@ -149,9 +150,23 @@ export async function handleSecureShareCreate(req) {
     if (!pdf || typeof pdf === 'string') return json({ error: 'PDF がありません' }, 400)
     if (pdf.size > PDF_MAX_BYTES) return json({ error: 'PDF が大きすぎます（20MBまで）' }, 400)
     if (!title) return json({ error: '書類名がありません' }, 400)
-    if (!recipientName) return json({ error: '送り先の名前を入力してください' }, 400)
-    if (recipientEmail && !EMAIL_RE.test(recipientEmail)) return json({ error: 'メールアドレスの形が正しくありません' }, 400)
-    if (wantDraft && !recipientEmail) return json({ error: 'Gmail の下書きを作るにはメールアドレスが必要です' }, 400)
+    if (!UUID_RE.test(contactId)) return json({ error: '送り先を連絡帳から選んでください' }, 400)
+    const supabase = getAdminClient()
+    const { data: contact, error: contactErr } = await supabase
+      .from('contacts')
+      .select('id, company_name, contact_person, mobile_phone, email_to')
+      .eq('id', contactId)
+      .maybeSingle()
+    if (contactErr) throw new Error(contactErr.message)
+    if (!contact) return json({ error: '連絡帳に送り先が見つかりません' }, 400)
+    const recipientName = [contact.company_name, contact.contact_person].map((v) => (v || '').trim()).filter(Boolean).join(' ').slice(0, 100)
+    // メールTO に複数書かれていても、最初の1件だけに送る
+    const recipientEmail = (contact.email_to || '').split(/[,;、\s]+/).find(Boolean) || ''
+    const recipientMobile = (contact.mobile_phone || '').trim().slice(0, 30)
+    if (!recipientEmail || !recipientMobile) {
+      return json({ error: '連絡帳の携帯電話番号とメールアドレスの両方が登録されている送り先を選んでください' }, 400)
+    }
+    if (!EMAIL_RE.test(recipientEmail)) return json({ error: '連絡帳のメールアドレスの形が正しくありません' }, 400)
 
     const bytes = new Uint8Array(await pdf.arrayBuffer())
     // PDF 以外を置かせない（先頭が %PDF-）
@@ -167,7 +182,6 @@ export async function handleSecureShareCreate(req) {
     const expiresAt = new Date(Date.now() + days * 86400 * 1000).toISOString()
 
     await putObject(objectKey, bytes, 'application/pdf', { bucket: SHARE_BUCKET })
-    const supabase = getAdminClient()
     const { data: share, error: insErr } = await supabase
       .from('secure_shares')
       .insert({
@@ -179,7 +193,9 @@ export async function handleSecureShareCreate(req) {
         object_key: objectKey,
         size_bytes: bytes.length,
         recipient_name: recipientName,
-        recipient_email: recipientEmail || null,
+        recipient_email: recipientEmail,
+        recipient_mobile: recipientMobile,
+        contact_id: contact.id,
         expires_at: expiresAt,
         max_opens: maxOpens,
         created_by: actorOf(auth),
@@ -357,7 +373,7 @@ ${message ? `<p class="error" role="alert">${escHtml(message)}</p>` : ''}
 <input id="passcode" name="passcode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9０-９ ]*" maxlength="12" required autofocus>
 <button type="submit">開く（PDF をダウンロード）</button>
 </form>
-<p class="muted">パスコードは、送り主からメールとは別の方法（お電話など）でお知らせしています。${MAX_FAILED}回続けて間違えるとこのリンクは使えなくなります。</p>`,
+<p class="muted">パスコードは、送り主からメールとは別の方法（ショートメッセージやお電話）でお知らせしています。${MAX_FAILED}回続けて間違えるとこのリンクは使えなくなります。</p>`,
   })
 }
 

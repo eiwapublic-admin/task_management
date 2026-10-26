@@ -1507,3 +1507,6 @@ alter table secure_share_access_log enable row level security;
 revoke all on secure_share_access_log from anon, authenticated;
 grant select, insert, update, delete on secure_share_access_log to service_role;
 grant usage, select on sequence secure_share_access_log_id_seq to service_role;
+-- 送り先は連絡帳から選ぶ（2026-10-26 依頼）。パスコードの SMS 文面を作るため携帯番号も持つ（マイグレーション secure_shares_contact）
+alter table secure_shares add column if not exists contact_id uuid references contacts(id) on delete set null;
+alter table secure_shares add column if not exists recipient_mobile text;

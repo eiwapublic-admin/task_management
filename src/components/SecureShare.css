@@ -53,3 +53,21 @@
   border-radius: var(--radius-control);
 }
 .secure-share-reissued .secure-share-passcode { flex: none; font-size: var(--fs-lg); }
+.secure-share-contact {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-05) var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-control);
+}
+.secure-share-contact dt { color: var(--text-muted); }
+.secure-share-contact dd { margin: 0; overflow-wrap: anywhere; }
+.secure-share-send {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.secure-share-copy > .ui-textarea { flex: 1 1 0; min-width: 0; }
