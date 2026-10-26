@@ -65,7 +65,8 @@ const COLUMNS = {
     ['緊急連絡先 2', (r) => contactCell(r.p.emergency_contacts?.[1]), 'contact'],
     ['緊急連絡先 3', (r) => contactCell(r.p.emergency_contacts?.[2]), 'contact'],
     ['記入日', (r) => slash(r.p.entry_date), 'c nw'],
-    ['最終変更日付', (r) => slash(r.change?.date), 'c nw chg'],
+    // 見出しは「最終変更事項」の1つで日付と事項の2列にまたがる（2026-10-26 依頼。見出しが null の列は次の列の見出しにまとめる）
+    [null, (r) => slash(r.change?.date), 'c nw chg'],
     ['最終変更事項', (r) => esc(r.change?.note || ''), 'upd chg'],
   ],
 }
@@ -95,14 +96,22 @@ function sheetHtml(kind, groups, { since, asOf, today }) {
     g.rows.forEach((r, i) => {
       const floor = i === 0 ? `<td class="floor" rowspan="${g.rows.length}">${floorName(g.floor)}</td>` : ''
       const cells = cols.map(([, fn, cls]) => `<td class="${cls}">${fn(r) ?? ''}</td>`).join('')
-      const cls = [i === g.rows.length - 1 ? 'last' : '', r.movedOut ? 'moved-out' : ''].filter(Boolean).join(' ')
+      // 最終変更事項のある行は背景色（退去日のあるテナント＝退去・退去予定は薄いグレー、それ以外は薄い黄色。2026-10-26 依頼）
+      const changed = kind === 'emergency' && r.change ? (r.tenant.moved_out_on || r.movedOut ? 'chg-out' : 'chg-row') : ''
+      const cls = [i === g.rows.length - 1 ? 'last' : '', r.movedOut ? 'moved-out' : '', changed].filter(Boolean).join(' ')
       body += `<tr class="${cls}">${floor}${cells}</tr>`
     })
   }
-  const head = `<tr><th class="c">階</th>${cols.map(([h, , cls]) => `<th class="${cls}">${esc(h)}</th>`).join('')}</tr>`
+  const head = `<tr><th class="c">階</th>${cols
+    .map(([h, , cls], i) => {
+      if (h === null) return ''
+      const span = cols[i - 1]?.[0] === null ? 2 : 1
+      return `<th class="${cls}"${span > 1 ? ` colspan="${span}"` : ''}>${esc(h)}</th>`
+    })
+    .join('')}</tr>`
   const note =
     kind === 'emergency'
-      ? `最終変更日付・事項は ${slash(since)} 以降のもの（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
+      ? `最終変更事項は ${slash(since)} 以降のもの（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
       : `${slash(asOf)} 時点で入居中のテナント　／　`
   return `<div class="page"><div class="fit">
 <header><h1>${esc(label)}</h1><div class="kpis">${kpis.map(([v, l]) => `<div><b>${esc(v)}</b>${esc(l)}</div>`).join('')}</div></header>
