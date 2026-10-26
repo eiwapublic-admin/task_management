@@ -164,7 +164,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
 
           <h4 className="meter-form-section">基本情報（社員のみ）</h4>
           <div className="meter-form-grid">
-            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide && f.type !== 'checkbox').map((f) => (
+            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide && !f.contact && f.type !== 'checkbox').map((f) => (
               <label key={f.key} className="ui-field">
                 <span>{f.label}</span>
                 <input
@@ -209,6 +209,15 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
               </label>
             </div>
           ))}
+          <div className="meter-form-grid tenant-contact-change">
+            {TENANT_PROFILE_FIELDS.filter((f) => f.contact).map((f) => (
+              <label key={f.key} className="ui-field">
+                <span>{f.label}</span>
+                <input type={f.type === 'date' ? 'date' : 'text'} className="ui-input" value={profile[f.key] ?? ''} onChange={setP(f.key)} />
+              </label>
+            ))}
+          </div>
+          <p className="ui-note">緊急連絡先一覧表（PDF）の「最終変更日付」「最終変更事項」に出ます。出力時の起点の日付より前の日付なら出しません。</p>
           {TENANT_PROFILE_FIELDS.filter((f) => f.wide).map((f) => (
             <label key={f.key} className="ui-field">
               <span>{f.label}（社員のみ）</span>

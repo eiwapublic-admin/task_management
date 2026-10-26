@@ -121,6 +121,8 @@ const PROFILE_TEXT_KEYS = [
   'plate_name',
   'company_phone',
   'update_info',
+  // 緊急連絡先一覧表（PDF）の最終変更事項（連絡用。2026-10-26〜）
+  'contact_change_note',
 ]
 
 // テナントの基本情報（profile）を、決まったキーだけの形に整える
@@ -137,6 +139,8 @@ function cleanProfile(p) {
   if (appointed) out.fire_manager_appointed_on = appointed
   const entryDate = dateOrNull(p.entry_date)
   if (entryDate) out.entry_date = entryDate
+  const contactChanged = dateOrNull(p.contact_changed_on)
+  if (contactChanged) out.contact_changed_on = contactChanged
   if (p.list_exclude === true) out.list_exclude = true
   if (Array.isArray(p.emergency_contacts)) {
     const contacts = p.emergency_contacts
