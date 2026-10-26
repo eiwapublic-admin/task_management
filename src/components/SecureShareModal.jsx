@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Combobox from './Combobox'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import './SecureShare.css'
 import { TENANT_PDF_KINDS, buildTenantListPdfFile, defaultAsOf, defaultUpdateSince } from '../lib/tenantListPdf'
@@ -7,21 +8,28 @@ import {
   SHARE_DEFAULT_OPENS,
   SHARE_MAX_DAYS,
   SHARE_MAX_OPENS,
+  buildPasscodeSms,
+  contactLabel,
   copyText,
   createSecureShare,
   formatShareDateTime,
+  shareableContacts,
 } from '../lib/secureShares'
+import { fetchContacts } from '../lib/contacts'
 
 // 安全なリンクで共有（2026-10-26〜）。テナント一覧表・緊急連絡先一覧表の PDF を作り、期限付き・パスコード付きの
-// リンクにする。リンクとパスコードは作った直後のこの画面でしか見られない（サーバーはそのままの値を持たない）
+// リンクにする。リンクとパスコードは作った直後のこの画面でしか見られない（サーバーはそのままの値を持たない）。
+// 送り先は連絡帳から選ぶ（携帯電話番号とメールアドレスの両方があるものだけ）。リンクは Gmail の下書き、
+// パスコードは SMS アプリの文面として作る（どちらも送信は人がする）
 export default function SecureShareModal({ onClose }) {
   useBodyScrollLock()
 
   const [kind, setKind] = useState('emergency')
   const [since, setSince] = useState(defaultUpdateSince())
   const [asOf, setAsOf] = useState(defaultAsOf())
-  const [recipientName, setRecipientName] = useState('')
-  const [recipientEmail, setRecipientEmail] = useState('')
+  const [contacts, setContacts] = useState(null)
+  const [query, setQuery] = useState('')
+  const [contactId, setContactId] = useState('')
   const [days, setDays] = useState(String(SHARE_DEFAULT_DAYS))
   const [maxOpens, setMaxOpens] = useState(String(SHARE_DEFAULT_OPENS))
   const [draft, setDraft] = useState(true)
@@ -30,12 +38,29 @@ export default function SecureShareModal({ onClose }) {
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState('')
 
-  const email = recipientEmail.trim()
+  useEffect(() => {
+    let active = true
+    fetchContacts()
+      .then((list) => active && setContacts(shareableContacts(list)))
+      .catch((err) => active && setError(err.message))
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const options = useMemo(() => (contacts || []).map((c) => ({ key: c.id, label: contactLabel(c) })), [contacts])
+  const contact = contacts?.find((c) => c.id === contactId) || null
+
+  function changeQuery(v) {
+    setQuery(v)
+    // 選んだ後に書き換えたら選び直し
+    if (contact && v !== contactLabel(contact)) setContactId('')
+  }
 
   async function handleCreate() {
     const d = Number(days)
     const m = Number(maxOpens)
-    if (!recipientName.trim()) return setError('送り先の名前を入力してください')
+    if (!contact) return setError('送り先を連絡帳から選んでください')
     if (!Number.isInteger(d) || d < 1 || d > SHARE_MAX_DAYS) return setError(`有効期限は 1〜${SHARE_MAX_DAYS} 日で入力してください`)
     if (!Number.isInteger(m) || m < 1 || m > SHARE_MAX_OPENS) return setError(`開ける回数は 1〜${SHARE_MAX_OPENS} 回で入力してください`)
     if (kind === 'emergency' && !since) return setError('起点の日付を入力してください')
@@ -48,11 +73,10 @@ export default function SecureShareModal({ onClose }) {
         pdfBlob: file.blob,
         filename: file.filename,
         title: TENANT_PDF_KINDS[kind].label,
-        recipientName: recipientName.trim(),
-        recipientEmail: email,
+        contactId: contact.id,
         days: d,
         maxOpens: m,
-        draft: draft && !!email,
+        draft,
       })
       setResult(res)
     } catch (err) {
@@ -86,7 +110,7 @@ export default function SecureShareModal({ onClose }) {
           ) : (
             <>
               <p className="ui-note">
-                PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡します。リンクはメールで、パスコードはお電話など
+                PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡します。リンクはメールで、パスコードは SMS やお電話など
                 <strong>メール以外の方法</strong>で伝えてください。
               </p>
               <label className="ui-field">
@@ -107,30 +131,33 @@ export default function SecureShareModal({ onClose }) {
                   <input type="date" className="ui-input" value={asOf} onChange={(e) => setAsOf(e.target.value)} disabled={busy} />
                 </label>
               )}
-              <label className="ui-field">
-                <span>送り先の名前（〇〇 様）</span>
-                <input
-                  type="text"
-                  className="ui-input"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                  placeholder="例: 小泉産業株式会社 山田"
-                  maxLength={100}
-                  disabled={busy}
+              <div className="ui-field">
+                <span>送り先（連絡帳から選ぶ）</span>
+                <Combobox
+                  value={query}
+                  onChange={changeQuery}
+                  onSelect={(key, label) => {
+                    setContactId(key)
+                    setQuery(label)
+                  }}
+                  options={options}
+                  placeholder={contacts == null ? '読み込み中…' : '会社名・担当者名で検索'}
+                  disabled={busy || contacts == null}
                 />
-              </label>
-              <label className="ui-field">
-                <span>送り先のメールアドレス（任意）</span>
-                <input
-                  type="email"
-                  className="ui-input"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  placeholder="example@example.co.jp"
-                  maxLength={254}
-                  disabled={busy}
-                />
-              </label>
+              </div>
+              {contact ? (
+                <dl className="secure-share-contact">
+                  <dt>メール</dt>
+                  <dd>{contact.email_to}</dd>
+                  <dt>携帯</dt>
+                  <dd>{contact.mobile_phone}</dd>
+                </dl>
+              ) : (
+                <p className="ui-note">
+                  携帯電話番号とメールアドレスの両方が登録されている連絡先だけを出しています
+                  {contacts ? `（${contacts.length}件）` : ''}。足りないときは連絡帳に登録してください。
+                </p>
+              )}
               <div className="ui-field-row">
                 <label className="ui-field">
                   <span>有効期限（日）</span>
@@ -160,8 +187,8 @@ export default function SecureShareModal({ onClose }) {
                 </label>
               </div>
               <label className="secure-share-check">
-                <input type="checkbox" checked={draft && !!email} onChange={(e) => setDraft(e.target.checked)} disabled={busy || !email} />
-                <span>リンクを書いたメールを Gmail の下書きに作る{email ? '' : '（メールアドレスを入れると選べます）'}</span>
+                <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} disabled={busy} />
+                <span>リンクを書いたメールを Gmail の下書きに作る</span>
               </label>
             </>
           )}
@@ -192,6 +219,9 @@ export default function SecureShareModal({ onClose }) {
 
 function ShareResult({ result, copied, onCopy }) {
   const { share, url, passcode, draft_url: draftUrl, draft_error: draftError } = result
+  const sms = share.recipient_mobile
+    ? buildPasscodeSms({ mobile: share.recipient_mobile, title: share.title, passcode, expiresAt: share.expires_at })
+    : null
   return (
     <>
       <p className="ui-note">
@@ -208,7 +238,7 @@ function ShareResult({ result, copied, onCopy }) {
         </div>
       </div>
       <div className="ui-field">
-        <span>パスコード（お電話など、メール以外で伝える）</span>
+        <span>パスコード（SMS やお電話など、メール以外で伝える）</span>
         <div className="secure-share-copy">
           <output className="secure-share-passcode">{passcode}</output>
           <button type="button" className="btn-plain" onClick={() => onCopy('passcode', passcode)}>
@@ -217,11 +247,32 @@ function ShareResult({ result, copied, onCopy }) {
         </div>
       </div>
       {copied.endsWith('-ng') && <p className="ui-note">この端末ではコピーできませんでした。欄を長押しして選んでください。</p>}
-      {draftUrl && (
-        <p>
+      <div className="secure-share-send">
+        {draftUrl && (
           <a className="btn-plain" href={draftUrl} target="_blank" rel="noopener noreferrer">
-            Gmail で下書きを開く
+            ① Gmail で下書きを開く（リンク）
           </a>
+        )}
+        {sms && (
+          <a className="btn-plain" href={sms.href}>
+            ② SMS を作る（パスコード → {share.recipient_mobile}）
+          </a>
+        )}
+      </div>
+      {sms && (
+        <div className="ui-field">
+          <span>SMS の文面</span>
+          <div className="secure-share-copy">
+            <textarea className="ui-textarea" rows={3} value={sms.body} readOnly onFocus={(e) => e.target.select()} />
+            <button type="button" className="btn-plain" onClick={() => onCopy('sms', sms.body)}>
+              {copied === 'sms' ? 'コピーしました' : 'コピー'}
+            </button>
+          </div>
+        </div>
+      )}
+      {sms && (
+        <p className="ui-note">
+          スマホでは SMS アプリが宛先と文面入りで開きます（送信ボタンはご自身で押してください）。パソコンで開かないときは、文面をコピーしてスマホから送ってください。
         </p>
       )}
       {draftError && (

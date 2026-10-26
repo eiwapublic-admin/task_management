@@ -29,12 +29,12 @@ export const SHARE_LOG_RESULT = {
 }
 
 // 共有を作る。戻り値: { share, url, passcode, draft_url?, draft_error? }
-export async function createSecureShare({ pdfBlob, filename, title, recipientName, recipientEmail, days, maxOpens, draft }) {
+// 送り先は連絡帳の id で渡す（名前・アドレス・携帯番号はサーバーが連絡帳から引き直す）
+export async function createSecureShare({ pdfBlob, filename, title, contactId, days, maxOpens, draft }) {
   const form = new FormData()
   form.append('pdf', pdfBlob, filename)
   form.append('title', title)
-  form.append('recipient_name', recipientName)
-  form.append('recipient_email', recipientEmail || '')
+  form.append('contact_id', contactId)
   form.append('days', String(days))
   form.append('max_opens', String(maxOpens))
   form.append('draft', draft ? '1' : '0')
@@ -88,4 +88,26 @@ export function formatShareDateTime(iso) {
   const d = new Date(iso)
   const p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// 連絡帳のうち、安全なリンクの送り先に選べるもの（携帯電話番号とメールアドレスの両方があるもの。2026-10-26 依頼）
+export function shareableContacts(contacts) {
+  return (contacts || []).filter((c) => (c.mobile_phone || '').trim() && (c.email_to || '').trim())
+}
+
+export function contactLabel(c) {
+  return [c.company_name, c.contact_person].map((v) => (v || '').trim()).filter(Boolean).join(' ')
+}
+
+// パスコードを伝える SMS（ショートメッセージ）の文面と、端末の SMS アプリを開く sms: リンク（2026-10-26 依頼）。
+// 送信はしない（自動送信は有料サービスが要るため）。スマホなら SMS アプリが宛先・本文入りで開く。
+// 「?&body=」は iPhone（&body=）と Android（?body=）のどちらでも本文が入る書き方
+export function buildPasscodeSms({ mobile, title, passcode, expiresAt }) {
+  const number = String(mobile || '')
+    .normalize('NFKC')
+    .replace(/[^\d+]/g, '')
+  const d = new Date(expiresAt)
+  const until = `${d.getMonth() + 1}/${d.getDate()}`
+  const body = `${title}を開くパスコードは ${passcode} です。メールでお送りしたリンクを開いて入力してください（${until}まで有効）。`
+  return { number, body, href: `sms:${number}?&body=${encodeURIComponent(body)}` }
 }
