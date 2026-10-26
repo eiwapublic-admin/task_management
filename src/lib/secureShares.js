@@ -101,13 +101,20 @@ export function contactLabel(c) {
 
 // パスコードを伝える SMS（ショートメッセージ）の文面と、端末の SMS アプリを開く sms: リンク（2026-10-26 依頼）。
 // 送信はしない（自動送信は有料サービスが要るため）。スマホなら SMS アプリが宛先・本文入りで開く。
-// 「?&body=」は iPhone（&body=）と Android（?body=）のどちらでも本文が入る書き方
-export function buildPasscodeSms({ mobile, title, passcode, expiresAt }) {
+// 「?&body=」は iPhone（&body=）と Android（?body=）のどちらでも本文が入る書き方。
+// 受け取る側には「パスワード」と伝える（文面は依頼元の指定。2026-10-26）
+export function passcodeSmsText(title, passcode) {
+  return `別途メールでご案内しました「${title}」をダウンロードするためのパスワードのご連絡です。\nパスワードは${passcode}です。ダウンロード画面にてご入力ください。`
+}
+
+export function smsHref(mobile, body) {
   const number = String(mobile || '')
     .normalize('NFKC')
     .replace(/[^\d+]/g, '')
-  const d = new Date(expiresAt)
-  const until = `${d.getMonth() + 1}/${d.getDate()}`
-  const body = `${title}を開くパスコードは ${passcode} です。メールでお送りしたリンクを開いて入力してください（${until}まで有効）。`
-  return { number, body, href: `sms:${number}?&body=${encodeURIComponent(body)}` }
+  return `sms:${number}?&body=${encodeURIComponent(body)}`
+}
+
+export function buildPasscodeSms({ mobile, title, passcode }) {
+  const body = passcodeSmsText(title, passcode)
+  return { body, href: smsHref(mobile, body) }
 }

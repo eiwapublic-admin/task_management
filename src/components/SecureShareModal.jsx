@@ -8,12 +8,13 @@ import {
   SHARE_DEFAULT_OPENS,
   SHARE_MAX_DAYS,
   SHARE_MAX_OPENS,
-  buildPasscodeSms,
   contactLabel,
   copyText,
   createSecureShare,
   formatShareDateTime,
+  passcodeSmsText,
   shareableContacts,
+  smsHref,
 } from '../lib/secureShares'
 import { fetchContacts } from '../lib/contacts'
 
@@ -217,73 +218,80 @@ export default function SecureShareModal({ onClose }) {
   )
 }
 
+// 作った後の画面。上に「自動で作るメールとメッセージ」（Gmail の下書き・SMS アプリ）、下に送る中身の部品（リンク・パスコード・
+// SMS の文面）を区切って置く（2026-10-26 依頼）
 function ShareResult({ result, copied, onCopy }) {
   const { share, url, passcode, draft_url: draftUrl, draft_error: draftError } = result
-  const sms = share.recipient_mobile
-    ? buildPasscodeSms({ mobile: share.recipient_mobile, title: share.title, passcode, expiresAt: share.expires_at })
-    : null
+  const mobile = share.recipient_mobile
+  const [smsBody, setSmsBody] = useState(() => passcodeSmsText(share.title, passcode))
   return (
     <>
       <p className="ui-note">
         {share.recipient_name} 様あての共有を作りました。有効期限は {formatShareDateTime(share.expires_at)} まで、開ける回数は{' '}
         {share.max_opens} 回までです。
       </p>
-      <div className="ui-field">
-        <span>リンク（メールで送る）</span>
-        <div className="secure-share-copy">
-          <input type="text" className="ui-input" value={url} readOnly onFocus={(e) => e.target.select()} />
-          <button type="button" className="btn-plain" onClick={() => onCopy('url', url)}>
-            {copied === 'url' ? 'コピーしました' : 'コピー'}
-          </button>
+      <section className="secure-share-auto" aria-label="自動でメールとメッセージを生成">
+        <h4 className="secure-share-auto-title">自動でメールとメッセージを生成</h4>
+        <div className="secure-share-send">
+          {draftUrl && (
+            <a className="btn-plain" href={draftUrl} target="_blank" rel="noopener noreferrer">
+              ① Gmail で下書きを開く（リンク）
+            </a>
+          )}
+          {mobile && (
+            <a className="btn-plain" href={smsHref(mobile, smsBody)}>
+              ② SMS を作る（パスワード → {mobile}）
+            </a>
+          )}
         </div>
-      </div>
-      <div className="ui-field">
-        <span>パスコード（SMS やお電話など、メール以外で伝える）</span>
-        <div className="secure-share-copy">
-          <output className="secure-share-passcode">{passcode}</output>
-          <button type="button" className="btn-plain" onClick={() => onCopy('passcode', passcode)}>
-            {copied === 'passcode' ? 'コピーしました' : 'コピー'}
-          </button>
-        </div>
-      </div>
-      {copied.endsWith('-ng') && <p className="ui-note">この端末ではコピーできませんでした。欄を長押しして選んでください。</p>}
-      <div className="secure-share-send">
-        {draftUrl && (
-          <a className="btn-plain" href={draftUrl} target="_blank" rel="noopener noreferrer">
-            ① Gmail で下書きを開く（リンク）
-          </a>
+        {draftError && (
+          <p className="dashboard-error dashboard-banner" role="alert">
+            {draftError}
+          </p>
         )}
-        {sms && (
-          <a className="btn-plain" href={sms.href}>
-            ② SMS を作る（パスコード → {share.recipient_mobile}）
-          </a>
-        )}
-      </div>
-      {sms && (
+        <p className="ui-note">
+          ① は共有アドレスの Gmail に、リンクを書いた下書きを作りました。② はスマホで押すと SMS アプリが宛先と文面入りで開きます。
+          どちらも送信ボタンはご自身で押してください。パソコンで ② が開かないときは、下の SMS の文面をコピーしてスマホから送ってください。
+        </p>
+      </section>
+
+      <section className="secure-share-parts" aria-label="送る内容">
+        <h4 className="secure-share-parts-title">送る内容（付随内容）</h4>
         <div className="ui-field">
-          <span>SMS の文面</span>
+          <span>リンク（メールで送る）</span>
           <div className="secure-share-copy">
-            <textarea className="ui-textarea" rows={3} value={sms.body} readOnly onFocus={(e) => e.target.select()} />
-            <button type="button" className="btn-plain" onClick={() => onCopy('sms', sms.body)}>
-              {copied === 'sms' ? 'コピーしました' : 'コピー'}
+            <input type="text" className="ui-input" value={url} readOnly onFocus={(e) => e.target.select()} />
+            <button type="button" className="btn-plain" onClick={() => onCopy('url', url)}>
+              {copied === 'url' ? 'コピーしました' : 'コピー'}
             </button>
           </div>
         </div>
-      )}
-      {sms && (
+        <div className="ui-field">
+          <span>パスコード（SMS やお電話など、メール以外で伝える）</span>
+          <div className="secure-share-copy">
+            <output className="secure-share-passcode">{passcode}</output>
+            <button type="button" className="btn-plain" onClick={() => onCopy('passcode', passcode)}>
+              {copied === 'passcode' ? 'コピーしました' : 'コピー'}
+            </button>
+          </div>
+        </div>
+        {mobile && (
+          <div className="ui-field">
+            <span>SMS の文面（書き換えると ② にも反映）</span>
+            <div className="secure-share-copy">
+              <textarea className="ui-textarea" rows={4} value={smsBody} onChange={(e) => setSmsBody(e.target.value)} />
+              <button type="button" className="btn-plain" onClick={() => onCopy('sms', smsBody)}>
+                {copied === 'sms' ? 'コピーしました' : 'コピー'}
+              </button>
+            </div>
+          </div>
+        )}
+        {copied.endsWith('-ng') && <p className="ui-note">この端末ではコピーできませんでした。欄を長押しして選んでください。</p>}
         <p className="ui-note">
-          スマホでは SMS アプリが宛先と文面入りで開きます（送信ボタンはご自身で押してください）。パソコンで開かないときは、文面をコピーしてスマホから送ってください。
+          この画面を閉じると、リンクとパスコードはもう表示できません。パスコードを忘れたときは「共有リンクの一覧」から再発行できます。
+          パスコードは<strong>メールに書かないでください</strong>。
         </p>
-      )}
-      {draftError && (
-        <p className="dashboard-error dashboard-banner" role="alert">
-          {draftError}
-        </p>
-      )}
-      <p className="ui-note">
-        この画面を閉じると、リンクとパスコードはもう表示できません。パスコードを忘れたときは「共有リンクの一覧」から再発行できます。
-        パスコードは<strong>メールに書かないでください</strong>。
-      </p>
+      </section>
     </>
   )
 }
