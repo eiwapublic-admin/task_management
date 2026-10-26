@@ -79,7 +79,16 @@ import {
   handleContactDelete,
   handleContactSync,
 } from './lib/contacts.js'
-import { handleManualList, handleManualCreate, handleManualUpdate, handleManualDelete } from './lib/manuals.js'
+import {
+  handleManualList,
+  handleManualCreate,
+  handleManualUpdate,
+  handleManualDelete,
+  handleManualAttachmentCreate,
+  handleManualAttachmentDelete,
+  handleManualAttachmentPreviewToken,
+  handleManualAttachmentDownload,
+} from './lib/manuals.js'
 import {
   handleMeterMasters,
   handleMeterTenants,
@@ -1183,6 +1192,18 @@ async function route(req, env) {
     if (req.method === 'PATCH') return handleManualUpdate(req)
     if (req.method === 'DELETE') return handleManualDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 添付ファイル（2026-10-26〜）
+  if (pathname === '/api/manuals/attachments') {
+    if (req.method === 'POST') return handleManualAttachmentCreate(req)
+    if (req.method === 'DELETE') return handleManualAttachmentDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/manuals/attachments/preview-token') {
+    return req.method === 'POST' ? handleManualAttachmentPreviewToken(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/manuals/attachments/download') {
+    return req.method === 'GET' ? handleManualAttachmentDownload(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   // --- 検針管理（FileMaker「検針記録」の移植。2026-10-20〜。ハンドラは worker/lib/meter.js。社員のみ） ---

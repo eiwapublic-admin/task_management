@@ -17,6 +17,8 @@ th { background: #0f766e; color: #fff; font-size: 7.4pt; font-weight: bold; whit
 th:first-child { border-radius: 6px 0 0 0; } th:last-child { border-radius: 0 6px 0 0; }
 td { border-bottom: 1px solid #e2e8f0; }
 tr.last td { border-bottom: 2px solid #99f6e4; }
+/* 緊急連絡先一覧表: 起点の日付より後に退去したテナント（2026-10-26〜） */
+tr.moved-out td:not(.floor) { color: #6b7280; }
 .floor { background: #f0fdfa; color: #0f766e; font-weight: bold; font-size: 11pt; text-align: center; white-space: nowrap;
   border-left: 4px solid #14b8a6; border-bottom: 2px solid #99f6e4 !important; }
 .c { text-align: center; } .r { text-align: right; } .nw { white-space: nowrap; }

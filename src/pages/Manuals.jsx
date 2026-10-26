@@ -2,11 +2,24 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ManualForm from '../components/ManualForm'
-import { IconSearch } from '../components/Icons'
-import { MANUAL_KINDS, MANUAL_KIND_LABELS, MANUAL_FIELD_DEFS, fetchManuals, manualSearchText } from '../lib/manuals'
+import AttachmentPreview from '../components/AttachmentPreview'
+import { IconClip, IconSearch } from '../components/Icons'
+import {
+  MANUAL_KINDS,
+  MANUAL_KIND_LABELS,
+  MANUAL_FIELD_DEFS,
+  canPreviewAttachment,
+  downloadManualAttachment,
+  fetchManuals,
+  formatFileSize,
+  getManualAttachmentPreviewUrl,
+  manualSearchText,
+} from '../lib/manuals'
 import './Dashboard.css'
 import './Contacts.css'
 import './Manuals.css'
+// AttachmentPreview の見た目は KanbanBoard.css にある（DocumentTemplates.jsx と同じ対応）
+import '../components/KanbanBoard.css'
 
 // 業務マニュアル（日常業務の手引書。2026-10-13〜）。依頼元の「対応マニュアル.xlsx」を取り込んだもの。
 // 分類（対応方法・定例作業。2026-10-13 に3種類から2つへ整理）で切り替えて一覧し、キーワードで全件から絞り込める。
@@ -69,6 +82,8 @@ export default function Manuals() {
   const [tab, setTab] = useState('all')
   const [openIds, setOpenIds] = useState(() => new Set())
   const [editing, setEditing] = useState(null) // null | { kind } (新規) | manual
+  const [preview, setPreview] = useState(null) // { attachment, url }
+  const [opening, setOpening] = useState(null) // 開いている途中の添付ファイルの id
   const itemRefs = useRef(new Map())
 
   const load = useCallback(async () => {
@@ -118,6 +133,35 @@ export default function Manuals() {
     requestAnimationFrame(() =>
       requestAnimationFrame(() => itemRefs.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     )
+  }
+
+  // 添付ファイル: 画像・PDF はアプリ内で表示、それ以外はダウンロード
+  async function openAttachment(a) {
+    setOpening(a.id)
+    setError('')
+    try {
+      if (canPreviewAttachment(a)) {
+        setPreview({ attachment: a, url: await getManualAttachmentPreviewUrl(a.id) })
+      } else {
+        await downloadManualAttachment(a)
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOpening(null)
+    }
+  }
+
+  async function downloadPreview() {
+    if (!preview) return
+    setOpening(preview.attachment.id)
+    try {
+      await downloadManualAttachment(preview.attachment)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOpening(null)
+    }
   }
 
   function handleSaved(saved) {
@@ -232,6 +276,12 @@ export default function Manuals() {
                         <span className="manuals-item-title">
                           <Highlight text={m.title} query={query} />
                         </span>
+                        {m.attachments?.length > 0 && (
+                          <span className="manuals-item-clip" title={`添付ファイル ${m.attachments.length}件`}>
+                            <IconClip size={14} />
+                            {m.attachments.length}
+                          </span>
+                        )}
                         <span className="manuals-item-caret" aria-hidden="true">
                           {open ? '▲' : '▼'}
                         </span>
@@ -255,6 +305,32 @@ export default function Manuals() {
                             <p className="manuals-field-value">
                               <RichText text={m.body} query={query} />
                             </p>
+                          )}
+                          {m.attachments?.length > 0 && (
+                            <div className="manuals-attachments">
+                              <p className="manuals-field-label">添付ファイル</p>
+                              <ul className="manuals-attachment-list">
+                                {m.attachments.map((a) => (
+                                  <li key={a.id}>
+                                    <button
+                                      type="button"
+                                      className="manuals-attachment-link"
+                                      onClick={() => openAttachment(a)}
+                                      disabled={opening === a.id}
+                                      title={canPreviewAttachment(a) ? '開く' : 'ダウンロード'}
+                                    >
+                                      <IconClip size={14} />
+                                      <span className="manuals-attachment-name">
+                                        <Highlight text={a.filename} query={query} />
+                                      </span>
+                                      <span className="manuals-attachment-size">
+                                        {opening === a.id ? '開いています…' : formatFileSize(a.file_size)}
+                                      </span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                           {related.length > 0 && (
                             <div className="manuals-related">
@@ -291,6 +367,24 @@ export default function Manuals() {
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
+        />
+      )}
+
+      {preview && (
+        <AttachmentPreview
+          attachment={{ filename: preview.attachment.filename, mimeType: preview.attachment.mime || 'application/pdf' }}
+          url={preview.url}
+          onClose={() => setPreview(null)}
+          headerAction={
+            <button
+              type="button"
+              className="attachment-preview-share"
+              onClick={downloadPreview}
+              disabled={opening === preview.attachment.id}
+            >
+              ダウンロード
+            </button>
+          }
         />
       )}
     </div>

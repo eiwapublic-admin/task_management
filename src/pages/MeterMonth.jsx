@@ -173,7 +173,7 @@ export default function MeterMonth() {
                 要確認だけ（写真なし・未入力・未確認・前月比が大きく違う）
               </label>
             </div>
-            <div className="ui-table-wrap">
+            <div className="ui-table-wrap meter-sticky-wrap">
               <table className="ui-table meter-table meter-month-table">
                 <thead>
                   <tr>
@@ -208,10 +208,10 @@ export default function MeterMonth() {
                             {r.meter.is_oa_meter && <span className="ui-badge is-action">外調機</span>}
                           </td>
                           <td>
-                            {r.tenant?.short_name || r.tenant?.name || ''}
+                            <strong>{r.tenant?.short_name || r.tenant?.name || ''}</strong>
                             <div className="meter-sub">{r.meter.seal_label || r.meter.room_name || ''}</div>
                           </td>
-                          <td className="is-numeric">
+                          <td className="is-numeric meter-strong">
                             {formatValue(r.reading?.value)}
                             {r.meter.is_oa_meter && r.reading?.value2 != null && (
                               <div className="meter-sub">{formatValue(r.reading.value2)}</div>
@@ -221,7 +221,7 @@ export default function MeterMonth() {
                             {formatValue(r.usage.prev)}
                             {r.meter.is_oa_meter && <div className="meter-sub">{formatValue(r.usage.prev2)}</div>}
                           </td>
-                          <td className="is-numeric">{r.entered ? formatValue(r.total) : ''}</td>
+                          <td className="is-numeric meter-strong">{r.entered ? formatValue(r.total) : ''}</td>
                           <td className="is-numeric">{formatValue(r.prevTotal)}</td>
                           <td className={`is-numeric${r.unusual ? ' meter-unusual' : ''}`}>{formatRatio(r.ratio)}</td>
                           <td>
@@ -275,10 +275,24 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   const [error, setError] = useState('')
   const [zoom, setZoom] = useState(false)
   const valueRef = useRef(null)
+  // 入力欄に入ったときの値（離れたときに変わっていれば読み上げる）
+  const focusValueRef = useRef({})
 
   useEffect(() => {
     valueRef.current?.focus()
   }, [])
+
+  // 当月値の入力欄から離れたとき、入れた数字を自動で読み上げる（2026-10-26 依頼。値が変わったときだけ）
+  const valueFocusProps = (key) => ({
+    onFocus: (e) => {
+      focusValueRef.current[key] = e.target.value
+    },
+    onBlur: (e) => {
+      const v = e.target.value.trim()
+      if (v !== '' && v !== (focusValueRef.current[key] ?? '').trim()) speakValue(v, { skipIfSpeaking: true })
+      focusValueRef.current[key] = e.target.value
+    },
+  })
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -332,7 +346,7 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
         ...(reading?.read_on ? {} : taken ? { read_on: taken.date, read_time: taken.time } : {}),
       })
       onSaved(saved)
-      speakValue(spokenValues)
+      speakValue(spokenValues, { skipIfSpeaking: true })
       if (next) onGo(nextRow)
       else setSaving(false)
     } catch (err) {
@@ -392,12 +406,20 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
                 autoComplete="off"
                 value={form.value}
                 onChange={set('value')}
+                {...valueFocusProps('value')}
               />
             </label>
             {meter.is_oa_meter && (
               <label className="ui-field">
                 <span>当月値（2つめ）</span>
-                <input className="ui-input meter-value-input" inputMode="decimal" autoComplete="off" value={form.value2} onChange={set('value2')} />
+                <input
+                  className="ui-input meter-value-input"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={form.value2}
+                  onChange={set('value2')}
+                  {...valueFocusProps('value2')}
+                />
               </label>
             )}
           </div>
@@ -454,7 +476,7 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
           {error && <p className="ui-note is-danger">{error}</p>}
           <div className="meter-import-actions">
             {speechSupported() && (
-              <button type="button" className="btn-plain" onClick={() => speakValue(spokenValues)} disabled={!form.value}>
+              <button type="button" className="btn-plain" onClick={() => speakValue(spokenValues, { skipIfSpeaking: true })} disabled={!form.value}>
                 ♩ 読み上げ
               </button>
             )}

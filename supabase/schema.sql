@@ -871,6 +871,24 @@ create trigger work_manuals_set_updated_at before update on work_manuals
 alter table work_manuals enable row level security;
 revoke all on work_manuals from anon, authenticated;
 
+-- 業務マニュアルの添付ファイル（2026-10-26〜。対応方法・定例作業のどちらにも付けられる）。
+-- 本体は Storage の work-templates バケット（非公開）の manuals/ の下。取得は必ず Worker 経由（社員だけ）。
+-- 項目を消すと行は消え（on delete cascade）、ファイルは Worker が消す
+create table if not exists work_manual_attachments (
+  id           uuid primary key default gen_random_uuid(),
+  manual_id    uuid not null references work_manuals(id) on delete cascade,
+  filename     text not null,
+  mime         text,
+  file_size    bigint,
+  storage_key  text not null,
+  created_by   uuid references users(id),
+  created_at   timestamptz not null default now()
+);
+create index if not exists work_manual_attachments_manual_idx on work_manual_attachments (manual_id, created_at);
+alter table work_manual_attachments enable row level security;
+revoke all on work_manual_attachments from anon, authenticated;
+grant select, insert, update, delete on work_manual_attachments to service_role;
+
 -- ============================================================
 -- ビルメンテナンス管理（ビルメン。Phase 1。2026-09-02〜）
 -- 現行 FileMaker「BKB-Mgt / 作業管理」の移行。詳細は docs/bilmen-plan.md 参照。

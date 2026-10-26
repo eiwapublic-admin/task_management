@@ -137,6 +137,8 @@
 .meter-sub { font-size: var(--fs-xs); color: var(--text-muted); }
 
 .meter-month-table td { vertical-align: middle; }
+/* 検針一覧の明細: テナント名・当月値・使用量を太字に（2026-10-26 依頼） */
+.meter-month-table .meter-strong { font-weight: 700; }
 .meter-row.is-unusual td { background: var(--color-warn-surface); }
 .meter-unusual { color: var(--color-warn-ink); font-weight: 700; }
 .meter-month-table .ui-badge + .ui-badge { margin-left: var(--space-1); }

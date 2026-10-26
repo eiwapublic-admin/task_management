@@ -1,4 +1,5 @@
 import { authFetch } from './api'
+import { getToken } from './auth'
 
 // 業務マニュアル（日常業務の手引書。2026-10-13〜）の API 呼び出しと、種類ごとの項目定義。
 // 種類と項目は worker/lib/manuals.js の MANUAL_FIELDS と揃えること。
@@ -52,9 +53,11 @@ export function convertManualFields(fields, from, to) {
   return out
 }
 
-// キーワード検索の対象になる文字列（項目名・各項目・本文をつないだもの）
+// キーワード検索の対象になる文字列（項目名・各項目・本文・添付ファイル名をつないだもの）
 export function manualSearchText(m) {
-  return [m.title, ...Object.values(m.fields || {}), m.body || ''].join('\n').toLowerCase()
+  return [m.title, ...Object.values(m.fields || {}), m.body || '', ...(m.attachments || []).map((a) => a.filename)]
+    .join('\n')
+    .toLowerCase()
 }
 
 export async function fetchManuals() {
@@ -74,4 +77,73 @@ export async function updateManual(id, payload) {
 
 export async function deleteManual(id) {
   await authFetch(`/api/manuals?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// --- 添付ファイル（2026-10-26〜。worker/lib/manuals.js。1ファイル20MB・1項目20個まで） ---
+export const MANUAL_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
+
+export async function uploadManualAttachment(manualId, file) {
+  const form = new FormData()
+  form.append('manual_id', manualId)
+  form.append('file', file, file.name)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 60000)
+  let res
+  try {
+    res = await fetch('/api/manuals/attachments', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`「${file.name}」のアップロードがタイムアウトしました。通信環境をご確認のうえ再度お試しください`)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `「${file.name}」の保存に失敗しました`)
+  return data.attachment
+}
+
+export async function deleteManualAttachment(id) {
+  await authFetch(`/api/manuals/attachments?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// アプリ内でプレビューできるか（画像・PDF）
+export function canPreviewAttachment(a) {
+  const mime = a.mime || ''
+  return mime.startsWith('image/') || mime === 'application/pdf' || /\.pdf$/i.test(a.filename)
+}
+
+// プレビュー用の直接アクセス URL（120秒有効。<iframe src> は Authorization ヘッダを送れないため）
+export async function getManualAttachmentPreviewUrl(id) {
+  const { token } = await authFetch('/api/manuals/attachments/preview-token', { method: 'POST', body: JSON.stringify({ id }) })
+  return `/api/manuals/attachments/download?${new URLSearchParams({ id, preview_token: token })}`
+}
+
+export async function downloadManualAttachment(a) {
+  const res = await fetch(`/api/manuals/attachments/download?id=${encodeURIComponent(a.id)}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'ファイルの取得に失敗しました')
+  }
+  const url = URL.createObjectURL(await res.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = a.filename || 'file'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export function formatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return ''
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }

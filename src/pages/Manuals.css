@@ -215,3 +215,71 @@
   opacity: 1;
   border-color: currentColor;
 }
+
+/* 添付ファイル（2026-10-26〜） */
+.manuals-item-clip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.manuals-attachments { margin-top: var(--space-2); }
+
+.manuals-attachment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.manuals-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.manuals-attachment-link:disabled { opacity: 0.6; cursor: wait; }
+.manuals-attachment-name { text-decoration: underline; overflow-wrap: anywhere; }
+.manuals-attachment-size { flex: none; font-size: var(--fs-2xs); color: var(--text-muted); }
+
+/* 修正画面の添付ファイル */
+.manuals-form-attachments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.manuals-form-attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  font-size: var(--fs-sm);
+}
+
+.manuals-form-attachment.is-new { border-style: dashed; }
+.manuals-form-attachment.is-removed .manuals-form-attachment-name,
+.manuals-form-attachment.is-removed .manuals-form-attachment-size { opacity: 0.5; text-decoration: line-through; }
+.manuals-form-attachment-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.manuals-form-attachment-size { flex: none; font-size: var(--fs-2xs); color: var(--text-muted); }
+.manuals-form-attachment-add { align-self: flex-start; margin-top: var(--space-1); }

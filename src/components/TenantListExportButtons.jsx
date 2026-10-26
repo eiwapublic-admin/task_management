@@ -25,7 +25,7 @@ export default function TenantListExportButtons({ onError }) {
     if (kind === 'emergency') {
       // 更新情報に載せる変更履歴の起点を聞く
       const input = window.prompt(
-        '更新情報に載せる変更の起点の日付を入力してください（例: 2026/10/01）。この日以降のテナントマスタの変更を載せます',
+        '更新情報に載せる変更の起点の日付を入力してください（例: 2026/10/01）。この日以降のテナントマスタの変更を載せ、この日の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せます',
         defaultUpdateSince().replaceAll('-', '/'),
       )
       if (input == null) return
