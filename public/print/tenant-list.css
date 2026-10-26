@@ -31,3 +31,6 @@ td.upd { font-size: 7pt; color: #0f766e; min-width: 50mm; }
 /* 最終変更日付・事項（連絡用）は赤字の太字（2026-10-26 依頼） */
 td.chg, tr.moved-out td.chg { color: #dc2626; font-weight: bold; }
 footer { margin-top: 5px; font-size: 6.8pt; color: #9ca3af; text-align: right; }
+/* 緊急連絡先一覧表: 最終変更事項のある行の背景（退去・退去予定は薄いグレー、それ以外は薄い黄色。2026-10-26 依頼） */
+tr.chg-row td:not(.floor) { background: #fef9c3; }
+tr.chg-out td:not(.floor) { background: #e5e7eb; }

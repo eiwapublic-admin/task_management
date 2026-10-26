@@ -73,7 +73,7 @@ export const TENANT_PROFILE_FIELDS = [
   // 部屋番号は空なら旧テナントコード → メータの部屋番号の順で補う。会社電話番号は空なら代表電話番号
   { key: 'room_label', label: '部屋番号（一覧表）' },
   { key: 'plate_name', label: 'プレート表示名' },
-  { key: 'company_phone', label: '会社電話番号（緊急連絡先一覧）' },
+  { key: 'company_phone', label: '会社電話番号' },
   { key: 'entry_date', label: '記入日', type: 'date' },
   { key: 'update_info', label: '更新情報（一覧表）', wide: true },
   { key: 'list_exclude', label: 'テナント一覧表・緊急連絡先一覧表に載せない', type: 'checkbox' },
