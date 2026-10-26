@@ -453,6 +453,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET/POST/PATCH/DELETE `/api/report/chlorine` | JWT（書込はowner不可） | 残留塩素等検査（4-14参照）。GET は `year=YYYY`（JST基準の1年）・`building=`・`report_id=`（2026-08-10追加。日報詳細の「残留塩素」ボタン用）で絞り込み（省略で全期間・全施設。新しい順・上限1000）、各行に `report_date`（記録元の日報の日付）を付ける。POST は `tested_at` のJST日付から日報を引き当て（無ければ作成）て紐付ける。PATCH で測定日を別の日に変えた場合は紐づく写真の `report_id` も付け替える。DELETE は紐づく写真（Storage実体・DB行とも）も削除する（2026-08-10追加） |
 | `/api/documents`・`/api/contacts`・`/api/reminders`・`/api/paper/*` | JWT | 雛形ファイル・連絡帳・リマインダー・古紙回収。それぞれ 4-15〜4-18 を参照 |
 | GET/POST/PATCH/DELETE `/api/manuals` | JWT（**staff/admin のみ。owner・備品出庫限定ロールは閲覧も不可**） | 業務マニュアル（4-19） |
+| POST/DELETE `/api/manuals/attachments`・POST `/api/manuals/attachments/preview-token`・GET `/api/manuals/attachments/download` | JWT（staff/admin のみ）。download は preview_token でも可 | 業務マニュアルの添付ファイル（追加〔multipart: manual_id・file〕・削除・プレビュー用トークン・本体。4-19。2026-10-26〜） |
 | `/api/equipment/*` | JWT（書込は staff/admin。出庫だけ備品出庫限定ロールも可） | 備品管理（カテゴリ・備品・入出庫・テナント・署名）。一覧は `docs/equipment-plan.md` 6-1 |
 | GET `/api/equipment/installations`・POST `/api/equipment/tenants/sync` | **APIキー**（`X-API-Key`。JWT 不要） | FileMaker 連携（設置実績の提供／テナント同期の受信）。**JWT の外側に開く唯一の口**。請求対象外の新規入替・不良品処分・無償交換は返さない（`docs/equipment-plan.md` 6-2・6-3） |
 | `/api/bilmen/*` | JWT（書込は staff/admin。メール設定は owner・備品出庫限定ロールに GET も不可） | ビルメン（作業マスタ・予定・自動作成・注釈・メール設定・Gmail 下書き・カレンダー反映）。一覧は `docs/HANDOFF.md` 3章「ビルメン API」 |
@@ -1273,6 +1274,17 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
   文字は元のセルのまま（改行を含む）。表形式の手順シートは「1. 手順名（タイミング／持ち物／場所）＋中身」の文章にまとめた。
   投入後、元データとの一致を件数・内容のハッシュで照合済み。**中身は取り込んだ時点のまま**なので、古くなった記述
   （例: 対応マニュアル7「iPadのFileMaker備品管理アプリに入力」＝現在は本システムの備品画面）は画面の「修正」から直していく
+- **添付ファイル（2026-10-26〜。327・328番）**: 対応方法・定例作業のどちらの項目にも、写真・PDF・Excel などを付けられる。
+  - テーブル `work_manual_attachments`（`manual_id`〔work_manuals への外部キー。項目を消すと行も消える〕・`filename`・`mime`・`file_size`・
+    `storage_key`・`created_by`）。RLS 有効・`anon`/`authenticated` の権限なし・`service_role` に select/insert/update/delete を grant
+  - 本体は Supabase Storage の非公開バケット `work-templates`（雛形ファイルと共用）の `manuals/` の下。取得は必ず Worker 経由（社員のみ）。
+    **1ファイル20MB・1項目20個まで**（Worker と画面の両方で確認）。項目を削除するとファイルもまとめて消す
+  - 修正画面（`ManualForm.jsx`）の「添付ファイル」欄で「＋ ファイルを追加」から選び、**「保存する」を押したときに**項目の保存 → 外した添付の削除 →
+    新しい添付の送信の順で行う（新規の項目も保存のあとで送れる）。途中で失敗しても項目を二重に作らない（保存済みの id を覚えて次は更新にする）。
+    欄の下に注釈「※添付資料は無料利用枠を圧迫する可能性があるのでサイズの大きいファイルを避け、必要最低限としてください。」
+  - 一覧では項目名の右にクリップと件数、開くと「添付ファイル」の一覧。**画像・PDF はアプリ内のプレビュー**（`AttachmentPreview`。120秒有効の
+    プレビュー用トークンで `<iframe>`／`<img>` に渡す。雛形ファイルと同じ方式）、それ以外はダウンロード。添付のファイル名もキーワード検索の対象
+  - 無料枠: Storage 1GB の中（2026-10-26 時点で全バケット約30MB）。大きなファイルが増えると無料枠を圧迫するため、上の注釈で必要最低限を案内している
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
@@ -1531,6 +1543,7 @@ CLOUDFLARE_API_TOKEN（テンプレート「Edit Cloudflare Workers」）/ CLOUD
 |---|---|---|
 | Cloudflare Workers | 10万リクエスト/日・Cron 可・静的配信は無課金 | 社内3名 + Cron 288回/日 → 余裕で枠内 |
 | Supabase | 500MB DB | テキストのみで枠内 |
+| Supabase Storage | 1GB | 日報・検針の写真、雛形ファイル、業務マニュアルの添付。2026-10-26 時点で約30MB。超えると Pro（月額25ドル〜）が必要になるため、業務マニュアルの添付は画面の注釈で必要最低限を案内 |
 | Gmail API | 無料 | — |
 | Claude API (haiku) | 従量課金 | 1通あたり約0.3円。購入済み $5 で数か月分 |
 
