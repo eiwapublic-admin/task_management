@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { IconDocument, IconDownload } from './Icons'
+import { IconDocument, IconDownload, IconList, IconShare } from './Icons'
+import SecureShareModal from './SecureShareModal'
+import SecureShareListModal from './SecureShareListModal'
 import { TENANT_LIST_KINDS, exportTenantList } from '../lib/tenantListExport'
 import { TENANT_PDF_KINDS, defaultAsOf, defaultUpdateSince, parseSinceDate, printTenantListPdf } from '../lib/tenantListPdf'
 
 // テナント一覧表（Excel）の出力ボタン（2026-10-21〜。社員だけ。基本情報を含むため。緊急連絡先は隠した列グループに入る）と、
-// テナント一覧表・緊急連絡先一覧表の印刷用 PDF のボタン（2026-10-21〜。ブラウザの印刷で「PDFに保存」）
+// テナント一覧表・緊急連絡先一覧表の印刷用 PDF のボタン（2026-10-21〜。ブラウザの印刷で「PDFに保存」）と、
+// 同じ PDF を期限付き・パスコード付きのリンクで渡す「安全なリンクで共有」（2026-10-26〜）
 export default function TenantListExportButtons({ onError }) {
   const [busy, setBusy] = useState(null)
+  const [shareModal, setShareModal] = useState(null)
 
   async function run(key, fn) {
     setBusy(key)
@@ -84,6 +88,28 @@ export default function TenantListExportButtons({ onError }) {
           <span className="btn-plain-label">{busy === `pdf-${kind}` ? '作成中…' : `${def.label}（PDF）`}</span>
         </button>
       ))}
+      <button
+        type="button"
+        className="btn-plain"
+        onClick={() => setShareModal('create')}
+        disabled={busy != null}
+        title="PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡す"
+      >
+        <IconShare size={20} />
+        <span className="btn-plain-label">安全なリンクで共有</span>
+      </button>
+      <button
+        type="button"
+        className="btn-plain"
+        onClick={() => setShareModal('list')}
+        disabled={busy != null}
+        title="作った共有リンクの状態・開かれた記録を見る。取り消し・パスコードの再発行"
+      >
+        <IconList size={20} />
+        <span className="btn-plain-label">共有リンクの一覧</span>
+      </button>
+      {shareModal === 'create' && <SecureShareModal onClose={() => setShareModal(null)} />}
+      {shareModal === 'list' && <SecureShareListModal onClose={() => setShareModal(null)} />}
     </>
   )
 }

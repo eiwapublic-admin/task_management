@@ -188,8 +188,9 @@ export function parseSinceDate(s) {
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : iso
 }
 
-/** 出力する。見えない iframe に描いてブラウザの印刷を開く（「PDFに保存」で PDF になる）。載せた件数を返す */
-export async function printTenantListPdf(kind, { since = '', asOf = '' } = {}) {
+// 見えない iframe（用紙と同じ大きさ）に表を描き、書式を読み終えて A4 横1枚に合わせたところまで進める。
+// 印刷（printTenantListPdf）と、安全なリンクで共有する PDF（buildTenantListPdfFile）の両方で使う
+async function renderTenantListFrame(kind, { since = '', asOf = '' } = {}) {
   if (!TENANT_PDF_KINDS[kind]) throw new Error('出力の種類が正しくありません')
   const data = await fetchMeterMasters()
   // iframe（about:blank）の中では相対パスが解決されないことがあるので、絶対 URL で渡す
@@ -226,6 +227,12 @@ export async function printTenantListPdf(kind, { since = '', asOf = '' } = {}) {
   }
   await (doc.fonts?.ready ?? Promise.resolve())
   fitToPage(doc)
+  return { frame, doc, title }
+}
+
+/** 出力する。見えない iframe に描いてブラウザの印刷を開く（「PDFに保存」で PDF になる）。載せた件数を返す */
+export async function printTenantListPdf(kind, opts = {}) {
+  const { frame, doc, title } = await renderTenantListFrame(kind, opts)
 
   // PDF のファイル名は親の画面のタイトルになるブラウザが多いので、印刷の間だけ差し替える
   const prevTitle = document.title
@@ -240,4 +247,25 @@ export async function printTenantListPdf(kind, { since = '', asOf = '' } = {}) {
   // afterprint が来ないブラウザ向けの保険
   setTimeout(() => frame.isConnected && cleanup(), 120000)
   return doc.querySelectorAll('tbody tr').length
+}
+
+/**
+ * 安全なリンクで共有する PDF を作る（2026-10-26〜）。印刷と同じ表を html2canvas で画像にし、jsPDF で A4 横1ページにする
+ * （共有にはファイルそのものが要るため。印刷の「PDFに保存」は端末の中でしか PDF にならない）。
+ * 戻り値: { blob, filename, count }
+ */
+export async function buildTenantListPdfFile(kind, opts = {}) {
+  const { frame, doc, title } = await renderTenantListFrame(kind, opts)
+  try {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+    const pageEl = doc.querySelector('.page')
+    const canvas = await html2canvas(pageEl, { scale: 3, backgroundColor: '#ffffff', windowWidth: pageEl.scrollWidth })
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
+    // 圧縮指定（'FAST'）が無いと画像が生のまま入り数十MBになる（他の帳票と同じ）
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 297, 210, undefined, 'FAST')
+    pdf.setProperties({ title })
+    return { blob: pdf.output('blob'), filename: `${title}.pdf`, count: doc.querySelectorAll('tbody tr').length }
+  } finally {
+    frame.remove()
+  }
 }

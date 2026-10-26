@@ -1450,3 +1450,60 @@ create trigger meter_ac_units_history after insert or update or delete on meter_
   for each row execute function meter_master_history_log();
 -- 変更理由（2026-10-21〜）。保存のときに任意で入れるか、変更履歴の画面から後で書き足す
 alter table meter_master_history add column if not exists reason text;
+
+-- ============================================================
+-- 安全なリンクで共有（2026-10-26〜。worker/lib/secure-shares.js）
+-- 個人情報を含む書類（緊急連絡先一覧表など）を、メール添付ではなく期限付き・パスコード付きのリンクで渡す。
+-- PDF は Storage の secure-shares バケット（非公開）に置き、取り出しは必ず Worker 経由。
+-- リンクの文字列は SHA-256、パスコードは SESSION_SECRET を鍵にした HMAC で持ち、そのままは残さない。
+-- 期限切れ・取り消し・回数を使い切ったものは毎日の定期処理で PDF を消し、行（記録）は残す。
+-- secure-shares バケットは日次バックアップの対象外（.github/workflows/backup.yml）
+-- ============================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('secure-shares', 'secure-shares', false, 20971520, array['application/pdf'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists secure_shares (
+  id               uuid primary key default gen_random_uuid(),
+  token_hash       text not null unique,          -- リンクの文字列の SHA-256（16進）
+  passcode_hash    text not null,                 -- パスコードの HMAC-SHA256（16進）
+  title            text not null,                 -- 書類名（緊急連絡先一覧表 など）
+  filename         text not null,                 -- 受け取る側に渡すファイル名
+  object_key       text,                          -- バケット内の場所。PDF を消したら null
+  size_bytes       bigint,
+  recipient_name   text not null,                 -- 送り先（〇〇 様）
+  recipient_email  text,
+  expires_at       timestamptz not null,
+  max_opens        int not null check (max_opens > 0),
+  open_count       int not null default 0,
+  failed_attempts  int not null default 0,        -- 続けて間違えた回数（正しく開くか再発行で0に戻す）
+  locked_at        timestamptz,                   -- 5回間違えて止まった日時
+  revoked_at       timestamptz,
+  revoked_by       text,
+  file_deleted_at  timestamptz,
+  last_opened_at   timestamptz,
+  created_by       text,
+  created_at       timestamptz not null default now()
+);
+create index if not exists secure_shares_created_idx on secure_shares (created_at desc);
+alter table secure_shares enable row level security;
+revoke all on secure_shares from anon, authenticated;
+grant select, insert, update, delete on secure_shares to service_role;
+
+-- 開いた・間違えた・使えないリンクを開こうとした記録
+create table if not exists secure_share_access_log (
+  id           bigint generated always as identity primary key,
+  share_id     uuid not null references secure_shares(id) on delete cascade,
+  accessed_at  timestamptz not null default now(),
+  result       text not null check (result in ('opened', 'wrong_passcode', 'expired', 'revoked', 'locked', 'used_up', 'deleted')),
+  ip           text,
+  user_agent   text
+);
+create index if not exists secure_share_access_log_share_idx on secure_share_access_log (share_id, accessed_at desc);
+alter table secure_share_access_log enable row level security;
+revoke all on secure_share_access_log from anon, authenticated;
+grant select, insert, update, delete on secure_share_access_log to service_role;
+grant usage, select on sequence secure_share_access_log_id_seq to service_role;
