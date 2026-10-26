@@ -185,6 +185,9 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
 
           <div className="ui-field">
             <span>添付ファイル（写真・PDF・Excel など。1ファイル20MBまで）</span>
+            <p className="ui-note">
+              ※添付資料は無料利用枠を圧迫する可能性があるのでサイズの大きいファイルを避け、必要最低限としてください。
+            </p>
             <ul className="manuals-form-attachments">
               {(existing?.attachments || []).filter((a) => !deletedIds.has(a.id)).map((a) => (
                 <li key={a.id} className={`manuals-form-attachment${removedIds.has(a.id) ? ' is-removed' : ''}`}>

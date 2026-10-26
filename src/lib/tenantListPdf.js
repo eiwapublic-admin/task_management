@@ -2,6 +2,7 @@
 // 画面の中に見えない iframe を作って表を描き、ブラウザの印刷を開く（印刷先で「PDFに保存」を選ぶ。PDF のライブラリや
 // 日本語フォントを読み込まずに済み、追加の費用もかからない）。どちらも A4 横1枚に収まるよう、表の大きさを縮めて合わせる。
 // 行（入居中のテナント・階の順・部屋番号）は Excel 出力と同じ buildTenantListGroups で作る。
+// テナント一覧表は出力前に聞く時点の日付で退去済みのテナントを、どちらも警備番号が空のテナントを除く（2026-10-26〜）。
 // 緊急連絡先一覧表の「更新情報」は、指定した日以降のテナントマスタの変更履歴（変更理由があればそれ、無ければ変わった項目名）
 
 import { TENANT_FIELD_LABELS, TENANT_PROFILE_LABELS, fetchMeterHistory, fetchMeterMasters } from './meter'
@@ -92,7 +93,7 @@ const COLUMNS = {
 // 同じオリジンのファイルとして読み込む（2026-10-21。埋め込みにしていたら本番で書式が全く効かなかった）
 const STYLE_URL = '/print/tenant-list.css'
 
-function sheetHtml(kind, groups, { since, today }) {
+function sheetHtml(kind, groups, { since, asOf, today }) {
   const label = TENANT_PDF_KINDS[kind].label
   const cols = COLUMNS[kind]
   const rows = groups.flatMap((g) => g.rows)
@@ -121,7 +122,7 @@ function sheetHtml(kind, groups, { since, today }) {
   const note =
     kind === 'emergency'
       ? `更新情報は ${slash(since)} 以降のテナントマスタの変更（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
-      : ''
+      : `${slash(asOf)} 時点で入居中のテナント　／　`
   return `<div class="page"><div class="fit">
 <header><h1>${esc(label)}</h1><div class="kpis">${kpis.map(([v, l]) => `<div><b>${esc(v)}</b>${esc(l)}</div>`).join('')}</div></header>
 <table><thead>${head}</thead><tbody>${body}</tbody></table>
@@ -151,7 +152,8 @@ export function fitToPage(doc) {
 }
 
 /** 印刷用の HTML を作る（kind: 'tenants' | 'emergency'。since は緊急連絡先一覧表の更新情報の起点 YYYY-MM-DD） */
-export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], since = '', today = jstToday(), styleHref = STYLE_URL }) {
+// asOf はテナント一覧表の時点の日付（その日に退去済みのテナントを除く。2026-10-26〜）
+export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], since = '', asOf = '', today = jstToday(), styleHref = STYLE_URL }) {
   const updatesByTenant = new Map()
   for (const h of [...history].sort((a, b) => String(a.changed_at).localeCompare(String(b.changed_at)))) {
     if (h.table_name && h.table_name !== 'equipment_tenants') continue
@@ -163,7 +165,7 @@ export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], si
   // 緊急連絡先一覧表は、起点の日付の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せ、
   // 更新情報の先頭に退去日を出す（2026-10-26 依頼）
   const emergency = kind === 'emergency'
-  const groups = buildTenantListGroups(tenants, meters, today, { activeOn: emergency ? since : '' }).map((g) => ({
+  const groups = buildTenantListGroups(tenants, meters, today, { activeOn: emergency ? since : asOf }).map((g) => ({
     ...g,
     rows: g.rows.map((r) => {
       const t = r.tenant
@@ -171,14 +173,19 @@ export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], si
         emergency && t.moved_out_on && (!since || t.moved_out_on > since)
           ? [`${slash(t.moved_out_on)} ${isMovedOut(t, today) ? '退去' : '退去予定'}`]
           : []
-      return { ...r, p: t.profile || {}, movedOut: emergency && isMovedOut(t, today), updates: [...moveOut, ...(updatesByTenant.get(t.id) || [])] }
+      return { ...r, p: t.profile || {}, movedOut: isMovedOut(t, today), updates: [...moveOut, ...(updatesByTenant.get(t.id) || [])] }
     }),
   }))
   const title = `${TENANT_PDF_KINDS[kind].label}_${today.replaceAll('-', '')}`
   return {
     title,
-    html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><link rel="stylesheet" href="${esc(styleHref)}"></head><body>${sheetHtml(kind, groups, { since, today })}</body></html>`,
+    html: `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><link rel="stylesheet" href="${esc(styleHref)}"></head><body>${sheetHtml(kind, groups, { since, asOf: asOf || today, today })}</body></html>`,
   }
+}
+
+// テナント一覧表の時点の既定: 今月の1日（2026-10-26 依頼）
+export function defaultAsOf(today = jstToday()) {
+  return `${today.slice(0, 7)}-01`
 }
 
 // 既定の起点: 前の月の1日
@@ -201,7 +208,7 @@ export function parseSinceDate(s) {
 }
 
 /** 出力する。見えない iframe に描いてブラウザの印刷を開く（「PDFに保存」で PDF になる）。載せた件数を返す */
-export async function printTenantListPdf(kind, { since = '' } = {}) {
+export async function printTenantListPdf(kind, { since = '', asOf = '' } = {}) {
   if (!TENANT_PDF_KINDS[kind]) throw new Error('出力の種類が正しくありません')
   const [data, history] = await Promise.all([
     fetchMeterMasters(),
@@ -214,6 +221,7 @@ export async function printTenantListPdf(kind, { since = '' } = {}) {
     meters: data.meters || [],
     history,
     since,
+    asOf,
     styleHref,
   })
 
