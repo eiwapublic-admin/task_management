@@ -47,8 +47,14 @@ function occupiedArea(tenant, meters) {
 
 const asNumberIfDigits = (v) => (v != null && /^\d+$/.test(String(v)) ? Number(v) : v || null)
 
-/** テナントマスタから表の行（階ごと）を作る。画面のテストでも使う */
-export function buildTenantListGroups(tenants, meters, today = jstToday()) {
+/**
+ * テナントマスタから表の行（階ごと）を作る。画面のテストでも使う。
+ * activeOn（YYYY-MM-DD。任意）: その日の時点で退去日を迎えていないテナントも載せる
+ * （緊急連絡先一覧表で、起点の日付より後に退去した〈退去する〉テナントも残すため。2026-10-26 依頼）
+ */
+export function buildTenantListGroups(tenants, meters, today = jstToday(), { activeOn = '' } = {}) {
+  const listed = (t) =>
+    !isMovedOut(t, today) || (!!activeOn && activeOn < today && !!t.moved_out_on && t.moved_out_on > activeOn)
   const metersByTenant = new Map()
   for (const m of meters) {
     if (!m.tenant_id) continue
@@ -58,7 +64,7 @@ export function buildTenantListGroups(tenants, meters, today = jstToday()) {
   const groups = []
   for (const floor of FLOOR_ORDER) {
     const rows = tenants
-      .filter((t) => (t.floor || '') === floor && !isMovedOut(t, today) && !t.profile?.list_exclude)
+      .filter((t) => (t.floor || '') === floor && listed(t) && !t.profile?.list_exclude)
       .map((t) => {
         const own = metersByTenant.get(t.id) || []
         return { tenant: t, room: roomLabel(t, own), area: occupiedArea(t, own) }

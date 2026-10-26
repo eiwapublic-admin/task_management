@@ -25,14 +25,20 @@ function pickVoice() {
   return japaneseVoice
 }
 
+let lastBody = ''
+
 // 値を読み上げる。前の読み上げが残っていれば止めてから読む。
-// 外調機のように値が2つあるときは配列で渡すと「…、ふたつめ、…」と続けて読む
-export function speakValue(value) {
+// 外調機のように値が2つあるときは配列で渡すと「…、ふたつめ、…」と続けて読む。
+// skipIfSpeaking: 同じ文をいま読んでいる途中なら読み直さない（入力欄から離れたときの読み上げの直後に
+// 「保存」ボタンを押したとき、同じ数字を頭から読み直さないため。2026-10-26〜）
+export function speakValue(value, { skipIfSpeaking = false } = {}) {
   if (!speechSupported()) return false
   const values = (Array.isArray(value) ? value : [value]).filter((v) => v != null && v !== '')
   const body = values.map(digitsToSpeech).filter(Boolean).join('、ふたつめ、')
   if (!body) return false
   const synth = window.speechSynthesis
+  if (skipIfSpeaking && body === lastBody && (synth.speaking || synth.pending)) return true
+  lastBody = body
   synth.cancel()
   const u = new SpeechSynthesisUtterance(body)
   u.lang = 'ja-JP'

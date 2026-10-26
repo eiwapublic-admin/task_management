@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import { IconClip } from './Icons'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import {
   MANUAL_KINDS,
@@ -8,11 +9,16 @@ import {
   createManual,
   updateManual,
   deleteManual,
+  uploadManualAttachment,
+  deleteManualAttachment,
+  formatFileSize,
+  MANUAL_ATTACHMENT_MAX_BYTES,
 } from '../lib/manuals'
 
 // 業務マニュアルの1項目の追加・修正（2026-10-13〜）。分類（対応方法・定例作業）は色付きラベルで選ぶ。
 // 修正でも選び直せ、その場合は中身を近い項目へ移す（convertManualFields）。
-// 「関連」には、この項目から参照する別の項目（例: 定例作業 → 関連手順）をチェックで選ぶ
+// 「関連」には、この項目から参照する別の項目（例: 定例作業 → 関連手順）をチェックで選ぶ。
+// 添付ファイル（2026-10-26〜）は選んだ時点では送らず、「保存する」で項目を保存したあとに追加・削除する
 export default function ManualForm({ existing, defaultKind = 'response', manuals, onClose, onSaved, onDeleted }) {
   useBodyScrollLock()
 
@@ -22,8 +28,14 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
   const [fields, setFields] = useState(() => ({ ...(existing?.fields || {}) }))
   const [body, setBody] = useState(existing?.body || '')
   const [related, setRelated] = useState(() => new Set(existing?.related_ids || []))
+  const [newFiles, setNewFiles] = useState([]) // まだ送っていない File
+  const [removedIds, setRemovedIds] = useState(() => new Set()) // 保存時に消す添付ファイルの id
+  const [deletedIds, setDeletedIds] = useState(() => new Set()) // 消し終えた添付ファイルの id
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const fileInputRef = useRef(null)
+  // 項目の保存は済んだが添付で失敗したとき、やり直しで項目を二重に作らないよう保存済みの id を覚えておく
+  const savedRef = useRef(existing || null)
 
   const kindDef = MANUAL_KINDS.find((k) => k.key === kind)
   const candidates = useMemo(() => manuals.filter((m) => m.id !== existing?.id), [manuals, existing])
@@ -43,16 +55,53 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
     })
   }
 
+  // 途中まで保存できていたら（添付で失敗したあと閉じたとき）一覧を読み直してもらう
+  function close() {
+    if (savedRef.current && savedRef.current !== existing) onSaved(savedRef.current)
+    else onClose()
+  }
+
+  function addFiles(list) {
+    const files = [...(list || [])]
+    const tooBig = files.filter((f) => f.size > MANUAL_ATTACHMENT_MAX_BYTES)
+    if (tooBig.length) setError(`20MBを超えるファイルは添付できません（${tooBig.map((f) => f.name).join('、')}）`)
+    else setError('')
+    setNewFiles((prev) => [...prev, ...files.filter((f) => f.size <= MANUAL_ATTACHMENT_MAX_BYTES)])
+  }
+
+  function toggleRemoved(id) {
+    setRemovedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   async function handleSave() {
     setError('')
     if (!title.trim()) return setError(`${kindDef.titleLabel}を入力してください`)
     setSaving(true)
     try {
       const payload = { kind, no: no.trim(), title, fields, body, related_ids: [...related] }
-      const saved = existing ? await updateManual(existing.id, payload) : await createManual(payload)
+      const saved = savedRef.current ? await updateManual(savedRef.current.id, payload) : await createManual(payload)
+      savedRef.current = saved
+      for (const id of removedIds) {
+        await deleteManualAttachment(id)
+        setDeletedIds((prev) => new Set(prev).add(id))
+        setRemovedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+      for (const file of newFiles) {
+        await uploadManualAttachment(saved.id, file)
+        setNewFiles((prev) => prev.filter((f) => f !== file))
+      }
       onSaved(saved)
     } catch (err) {
-      setError(err.message)
+      setError(savedRef.current ? `項目は保存しましたが、添付ファイルで失敗しました: ${err.message}` : err.message)
       setSaving(false)
     }
   }
@@ -67,11 +116,11 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
   }
 
   return (
-    <div className="ui-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div className="ui-overlay" role="dialog" aria-modal="true" onClick={close}>
       <div className="ui-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
           <h3 className="ui-modal-title">{existing ? '業務マニュアルの修正' : '業務マニュアルに追加'}</h3>
-          <button type="button" className="icon-btn-close" onClick={onClose} aria-label="閉じる">
+          <button type="button" className="icon-btn-close" onClick={close} aria-label="閉じる">
             ×
           </button>
         </div>
@@ -135,6 +184,55 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
           </label>
 
           <div className="ui-field">
+            <span>添付ファイル（写真・PDF・Excel など。1ファイル20MBまで）</span>
+            <ul className="manuals-form-attachments">
+              {(existing?.attachments || []).filter((a) => !deletedIds.has(a.id)).map((a) => (
+                <li key={a.id} className={`manuals-form-attachment${removedIds.has(a.id) ? ' is-removed' : ''}`}>
+                  <IconClip size={14} />
+                  <span className="manuals-form-attachment-name">{a.filename}</span>
+                  <span className="manuals-form-attachment-size">{formatFileSize(a.file_size)}</span>
+                  <button type="button" className="btn-plain" onClick={() => toggleRemoved(a.id)} disabled={saving}>
+                    {removedIds.has(a.id) ? '戻す' : '削除'}
+                  </button>
+                </li>
+              ))}
+              {newFiles.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="manuals-form-attachment is-new">
+                  <IconClip size={14} />
+                  <span className="manuals-form-attachment-name">{f.name}（保存時に追加）</span>
+                  <span className="manuals-form-attachment-size">{formatFileSize(f.size)}</span>
+                  <button
+                    type="button"
+                    className="btn-plain"
+                    onClick={() => setNewFiles((prev) => prev.filter((x) => x !== f))}
+                    disabled={saving}
+                  >
+                    取消
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                addFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              className="btn-plain manuals-form-attachment-add"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={saving}
+            >
+              ＋ ファイルを追加
+            </button>
+          </div>
+
+          <div className="ui-field">
             <span>関連（この項目から参照する別の項目）</span>
             <div className="manuals-related-picker">
               {MANUAL_KINDS.map((k) => {
@@ -170,7 +268,7 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
             {existing && <ConfirmDeleteButton onConfirm={handleDelete} label="この項目を削除" size={22} />}
           </div>
           <div className="ui-modal-foot-end">
-            <button type="button" className="btn-plain" onClick={onClose}>
+            <button type="button" className="btn-plain" onClick={close}>
               キャンセル
             </button>
             <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>

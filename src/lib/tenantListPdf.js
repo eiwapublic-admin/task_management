@@ -5,7 +5,7 @@
 // 緊急連絡先一覧表の「更新情報」は、指定した日以降のテナントマスタの変更履歴（変更理由があればそれ、無ければ変わった項目名）
 
 import { TENANT_FIELD_LABELS, TENANT_PROFILE_LABELS, fetchMeterHistory, fetchMeterMasters } from './meter'
-import { jstToday } from './tenants'
+import { isMovedOut, jstToday } from './tenants'
 import { buildTenantListGroups } from './tenantListExport'
 import { escapeXml as esc } from './xlsxWrite'
 
@@ -113,11 +113,15 @@ function sheetHtml(kind, groups, { since, today }) {
     g.rows.forEach((r, i) => {
       const floor = i === 0 ? `<td class="floor" rowspan="${g.rows.length}">${floorName(g.floor)}</td>` : ''
       const cells = cols.map(([, fn, cls]) => `<td class="${cls}">${fn(r) ?? ''}</td>`).join('')
-      body += `<tr class="${i === g.rows.length - 1 ? 'last' : ''}">${floor}${cells}</tr>`
+      const cls = [i === g.rows.length - 1 ? 'last' : '', r.movedOut ? 'moved-out' : ''].filter(Boolean).join(' ')
+      body += `<tr class="${cls}">${floor}${cells}</tr>`
     })
   }
   const head = `<tr><th class="c">階</th>${cols.map(([h, , cls]) => `<th class="${cls}">${esc(h)}</th>`).join('')}</tr>`
-  const note = kind === 'emergency' ? `更新情報は ${slash(since)} 以降のテナントマスタの変更　／　` : ''
+  const note =
+    kind === 'emergency'
+      ? `更新情報は ${slash(since)} 以降のテナントマスタの変更（${slash(since)} 時点で退去日を迎えていないテナントを含む）　／　`
+      : ''
   return `<div class="page"><div class="fit">
 <header><h1>${esc(label)}</h1><div class="kpis">${kpis.map(([v, l]) => `<div><b>${esc(v)}</b>${esc(l)}</div>`).join('')}</div></header>
 <table><thead>${head}</thead><tbody>${body}</tbody></table>
@@ -156,9 +160,19 @@ export function buildTenantListPdfHtml(kind, { tenants, meters, history = [], si
     if (!updatesByTenant.has(h.row_key)) updatesByTenant.set(h.row_key, [])
     updatesByTenant.get(h.row_key).push(line)
   }
-  const groups = buildTenantListGroups(tenants, meters, today).map((g) => ({
+  // 緊急連絡先一覧表は、起点の日付の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せ、
+  // 更新情報の先頭に退去日を出す（2026-10-26 依頼）
+  const emergency = kind === 'emergency'
+  const groups = buildTenantListGroups(tenants, meters, today, { activeOn: emergency ? since : '' }).map((g) => ({
     ...g,
-    rows: g.rows.map((r) => ({ ...r, p: r.tenant.profile || {}, updates: updatesByTenant.get(r.tenant.id) || [] })),
+    rows: g.rows.map((r) => {
+      const t = r.tenant
+      const moveOut =
+        emergency && t.moved_out_on && (!since || t.moved_out_on > since)
+          ? [`${slash(t.moved_out_on)} ${isMovedOut(t, today) ? '退去' : '退去予定'}`]
+          : []
+      return { ...r, p: t.profile || {}, movedOut: emergency && isMovedOut(t, today), updates: [...moveOut, ...(updatesByTenant.get(t.id) || [])] }
+    }),
   }))
   const title = `${TENANT_PDF_KINDS[kind].label}_${today.replaceAll('-', '')}`
   return {
