@@ -173,13 +173,16 @@ jobs:
           esac
 
           # storage.objects はファイル本体を持たないメタ情報テーブル（バケット名・パス・
-          # MIMEタイプ・サイズ）。本体はStorage REST APIから別途ダウンロードする
+          # MIMEタイプ・サイズ）。本体はStorage REST APIから別途ダウンロードする。
+          # secure-shares（安全なリンクで共有のPDF。2026-10-26〜）は除く: 期限付きの一時的な写しで、
+          # 中身は DB から作り直せる。バックアップの Git 履歴に個人情報の PDF を残し続けないため
           psql "$DB_URL" -Atc "
             select coalesce(json_agg(row_to_json(t)), '[]')
             from (
               select bucket_id, name,
                      coalesce(metadata->>'mimetype', 'application/octet-stream') as mimetype
               from storage.objects
+              where bucket_id <> 'secure-shares'
               order by bucket_id, name
             ) t
           " > storage_manifest.json

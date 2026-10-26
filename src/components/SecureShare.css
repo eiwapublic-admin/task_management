@@ -1,0 +1,55 @@
+/* 安全なリンクで共有（SecureShareModal・SecureShareListModal。2026-10-26〜） */
+.secure-share-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-base);
+}
+.secure-share-check input { margin-top: var(--space-05); }
+
+.secure-share-copy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.secure-share-copy > .ui-input { flex: 1 1 0; min-width: 0; }
+.secure-share-copy > .btn-plain { flex: none; }
+
+.secure-share-passcode {
+  flex: 1 1 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.secure-share-table td { vertical-align: top; }
+.secure-share-table .nowrap { white-space: nowrap; }
+.secure-share-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.secure-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+.secure-share-log { margin-top: var(--space-1); font-size: var(--fs-sm); color: var(--text-muted); }
+.secure-share-log summary { cursor: pointer; }
+.secure-share-log ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); }
+.secure-share-reissued {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-control);
+}
+.secure-share-reissued .secure-share-passcode { flex: none; font-size: var(--fs-lg); }

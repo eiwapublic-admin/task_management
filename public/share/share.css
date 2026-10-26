@@ -1,0 +1,59 @@
+/* 共有リンクの受け取りページ（worker/lib/secure-shares.js の handleSharePage）。
+   本番の CSP（style-src 'self'）で埋め込みの <style> が効かないため、ファイルにして読む */
+:root {
+  color-scheme: light;
+  --teal: #0f766e;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --bg: #f3f4f6;
+  --error: #b91c1c;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  line-height: 1.7;
+}
+.card {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  background: #fff;
+  border-top: 4px solid var(--teal);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+h1 { margin: 0 0 12px; font-size: 1.25rem; }
+.doc { margin: 0 0 12px; font-size: 1.1rem; font-weight: 700; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 16px; padding: 12px; background: #f9fafb; border: 1px solid var(--line); border-radius: 6px; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+label { display: block; margin-bottom: 6px; font-weight: 700; }
+input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.4rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+}
+input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--teal);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.error { margin: 0 0 12px; padding: 8px 12px; color: var(--error); background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; }
+.muted { color: var(--muted); font-size: 0.875rem; }

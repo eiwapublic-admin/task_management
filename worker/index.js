@@ -157,6 +157,13 @@ import {
   handlePaperRecordUpsert,
   handlePaperRecordDelete,
 } from './lib/paper.js'
+import {
+  handleSecureShareCreate,
+  handleSecureShareList,
+  handleSecureShareUpdate,
+  handleSharePage,
+  cleanupSecureShares,
+} from './lib/secure-shares.js'
 
 // Cloudflare Worker 本体。
 // - fetch:    /api/* を処理し、それ以外は静的アセット（Vite ビルド成果物）へフォールバック
@@ -1362,8 +1369,23 @@ async function route(req, env) {
     return json({ error: 'Method Not Allowed' }, 405)
   }
 
+  // 安全なリンクで共有（2026-10-26〜。worker/lib/secure-shares.js。社員だけ）
+  if (pathname === '/api/secure-shares') {
+    if (req.method === 'GET') return handleSecureShareList(req)
+    if (req.method === 'POST') return handleSecureShareCreate(req)
+    if (req.method === 'PATCH') return handleSecureShareUpdate(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+
   if (pathname.startsWith('/api/')) {
     return json({ error: 'Not Found' }, 404)
+  }
+
+  // 共有リンクの受け取りページ（ログイン不要。パスコードで開く）
+  const shareMatch = pathname.match(/^\/s\/([^/]+)\/?$/)
+  if (shareMatch) {
+    if (req.method === 'GET' || req.method === 'POST') return handleSharePage(req, shareMatch[1])
+    return new Response('Method Not Allowed', { status: 405 })
   }
 
   // 静的アセット（SPA フォールバックは wrangler.jsonc の not_found_handling で処理）
@@ -1402,6 +1424,7 @@ async function runReminderCheck() {
 // （メール取得が止まっている深夜なら、Workers の1回あたりの外部リクエスト数に余裕がある）
 //   ・退去日を過ぎたテナントを退去済みにする
 //   ・2年を過ぎた検針写真の削除（docs/meter-plan.md 7章）
+//   ・期限切れ・取り消し・回数を使い切った共有リンクの PDF の削除（2026-10-26〜）
 async function runDailyJobs() {
   const jst = new Date(Date.now() + 9 * 3600 * 1000)
   if (jst.getUTCHours() !== 3 || jst.getUTCMinutes() >= 5) return
@@ -1416,6 +1439,12 @@ async function runDailyJobs() {
     if (removed) console.log(`meter-photo-cleanup: ${removed}枚を削除`)
   } catch (err) {
     console.error('meter-photo-cleanup 失敗:', err)
+  }
+  try {
+    const removed = await cleanupSecureShares()
+    if (removed) console.log(`secure-share-cleanup: ${removed}件の PDF を削除`)
+  } catch (err) {
+    console.error('secure-share-cleanup 失敗:', err)
   }
 }
 
