@@ -4,7 +4,7 @@
 // ここでも同じ1枚の表を作り、緊急連絡先の列グループ（R〜AC）を隠した状態で出す（グループの「＋」で開けば緊急連絡先一覧表になる。
 // 2026-10-21 の依頼で出力は「テナント一覧表」の1ファイルに整理。雛形は public/templates/tenant-list.xlsx。
 // 元の「最新」シートから見出し4行と、データ行・階の区切り行・合計行の書式見本を残したもの）。
-// 行はテナントマスタの入居中のテナント（退去日を過ぎたもの・「一覧表に載せない」・階の無いものを除く）を、
+// 行はテナントマスタの入居中のテナント（時点の日付で退去済みのもの・警備番号が空のもの・「一覧表に載せない」・階の無いものを除く）を、
 // 7F → 1F → B1 の順、各階の中は部屋番号の順に並べる
 
 import { fetchMeterMasters } from './meter'
@@ -49,12 +49,14 @@ const asNumberIfDigits = (v) => (v != null && /^\d+$/.test(String(v)) ? Number(v
 
 /**
  * テナントマスタから表の行（階ごと）を作る。画面のテストでも使う。
- * activeOn（YYYY-MM-DD。任意）: その日の時点で退去日を迎えていないテナントも載せる
- * （緊急連絡先一覧表で、起点の日付より後に退去した〈退去する〉テナントも残すため。2026-10-26 依頼）
+ * activeOn（YYYY-MM-DD。任意。既定は today）: その日の時点で退去日を迎えていないテナントを載せる
+ * （緊急連絡先一覧表は起点の日付、テナント一覧表は出力時に入れる時点の日付。2026-10-26 依頼）。
+ * 退去日の無い旧来の退去済みは載せない。警備番号が空のテナントも載せない（2026-10-26 依頼。両方の一覧表とも）
  */
 export function buildTenantListGroups(tenants, meters, today = jstToday(), { activeOn = '' } = {}) {
+  const on = activeOn || today
   const listed = (t) =>
-    !isMovedOut(t, today) || (!!activeOn && activeOn < today && !!t.moved_out_on && t.moved_out_on > activeOn)
+    (t.moved_out_on ? t.moved_out_on > on : !isMovedOut(t, today)) && String(t.profile?.security_block ?? '').trim() !== ''
   const metersByTenant = new Map()
   for (const m of meters) {
     if (!m.tenant_id) continue
@@ -130,8 +132,8 @@ function rowXml(r, tpl, values = {}) {
   return `<row r="${r}"${tpl.attrs}>${cells.join('')}</row>`
 }
 
-/** 出力する（kind: 'tenants'）。ファイルを保存させ、出力した件数を返す */
-export async function exportTenantList(kind) {
+/** 出力する（kind: 'tenants'。asOf は時点の日付 YYYY-MM-DD で、その日に退去済みのテナントを除く）。ファイルを保存させ、出力した件数を返す */
+export async function exportTenantList(kind, { asOf = '' } = {}) {
   const def = TENANT_LIST_KINDS[kind]
   if (!def) throw new Error('出力の種類が正しくありません')
   const [data, tplRes] = await Promise.all([fetchMeterMasters(), fetch('/templates/tenant-list.xlsx')])
@@ -142,7 +144,7 @@ export async function exportTenantList(kind) {
   let sheet = dec.decode(files.get('xl/worksheets/sheet1.xml'))
   let book = dec.decode(files.get('xl/workbook.xml'))
 
-  const groups = buildTenantListGroups(data.tenants || [], data.meters || [])
+  const groups = buildTenantListGroups(data.tenants || [], data.meters || [], jstToday(), { activeOn: asOf })
   const dataTpl = rowTemplate(sheet, 5)
   const gapTpl = rowTemplate(sheet, 6)
   const footTpl = rowTemplate(sheet, 7)
