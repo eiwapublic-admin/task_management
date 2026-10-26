@@ -65,8 +65,8 @@ const COLUMNS = {
     ['緊急連絡先 2', (r) => contactCell(r.p.emergency_contacts?.[1]), 'contact'],
     ['緊急連絡先 3', (r) => contactCell(r.p.emergency_contacts?.[2]), 'contact'],
     ['記入日', (r) => slash(r.p.entry_date), 'c nw'],
-    ['最終変更日付', (r) => slash(r.change?.date), 'c nw'],
-    ['最終変更事項', (r) => [r.change?.note, r.moveOut].filter(Boolean).map(esc).join('<br>'), 'upd'],
+    ['最終変更日付', (r) => slash(r.change?.date), 'c nw chg'],
+    ['最終変更事項', (r) => esc(r.change?.note || ''), 'upd chg'],
   ],
 }
 
@@ -135,8 +135,7 @@ export function fitToPage(doc) {
 /** 印刷用の HTML を作る（kind: 'tenants' | 'emergency'。since は緊急連絡先一覧表の更新情報の起点 YYYY-MM-DD） */
 // asOf はテナント一覧表の時点の日付（その日に退去済みのテナントを除く。2026-10-26〜）
 export function buildTenantListPdfHtml(kind, { tenants, meters, since = '', asOf = '', today = jstToday(), styleHref = STYLE_URL }) {
-  // 緊急連絡先一覧表は、起点の日付の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せ、
-  // 最終変更事項の末尾に退去日を出す（2026-10-26 依頼）。
+  // 緊急連絡先一覧表は、起点の日付の時点で退去日を迎えていないテナント（その後に退去した・退去予定）も載せる（2026-10-26 依頼）。
   // 最終変更日付・事項はテナントマスタの「最終変更日付（連絡用）」「最終変更事項（連絡用）」。日付が起点より前なら出さない
   // （2026-10-26 依頼。それまでは変更履歴から作った「更新情報」を出していた）
   const emergency = kind === 'emergency'
@@ -145,12 +144,8 @@ export function buildTenantListPdfHtml(kind, { tenants, meters, since = '', asOf
     rows: g.rows.map((r) => {
       const t = r.tenant
       const p = t.profile || {}
-      const moveOut =
-        emergency && t.moved_out_on && (!since || t.moved_out_on > since)
-          ? `${slash(t.moved_out_on)} ${isMovedOut(t, today) ? '退去' : '退去予定'}`
-          : ''
       const change = contactChange(p, since)
-      return { ...r, p, movedOut: isMovedOut(t, today), moveOut, change }
+      return { ...r, p, movedOut: isMovedOut(t, today), change }
     }),
   }))
   const title = `${TENANT_PDF_KINDS[kind].label}_${today.replaceAll('-', '')}`

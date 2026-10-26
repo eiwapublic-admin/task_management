@@ -54,6 +54,20 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
   const [error, setError] = useState('')
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  // 退去日を入れたとき、最終変更日付・事項（連絡用）が空なら退去日と「退去」を入れる（2026-10-26 依頼）。
+  // ここで入れたまま（日付が前の退去日・事項が「退去」）なら、退去日を直したときに日付も合わせる
+  function changeMovedOutOn(e) {
+    const date = e.target.value
+    const prev = form.moved_out_on
+    setForm((f) => ({ ...f, moved_out_on: date }))
+    if (!date) return
+    setProfile((p) => {
+      const blank = !p.contact_changed_on && !String(p.contact_change_note ?? '').trim()
+      const auto = prev && p.contact_changed_on === prev && p.contact_change_note === '退去'
+      return blank || auto ? { ...p, contact_changed_on: date, contact_change_note: '退去' } : p
+    })
+  }
   const setP = (key) => (e) => setProfile((p) => ({ ...p, [key]: e.target.value }))
   const setContact = (i, key) => (e) =>
     setProfile((p) => ({
@@ -116,7 +130,7 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
             </label>
             <label className="ui-field">
               <span>退去日</span>
-              <input type="date" className="ui-input" value={form.moved_out_on} onChange={set('moved_out_on')} />
+              <input type="date" className="ui-input" value={form.moved_out_on} onChange={changeMovedOutOn} />
             </label>
           </div>
           <p className="ui-note">

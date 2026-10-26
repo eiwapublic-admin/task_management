@@ -28,4 +28,6 @@ tr.moved-out td:not(.floor) { color: #6b7280; }
 .contact { white-space: nowrap; } .contact b { display: block; }
 .tel { display: block; font-size: 7pt; color: #374151; }
 td.upd { font-size: 7pt; color: #0f766e; min-width: 50mm; }
+/* 最終変更日付・事項（連絡用）は赤字の太字（2026-10-26 依頼） */
+td.chg, tr.moved-out td.chg { color: #dc2626; font-weight: bold; }
 footer { margin-top: 5px; font-size: 6.8pt; color: #9ca3af; text-align: right; }
