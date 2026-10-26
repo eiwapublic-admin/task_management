@@ -118,11 +118,11 @@ function draftBody({ recipientName, title, url, expiresAt, maxOpens }) {
     `${recipientName} 様`,
     '',
     'いつもお世話になっております。',
-    `${title}をお送りします。下のリンクを開き、パスコードを入力してご覧ください。`,
+    `${title}をお送りします。下のリンクを開き、パスワードを入力してご覧ください。`,
     '',
     url,
     '',
-    '・パスコードは、このメールとは別に携帯電話のショートメッセージ（SMS）またはお電話でお知らせします。',
+    '・パスワードは、このメールとは別に携帯電話のショートメッセージ（SMS）またはお電話でお知らせします。',
     `・有効期限: ${slashDateTime(expiresAt)} まで（開ける回数: ${maxOpens}回まで）`,
     '・個人情報を含むため、受け取ったファイルの取り扱いにはご注意ください。',
     '',
@@ -215,7 +215,7 @@ export async function handleSecureShareCreate(req) {
       try {
         const raw = buildMimeMessage({
           to: [{ name: recipientName, email: recipientEmail }],
-          subject: `${title}の送付（パスコード付きリンク）`,
+          subject: `${title}の送付（パスワード付きリンク）`,
           body: draftBody({ recipientName, title, url, expiresAt, maxOpens }),
         })
         const draft = await createDraft(await getAccessToken(), raw)
@@ -314,7 +314,8 @@ export async function handleSecureShareUpdate(req) {
 
 // ============================================================
 // 受け取る側のページ（ログイン不要）。GET /s/<token> でパスコードの入力欄、POST で PDF を返す。
-// 画面は JavaScript を使わない素の HTML のフォーム（CSP の script-src 'self' と無関係に動き、どの端末でも開ける）。
+// 画面は素の HTML のフォーム（JavaScript が無くても動く）。押したときの反応（準備中・ダウンロードを始めた表示）だけを
+// public/share/share.js で足す（2026-10-26 依頼。反応が無く何度も押してしまうため）。
 // 書式は public/share/share.css（埋め込みの <style> は CSP で無視されるため）
 // ============================================================
 
@@ -332,14 +333,14 @@ const PAGE_HEADERS = {
 function page(status, { heading, body }) {
   const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">
-<title>${escHtml(heading)}</title><link rel="stylesheet" href="/share/share.css"></head>
+<title>${escHtml(heading)}</title><link rel="stylesheet" href="/share/share.css"><script src="/share/share.js" defer></script></head>
 <body><main class="card"><h1>${escHtml(heading)}</h1>${body}</main></body></html>`
   return new Response(html, { status, headers: PAGE_HEADERS })
 }
 
 const UNAVAILABLE = {
   revoked: 'このリンクは送り主によって取り消されました。',
-  locked: 'パスコードを続けて間違えたため、このリンクは止まっています。送り主にご連絡ください。',
+  locked: 'パスワードを続けて間違えたため、このリンクは止まっています。送り主にご連絡ください。',
   expired: 'このリンクは有効期限を過ぎています。',
   used_up: 'このリンクは開ける回数の上限に達しました。',
   deleted: 'このファイルはすでに削除されています。',
@@ -366,14 +367,15 @@ function formPage(row, token, message = '') {
     body: `<p class="doc">${escHtml(row.title)}</p>
 <dl><dt>宛先</dt><dd>${escHtml(row.recipient_name)} 様</dd>
 <dt>有効期限</dt><dd>${escHtml(slashDateTime(row.expires_at))} まで</dd>
-<dt>開ける回数</dt><dd>あと ${left} 回</dd></dl>
+<dt>開ける回数</dt><dd>あと <span id="left">${left}</span> 回</dd></dl>
 ${message ? `<p class="error" role="alert">${escHtml(message)}</p>` : ''}
 <form method="post" action="/s/${escHtml(token)}">
-<label for="passcode">パスコード（6桁の数字）</label>
+<label for="passcode">パスワード（6桁の数字）</label>
 <input id="passcode" name="passcode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9０-９ ]*" maxlength="12" required autofocus>
-<button type="submit">開く（PDF をダウンロード）</button>
+<button type="submit" id="open">開く（PDF をダウンロード）</button>
+<p id="status" class="status" role="status" aria-live="polite" hidden></p>
 </form>
-<p class="muted">パスコードは、送り主からメールとは別の方法（ショートメッセージやお電話）でお知らせしています。${MAX_FAILED}回続けて間違えるとこのリンクは使えなくなります。</p>`,
+<p class="muted">パスワードは、送り主からメールとは別の方法（ショートメッセージやお電話）でお知らせしています。${MAX_FAILED}回続けて間違えるとこのリンクは使えなくなります。</p>`,
   })
 }
 
@@ -423,7 +425,7 @@ export async function handleSharePage(req, token) {
         .eq('id', row.id)
       await logAccess(supabase, row.id, 'wrong_passcode', req)
       if (lock) return unavailablePage('locked')
-      return formPage(row, token, `パスコードが違います（あと ${MAX_FAILED - failed} 回で使えなくなります）`)
+      return formPage(row, token, `パスワードが違います（あと ${MAX_FAILED - failed} 回で使えなくなります）`)
     }
 
     // 開いた回数を数える。同時に開かれても上限を超えないよう、読んだときの回数のままなら足す
@@ -443,8 +445,12 @@ export async function handleSharePage(req, token) {
     }
     await logAccess(supabase, row.id, 'opened', req)
     const star = `UTF-8''${encodeURIComponent(row.filename)}`
+    // ダウンロードが始まったことをページの share.js に知らせる目印（送られてきた値をそのまま Cookie で返す）
+    const dl = String(form?.get('dl') || '')
+    const signal = /^[a-z0-9]{8,32}$/.test(dl) ? { 'Set-Cookie': `share_dl=${dl}; Path=/s; Max-Age=120; Secure; SameSite=Strict` } : {}
     return new Response(file.body, {
       headers: {
+        ...signal,
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="share.pdf"; filename*=${star}`,
         'Cache-Control': 'no-store',

@@ -71,3 +71,26 @@
   gap: var(--space-2);
 }
 .secure-share-copy > .ui-textarea { flex: 1 1 0; min-width: 0; }
+.secure-share-auto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-card);
+}
+.secure-share-auto-title,
+.secure-share-parts-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.secure-share-parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+}
+.secure-share-parts-title { color: var(--text-muted); }
