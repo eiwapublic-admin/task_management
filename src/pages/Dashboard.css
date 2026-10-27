@@ -98,33 +98,40 @@
   flex-shrink: 0;
 }
 
+/* 2026-10-27: 「アイコン＋文字」（デザイン6案から案C）。アイコンはダッシュボードのタイルと同じ。
+   区切り線はやめ、1項目を幅をそろえた（雛形ファイルだけは文字に合わせて広がる）縦積みのボタンにする（ヘッダーの高さは約 64px になる） */
 .app-header-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 70px;
+  padding: 6px 6px 5px;
   border: none;
+  border-radius: var(--radius-control);
   background: transparent;
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--fs-md);
+  font-family: inherit;
+  font-size: var(--fs-xs);
   font-weight: 600;
+  line-height: 1.3;
   color: var(--text-on-dark);
-  opacity: 0.85;
+  opacity: 0.82;
   white-space: nowrap;
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  transition: background var(--transition), opacity var(--transition);
 }
 
-/* 区切り線が薄すぎて中途半端に見えるとの指摘（2026-08-25）を受けて濃くした */
-.app-header-nav-btn:not(:last-child) { border-right: 1px solid rgba(255, 255, 255, 0.5); }
+.app-header-nav-icon { flex-shrink: 0; }
 
-.app-header-nav-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+.app-header-nav-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
 
-/* 現在地の見え方を明確にする（2026-08-25）。背景の濃さを上げるだけでなく、
-   枠線（inset box-shadowなのでレイアウトに影響しない）と太字で「選ばれている」
-   ことがひと目で分かるようにした */
+/* 現在地: 白い薄地＋細い白枠（inset box-shadow なのでレイアウトに影響しない）＋太字 */
 .app-header-nav-btn.is-active {
   opacity: 1;
   font-weight: 700;
   color: var(--ink-on-fill);
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 /* ハンバーガー左のログインユーザー名。狭幅（モバイル）では場所を取るうえ、
@@ -519,13 +526,16 @@
 }
 
 /* 2026-10-27: 業務メニューが10項目（検針・廃棄物・古紙回収を追加）になり、768px を少し超える幅では
-   機能名・ユーザー名と重なるため、1240px 以下は文字と余白を詰め、1099px 以下はヘッダーから外して
-   ハンバーガーのトップ領域（.app-menu-top）に出す */
-@media (max-width: 1240px) {
-  .app-header-nav-btn {
-    padding: var(--space-1) 6px;
-    font-size: var(--fs-sm);
+   機能名・ユーザー名と重なるため、1365px 以下は中央固定をやめて項目の幅を詰め、1099px 以下はヘッダーから
+   外してハンバーガーのトップ領域（.app-menu-top）に出す */
+@media (max-width: 1365px) {
+  /* 帯の中央に固定すると長い機能名（ビルメンテナンス管理など）と重なるので、左右の間に並べる */
+  .app-header-nav {
+    position: static;
+    transform: none;
+    margin-inline: auto;
   }
+  .app-header-nav-btn { min-width: 56px; padding-inline: 4px; }
 }
 
 @media (max-width: 1099px) {
