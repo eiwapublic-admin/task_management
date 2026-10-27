@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Portal from './pages/Portal'
 import Dashboard from './pages/Dashboard'
@@ -28,6 +29,7 @@ import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
 import { isAuthenticated, getCurrentUser, isLimitedRole } from './lib/auth'
+import { takeSkipLaunchPortal } from './lib/launch'
 import { ReloadPrompt } from './pwa/ReloadPrompt'
 
 function RequireAuth({ children }) {
@@ -44,23 +46,33 @@ function RequireStaff({ children }) {
   return children
 }
 
-// モバイル幅の判定。他画面（ReportList.jsxのWIDE_SCREEN_QUERY等）と同じ768pxを閾値にする
-const MOBILE_QUERY = '(max-width: 768px)'
-
-// アプリ起動時、モバイル幅だけはダッシュボード（ポータル）を既定表示にする（2026-09-02）。
+// アプリ起動時の既定表示はダッシュボード（ポータル）にする（2026-10-27 依頼。それまではモバイル幅だけ
+// ポータル、PC・iPad幅はカンバンだった。2026-09-02〜）。
 // 起動直後の最初の「/」だけをポータルへ振り替えたい（ヘッダー・ハンバーガーの「タスク」
 // リンクで明示的に「/」へ来たときはカンバンをそのまま見せる必要がある）ため、
-// モジュールスコープのフラグで「まだ振り替えていない最初の1回」だけに限定する
-// （コンポーネントのrefだとルートの出入りで作り直されてしまい使えない）
-let mobileLaunchRedirected = false
+// 読み込んだ時点の URL で一度だけ決め、振り替えたら下ろす（描画中に書き換えると StrictMode の
+// 二重描画で2回目がカンバンになるので、下ろすのは effect の中で行う）。
+// 「今すぐ取得」のあとの再読み込み（AppHeader の handleRunFetch）はカンバンへ戻すのが目的なので、
+// その印（lib/launch.js）があるときは振り替えない。未ログインならログイン後に /portal へ行く（Login.jsx）
+let launchToPortal = window.location.pathname === '/' && isAuthenticated() && !takeSkipLaunchPortal()
 
+function LaunchToPortal() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    launchToPortal = false
+    navigate('/portal', { replace: true })
+  }, [navigate])
+  return null
+}
+
+// owner（小泉産業様）・備品出庫限定ロールもダッシュボードは見られるので、RequireStaff より先に振り替える
 function DefaultRoute() {
-  const isMobile = typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
-  if (!mobileLaunchRedirected && isMobile) {
-    mobileLaunchRedirected = true
-    return <Navigate to="/portal" replace />
-  }
-  return <Dashboard />
+  if (launchToPortal) return <LaunchToPortal />
+  return (
+    <RequireStaff>
+      <Dashboard />
+    </RequireStaff>
+  )
 }
 
 function App() {
@@ -72,8 +84,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* ダッシュボード 兼 ポータル（2026-08-12）。各機能への入口。
-            アプリ起動時の既定表示はカンバン（/）のままにしてあり、この画面へは
-            ヘッダーのロゴ（またはハンバーガーメニュー）から入る。
+            2026-10-27 からアプリ起動時の既定表示（DefaultRoute 参照）。ヘッダーのロゴからも入れる。
             owner（小泉産業様）も自分が見られる機能のカードだけを見られる */}
         <Route
           path="/portal"
@@ -83,17 +94,9 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* 起動時の既定表示。PC/iPad幅はカンバン（従来どおり）、モバイル幅だけは
-            ポータルを既定にする（2026-09-02。DefaultRoute参照）。ヘッダー等から
-            明示的に「/」（タスク）を選んだ場合はモバイルでもカンバンをそのまま見せる */}
-        <Route
-          path="/"
-          element={
-            <RequireStaff>
-              <DefaultRoute />
-            </RequireStaff>
-          }
-        />
+        {/* 起動時はダッシュボード（ポータル）へ振り替える（2026-10-27〜全幅。DefaultRoute参照）。
+            ヘッダー等から明示的に「/」（タスク）を選んだ場合はカンバンをそのまま見せる */}
+        <Route path="/" element={<DefaultRoute />} />
         <Route
           path="/logs"
           element={

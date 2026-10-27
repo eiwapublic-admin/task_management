@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AboutModal from './AboutModal'
+import { markSkipLaunchPortal } from '../lib/launch'
 import {
   IconBox,
   IconBuildingWrench,
@@ -200,6 +201,8 @@ export default function AppHeader({
       window.alert(`メール取得に失敗しました: ${err.message}`)
     } finally {
       setMenuOpen(false)
+      // 起動時のダッシュボードへの振り替え（App.jsx の DefaultRoute）をこの再読み込みでは行わない
+      markSkipLaunchPortal()
       window.location.assign('/')
     }
   }
