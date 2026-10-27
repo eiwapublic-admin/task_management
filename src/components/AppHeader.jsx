@@ -59,6 +59,8 @@ const FEATURE_TITLES = [
 // 各機能へ直接ジャンプできるようにする（モバイルはハンバーガーメニューのみのまま）。
 // タスク（カンバン）は owner（小泉産業様）・備品出庫限定ロールには見せない
 // （RequireStaffガードで結局 /reports へ送り返されるだけのため。App.jsx参照）
+// 2026-10-27: 検針・廃棄物・古紙回収を残留塩素の右に追加（依頼。項目数は10に）。検針は社員のみ
+// （RequireStaff）、廃棄物・古紙回収は owner も閲覧できるので staffOnly にしない。
 // 2026-09-02: ビルメン（ビルメンテナンス管理）を日報の右隣に追加し、代わりに連絡帳を
 // この並びから外してハンバーガーの共通メニュー（第3領域）へ移した（項目数は7のまま。
 // docs/bilmen-plan.md 5-0・13-11）。ビルメンは owner も閲覧できるので staffOnly にしない
@@ -69,6 +71,9 @@ const NAV_ITEMS = [
   { path: '/equipment', label: '備品' },
   { path: '/reports/parking', label: '違反車両' },
   { path: '/reports/chlorine', label: '残留塩素' },
+  { path: '/meter', label: '検針', staffOnly: true },
+  { path: '/waste', label: '廃棄物' },
+  { path: '/paper', label: '古紙回収' },
   { path: '/documents', label: '雛形ファイル', staffOnly: true },
 ]
 
@@ -394,8 +399,7 @@ export default function AppHeader({
               {!isOwner && <button onClick={() => goTo('/contacts')}>連絡帳</button>}
               {/* 業務マニュアル（2026-10-13）: 日常業務の手引書。いつでも参照できるよう連絡帳と並べて共通領域に置く */}
               {!isOwner && <button onClick={() => goTo('/manuals')}>業務マニュアル</button>}
-              {/* 検針（2026-10-20〜）: 月に一度の作業なので業務メニューの7項目には入れず、ここに置く */}
-              {!isOwner && <button onClick={() => goTo('/meter')}>検針</button>}
+              {/* 検針は2026-10-27に業務メニュー（NAV_ITEMS）へ移した（依頼）。ここから削除 */}
               {/* リマインダー（2026-09-07）: 従量課金事項・処理ログと同じくシステム運用上の
                   管理機能のため、全画面から1タップで開ける共通領域に置く */}
               {!isOwner && <button onClick={() => goTo('/reminders')}>リマインダー</button>}

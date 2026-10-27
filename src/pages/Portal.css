@@ -21,13 +21,6 @@
   color: var(--text-strong);
 }
 
-.portal-hero-title {
-  margin: var(--space-1) 0 0;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
 /* --- 機能カード ---------------------------------------------------------
    1枚が1機能への入口。押すと遷移するので、面ではなく「押せる合図」として
    ホバーで持ち上げる（アクション色の枠＋影）。数字そのものを読ませたいので、
@@ -169,11 +162,6 @@
   color: var(--text-muted);
 }
 
-.portal-card-sub {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-
 /* 機能ごとのアクセント。6枚を見分けられるようトークンから色相を散らす。
    ここでの色は「どの機能か」の目印であって操作の意味は持たない（帯とアイコンだけに
    使い、ボタンには使わない）ので、原則1（緑＝現在地／青＝操作）とは衝突しない。
@@ -223,7 +211,8 @@
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   font-family: inherit;
-  font-size: var(--fs-sm);
+  /* 2026-10-27: 文字を少し大きく（依頼。fs-sm → fs-md） */
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-base);
   cursor: pointer;

@@ -511,16 +511,32 @@
   gap: 1px;
 }
 
-@media (min-width: 769px) {
+@media (min-width: 1100px) {
   .app-menu-top,
   .app-menu-top-divider {
     display: none;
   }
 }
 
+/* 2026-10-27: 業務メニューが10項目（検針・廃棄物・古紙回収を追加）になり、768px を少し超える幅では
+   機能名・ユーザー名と重なるため、1240px 以下は文字と余白を詰め、1099px 以下はヘッダーから外して
+   ハンバーガーのトップ領域（.app-menu-top）に出す */
+@media (max-width: 1240px) {
+  .app-header-nav-btn {
+    padding: var(--space-1) 6px;
+    font-size: var(--fs-sm);
+  }
+}
+
+@media (max-width: 1099px) {
+  .app-header-nav {
+    display: none;
+  }
+}
+
 /* 業務別メニューのうち、モバイル幅でだけヘッダから移してくる項目（2026-09-01。
    連絡帳の「連絡帳を自動作成」・日報の自主検査表出力）。PC幅では元のヘッダー
-   ボタン側に残るので、ここでは.app-menu-topと同じ768px幅の閾値で隠す */
+   ボタン側に残るので、ここでは768px幅の閾値で隠す（.app-menu-top は2026-10-27から1099px） */
 @media (min-width: 769px) {
   .app-menu-mobile-only {
     display: none;
