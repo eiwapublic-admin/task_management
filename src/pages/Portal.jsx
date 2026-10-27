@@ -25,7 +25,7 @@ import { fetchEquipmentItems } from '../lib/equipment'
 import { fetchBilmenSchedules, isUnsettled } from '../lib/bilmen'
 import { fetchWasteRecords } from '../lib/waste'
 import { fetchPaperRecords, fiscalYearOf, paperRowTotal } from '../lib/paper'
-import { fetchMeterSummary, meterMonthLabel } from '../lib/meter'
+import { fetchMeterSummary } from '../lib/meter'
 import { electricChange } from '../lib/meterMonth'
 import {
   CHLORINE_STANDARD_MIN,
@@ -36,7 +36,6 @@ import {
   fetchClosedDays,
   fetchParkingViolations,
   fetchReports,
-  formatReportDate,
   jstDateOnly,
   shiftDate,
   todayJST,
@@ -95,10 +94,6 @@ function changePercent(now, prev) {
   return `${p > 0 ? '+' : ''}${p.toFixed(1)}`
 }
 
-function formatKgTotal(kg) {
-  return kg == null ? '—' : `${Math.round(kg).toLocaleString('ja-JP')}kg`
-}
-
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 function todayLabel() {
@@ -106,14 +101,6 @@ function todayLabel() {
   // 曜日は暦上の日付から求める（タイムゾーン換算を挟むとずれるので Date.UTC で固定する）
   const w = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
   return `${y}年${m}月${d}日（${w}）`
-}
-
-function greeting() {
-  // 端末のローカル時刻でよい（挨拶なので厳密なJST換算までは要らない）
-  const h = new Date().getHours()
-  if (h < 11) return 'おはようございます'
-  if (h < 18) return 'おつかれさまです'
-  return 'おつかれさまです'
 }
 
 // 当月1日〜昨日のうち、休館日を除いて記録が無い日数を数える
@@ -191,7 +178,6 @@ export default function Portal() {
     // --- タスク（カンバン）---
     const tasks = stats?.tasks
     const todo = tasks?.filter((t) => t.status === '未処理').length
-    const inProgress = tasks?.filter((t) => t.status === '対応中').length
     const overdue = tasks?.filter(
       (t) => t.status !== STATUS_DONE && dueStatus(t.due_date)?.level === 'overdue',
     ).length
@@ -220,8 +206,6 @@ export default function Portal() {
 
     // --- 残留塩素等検査：過去10日間（当日含む）で規定値未満（0.1未満）の検出件数（2026-08-14） ---
     const chlorine = stats?.chlorine
-    // API は新しい順で返すので先頭が最終測定
-    const lastChlorine = chlorine?.[0]?.tested_at
     const chlorineSince = shiftDate(today, -9)
     const belowStandardCount = chlorine?.filter((t) => {
       if (jstDateOnly(t.tested_at) < chlorineSince) return false
@@ -260,10 +244,6 @@ export default function Portal() {
         value: todo,
         unit: '件',
         caption: '未処理',
-        sub:
-          tasks == null
-            ? '取得できませんでした'
-            : `対応中 ${inProgress} 件 ・ 期限超過 ${overdue} 件`,
         alert: overdue > 0,
         staffOnly: true,
       },
@@ -275,7 +255,6 @@ export default function Portal() {
         value: unfiledReportDays,
         unit: '日',
         caption: '未起票（昨日まで）',
-        sub: reports == null ? '取得できませんでした' : `${monthLabel}の記録 ${monthReports.length} 日`,
         alert: unfiledReportDays > 0,
         // タイル右上の「本日」（2026-09-02）。日報一覧へ遷移した上で本日の詳細を
         // 開きたいので、詳細モーダルも兼ねる /reports/:date へ直接ジャンプする
@@ -293,12 +272,6 @@ export default function Portal() {
         value: monthBilmen?.length,
         unit: '件',
         caption: `${monthLabel}の予定`,
-        sub:
-          bilmen == null
-            ? '取得できませんでした'
-            : bilmenUnsettled > 0
-              ? `未確定 ${bilmenUnsettled} 件（日付・作業IDが未入力）`
-              : 'すべて確定済み',
         alert: bilmenUnsettled > 0,
       },
       {
@@ -309,7 +282,6 @@ export default function Portal() {
         value: lowestItem?.stock_qty,
         unit: '点',
         caption: '在庫最少',
-        sub: items == null ? '取得できませんでした' : lowestItem ? lowestItem.name : '在庫管理の対象がありません',
         alert: lowestBelowWarn,
       },
       {
@@ -320,7 +292,6 @@ export default function Portal() {
         value: recentParking,
         unit: '件',
         caption: '過去30日',
-        sub: parking == null ? '取得できませんでした' : `累計 ${parking.length} 件`,
         // タイル右上の「＋」（2026-09-02）。違反車両一覧へ遷移した上で新規入力を
         // 開きたいので、遷移先へその意図を渡す（ParkingViolations.jsx側で受け取る）。
         // owner（小泉産業様）は違反車両の登録ができないため出さない
@@ -340,12 +311,6 @@ export default function Portal() {
         value: belowStandardCount,
         unit: '件',
         caption: '規定値未満（10日間）',
-        sub:
-          chlorine == null
-            ? '取得できませんでした'
-            : lastChlorine
-              ? `最終測定 ${formatReportDate(jstDateOnly(lastChlorine))}`
-              : 'まだ記録がありません',
         alert: belowStandardCount > 0,
         // タイル右上の「＋」（2026-09-02）。残留塩素画面へ遷移した上で新規入力を開く。
         // owner（小泉産業様）は測定の登録ができないため出さない
@@ -368,14 +333,6 @@ export default function Portal() {
         caption: meterChange?.current
           ? `${Number(meterChange.current.month.slice(5, 7))}月度の電気（前月度比）`
           : '電気（前月度比）',
-        sub:
-          meter == null
-            ? '取得できませんでした'
-            : !meter.latestMonth
-              ? 'まだ記録がありません'
-              : `最新 ${meterMonthLabel(meter.latestMonth)}${
-                  meterChange.latest.complete ? '' : `（入力中 ${meterChange.latest.entered}/${meterChange.latest.count}）`
-                }`,
         staffOnly: true,
       },
       {
@@ -386,12 +343,6 @@ export default function Portal() {
         value: changePercent(wasteNow, wastePrev),
         unit: '%',
         caption: `${ytd.label}の累計（前年同期比）`,
-        sub:
-          waste == null
-            ? '取得できませんでした'
-            : `${formatKgTotal(wasteNow)}（前年 ${formatKgTotal(wastePrev)}）${
-                wasteUnconfirmed > 0 ? `・未確認 ${wasteUnconfirmed} 件` : ''
-              }`,
         alert: wasteUnconfirmed > 0,
       },
       {
@@ -402,7 +353,6 @@ export default function Portal() {
         value: changePercent(paperNow, paperPrev),
         unit: '%',
         caption: `${ytd.label}の累計（前年同期比）`,
-        sub: paper == null ? '取得できませんでした' : `${formatKgTotal(paperNow)}（前年 ${formatKgTotal(paperPrev)}）`,
       },
     ]
 
@@ -455,12 +405,9 @@ export default function Portal() {
     <div className="ui-page">
       <AppHeader />
       <div className="ui-container is-wide portal-container app-scroll">
+        {/* 2026-10-27: 日付の下の挨拶（「おはようございます、〇〇 さん」）は削除（依頼。縦スクロールを避けるため） */}
         <header className="portal-hero">
           <p className="portal-hero-date">{todayLabel()}</p>
-          <h1 className="portal-hero-title">
-            {greeting()}
-            {user?.display_name ? `、${user.display_name} さん` : ''}
-          </h1>
         </header>
 
         {error && (
@@ -490,7 +437,6 @@ export default function Portal() {
                   <span className="portal-card-unit">{card.unit}</span>
                   <span className="portal-card-caption">{card.caption}</span>
                 </span>
-                <span className="portal-card-sub">{loading ? '読み込み中…' : card.sub}</span>
               </button>
               {/* カード本体のボタンとは別の兄弟要素として右上に重ねる（2026-09-02）。
                   ボタンの入れ子はHTML上不正なため、position:absoluteで角に載せるだけに
