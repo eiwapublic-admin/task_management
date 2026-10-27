@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AboutModal from './AboutModal'
+import {
+  IconBox,
+  IconBuildingWrench,
+  IconCar,
+  IconClipboard,
+  IconDroplet,
+  IconFolder,
+  IconGauge,
+  IconKanban,
+  IconRecycle,
+  IconScale,
+} from './Icons'
 import { getCurrentUser, logout, isLimitedRole } from '../lib/auth'
 import { reloadApp } from '../pwa/reloadApp'
 import { formatBuildTime } from '../lib/version'
@@ -64,17 +76,18 @@ const FEATURE_TITLES = [
 // 2026-09-02: ビルメン（ビルメンテナンス管理）を日報の右隣に追加し、代わりに連絡帳を
 // この並びから外してハンバーガーの共通メニュー（第3領域）へ移した（項目数は7のまま。
 // docs/bilmen-plan.md 5-0・13-11）。ビルメンは owner も閲覧できるので staffOnly にしない
+// 2026-10-27: デザインを「アイコン＋文字」（6案から案C）に変更。アイコンはダッシュボードのタイルと同じもの
 const NAV_ITEMS = [
-  { path: '/', label: 'タスク', exact: true, staffOnly: true },
-  { path: '/reports', label: '日報', exact: true },
-  { path: '/bilmen', label: 'ビルメン' },
-  { path: '/equipment', label: '備品' },
-  { path: '/reports/parking', label: '違反車両' },
-  { path: '/reports/chlorine', label: '残留塩素' },
-  { path: '/meter', label: '検針', staffOnly: true },
-  { path: '/waste', label: '廃棄物' },
-  { path: '/paper', label: '古紙回収' },
-  { path: '/documents', label: '雛形ファイル', staffOnly: true },
+  { path: '/', label: 'タスク', Icon: IconKanban, exact: true, staffOnly: true },
+  { path: '/reports', label: '日報', Icon: IconClipboard, exact: true },
+  { path: '/bilmen', label: 'ビルメン', Icon: IconBuildingWrench },
+  { path: '/equipment', label: '備品', Icon: IconBox },
+  { path: '/reports/parking', label: '違反車両', Icon: IconCar },
+  { path: '/reports/chlorine', label: '残留塩素', Icon: IconDroplet },
+  { path: '/meter', label: '検針', Icon: IconGauge, staffOnly: true },
+  { path: '/waste', label: '廃棄物', Icon: IconScale },
+  { path: '/paper', label: '古紙回収', Icon: IconRecycle },
+  { path: '/documents', label: '雛形ファイル', Icon: IconFolder, staffOnly: true },
 ]
 
 function isNavItemActive(item, pathname) {
@@ -338,7 +351,8 @@ export default function AppHeader({
               aria-current={isNavItemActive(item, location.pathname) ? 'page' : undefined}
               onClick={() => navigate(item.path)}
             >
-              {item.label}
+              <item.Icon size={22} className="app-header-nav-icon" />
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
