@@ -20,7 +20,8 @@ export default function Login() {
     setLoading(true)
     try {
       await login(username, password)
-      navigate('/')
+      // ログイン後はダッシュボードへ（2026-10-27。起動時の既定表示と合わせる）
+      navigate('/portal')
     } catch (err) {
       setError(err.message)
     } finally {
