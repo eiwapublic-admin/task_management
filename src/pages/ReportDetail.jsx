@@ -4,6 +4,7 @@ import ReportParkingViolations from '../components/ReportParkingViolations'
 import ConfirmDeleteButton from '../components/ConfirmDeleteButton'
 import InspectionForm from '../components/InspectionForm'
 import TimeInput from '../components/TimeInput'
+import AutoGrowTextarea from '../components/AutoGrowTextarea'
 import { IconCheckCircle } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
@@ -453,11 +454,11 @@ export default function ReportDetail({ date, onClose }) {
                       onChange={(v) => handleEntryChange(e.id, { entry_time: v })}
                       aria-label="時刻"
                     />
-                    <textarea
+                    <AutoGrowTextarea
                       className="entry-content"
                       value={e.content}
                       disabled={readOnly}
-                      rows={2}
+                      rows={1}
                       placeholder="作業内容"
                       onChange={(ev) => handleEntryChange(e.id, { content: ev.target.value })}
                       aria-label="作業内容"
