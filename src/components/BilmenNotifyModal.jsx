@@ -57,7 +57,8 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
   }, [month])
 
   const targets = notifyTargets(schedules)
-  const activeRecipients = activeBilmenRecipients(recipients || undefined)
+  // 「その他の宛先」を入れるかは案内メールの雛型の設定に従う（2026-10-29〜。サーバーの下書きも同じ）
+  const activeRecipients = activeBilmenRecipients(recipients || undefined, { includeOthers: settings?.include_others ?? true })
   const recipientRows = groupBilmenRecipients(activeRecipients)
   const [openKey, setOpenKey] = useState(null) // 押してアドレスを出している宛先（タッチ端末用）
   const cannotSend = targets.length === 0 || activeRecipients.length === 0
@@ -101,7 +102,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
           <p className="bilmen-notify-settings-note">
             ※ テナントの宛先は<Link to="/equipment/tenants">テナントマスタ</Link>の「案内メールの宛先」、
             <br />
-            その他の宛先と返信先は<Link to="/bilmen/mail">メール設定</Link>の画面で指定します。
+            件名・本文・その他の宛先・返信先は<Link to="/tenant-mail?tab=templates">テナントへのメール</Link>の画面で指定します。
           </p>
           <button type="button" className="icon-btn-close" onClick={onClose} disabled={drafting} aria-label="閉じる">
             ×
@@ -122,7 +123,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
               )}
               {activeRecipients.length === 0 && (
                 <p className="bilmen-undecided">
-                  宛先がありません。テナントマスタの「案内メールの宛先」か、メール設定の「その他の宛先」に登録してください。
+                  宛先がありません。テナントマスタの「案内メールの宛先」か、テナントへのメールの「その他の宛先」に登録してください。
                 </p>
               )}
 

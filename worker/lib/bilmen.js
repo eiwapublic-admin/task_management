@@ -19,7 +19,7 @@ import { buildBilmenEvent, eventFingerprint, withCalendarState } from './bilmen-
 // メール設定・宛先は「外部に出る操作」の一部として、owner・備品出庫限定ロールには
 // 一切見せない（10章・13-14）。canWrite() と同じ判定だが、GET も含めて塞ぐ意図を
 // 名前で明示するために別関数にしている
-async function requireMailAccess(req) {
+export async function requireMailAccess(req) {
   const auth = await verifyRequestAuth(req)
   if (!auth) return { error: json({ error: '認証が必要です' }, 401) }
   if (!canWrite(auth)) return { error: json({ error: 'この操作を行う権限がありません' }, 403) }
@@ -149,7 +149,7 @@ async function nextBilmenWorkNo(supabase) {
 // 外部に影響する操作・一括操作を操作ログに残す（11章）。既存の log_type 制約
 // （fetch / status_change / backup）はそのままに、status_change として actor で識別する
 // （equipment.js の logEquipmentApiCall と同じ考え方）
-async function logBilmen(supabase, actor, message, detail) {
+export async function logBilmen(supabase, actor, message, detail) {
   try {
     await supabase
       .from('activity_logs')
@@ -817,76 +817,89 @@ export async function handleBilmenScheduleGenerate(req) {
 
 // ============================================================
 // メール設定（文面・宛先）。Phase 4 の一部を先行実装（2026-09-03〜）。
-// 現行は雛形が1本（MAINT）のみのため、複数テンプレート管理はせず単一設定行にした
-// （bilmen_mail_settings.id='default' 固定）。送信は当面 mailto:（方式B）のみで、
-// Gmail下書き作成（方式A。PDF自動添付）は別途 gmail.compose 書き込みの実装が
-// 要るため未着手（docs/bilmen-plan.md 3-5・7-3）。
+// 当初は雛形が1本（MAINT）のみのため単一設定行（bilmen_mail_settings.id='default' 固定）にしていたが、
+// 2026-10-29〜 件名・本文はテナントへのメールの雛型（tenant_mail_templates の kind='bilmen'。
+// worker/lib/tenant-mail.js）へ移した。bilmen_mail_settings に残るのは返信先（全雛型で共通）だけ。
 // ============================================================
 
-const MAIL_SETTINGS_ID = 'default'
-const MAIL_SETTINGS_COLUMNS = 'id, subject, body, reply_to, updated_at'
+export const MAIL_SETTINGS_ID = 'default'
 const MAIL_RECIPIENT_COLUMNS = 'id, name, email, note, disabled, sort_order, created_at, updated_at'
 
 // 返信先アドレス（2026-09-29〜）は**メールのヘッダーにそのまま入る**ため、宛先より厳しく検証する。
 // 空白・改行・カンマ・<>・引用符を含むものを弾くことで、ヘッダーの差し込み（改行で別の
 // ヘッダーを足す）や、カンマ区切りで返信先を複数に増やすことを防ぐ
 const REPLY_TO_RE = /^[^\s@,<>"]+@[^\s@,<>"]+\.[^\s@,<>"]+$/
-function normalizeReplyTo(value) {
+export function normalizeReplyTo(value) {
   const v = typeof value === 'string' ? value.trim() : ''
   if (!v) return { value: null }
   if (v.length > 200 || !REPLY_TO_RE.test(v)) return { error: '返信先アドレスの形式が正しくありません' }
   return { value: v.toLowerCase() }
 }
 
-// GET /api/bilmen/mail/settings — 件名・本文の雛形
+// ビルメンの案内メールの雛型（tenant_mail_templates の kind='bilmen'）。移行前の環境などで
+// 無いときは null（画面は「件名が空」として扱い、下書きの作成もサーバー側で弾かれる）
+export async function loadBilmenTemplate(supabase) {
+  const { data, error } = await supabase
+    .from('tenant_mail_templates')
+    .select('id, subject, body, include_others')
+    .eq('kind', 'bilmen')
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// GET /api/bilmen/mail/settings — 案内メールの件名・本文（雛型 kind='bilmen'）と返信先（共通）
 export async function handleBilmenMailSettingsGet(req) {
   const { error } = await requireMailAccess(req)
   if (error) return error
   try {
     const supabase = getAdminClient()
-    const { data, error: err } = await supabase
-      .from('bilmen_mail_settings')
-      .select(MAIL_SETTINGS_COLUMNS)
-      .eq('id', MAIL_SETTINGS_ID)
-      .maybeSingle()
+    const [template, { data, error: err }] = await Promise.all([
+      loadBilmenTemplate(supabase),
+      supabase.from('bilmen_mail_settings').select('reply_to').eq('id', MAIL_SETTINGS_ID).maybeSingle(),
+    ])
     if (err) {
       console.error('bilmen-mail-settings-get:', err.message)
       return json({ error: 'メール設定の取得に失敗しました' }, 500)
     }
-    return json({ settings: data || { id: MAIL_SETTINGS_ID, subject: '', body: '', reply_to: null } })
+    return json({
+      settings: {
+        id: MAIL_SETTINGS_ID,
+        subject: template?.subject || '',
+        body: template?.body || '',
+        include_others: template ? template.include_others : true,
+        reply_to: data?.reply_to || null,
+      },
+    })
   } catch (err) {
     console.error('bilmen-mail-settings-get 失敗:', err)
     return json({ error: 'メール設定の取得に失敗しました' }, 500)
   }
 }
 
-// PUT /api/bilmen/mail/settings — 件名・本文の雛形を保存
+// PUT /api/bilmen/mail/settings — 返信先を保存（2026-10-29〜 件名・本文は雛型の画面で直すので受け取らない）
 export async function handleBilmenMailSettingsUpdate(req) {
   const { error } = await requireMailAccess(req)
   if (error) return error
   try {
     const payload = await req.json().catch(() => null)
-    const subject = trimOrNull(payload?.subject, 200)
-    const body = typeof payload?.body === 'string' ? payload.body.slice(0, 5000) : ''
-    if (!subject) return json({ error: '件名は必須です' }, 400)
-    if (!body.trim()) return json({ error: '本文は必須です' }, 400)
     const replyTo = normalizeReplyTo(payload?.reply_to)
     if (replyTo.error) return json({ error: replyTo.error }, 400)
 
     const supabase = getAdminClient()
     const { data, error: err } = await supabase
       .from('bilmen_mail_settings')
-      .upsert({ id: MAIL_SETTINGS_ID, subject, body, reply_to: replyTo.value }, { onConflict: 'id' })
-      .select(MAIL_SETTINGS_COLUMNS)
+      .upsert({ id: MAIL_SETTINGS_ID, reply_to: replyTo.value }, { onConflict: 'id' })
+      .select('id, reply_to, updated_at')
       .single()
     if (err) {
       console.error('bilmen-mail-settings-update:', err.message)
-      return json({ error: 'メール設定の保存に失敗しました' }, 500)
+      return json({ error: '返信先の保存に失敗しました' }, 500)
     }
     return json({ settings: data })
   } catch (err) {
     console.error('bilmen-mail-settings-update 失敗:', err)
-    return json({ error: 'メール設定の保存に失敗しました' }, 500)
+    return json({ error: '返信先の保存に失敗しました' }, 500)
   }
 }
 
@@ -897,16 +910,20 @@ export async function handleBilmenMailSettingsUpdate(req) {
 //   渡さないとき（メール設定の画面）… 今日の時点で退去済みなら外す
 // 退去日の無い退去済み（moved_out=true）はいつでも外す。
 // 1テナントに複数のアドレスを持てるので、アドレスごとに1行で返す。宛先名はテナントの略称（無ければ正式名称）
-async function loadTenantRecipients(supabase, month = null) {
+// withMissing（2026-10-29〜。テナントへのメールの画面）: 有効なのにアドレスの無いテナントも
+// { recipients, missing } で返す（「有効なテナント全員」に届かない先を画面で知らせるため）
+export async function loadTenantRecipients(supabase, month = null, { withMissing = false } = {}) {
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
   const stillIn = month ? (on) => on >= `${month}-01` : (on) => on > today
-  const { data, error } = await supabase
+  let query = supabase
     .from('equipment_tenants')
     .select('id, billing_code, name, short_name, floor, moved_out, moved_out_on, notice_emails')
-    .neq('notice_emails', '{}')
+  if (!withMissing) query = query.neq('notice_emails', '{}')
+  const { data, error } = await query
   if (error) throw new Error(error.message)
-  return (data || [])
-    .filter((t) => (t.moved_out_on ? stillIn(t.moved_out_on) : !t.moved_out))
+  const active = (data || []).filter((t) => (t.moved_out_on ? stillIn(t.moved_out_on) : !t.moved_out))
+  const hasMail = (t) => (t.notice_emails || []).some((e) => e && e.includes('@'))
+  const recipients = active
     .flatMap((t) =>
       (t.notice_emails || [])
         .filter((e) => e && e.includes('@'))
@@ -919,6 +936,11 @@ async function loadTenantRecipients(supabase, month = null) {
           email,
         }))
     )
+  if (!withMissing) return recipients
+  const missing = active
+    .filter((t) => !hasMail(t))
+    .map((t) => ({ tenant_id: t.id, billing_code: t.billing_code, floor: t.floor, tenant_name: t.name }))
+  return { recipients, missing }
 }
 
 // GET /api/bilmen/mail/recipients?month=YYYY-MM — 宛先一覧（month はテナントへ報知の画面から。退去の判定に使う）。
@@ -938,13 +960,13 @@ export async function handleBilmenMailRecipientList(req) {
         .order('disabled', { ascending: true })
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true }),
-      loadTenantRecipients(supabase, month),
+      loadTenantRecipients(supabase, month, { withMissing: true }),
     ])
     if (err) {
       console.error('bilmen-mail-recipient-list:', err.message)
       return json({ error: '宛先の取得に失敗しました' }, 500)
     }
-    return json({ recipients: data || [], tenants })
+    return json({ recipients: data || [], tenants: tenants.recipients, missing_tenants: tenants.missing })
   } catch (err) {
     console.error('bilmen-mail-recipient-list 失敗:', err)
     return json({ error: '宛先の取得に失敗しました' }, 500)
@@ -1075,13 +1097,13 @@ export async function handleBilmenMailDraftCreate(req) {
     const pdf = form.get('pdf')
 
     if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: '対象年月が不正です' }, 400)
-    if (!subject) return json({ error: '件名が空です。メール設定で件名を登録してください' }, 400)
-    if (!body.trim()) return json({ error: '本文が空です。メール設定で本文を登録してください' }, 400)
+    if (!subject) return json({ error: '件名が空です。テナントへのメールの雛型で件名を登録してください' }, 400)
+    if (!body.trim()) return json({ error: '本文が空です。テナントへのメールの雛型で本文を登録してください' }, 400)
     if (!pdf || typeof pdf === 'string') return json({ error: '連絡票PDFが添付されていません' }, 400)
     if (pdf.size > DRAFT_PDF_MAX_BYTES) return json({ error: '連絡票PDFが大きすぎます（20MBまで）' }, 400)
 
     const supabase = getAdminClient()
-    const [{ data: recipients, error: recErr }, tenantRecipients, { data: shared }, { data: mailSettings }] = await Promise.all([
+    const [{ data: recipients, error: recErr }, tenantRecipients, { data: shared }, { data: mailSettings }, template] = await Promise.all([
       supabase
         .from('bilmen_mail_recipients')
         .select('name, email')
@@ -1092,6 +1114,8 @@ export async function handleBilmenMailDraftCreate(req) {
       supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
       // 返信先（Reply-To）はメール設定から。画面からは受け取らない（宛先と同じ理由）
       supabase.from('bilmen_mail_settings').select('reply_to').eq('id', MAIL_SETTINGS_ID).maybeSingle(),
+      // 「その他の宛先」を入れるかは案内メールの雛型の設定に従う（2026-10-29〜）
+      loadBilmenTemplate(supabase),
     ])
     if (recErr) {
       console.error('bilmen-mail-draft recipients:', recErr.message)
@@ -1099,14 +1123,15 @@ export async function handleBilmenMailDraftCreate(req) {
     }
     // 同じアドレスがテナントとその他の両方にあっても1回だけ入れる
     const seen = new Set()
-    const bcc = [...tenantRecipients, ...(recipients || [])].filter((r) => {
+    const others = template && !template.include_others ? [] : recipients || []
+    const bcc = [...tenantRecipients, ...others].filter((r) => {
       const key = (r.email || '').trim().toLowerCase()
       if (!key || seen.has(key)) return false
       seen.add(key)
       return true
     })
     if (bcc.length === 0) {
-      return json({ error: '宛先がありません。テナントマスタの「案内メールの宛先」かメール設定の「その他の宛先」に登録してください' }, 400)
+      return json({ error: '宛先がありません。テナントマスタの「案内メールの宛先」か、テナントへのメールの「その他の宛先」に登録してください' }, 400)
     }
 
     const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`

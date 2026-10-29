@@ -144,6 +144,13 @@ import {
   handleBilmenCalendarSync,
 } from './lib/bilmen.js'
 import {
+  handleTenantMailTemplateList,
+  handleTenantMailTemplateCreate,
+  handleTenantMailTemplateUpdate,
+  handleTenantMailTemplateDelete,
+  handleTenantMailDraftCreate,
+} from './lib/tenant-mail.js'
+import {
   handleWasteRecordList,
   handleWasteRecordUpsert,
   handleWasteRecordDelete,
@@ -1334,6 +1341,18 @@ async function route(req, env) {
     if (req.method === 'POST') return handleBilmenMailRecipientCreate(req)
     if (req.method === 'PATCH') return handleBilmenMailRecipientUpdate(req)
     if (req.method === 'DELETE') return handleBilmenMailRecipientDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // テナントへのメール（雛型からの一斉メール。2026-10-29〜。worker/lib/tenant-mail.js）
+  if (pathname === '/api/tenant-mail/templates') {
+    if (req.method === 'GET') return handleTenantMailTemplateList(req)
+    if (req.method === 'POST') return handleTenantMailTemplateCreate(req)
+    if (req.method === 'PATCH') return handleTenantMailTemplateUpdate(req)
+    if (req.method === 'DELETE') return handleTenantMailTemplateDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/tenant-mail/draft') {
+    if (req.method === 'POST') return handleTenantMailDraftCreate(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   // 廃棄物実測値管理（docs/waste-plan.md）

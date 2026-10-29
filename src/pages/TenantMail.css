@@ -1,0 +1,59 @@
+/* テナントへのメール（2026-10-29〜。src/pages/TenantMail.jsx）。
+   作成タブの左右（プレビュー・宛先）と2方式の枠は Bilmen.css の .bilmen-notify-* をそのまま使う */
+.tenant-mail-compose { display: flex; flex-direction: column; gap: var(--space-3); }
+.tenant-mail-compose > .ui-field { margin: 0; max-width: 480px; }
+
+.tenant-mail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+.tenant-mail-section-head .ui-page-title { margin: 0; }
+
+.tenant-mail-template-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.tenant-mail-template-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.tenant-mail-template-item > .tenant-mail-template-editor { flex: 1; }
+.tenant-mail-template-summary { min-width: 0; }
+.tenant-mail-template-name { margin: 0; font-size: var(--fs-md); font-weight: 700; }
+.tenant-mail-template-subject { margin: 2px 0 0; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.tenant-mail-template-meta { margin: 2px 0 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.tenant-mail-badge {
+  display: inline-block;
+  margin-right: var(--space-1);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  vertical-align: 2px;
+}
+
+.tenant-mail-template-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.tenant-mail-template-editor .ui-field { margin: 0; }
+.tenant-mail-template-options { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+.tenant-mail-check { display: inline-flex; align-items: center; gap: var(--space-1); }
+.tenant-mail-sort { display: inline-flex; align-items: center; gap: var(--space-1); }
+.tenant-mail-sort .ui-input { width: 6em; }
+
+.tenant-mail-missing { color: var(--color-danger); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .tenant-mail-template-item { flex-direction: column; }
+}

@@ -18,7 +18,7 @@ import EquipmentItems from './pages/EquipmentItems'
 import EquipmentTenants from './pages/EquipmentTenants'
 import Bilmen from './pages/Bilmen'
 import BilmenMasters from './pages/BilmenMasters'
-import BilmenMail from './pages/BilmenMail'
+import TenantMail from './pages/TenantMail'
 import DocumentTemplates from './pages/DocumentTemplates'
 import Contacts from './pages/Contacts'
 import Manuals from './pages/Manuals'
@@ -246,17 +246,18 @@ function App() {
             </RequireAuth>
           }
         />
-        {/* メール設定（文面・宛先）。外部に出る操作の一部のため owner・備品出庫限定ロールには
-            画面ごと見せない（10章・13-14。API側も worker/lib/bilmen.js の requireMailAccess で
-            同じ判定を持つ） */}
+        {/* テナントへのメール（雛型からの一斉メール。2026-10-29〜）。旧 /bilmen/mail（メール設定）は
+            この画面の「宛先・返信先」タブに合流した。外部に出る操作の一部のため owner・備品出庫限定ロールには
+            画面ごと見せない（10章・13-14。API側も worker/lib/bilmen.js の requireMailAccess で同じ判定を持つ） */}
         <Route
-          path="/bilmen/mail"
+          path="/tenant-mail"
           element={
             <RequireStaff>
-              <BilmenMail />
+              <TenantMail />
             </RequireStaff>
           }
         />
+        <Route path="/bilmen/mail" element={<Navigate to="/tenant-mail?tab=recipients" replace />} />
         {/* 雛形ファイル（業務で使う資料テンプレート。2026-08-30〜）。owner・備品出庫限定
             ロールも閲覧・ダウンロードはできるため RequireAuth（書き込みはサーバー側で拒否） */}
         <Route
