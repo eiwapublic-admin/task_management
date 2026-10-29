@@ -1,7 +1,41 @@
 /* テナントへのメール（2026-10-29〜。src/pages/TenantMail.jsx）。
    作成タブの左右（プレビュー・宛先）と2方式の枠は Bilmen.css の .bilmen-notify-* をそのまま使う */
 .tenant-mail-compose { display: flex; flex-direction: column; gap: var(--space-3); }
-.tenant-mail-compose > .ui-field { margin: 0; max-width: 480px; }
+.tenant-mail-compose .ui-field { margin: 0; }
+
+/* 1行目: 雛型（左1/3）＋返信先（その右） */
+.tenant-mail-compose-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-3);
+  align-items: end;
+}
+.tenant-mail-compose-top > .ui-field:last-child:not(:first-child) { max-width: 420px; }
+.tenant-mail-divider {
+  margin: 0;
+  border: 0;
+  border-top: 2px solid var(--border-strong);
+}
+
+/* 左1/3＝件名・宛先、右2/3＝本文（本文を広くとる。宛先は切れてもよい） */
+.tenant-mail-compose-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-3);
+  align-items: stretch;
+}
+.tenant-mail-compose-side { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.tenant-mail-compose-side > .bilmen-notify-recipients { flex: 1; min-height: 200px; }
+.tenant-mail-body-field { display: flex; flex-direction: column; }
+.tenant-mail-body-field > .ui-textarea { flex: 1; min-height: 360px; resize: vertical; }
+.tenant-mail-label-note { margin-left: var(--space-1); font-weight: 400; color: var(--text-muted); font-size: var(--fs-xs); }
+
+@media (max-width: 768px) {
+  .tenant-mail-compose-top,
+  .tenant-mail-compose-main { grid-template-columns: minmax(0, 1fr); }
+  .tenant-mail-compose-side > .bilmen-notify-recipients { min-height: 0; }
+  .tenant-mail-compose-side .bilmen-notify-recipients-inner { position: static; max-height: 200px; }
+}
 
 .tenant-mail-section-head {
   display: flex;
@@ -20,8 +54,10 @@
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
 }
 .tenant-mail-template-item > .tenant-mail-template-editor { flex: 1; }
 .tenant-mail-template-summary { min-width: 0; }
