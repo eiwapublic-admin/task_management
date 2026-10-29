@@ -1570,7 +1570,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-base);
-  resize: vertical;
+  /* 高さは内容に合わせて自動伸縮（AutoGrowTextarea。2026-10-29〜）。手動のつまみは出さない */
+  resize: none;
+  overflow: hidden;
   font-family: inherit;
 }
 
