@@ -1510,3 +1510,35 @@ grant usage, select on sequence secure_share_access_log_id_seq to service_role;
 -- 送り先は連絡帳から選ぶ（2026-10-26 依頼）。パスコードの SMS 文面を作るため携帯番号も持つ（マイグレーション secure_shares_contact）
 alter table secure_shares add column if not exists contact_id uuid references contacts(id) on delete set null;
 alter table secure_shares add column if not exists recipient_mobile text;
+
+-- ============================================================
+-- テナントへのメール（雛型からの一斉メール。2026-10-29〜。マイグレーション add_tenant_mail_templates）
+-- ============================================================
+-- 件名・本文の雛型を複数持ち、選んだ雛型から「有効なテナント全員を BCC」にしたメールを作る。
+-- ビルメンの案内メール（従来は bilmen_mail_settings の subject/body 1本）は kind='bilmen' の雛型として
+-- ここへ移した（連絡票PDFを添付するため、作成はビルメンテナンス管理の「テナントへ報知」から行う）。
+-- 返信先（bilmen_mail_settings.reply_to）と「その他の宛先」（bilmen_mail_recipients）は全雛型で共通。
+-- bilmen_mail_settings の subject/body 列は移行前の控えとして残しているが、もう読まない
+create table if not exists tenant_mail_templates (
+  id             uuid primary key default gen_random_uuid(),
+  kind           text not null default 'general' check (kind in ('general', 'bilmen')),
+  name           text not null,                 -- 雛型名（選ぶときの表示）
+  subject        text not null,
+  body           text not null,
+  include_others boolean not null default true, -- 「その他の宛先」（小泉産業様のご担当者・栄和ML など）も BCC に入れるか
+  sort_order     integer not null default 999,
+  updated_by     text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create unique index if not exists tenant_mail_templates_bilmen_idx on tenant_mail_templates (kind) where kind = 'bilmen';
+drop trigger if exists tenant_mail_templates_set_updated_at on tenant_mail_templates;
+create trigger tenant_mail_templates_set_updated_at before update on tenant_mail_templates
+  for each row execute function set_updated_at();
+alter table tenant_mail_templates enable row level security;
+revoke all on tenant_mail_templates from anon, authenticated;
+grant select, insert, update, delete on tenant_mail_templates to service_role;
+insert into tenant_mail_templates (kind, name, subject, body, include_others, sort_order)
+select 'bilmen', 'ビルメンテナンスのご案内（連絡票添付）', s.subject, s.body, true, 0
+from bilmen_mail_settings s
+where s.id = 'default' and not exists (select 1 from tenant_mail_templates where kind = 'bilmen');

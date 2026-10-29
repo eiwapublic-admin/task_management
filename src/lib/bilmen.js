@@ -157,7 +157,9 @@ export function formatRevisionLabel(revisedOn) {
 }
 
 // ---- メール設定（文面・宛先） ----
-// 画面（/bilmen/mail）自体を owner・備品出庫限定ロールには出さない（AppHeader・App.jsx側）が、
+// 2026-10-29〜 画面はテナントへのメール（/tenant-mail。src/pages/TenantMail.jsx）に合流。
+// 件名・本文は雛型（kind='bilmen'）から返り、PUT で保存するのは返信先だけ。
+// 画面自体を owner・備品出庫限定ロールには出さない（AppHeader・App.jsx側）が、
 // API 側でも同じ判定で塞いである（worker/lib/bilmen.js の requireMailAccess）。
 
 export async function fetchBilmenMailSettings() {
@@ -187,6 +189,10 @@ export async function fetchBilmenMailRecipients(month = null) {
       (a, b) => floorRank(a.floor) - floorRank(b.floor) || (a.billing_code || '').localeCompare(b.billing_code || '')
     ),
     others: [...(data.recipients || [])].sort(byName),
+    // 有効なのに「案内メールの宛先」が無いテナント（2026-10-29〜。テナントへのメールの画面で知らせる）
+    missing: [...(data.missing_tenants || [])].sort(
+      (a, b) => floorRank(a.floor) - floorRank(b.floor) || (a.billing_code || '').localeCompare(b.billing_code || '')
+    ),
   }
 }
 
@@ -212,9 +218,10 @@ export function groupBilmenRecipients(list) {
 }
 
 // 実際に送る宛先（テナント＋有効なその他。同じアドレスは1回だけ）。下書き（サーバー側）と同じ考え方
-export function activeBilmenRecipients({ tenants = [], others = [] } = {}) {
+// includeOthers（2026-10-29〜）: 雛型が「その他の宛先も含める」でなければテナントだけにする
+export function activeBilmenRecipients({ tenants = [], others = [] } = {}, { includeOthers = true } = {}) {
   const seen = new Set()
-  return [...tenants, ...others.filter((r) => !r.disabled)].filter((r) => {
+  return [...tenants, ...(includeOthers ? others.filter((r) => !r.disabled) : [])].filter((r) => {
     const key = (r.email || '').trim().toLowerCase()
     if (!key || seen.has(key)) return false
     seen.add(key)
