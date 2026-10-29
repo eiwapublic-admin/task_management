@@ -326,7 +326,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 - **その他の導線（2026-09-05に3グループへ再編。205番）**: 統計を出すほどではない画面へのリンクは、
   カードの下に**「その他機能」「マスタ」「管理」**の3つの見出し付きグループでピル型のボタンを並べる。
   **アーカイブへのリンクはここから削除**し、タスク画面（カンバン）側の導線に一本化した（下記参照）
-  - **その他機能**（記録の参照）: 雛形ファイル／連絡帳
+  - **その他機能**（記録の参照）: 雛形ファイル／連絡帳／業務マニュアル（2026-10-13追加。4-19）／テナントへのメール（2026-10-29追加。4-21）
   - **マスタ**（各種マスタの管理）: 日報用作業定型文（旧「作業定型文」）／備品マスタ／
     備品用テナントマスタ（旧「テナントマスタ」）／ビルメン作業マスタ（旧「作業マスタ」。
     owner（小泉産業様）も閲覧できる。`docs/bilmen-plan.md` 10章）
@@ -457,7 +457,8 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | POST/DELETE `/api/manuals/attachments`・POST `/api/manuals/attachments/preview-token`・GET `/api/manuals/attachments/download` | JWT（staff/admin のみ）。download は preview_token でも可 | 業務マニュアルの添付ファイル（追加〔multipart: manual_id・file〕・削除・プレビュー用トークン・本体。4-19。2026-10-26〜） |
 | `/api/equipment/*` | JWT（書込は staff/admin。出庫だけ備品出庫限定ロールも可） | 備品管理（カテゴリ・備品・入出庫・テナント・署名）。一覧は `docs/equipment-plan.md` 6-1 |
 | GET `/api/equipment/installations`・POST `/api/equipment/tenants/sync` | **APIキー**（`X-API-Key`。JWT 不要） | FileMaker 連携（設置実績の提供／テナント同期の受信）。**JWT の外側に開く唯一の口**。請求対象外の新規入替・不良品処分・無償交換は返さない（`docs/equipment-plan.md` 6-2・6-3） |
-| `/api/bilmen/*` | JWT（書込は staff/admin。メール設定は owner・備品出庫限定ロールに GET も不可） | ビルメン（作業マスタ・予定・自動作成・注釈・メール設定・Gmail 下書き・カレンダー反映）。一覧は `docs/HANDOFF.md` 3章「ビルメン API」 |
+| `/api/bilmen/*` | JWT（書込は staff/admin。メール設定は owner・備品出庫限定ロールに GET も不可） | ビルメン（作業マスタ・予定・自動作成・注釈・メール設定・Gmail 下書き・カレンダー反映）。一覧は `docs/HANDOFF.md` 3章「ビルメン API」。2026-10-29〜 `GET /api/bilmen/mail/settings` は件名・本文を雛型（kind='bilmen'）から返し、`PUT` は返信先だけを保存。宛先一覧は有効なのに宛先の無いテナント（`missing_tenants`）も返す |
+| GET/POST/PATCH/DELETE `/api/tenant-mail/templates`・POST `/api/tenant-mail/draft` | JWT（**staff/admin のみ。GET も不可**） | テナントへのメールの雛型の一覧・追加・修正・削除（ビルメンの雛型は削除不可）と、選んだ雛型からの Gmail 下書き作成（添付なし。4-21） |
 | `/api/waste/*` | JWT（書込は staff/admin） | 廃棄物実測値（記録・Excel 取込・Googleドライブ取込）。`docs/waste-plan.md` |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
@@ -1293,6 +1294,9 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
 パスワード付き ZIP を別メールで送る方法（いわゆる PPAP）は、同じメール経路で両方届くため採らない。
 
 - **画面**: 検針マスタ（テナント）・備品のテナント画面の「安全なリンクで共有」（`SecureShareModal.jsx`）と「共有リンクの一覧」（`SecureShareListModal.jsx`）。社員だけ
+  - 2026-10-29〜（342番）: 「安全なリンクで共有」は、テナント一覧表（PDF）・緊急連絡先一覧表（PDF）の**プレビュー画面のヘッダ**に置く。
+    押すと見ているPDFをそのまま共有する（`SecureShareModal` の `preset`。書類・日付は選ばせず「プレビュー中の PDF」と表示。プレビューの上に重ねる）。
+    「共有リンクの一覧」は**ハンバーガーメニュー**の一番上（`AppHeader.jsx`。テナントマスタ・検針マスタの画面で社員だけ）
 - **作る**: 書類（緊急連絡先一覧表／テナント一覧表）と起点・時点の日付、送り先、有効期限（既定15日・1〜90日）、
   開ける回数（既定5回・1〜50回）を入れる。送り先は連絡帳から選ぶ（携帯電話番号とメールアドレスの両方があるものだけ。サーバーが連絡帳から引き直す）。
   PDF は印刷用と同じ HTML を html2canvas＋jsPDF で A4 横1枚にしたもの（`buildTenantListPdfFile`）。
@@ -1307,6 +1311,37 @@ owner・備品出庫限定ロールには関係の無いシステム運用機能
   `secure-shares` は日次バックアップの対象外（一時的な写しで、個人情報の PDF をバックアップの履歴に残さないため）
 - **API**: `GET /api/secure-shares`（一覧＋記録）・`POST`（multipart。作成）・`PATCH`（`{ id, action: 'revoke' | 'reissue' }`）
 - **費用**: Supabase Storage（無料枠1GB）・Workers の範囲で追加費用なし。パスコードの SMS 自動送信は有料サービスが要るため入れていない
+
+### 4-21. テナントへのメール（雛型からの一斉メール。2026-10-29〜。340・341番）
+
+テナント向けの報知メールの件名・本文を雛型として複数登録し、選んだ雛型から**有効なテナント全員を BCC** にしたメールを作る。
+ビルメンの「案内メール設定」「テナントへ報知」の仕組み（宛先・返信先・2つの作成方式）を流用し、ビルメンの案内メールもこの雛型の1つに合流させた。
+
+- **画面**: `/tenant-mail`（`src/pages/TenantMail.jsx`・`TenantMail.css`）。入口はダッシュボードの「その他機能」と、ビルメンのハンバーガーメニュー
+  （旧「メール設定」の位置）。旧 `/bilmen/mail` はこの画面の「宛先・返信先」タブへ転送する（`BilmenMail.jsx` は削除）。
+  **閲覧も含めて staff/admin のみ**（外部に出る操作の一部。API も `requireMailAccess` で同じ判定）。機能ヘッダのセグメントで3タブを切り替える（`?tab=`）
+  - **メール作成**: 1行目に雛型（左1/3）とその右に返信先（読み取りのみ）→ 横幅いっぱいの区切り線 → 左1/3に件名・宛先（BCC。長いと切れてよい）、
+    右2/3に本文（見出しの右に「（雛型を変更する場合は雛型タブから）」）。件名・本文は雛型を変数展開したものを初期値にし、その場で書き足せる
+    （雛型は変わらない）。下に2つの作成方式を並べる（ビルメンの報知と同じ見た目）:
+    - メールソフト方式 … `mailto:`（BCC・件名・本文・reply-to）で端末のメールソフトを開く
+    - Gmail方式 … 共有アドレスの Gmail に**添付なし**の下書きを作る（送信はしない。返信先があれば本文末尾に「ご返信は…までお願いいたします。」）
+    - ビルメンの雛型を選んだときは作成させず、「ビルメンテナンス管理の『テナントへ報知』から作成」と案内する（連絡票PDFを添付するため）
+  - **雛型**: 一覧（白地の明細。ビルメンの雛型には「ビルメン」の印）と「＋ 雛型を追加」・修正・削除（ビルメンの雛型は削除不可）。
+    項目は雛型名・件名・本文・「その他の宛先も BCC に入れる」・表示順。使える変数は一般の雛型が `%建物名%`・`%今日%`・`%今月%`・`%来月%`
+    （`src/lib/tenantMail.js` の `expandTenantMailVariables`）、ビルメンの雛型は従来どおり `%対象年月%`・`%建物名%`・`%作業件数%`
+  - **宛先・返信先**: 返信先アドレス（全雛型共通）、テナントの宛先（テナントマスタの「案内メールの宛先」。見るだけ。有効なのに宛先の無いテナントは
+    「未登録（送られません）」と灰色で出す）、その他の宛先（小泉産業様のご担当者・栄和ML など。追加・修正・無効化・削除）
+- **宛先**: 今日の時点で退去していないテナント（退去日が今日より後、または退去日が無く退去済みでない）の `equipment_tenants.notice_emails`
+  ＋（雛型が「その他の宛先も含める」なら）有効な `bilmen_mail_recipients`。同じアドレスは1回だけ。**下書きの宛先・返信先は画面から受け取らず
+  サーバーがDBから引き直す**（ビルメンの下書きと同じ）。ビルメンの報知（`/api/bilmen/mail/draft`）も、その他の宛先を入れるかは雛型の設定に従う
+- **テーブル** `tenant_mail_templates`（`kind` 'general'｜'bilmen'〔'bilmen' は部分一意インデックスで1行だけ〕・`name`・`subject`・`body`・
+  `include_others`・`sort_order`・`updated_by`）。RLS 有効・`anon`/`authenticated` の権限なし・`service_role` に select/insert/update/delete を grant。
+  マイグレーション `add_tenant_mail_templates`（2026-10-29。Supabase の SQL Editor で実行）で、`bilmen_mail_settings` の件名・本文を
+  ビルメンの雛型「ビルメンテナンスのご案内（連絡票添付）」として写した。`bilmen_mail_settings` は返信先（`reply_to`）だけを使い、
+  `subject`/`body` 列は移行前の控えとして残している（読まない）
+- **API**: `worker/lib/tenant-mail.js`（`/api/tenant-mail/templates`・`/api/tenant-mail/draft`）。下書きは操作ログ（`activity_logs`）に
+  「テナントへのメール: 「雛型名」の下書きを作成しました（宛先 N 件）」と残す
+- **費用**: Gmail API（下書き作成）・Workers・Supabase の範囲で追加費用なし
 
 ### 4-9. 新規タスク登録時のWeb Push通知（2026-07-21）
 
