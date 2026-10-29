@@ -22,12 +22,14 @@ import { fetchContacts } from '../lib/contacts'
 // リンクにする。リンクとパスコードは作った直後のこの画面でしか見られない（サーバーはそのままの値を持たない）。
 // 送り先は連絡帳から選ぶ（携帯電話番号とメールアドレスの両方があるものだけ）。リンクは Gmail の下書き、
 // パスコードは SMS アプリの文面として作る（どちらも送信は人がする）
-export default function SecureShareModal({ onClose }) {
+// preset（2026-10-29〜）: PDF のプレビュー画面のヘッダから開いたとき、見ている PDF（{ kind, since, asOf, blob, filename }）。
+// 書類・日付は選ばせず、その PDF をそのまま共有する（プレビュー画面の上に重ねて出す）
+export default function SecureShareModal({ onClose, preset = null }) {
   useBodyScrollLock()
 
-  const [kind, setKind] = useState('emergency')
-  const [since, setSince] = useState(defaultUpdateSince())
-  const [asOf, setAsOf] = useState(defaultAsOf())
+  const [kind, setKind] = useState(preset?.kind || 'emergency')
+  const [since, setSince] = useState(preset?.since || defaultUpdateSince())
+  const [asOf, setAsOf] = useState(preset?.asOf || defaultAsOf())
   const [contacts, setContacts] = useState(null)
   const [query, setQuery] = useState('')
   const [contactId, setContactId] = useState('')
@@ -69,7 +71,9 @@ export default function SecureShareModal({ onClose }) {
     setBusy(true)
     setError('')
     try {
-      const file = await buildTenantListPdfFile(kind, kind === 'emergency' ? { since } : { asOf })
+      const file = preset?.blob
+        ? { blob: preset.blob, filename: preset.filename }
+        : await buildTenantListPdfFile(kind, kind === 'emergency' ? { since } : { asOf })
       const res = await createSecureShare({
         pdfBlob: file.blob,
         filename: file.filename,
@@ -92,7 +96,16 @@ export default function SecureShareModal({ onClose }) {
   }
 
   return (
-    <div className="ui-overlay" role="dialog" aria-modal="true" onClick={busy ? undefined : onClose}>
+    <div
+      className={`ui-overlay${preset ? ' is-over-preview' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        // プレビュー画面の上に重ねたときは、背景のクリックをプレビュー側へ伝えない（一緒に閉じてしまうため）
+        e.stopPropagation()
+        if (!busy) onClose()
+      }}
+    >
       <div className="ui-modal is-sm" onClick={(e) => e.stopPropagation()}>
         <div className="ui-modal-head">
           <h3 className="ui-modal-title">安全なリンクで共有</h3>
@@ -114,23 +127,34 @@ export default function SecureShareModal({ onClose }) {
                 PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡します。リンクはメールで、パスコードは SMS やお電話など
                 <strong>メール以外の方法</strong>で伝えてください。
               </p>
-              <label className="ui-field">
-                <span>書類</span>
-                <select className="ui-select" value={kind} onChange={(e) => setKind(e.target.value)} disabled={busy}>
-                  <option value="emergency">{TENANT_PDF_KINDS.emergency.label}</option>
-                  <option value="tenants">{TENANT_PDF_KINDS.tenants.label}</option>
-                </select>
-              </label>
-              {kind === 'emergency' ? (
-                <label className="ui-field">
-                  <span>最終変更事項の起点の日付</span>
-                  <input type="date" className="ui-input" value={since} onChange={(e) => setSince(e.target.value)} disabled={busy} />
-                </label>
+              {preset ? (
+                <dl className="secure-share-contact">
+                  <dt>書類</dt>
+                  <dd>{TENANT_PDF_KINDS[kind]?.label}（プレビュー中の PDF）</dd>
+                  <dt>{kind === 'emergency' ? '起点の日付' : '時点の日付'}</dt>
+                  <dd>{(kind === 'emergency' ? since : asOf).replaceAll('-', '/')}</dd>
+                </dl>
               ) : (
-                <label className="ui-field">
-                  <span>時点の日付（この日に退去済みのテナントは載せない）</span>
-                  <input type="date" className="ui-input" value={asOf} onChange={(e) => setAsOf(e.target.value)} disabled={busy} />
-                </label>
+                <>
+                  <label className="ui-field">
+                    <span>書類</span>
+                    <select className="ui-select" value={kind} onChange={(e) => setKind(e.target.value)} disabled={busy}>
+                      <option value="emergency">{TENANT_PDF_KINDS.emergency.label}</option>
+                      <option value="tenants">{TENANT_PDF_KINDS.tenants.label}</option>
+                    </select>
+                  </label>
+                  {kind === 'emergency' ? (
+                    <label className="ui-field">
+                      <span>最終変更事項の起点の日付</span>
+                      <input type="date" className="ui-input" value={since} onChange={(e) => setSince(e.target.value)} disabled={busy} />
+                    </label>
+                  ) : (
+                    <label className="ui-field">
+                      <span>時点の日付（この日に退去済みのテナントは載せない）</span>
+                      <input type="date" className="ui-input" value={asOf} onChange={(e) => setAsOf(e.target.value)} disabled={busy} />
+                    </label>
+                  )}
+                </>
               )}
               <div className="ui-field">
                 <span>送り先（連絡帳から選ぶ）</span>

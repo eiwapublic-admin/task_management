@@ -94,3 +94,27 @@
   border-top: 1px solid var(--border-strong);
 }
 .secure-share-parts-title { color: var(--text-muted); }
+
+/* PDF のプレビュー画面（AttachmentPreview）の上に重ねるとき（2026-10-29〜。テナント一覧表・緊急連絡先一覧表） */
+.ui-overlay.is-over-preview { z-index: calc(var(--z-preview) + 5); }
+
+/* プレビュー画面のヘッダの「安全なリンクで共有」ボタン */
+.attachment-preview-share-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--color-brand);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.attachment-preview-share-link:hover { background: var(--color-brand-softer); }
+@media (max-width: 640px) {
+  .attachment-preview-share-link > span { display: none; }
+}
