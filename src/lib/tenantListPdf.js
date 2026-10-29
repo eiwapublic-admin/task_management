@@ -1,6 +1,7 @@
 // テナント一覧表・緊急連絡先一覧表の印刷用 PDF（2026-10-21〜。デザインは依頼元が選んだ「案C ティール＋数字カード」）。
-// 画面の中に見えない iframe を作って表を描き、ブラウザの印刷を開く（印刷先で「PDFに保存」を選ぶ。PDF のライブラリや
-// 日本語フォントを読み込まずに済み、追加の費用もかからない）。どちらも A4 横1枚に収まるよう、表の大きさを縮めて合わせる。
+// 画面の中に見えない iframe を作って表を描き、html2canvas＋jsPDF で A4 横1枚の PDF にする（どちらも A4 横1枚に収まるよう、
+// 表の大きさを縮めて合わせる）。2026-10-29〜 作った PDF はアプリ内のプレビュー画面に出す（TenantListExportButtons.jsx。
+// それまではブラウザの印刷を直接開き「PDFに保存」してもらっていた）。
 // 行（入居中のテナント・階の順・部屋番号）は Excel 出力と同じ buildTenantListGroups で作る。
 // テナント一覧表は出力前に聞く時点の日付で退去済みのテナントを、どちらも警備番号が空のテナントを除く（2026-10-26〜）。
 // 緊急連絡先一覧表の「最終変更日付・事項」は、テナントマスタの連絡用の2項目のうち指定した日以降のもの（2026-10-26〜。
@@ -189,7 +190,7 @@ export function parseSinceDate(s) {
 }
 
 // 見えない iframe（用紙と同じ大きさ）に表を描き、書式を読み終えて A4 横1枚に合わせたところまで進める。
-// 印刷（printTenantListPdf）と、安全なリンクで共有する PDF（buildTenantListPdfFile）の両方で使う
+// buildTenantListPdfFile（プレビュー・安全なリンクで共有）で使う
 async function renderTenantListFrame(kind, { since = '', asOf = '' } = {}) {
   if (!TENANT_PDF_KINDS[kind]) throw new Error('出力の種類が正しくありません')
   const data = await fetchMeterMasters()
@@ -230,28 +231,8 @@ async function renderTenantListFrame(kind, { since = '', asOf = '' } = {}) {
   return { frame, doc, title }
 }
 
-/** 出力する。見えない iframe に描いてブラウザの印刷を開く（「PDFに保存」で PDF になる）。載せた件数を返す */
-export async function printTenantListPdf(kind, opts = {}) {
-  const { frame, doc, title } = await renderTenantListFrame(kind, opts)
-
-  // PDF のファイル名は親の画面のタイトルになるブラウザが多いので、印刷の間だけ差し替える
-  const prevTitle = document.title
-  document.title = title
-  const cleanup = () => {
-    document.title = prevTitle
-    frame.remove()
-  }
-  frame.contentWindow.addEventListener('afterprint', () => setTimeout(cleanup, 500), { once: true })
-  frame.contentWindow.focus()
-  frame.contentWindow.print()
-  // afterprint が来ないブラウザ向けの保険
-  setTimeout(() => frame.isConnected && cleanup(), 120000)
-  return doc.querySelectorAll('tbody tr').length
-}
-
 /**
- * 安全なリンクで共有する PDF を作る（2026-10-26〜）。印刷と同じ表を html2canvas で画像にし、jsPDF で A4 横1ページにする
- * （共有にはファイルそのものが要るため。印刷の「PDFに保存」は端末の中でしか PDF にならない）。
+ * PDF を作る（2026-10-26〜。2026-10-29〜 プレビューもこれ）。表を html2canvas で画像にし、jsPDF で A4 横1ページにする。
  * 戻り値: { blob, filename, count }
  */
 export async function buildTenantListPdfFile(kind, opts = {}) {

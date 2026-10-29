@@ -1,16 +1,23 @@
 import { useState } from 'react'
-import { IconDocument, IconDownload, IconList, IconShare } from './Icons'
+import { IconDocument, IconDownload, IconShare } from './Icons'
+import AttachmentPreview from './AttachmentPreview'
+import PdfPreviewActions from './PdfPreviewActions'
+import PdfBusyOverlay from './PdfBusyOverlay'
 import SecureShareModal from './SecureShareModal'
-import SecureShareListModal from './SecureShareListModal'
+import './SecureShare.css'
 import { TENANT_LIST_KINDS, exportTenantList } from '../lib/tenantListExport'
-import { TENANT_PDF_KINDS, defaultAsOf, defaultUpdateSince, parseSinceDate, printTenantListPdf } from '../lib/tenantListPdf'
+import { TENANT_PDF_KINDS, buildTenantListPdfFile, defaultAsOf, defaultUpdateSince, parseSinceDate } from '../lib/tenantListPdf'
+import { getReportPdfPreviewUrl } from '../lib/reports'
 
 // テナント一覧表（Excel）の出力ボタン（2026-10-21〜。社員だけ。基本情報を含むため。緊急連絡先は隠した列グループに入る）と、
-// テナント一覧表・緊急連絡先一覧表の印刷用 PDF のボタン（2026-10-21〜。ブラウザの印刷で「PDFに保存」）と、
-// 同じ PDF を期限付き・パスコード付きのリンクで渡す「安全なリンクで共有」（2026-10-26〜）
+// テナント一覧表・緊急連絡先一覧表の PDF のボタン（2026-10-21〜）。
+// 2026-10-29〜 PDF はビルメンの日程表と同じく、作った PDF をアプリ内のプレビュー画面に出す（従来はブラウザの印刷を直接開いていた）。
+// 「安全なリンクで共有」（2026-10-26〜）はプレビュー画面のヘッダに移し、見ている PDF をそのまま共有する。
+// 「共有リンクの一覧」はハンバーガーメニュー（AppHeader）へ移した
 export default function TenantListExportButtons({ onError }) {
   const [busy, setBusy] = useState(null)
-  const [shareModal, setShareModal] = useState(null)
+  const [preview, setPreview] = useState(null) // { kind, since, asOf, blob, filename, url }
+  const [sharing, setSharing] = useState(false)
 
   async function run(key, fn) {
     setBusy(key)
@@ -43,7 +50,7 @@ export default function TenantListExportButtons({ onError }) {
     run(kind, () => exportTenantList(kind, { asOf }))
   }
 
-  function printPdf(kind) {
+  function previewPdf(kind) {
     let since = ''
     let asOf = ''
     if (kind === 'emergency') {
@@ -57,7 +64,11 @@ export default function TenantListExportButtons({ onError }) {
       asOf = askAsOf()
       if (!asOf) return
     }
-    run(`pdf-${kind}`, () => printTenantListPdf(kind, { since, asOf }))
+    run(`pdf-${kind}`, async () => {
+      const file = await buildTenantListPdfFile(kind, { since, asOf })
+      const url = await getReportPdfPreviewUrl(file.blob, file.filename, 'tenant-list')
+      setPreview({ kind, since, asOf, blob: file.blob, filename: file.filename, url })
+    })
   }
 
   return (
@@ -80,36 +91,42 @@ export default function TenantListExportButtons({ onError }) {
           key={`pdf-${kind}`}
           type="button"
           className="btn-plain"
-          onClick={() => printPdf(kind)}
+          onClick={() => previewPdf(kind)}
           disabled={busy != null}
-          title={`${def.label}（印刷用 PDF）を出力。印刷の画面で「PDFに保存」を選ぶ`}
+          title={`${def.label}（PDF）を作ってプレビューする。プレビューから印刷・ダウンロード・安全なリンクで共有ができる`}
         >
           <IconDocument size={20} />
           <span className="btn-plain-label">{busy === `pdf-${kind}` ? '作成中…' : `${def.label}（PDF）`}</span>
         </button>
       ))}
-      <button
-        type="button"
-        className="btn-plain"
-        onClick={() => setShareModal('create')}
-        disabled={busy != null}
-        title="PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡す"
-      >
-        <IconShare size={20} />
-        <span className="btn-plain-label">安全なリンクで共有</span>
-      </button>
-      <button
-        type="button"
-        className="btn-plain"
-        onClick={() => setShareModal('list')}
-        disabled={busy != null}
-        title="作った共有リンクの状態・開かれた記録を見る。取り消し・パスコードの再発行"
-      >
-        <IconList size={20} />
-        <span className="btn-plain-label">共有リンクの一覧</span>
-      </button>
-      {shareModal === 'create' && <SecureShareModal onClose={() => setShareModal(null)} />}
-      {shareModal === 'list' && <SecureShareListModal onClose={() => setShareModal(null)} />}
+      <PdfBusyOverlay show={busy != null && busy.startsWith('pdf-')} />
+      {preview && (
+        <AttachmentPreview
+          attachment={{ filename: preview.filename, mimeType: 'application/pdf' }}
+          url={preview.url}
+          onClose={() => setPreview(null)}
+          headerAction={
+            <>
+              <button
+                type="button"
+                className="attachment-preview-share-link"
+                onClick={() => setSharing(true)}
+                title="この PDF をメールに添付せず、期限付き・パスコード付きのリンクで渡す"
+              >
+                <IconShare size={16} />
+                <span>安全なリンクで共有</span>
+              </button>
+              <PdfPreviewActions blob={preview.blob} filename={preview.filename} />
+            </>
+          }
+        />
+      )}
+      {sharing && preview && (
+        <SecureShareModal
+          preset={{ kind: preview.kind, since: preview.since, asOf: preview.asOf, blob: preview.blob, filename: preview.filename }}
+          onClose={() => setSharing(false)}
+        />
+      )}
     </>
   )
 }

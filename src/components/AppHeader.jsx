@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AboutModal from './AboutModal'
+import SecureShareListModal from './SecureShareListModal'
 import { markSkipLaunchPortal } from '../lib/launch'
 import {
   IconBox,
@@ -124,6 +125,7 @@ export default function AppHeader({
 } = {}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [shareListOpen, setShareListOpen] = useState(false)
   const [fetching, setFetching] = useState(false)
   // 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed' | 'loading'
   const [pushStatus, setPushStatus] = useState('loading')
@@ -322,6 +324,10 @@ export default function AppHeader({
     )
   }
 
+  // 共有リンクの一覧（安全なリンクで共有の状態・記録。2026-10-29 にテナントマスタ・検針マスタの機能ボタンから移した）。
+  // 共有する PDF はテナントの基本情報を含むので、社員だけ・その2画面だけに出す
+  const showShareList = !isOwner && ['/equipment/tenants', '/meter/masters'].includes(location.pathname)
+
   // ロゴは「ダッシュボードへ戻る」ボタン。ダッシュボードにいるときだけ最新化を担う
   function handleLogoClick() {
     if (inPortal) {
@@ -404,6 +410,19 @@ export default function AppHeader({
               {/* 領域2: 業務別メニュー（表示中の業務に応じて内容が変わる。上でsectionごとに
                   組み立てたbusinessMenuItemsをそのまま出す。ダッシュボード・雛形ファイル
                   画面では出す内容が無いため区切り線ごと省く） */}
+              {showShareList && (
+                <>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShareListOpen(true)
+                    }}
+                  >
+                    共有リンクの一覧
+                  </button>
+                  <div className="app-menu-divider" role="separator" />
+                </>
+              )}
               {businessMenuItems && (
                 <>
                   {businessMenuItems}
@@ -451,6 +470,7 @@ export default function AppHeader({
         </div>
       </header>
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      {shareListOpen && <SecureShareListModal onClose={() => setShareListOpen(false)} />}
     </>
   )
 }
