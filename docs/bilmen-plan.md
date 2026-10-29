@@ -544,6 +544,7 @@ create table if not exists bilmen_mail_logs (
 > |---|---|
 > | `bilmen_mail_recipients` | 計画どおり（`lower(email)` の一意インデックスも同じ）。表示順用の `(disabled, sort_order, name)` インデックスを追加 |
 > | `bilmen_mail_templates`（雛形コード方式） | **作らず**、`bilmen_mail_settings`（`id='default'` の1行だけ）にした。現行も雛形が1本のため（Phase 2・4 の記録参照）。**2026-09-29 に `reply_to`（返信先）列を追加**（7-3-2） |
+> | （2026-10-29 追記）件名・本文 | **テナントへのメールの雛型（`tenant_mail_templates` の kind='bilmen'）へ移した**（340番。`docs/task-management-spec-cloudflare.md` 4-21）。`bilmen_mail_settings` は返信先（全雛型共通）だけを使い、`subject`/`body` 列は控えとして残す。雛型の「その他の宛先も含める」で、報知の BCC に `bilmen_mail_recipients` を入れるかを選べる |
 > | `bilmen_mail_logs`（送信ログ） | **作っていない**。Gmail方式の下書き作成は既存の操作ログ（`activity_logs`）に記録する（7-3-1） |
 
 ### 4-2. 変数の置換仕様（メール雛形）
@@ -837,6 +838,12 @@ const NAV_ITEMS = [
 出てきたら使い回してよい。**2026-09-16、実機確認で「確認OKです」との回答を得た**。
 
 ### 5-6. メール設定 `/bilmen/mail`
+
+> **📌 2026-10-29 変更（340番）**: メール設定は全体の「テナントへのメール」（`/tenant-mail`。`docs/task-management-spec-cloudflare.md` 4-21）に合流した。
+> 案内メールの件名・本文は雛型「ビルメンテナンスのご案内（連絡票添付）」（ビルメンの印）として「雛型」タブで直し、返信先・その他の宛先・テナントの宛先は
+> 「宛先・返信先」タブで扱う。`/bilmen/mail` はそのタブへ転送し、ビルメンのハンバーガーメニューの「メール設定」は「テナントへのメール」に置き換えた。
+> 報知そのもの（連絡票PDFの添付）は従来どおり予定一覧の「テナントへ報知」から作る。報知画面の「※ 件名・本文・その他の宛先・返信先は…」の案内も新しい画面を指す。
+> 以下は合流前の記録。
 
 タブ2つに簡素化する（現行の TO/CC/表示確認/アドレス展開確認は使っていないため落とす）:
 
