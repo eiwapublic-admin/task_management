@@ -144,7 +144,6 @@ function ComposeTab({ templates, settings, recipients }) {
     [recipients, includeOthers]
   )
   const rows = groupBilmenRecipients(active)
-  const missing = recipients?.missing || []
   const replyTo = settings?.reply_to || ''
   const cannotSend = !template || isBilmen || active.length === 0 || !subject.trim() || !body.trim()
   const mailtoUrl = cannotSend ? '#' : buildBilmenNoticeMailto(subject, body, active, replyTo)
@@ -171,24 +170,36 @@ function ComposeTab({ templates, settings, recipients }) {
     )
   }
 
+  // レイアウト（2026-10-29 依頼）: 1行目＝雛型（右に返信先）→ 横幅いっぱいの区切り線 →
+  // 左1/3＝件名・宛先（BCC）、右2/3＝本文。本文の領域をできるだけ広くとるため。
+  // 宛先の無い有効テナントの警告はこの画面には出さない（「宛先・返信先」タブの一覧に「未登録」と出る）
   return (
     <div className="tenant-mail-compose">
-      <div className="ui-field">
-        <label htmlFor="tenant-mail-template">雛型</label>
-        <select
-          id="tenant-mail-template"
-          className="ui-input"
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-          disabled={draftStep === 'draft'}
-        >
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.kind === 'bilmen' ? `【ビルメン】${t.name}` : t.name}
-            </option>
-          ))}
-        </select>
+      <div className="tenant-mail-compose-top">
+        <div className="ui-field">
+          <label htmlFor="tenant-mail-template">雛型</label>
+          <select
+            id="tenant-mail-template"
+            className="ui-input"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            disabled={draftStep === 'draft'}
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.kind === 'bilmen' ? `【ビルメン】${t.name}` : t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {!isBilmen && (
+          <div className="ui-field">
+            <label>返信先</label>
+            <input className="ui-input" value={replyTo || '（未設定：送信元のアドレスに返信されます）'} readOnly />
+          </div>
+        )}
       </div>
+      <hr className="tenant-mail-divider" />
 
       {isBilmen ? (
         <p className="bilmen-undecided">
@@ -197,20 +208,8 @@ function ComposeTab({ templates, settings, recipients }) {
         </p>
       ) : (
         <>
-          {missing.length > 0 && (
-            <p className="bilmen-undecided">
-              有効なテナントのうち {missing.length} 件は「案内メールの宛先」が未登録のため送られません（
-              {missing.map((t) => `${floorLabel(t.floor)} ${t.tenant_name}`.trim()).join('、')}）。
-              <Link to="/equipment/tenants">テナントマスタ</Link>で登録できます。
-            </p>
-          )}
-
-          <div className="bilmen-notify-preview">
-            <div className="bilmen-notify-fields">
-              <div className="ui-field">
-                <label>返信先</label>
-                <input className="ui-input" value={replyTo || '（未設定：送信元のアドレスに返信されます）'} readOnly />
-              </div>
+          <div className="tenant-mail-compose-main">
+            <div className="tenant-mail-compose-side">
               <div className="ui-field">
                 <label htmlFor="tenant-mail-subject">件名</label>
                 <input
@@ -220,43 +219,44 @@ function ComposeTab({ templates, settings, recipients }) {
                   onChange={(e) => setSubject(e.target.value)}
                 />
               </div>
-              <div className="ui-field">
-                <label htmlFor="tenant-mail-body">本文</label>
-                <textarea
-                  id="tenant-mail-body"
-                  className="ui-textarea"
-                  rows={10}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                />
-                <p className="ui-note">ここでの書き換えは今回のメールだけに使います（雛型は変わりません）。</p>
-              </div>
+              <section className="bilmen-notify-recipients" aria-label="宛先">
+                <div className="bilmen-notify-recipients-inner">
+                  <h3 className="bilmen-notify-recipients-title">宛先 {rows.length}件（BCC）</h3>
+                  <p className="bilmen-notify-recipients-note">
+                    今日の時点で退去済みのテナントを省いています。
+                    {includeOthers ? 'その他の宛先も含みます。' : 'その他の宛先は含みません。'}
+                  </p>
+                  <ol className="bilmen-notify-recipient-list">
+                    {rows.map((r, i) => (
+                      <li key={r.key}>
+                        <span className="bilmen-notify-recipient-no">{i + 1}</span>
+                        <button
+                          type="button"
+                          className="bilmen-notify-recipient-name"
+                          title={r.emails.join('\n')}
+                          onClick={() => setOpenKey((k) => (k === r.key ? null : r.key))}
+                        >
+                          {r.name}
+                        </button>
+                        {openKey === r.key && <span className="bilmen-notify-recipient-mail">{r.emails.join(', ')}</span>}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </section>
             </div>
-            <section className="bilmen-notify-recipients" aria-label="宛先">
-              <div className="bilmen-notify-recipients-inner">
-                <h3 className="bilmen-notify-recipients-title">宛先 {rows.length}件（BCC）</h3>
-                <p className="bilmen-notify-recipients-note">
-                  今日の時点で退去済みのテナントを省いています。
-                  {includeOthers ? 'その他の宛先も含みます。' : 'その他の宛先は含みません。'}
-                </p>
-                <ol className="bilmen-notify-recipient-list">
-                  {rows.map((r, i) => (
-                    <li key={r.key}>
-                      <span className="bilmen-notify-recipient-no">{i + 1}</span>
-                      <button
-                        type="button"
-                        className="bilmen-notify-recipient-name"
-                        title={r.emails.join('\n')}
-                        onClick={() => setOpenKey((k) => (k === r.key ? null : r.key))}
-                      >
-                        {r.name}
-                      </button>
-                      {openKey === r.key && <span className="bilmen-notify-recipient-mail">{r.emails.join(', ')}</span>}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </section>
+            <div className="ui-field tenant-mail-body-field">
+              <label htmlFor="tenant-mail-body">
+                本文<span className="tenant-mail-label-note">（雛型を変更する場合は雛型タブから）</span>
+              </label>
+              <textarea
+                id="tenant-mail-body"
+                className="ui-textarea"
+                rows={18}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+              />
+            </div>
           </div>
 
           {draftError && (

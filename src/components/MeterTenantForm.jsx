@@ -176,68 +176,65 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
           </label>
           <p className="ui-note">ビルメンの案内メールを送るアドレスです。未退去の間だけ送ります。</p>
 
-          <h4 className="meter-form-section">基本情報（社員のみ）</h4>
-          <div className="meter-form-grid">
-            {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide && !f.contact && f.type !== 'checkbox').map((f) => (
-              <label key={f.key} className="ui-field">
-                <span>{f.label}</span>
-                <input
-                  type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
-                  inputMode={f.type === 'number' ? 'numeric' : undefined}
-                  className="ui-input"
-                  value={profile[f.key] ?? ''}
-                  onChange={setP(f.key)}
-                />
-              </label>
-            ))}
-          </div>
-          {TENANT_PROFILE_FIELDS.filter((f) => f.type === 'checkbox').map((f) => (
-            <label key={f.key} className="meter-check">
-              <input
-                type="checkbox"
-                checked={!!profile[f.key]}
-                onChange={(e) => setProfile((p) => ({ ...p, [f.key]: e.target.checked }))}
-              />
-              {f.label}
-            </label>
-          ))}
-
-          <h4 className="meter-form-section">緊急連絡先</h4>
-          {profile.emergency_contacts.map((c, i) => (
-            <div key={i} className="meter-form-grid is-contact">
-              <label className="ui-field">
-                <span>氏名 {i + 1}</span>
-                <input className="ui-input" value={c.name || ''} onChange={setContact(i, 'name')} />
-              </label>
-              <label className="ui-field">
-                <span>フリガナ</span>
-                <input className="ui-input" value={c.kana || ''} onChange={setContact(i, 'kana')} />
-              </label>
-              <label className="ui-field">
-                <span>電話</span>
-                <input className="ui-input" inputMode="tel" value={c.phone || ''} onChange={setContact(i, 'phone')} />
-              </label>
-              <label className="ui-field">
-                <span>携帯</span>
-                <input className="ui-input" inputMode="tel" value={c.mobile || ''} onChange={setContact(i, 'mobile')} />
-              </label>
+          {/* 基本情報・緊急連絡先はそれぞれ枠で囲み、背景色を変えて範囲を分かりやすくする（2026-10-29 依頼）。
+              更新情報・修正に関する備考は基本情報の枠の一番下へ、最終変更日付・事項はフッタへ移した */}
+          <section className="tenant-form-box">
+            <h4 className="meter-form-section">基本情報</h4>
+            <div className="meter-form-grid">
+              {TENANT_PROFILE_FIELDS.filter((f) => !f.hidden && !f.wide && !f.contact && f.type !== 'checkbox').map((f) => (
+                <label key={f.key} className="ui-field">
+                  <span>{f.label}</span>
+                  <input
+                    type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
+                    inputMode={f.type === 'number' ? 'numeric' : undefined}
+                    className="ui-input"
+                    value={profile[f.key] ?? ''}
+                    onChange={setP(f.key)}
+                  />
+                </label>
+              ))}
             </div>
-          ))}
-          <div className="meter-form-grid tenant-contact-change">
-            {TENANT_PROFILE_FIELDS.filter((f) => f.contact).map((f) => (
-              <label key={f.key} className="ui-field">
-                <span>{f.label}</span>
-                <input type={f.type === 'date' ? 'date' : 'text'} className="ui-input" value={profile[f.key] ?? ''} onChange={setP(f.key)} />
+            {TENANT_PROFILE_FIELDS.filter((f) => f.type === 'checkbox').map((f) => (
+              <label key={f.key} className="meter-check">
+                <input
+                  type="checkbox"
+                  checked={!!profile[f.key]}
+                  onChange={(e) => setProfile((p) => ({ ...p, [f.key]: e.target.checked }))}
+                />
+                {f.label}
               </label>
             ))}
-          </div>
-          <p className="ui-note">緊急連絡先一覧表（PDF）の「最終変更日付」「最終変更事項」に出ます。出力時の起点の日付より前の日付なら出しません。</p>
-          {TENANT_PROFILE_FIELDS.filter((f) => f.wide).map((f) => (
-            <label key={f.key} className="ui-field">
-              <span>{f.label}（社員のみ）</span>
-              <textarea className="ui-textarea" rows={2} value={profile[f.key] ?? ''} onChange={setP(f.key)} />
-            </label>
-          ))}
+            {TENANT_PROFILE_FIELDS.filter((f) => f.wide).map((f) => (
+              <label key={f.key} className="ui-field">
+                <span>{f.label}</span>
+                <textarea className="ui-textarea" rows={2} value={profile[f.key] ?? ''} onChange={setP(f.key)} />
+              </label>
+            ))}
+          </section>
+
+          <section className="tenant-form-box">
+            <h4 className="meter-form-section">緊急連絡先</h4>
+            {profile.emergency_contacts.map((c, i) => (
+              <div key={i} className="meter-form-grid is-contact">
+                <label className="ui-field">
+                  <span>氏名 {i + 1}</span>
+                  <input className="ui-input" value={c.name || ''} onChange={setContact(i, 'name')} />
+                </label>
+                <label className="ui-field">
+                  <span>フリガナ</span>
+                  <input className="ui-input" value={c.kana || ''} onChange={setContact(i, 'kana')} />
+                </label>
+                <label className="ui-field">
+                  <span>電話</span>
+                  <input className="ui-input" inputMode="tel" value={c.phone || ''} onChange={setContact(i, 'phone')} />
+                </label>
+                <label className="ui-field">
+                  <span>携帯</span>
+                  <input className="ui-input" inputMode="tel" value={c.mobile || ''} onChange={setContact(i, 'mobile')} />
+                </label>
+              </div>
+            ))}
+          </section>
           <label className="ui-field">
             <span>備考</span>
             <textarea className="ui-textarea" rows={2} value={form.note} onChange={set('note')} />
@@ -250,15 +247,21 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
           )}
           {error && <p className="ui-note is-danger">{error}</p>}
         </div>
-        <div className="ui-modal-foot">
-          <div className="ui-modal-foot-end">
-            <button type="button" className="btn-plain" onClick={onClose}>
-              キャンセル
-            </button>
+        {/* フッタ（2026-10-29 依頼）: 最終変更日付・事項を常に見えるようにここへ置き、保存は同じ行の右端。
+            キャンセルは置かず、右上の × で閉じる */}
+        <div className="ui-modal-foot tenant-form-foot">
+          <div className="tenant-form-foot-row">
+            {TENANT_PROFILE_FIELDS.filter((f) => f.contact).map((f) => (
+              <label key={f.key} className={`ui-field${f.type === 'date' ? ' is-date' : ' is-note'}`}>
+                <span>{f.label}</span>
+                <input type={f.type === 'date' ? 'date' : 'text'} className="ui-input" value={profile[f.key] ?? ''} onChange={setP(f.key)} />
+              </label>
+            ))}
             <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? '保存中…' : '保存する'}
             </button>
           </div>
+          <p className="ui-note">緊急連絡先一覧表（PDF）の「最終変更日付」「最終変更事項」に出ます。出力時の起点の日付より前の日付なら出しません。</p>
         </div>
       </div>
     </div>

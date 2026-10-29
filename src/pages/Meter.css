@@ -304,9 +304,33 @@ button.meter-photo { cursor: zoom-in; }
 }
 
 /* テナントの修正画面: 最終変更日付・事項（連絡用）。事項を広く（2026-10-26） */
-.meter-form-grid.tenant-contact-change { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); }
+/* テナントの修正（MeterTenantForm.jsx）: 基本情報・緊急連絡先の枠（2026-10-29 依頼。範囲が分かるよう背景色を変える） */
+.tenant-form-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--bg-surface));
+}
+.tenant-form-box > .meter-form-section { margin: 0; }
+.tenant-form-box .ui-input,
+.tenant-form-box .ui-textarea { background: var(--bg-surface); }
+
+/* フッタ: 最終変更日付・事項（連絡用）と保存を1行に。保存は右端 */
+.tenant-form-foot { flex-direction: column; align-items: stretch; gap: var(--space-1); }
+.tenant-form-foot-row { display: flex; align-items: flex-end; gap: var(--space-3); }
+.tenant-form-foot-row > .ui-field { margin: 0; }
+.tenant-form-foot-row > .ui-field.is-date { flex: 0 0 180px; }
+.tenant-form-foot-row > .ui-field.is-note { flex: 1; min-width: 0; }
+.tenant-form-foot-row > .btn-primary { flex-shrink: 0; }
+.tenant-form-foot > .ui-note { margin: 0; }
 @media (max-width: 768px) {
-  .meter-form-grid.tenant-contact-change { grid-template-columns: minmax(0, 1fr); }
+  .tenant-form-foot-row { flex-wrap: wrap; }
+  .tenant-form-foot-row > .ui-field.is-date { flex: 1 1 140px; }
+  .tenant-form-foot-row > .ui-field.is-note { flex: 1 1 100%; order: 2; }
+  .tenant-form-foot-row > .btn-primary { order: 3; margin-left: auto; }
 }
 
 /* 検針マスタの変更履歴（MeterHistoryList.jsx。2026-10-21〜） */
