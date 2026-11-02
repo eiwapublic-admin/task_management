@@ -9,6 +9,7 @@
 
 import { fetchMeterMasters } from './meter'
 import { isMovedOut, jstToday } from './tenants'
+import { onTenantFloor, tenantRoomParts } from './tenantRooms'
 import { cellXml, colName, downloadBlob, unzipXlsx, zipFiles } from './xlsxWrite'
 
 export const TENANT_LIST_KINDS = {
@@ -26,17 +27,8 @@ const floorLabel = (f) => (f === 'B' ? 'B１' : Number.isNaN(Number(f)) ? f : Nu
 
 const natural = (a, b) => String(a).localeCompare(String(b), 'ja', { numeric: true })
 
-// メータがテナントの階にあるか。部屋番号が 0 で始まるもの（03-A など）は地下1階の倉庫なので、地下のテナント以外では除く
-const onTenantFloor = (tenant, m) => (m.floor || '') === (tenant.floor || '') && (tenant.floor === 'B' || !/^0/.test(m.room_no || ''))
-
-// 部屋番号: 入力があればそれ、無ければ旧テナントコード（FileMaker。21_23 → 21-23）、無ければ同じ階のメータの部屋番号
-function roomLabel(tenant, meters) {
-  const p = tenant.profile || {}
-  if (p.room_label) return p.room_label
-  if (p.legacy_tenant_code) return p.legacy_tenant_code.replace(/_/g, '-').replace(/^B(?=\d)/, '')
-  const rooms = [...new Set(meters.filter((m) => !m.removed && m.room_no && onTenantFloor(tenant, m)).map((m) => m.room_no))]
-  return rooms.sort(natural).join('・')
-}
+// 部屋番号: 入力があればそれ、無ければ旧テナントコード、無ければ同じ階のメータの部屋番号（tenantRooms.js）
+const roomLabel = (tenant, meters) => tenantRoomParts(tenant, meters).join('・')
 
 // 占有面積（㎡）: 同じ階にあるそのテナントのメータの部屋面積の合計（無ければ空）
 function occupiedArea(tenant, meters) {

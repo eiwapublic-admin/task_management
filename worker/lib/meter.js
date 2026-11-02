@@ -13,6 +13,7 @@
 import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject, deleteObjects } from './storage.js'
+import { tenantRoomNumbers } from '../../src/lib/tenantRooms.js'
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -261,7 +262,7 @@ export async function handleMeterMasters(req) {
       return json({ error: 'マスタの取得に失敗しました' }, 500)
     }
     return json({
-      tenants: tenants.data || [],
+      tenants: await withRoomNumbers(supabase, tenants.data || [], meters.data || []),
       meters: meters.data || [],
       acUnits: units.data || [],
       constants,
@@ -295,6 +296,26 @@ export async function applyTenantMoveOuts(supabase = getAdminClient()) {
     .select('id')
   if (error) throw new Error(error.message)
   return data?.length || 0
+}
+
+// テナントに部屋番号（room_numbers。数字だけ・「、」区切り。2026-11-02〜）を付ける。テナントには profile が要る。
+// meters を渡さなければここで読む（tenant_id・階・部屋番号・撤去だけ）
+export async function withRoomNumbers(supabase, tenants, meters = null) {
+  if (!tenants.length) return tenants
+  if (!meters) {
+    let q = supabase.from('meters').select('tenant_id, floor, room_no, removed').not('tenant_id', 'is', null)
+    if (tenants.length === 1) q = q.eq('tenant_id', tenants[0].id)
+    const { data, error } = await q
+    if (error) throw new Error(error.message)
+    meters = data || []
+  }
+  const byTenant = new Map()
+  for (const m of meters) {
+    if (!m.tenant_id) continue
+    if (!byTenant.has(m.tenant_id)) byTenant.set(m.tenant_id, [])
+    byTenant.get(m.tenant_id).push(m)
+  }
+  return tenants.map((t) => ({ ...t, room_numbers: tenantRoomNumbers(t, byTenant.get(t.id) || []) }))
 }
 
 // テナントの項目（追加・修正で共通）。p に無い項目は触らない
@@ -353,7 +374,7 @@ export async function handleMeterTenants(req) {
         console.error('meter-tenants:', err.message)
         return json({ error: 'テナントの取得に失敗しました' }, 500)
       }
-      return json({ tenants: data || [] })
+      return json({ tenants: await withRoomNumbers(supabase, data || []) })
     }
 
     const p = await req.json().catch(() => null)
@@ -373,7 +394,7 @@ export async function handleMeterTenants(req) {
         .single()
       if (err) return tenantSaveError(err, 'meter-tenant-create')
       await attachChangeReason(supabase, 'equipment_tenants', data.id, reason, since)
-      return json({ tenant: data })
+      return json({ tenant: (await withRoomNumbers(supabase, [data]))[0] })
     }
 
     const id = typeof p.id === 'string' && UUID_RE.test(p.id) ? p.id : null
@@ -388,7 +409,7 @@ export async function handleMeterTenants(req) {
     if (err) return tenantSaveError(err, 'meter-tenant-update')
     if (!data) return json({ error: 'テナントが見つかりません' }, 404)
     await attachChangeReason(supabase, 'equipment_tenants', data.id, reason, since)
-    return json({ tenant: data })
+    return json({ tenant: (await withRoomNumbers(supabase, [data]))[0] })
   } catch (err) {
     console.error('meter-tenants 失敗:', err)
     return json({ error: 'テナントの保存に失敗しました' }, 500)

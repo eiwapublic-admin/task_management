@@ -1,13 +1,14 @@
 /* テナントマスタの一覧（TenantTable.jsx。2026-10-20〜） */
 
 /* PC: 表を枠の幅に収める（収まらずはみ出すと、はみ出た列に枠の背景が無く、固定した見出しの右にも行が透けて見えた。
-   2026-10-21 指摘）。名称・略称・案内メール・備考は折り返し、コード・日付・状態は折り返さない */
+   2026-10-21 指摘）。案内メール・備考は折り返し、コード・正式名称・部屋番号・日付・状態は折り返さない
+   （正式名称は 2026-11-02 から折り返さない） */
 .tenant-table { width: 100%; }
 .tenant-table th,
 .tenant-table .is-nowrap { white-space: nowrap; }
 .tenant-table td { overflow-wrap: anywhere; }
 .tenant-table .ui-badge + .ui-badge { margin-left: var(--space-1); }
-.tenant-name-cell { font-weight: 700; color: var(--text-strong); }
+.tenant-name-cell { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
 .tenant-note-cell { min-width: 120px; color: var(--text-muted); font-size: var(--fs-sm); }
 
 .tenant-row.is-clickable { cursor: pointer; }
