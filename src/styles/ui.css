@@ -334,6 +334,20 @@
   color: var(--color-brand-ink);
 }
 
+/* 機能ヘッダの中で「一番やってほしいこと」だけ青地にする二次ボタン（2026-11-02。検針一覧の「写真の取込」）。
+   .btn-plain の大きさ・iPhone幅でラベルを隠す動きはそのまま、色だけ .btn-primary と同じ */
+.btn-plain.is-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+}
+
+.btn-plain.is-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-ink);
+}
+
 /* 破壊的操作の確定 */
 .btn-danger {
   height: var(--control-h);

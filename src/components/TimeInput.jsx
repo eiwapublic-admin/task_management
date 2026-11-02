@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toHalfWidth } from '../lib/halfWidthInput'
 
 // テンキーで4桁を入力して時刻を確定する入力欄（2026-08-19）。
 // モバイルのネイティブ <input type="time"> はダイアル式で時・分を選ぶ操作が
@@ -27,12 +28,18 @@ export default function TimeInput({ value, onChange, className, disabled, placeh
   }
 
   function handleChange(e) {
-    setEditingText(e.target.value.replace(/\D/g, '').slice(0, 4))
     setInvalid(false)
+    // 日本語入力の変換中は打った文字をそのまま見せる（ここで数字以外を消すと IME の確定で二重入力になる）。
+    // 確定すると lib/halfWidthInput.js が全角を半角に直して、もう一度ここへ来る（2026-11-02）
+    if (e.nativeEvent?.isComposing) {
+      setEditingText(e.target.value)
+      return
+    }
+    setEditingText(toHalfWidth(e.target.value).replace(/\D/g, '').slice(0, 4))
   }
 
   function commit() {
-    const text = editingText ?? ''
+    const text = toHalfWidth(editingText ?? '').replace(/\D/g, '').slice(0, 4)
     if (text === '') {
       setEditingText(null)
       setInvalid(false)
