@@ -8,7 +8,7 @@ import useMeterPhotoPdfExport from '../hooks/useMeterPhotoPdfExport'
 import { defaultMeterMonth, fetchMeterMonth, floorLabel, meterMonthLabel, saveMeterReading } from '../lib/meter'
 import { buildMonthRows, formatRatio, formatTaken, formatValue, jstDateTime, monthProgress } from '../lib/meterMonth'
 import { isMoveInFreeMonth, readingUsage, shiftMonth } from '../lib/meterOutput'
-import { speakValue, speechSupported } from '../lib/speech'
+import { ratioToSpeech, speakValue, speechSupported } from '../lib/speech'
 import './Dashboard.css'
 import './Meter.css'
 
@@ -124,6 +124,15 @@ export default function MeterMonth() {
             <>
               <button
                 type="button"
+                className="btn-plain is-primary"
+                onClick={() => navigate(`/meter/${month}/photos`)}
+                title="写真の取込"
+              >
+                <IconCamera size={20} />
+                <span className="btn-plain-label">写真の取込</span>
+              </button>
+              <button
+                type="button"
                 className="btn-plain"
                 onClick={() => pdf.download(month, rows)}
                 disabled={!rows.length || pdf.busy}
@@ -131,15 +140,6 @@ export default function MeterMonth() {
               >
                 <IconDownload size={20} />
                 <span className="btn-plain-label">写真一覧PDF</span>
-              </button>
-              <button
-                type="button"
-                className="btn-plain"
-                onClick={() => navigate(`/meter/${month}/photos`)}
-                title="写真の取込"
-              >
-                <IconCamera size={20} />
-                <span className="btn-plain-label">写真の取込</span>
               </button>
               <button type="button" className="btn-plain" onClick={() => navigate('/meter/masters')} title="検針マスタ（テナント・メータ・空調機）">
                 <IconList size={20} />
@@ -277,6 +277,9 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   const valueRef = useRef(null)
   // 入力欄に入ったときの値（離れたときに変わっていれば読み上げる）
   const focusValueRef = useRef({})
+  // 「保存して次へ」を押し始めた印。押したときは読み上げない（2026-11-02 依頼）。
+  // ボタンを押すと入力欄から離れる（blur）のが click より先なので、pointerdown で先に立てておく
+  const noSpeechRef = useRef(false)
 
   useEffect(() => {
     valueRef.current?.focus()
@@ -286,11 +289,16 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   const valueFocusProps = (key) => ({
     onFocus: (e) => {
       focusValueRef.current[key] = e.target.value
+      noSpeechRef.current = false
     },
     onBlur: (e) => {
       const v = e.target.value.trim()
-      if (v !== '' && v !== (focusValueRef.current[key] ?? '').trim()) speakValue(v, { skipIfSpeaking: true })
+      const changed = v !== '' && v !== (focusValueRef.current[key] ?? '').trim()
       focusValueRef.current[key] = e.target.value
+      if (!changed || noSpeechRef.current) return
+      // 外調機の1つめの欄では、2つめが未入力なら前月比はまだ読まない
+      const ready = !meter.is_oa_meter || (form.value.trim() !== '' && form.value2.trim() !== '')
+      speakValue(v, { skipIfSpeaking: true, suffix: ready ? ratioSuffix : '' })
     },
   })
 
@@ -346,7 +354,8 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
         ...(reading?.read_on ? {} : taken ? { read_on: taken.date, read_time: taken.time } : {}),
       })
       onSaved(saved)
-      speakValue(spokenValues, { skipIfSpeaking: true })
+      // 「保存して次へ（Enter）」では読み上げない（2026-11-02 依頼）。「保存する」は従来どおり読む
+      if (!next) speakValue(spokenValues, { skipIfSpeaking: true, suffix: ratioSuffix })
       if (next) onGo(nextRow)
       else setSaving(false)
     } catch (err) {
@@ -358,12 +367,15 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   function onKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.target.tagName !== 'TEXTAREA') {
       e.preventDefault()
+      noSpeechRef.current = true
       save({ next: true })
     }
   }
 
   const total = preview.diff + (meter.is_oa_meter ? preview.diff2 : 0)
   const ratio = row.prevTotal ? total / row.prevTotal : null
+  // 前月比の読み上げ（当月値が入っているときだけ）
+  const ratioSuffix = form.value.trim() === '' ? '' : ratioToSpeech(total, row.prevTotal)
 
   return (
     <div className="meter-entry" onKeyDown={onKeyDown}>
@@ -476,14 +488,22 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
           {error && <p className="ui-note is-danger">{error}</p>}
           <div className="meter-import-actions">
             {speechSupported() && (
-              <button type="button" className="btn-plain" onClick={() => speakValue(spokenValues, { skipIfSpeaking: true })} disabled={!form.value}>
+              <button type="button" className="btn-plain" onClick={() => speakValue(spokenValues, { skipIfSpeaking: true, suffix: ratioSuffix })} disabled={!form.value}>
                 ♩ 読み上げ
               </button>
             )}
             <button type="button" className="btn-plain" onClick={() => save({ next: false })} disabled={saving}>
               保存する
             </button>
-            <button type="button" className="btn-primary" onClick={() => save({ next: true })} disabled={saving}>
+            <button
+              type="button"
+              className="btn-primary"
+              onPointerDown={() => {
+                noSpeechRef.current = true
+              }}
+              onClick={() => save({ next: true })}
+              disabled={saving}
+            >
               {saving ? '保存中…' : nextRow ? '保存して次へ（Enter）' : '保存して一覧へ（Enter）'}
             </button>
           </div>
