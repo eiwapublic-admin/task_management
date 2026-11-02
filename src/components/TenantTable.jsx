@@ -9,6 +9,7 @@ function floorHead(floor) {
 // テナントマスタの一覧（2026-10-20〜。テナントマスタ画面と検針マスタのテナントタブで共通）。
 // 階ごとにまとめ、退去済みは各階の末尾に灰色で出す。列見出しはスクロールしても固定表示する
 // （PC は機能ヘッダの下に、スマートフォンは表の枠の中で。sticky-header-overflow-trap 参照）。
+// 2列目の正式名称は折り返さない。略称の列は部屋番号（API の room_numbers。数字だけ・「、」区切り）に替えた（2026-11-02 依頼）。
 // onEdit を渡さなければ参照だけ（行を押しても何も起きない）。meterCount を渡すとメータの台数の列を出す
 export default function TenantTable({ tenants, includeMovedOut, meterCount = null, onEdit = null }) {
   const today = jstToday()
@@ -26,7 +27,7 @@ export default function TenantTable({ tenants, includeMovedOut, meterCount = nul
           <tr>
             <th>請求先コード</th>
             <th>正式名称</th>
-            <th>略称</th>
+            <th>部屋番号</th>
             <th>入居年月日</th>
             <th>退去日</th>
             {meterCount && <th className="is-numeric">メータ</th>}
@@ -49,7 +50,7 @@ export default function TenantTable({ tenants, includeMovedOut, meterCount = nul
                 >
                   <td className="is-nowrap">{t.billing_code || '—'}</td>
                   <td className="tenant-name-cell">{t.name}</td>
-                  <td>{t.short_name || ''}</td>
+                  <td className="is-nowrap">{t.room_numbers || ''}</td>
                   <td className="is-nowrap">{formatDate(t.moved_in_on)}</td>
                   <td className="is-nowrap">{formatDate(t.moved_out_on)}</td>
                   {meterCount && <td className="is-numeric">{meterCount.get(t.id) || ''}</td>}

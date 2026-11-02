@@ -8,7 +8,7 @@ import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.j
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { notifyStockWarning } from './push.js'
-import { actorOf, applyTenantMoveOuts } from './meter.js'
+import { actorOf, applyTenantMoveOuts, withRoomNumbers } from './meter.js'
 
 const ITEM_COLUMNS =
   'id, item_no, category_code, name, short_name, product_code, sort_order, warn_qty, warned_at, disabled, track_stock, note, created_at, updated_at'
@@ -834,14 +834,16 @@ export async function handleEquipmentTenantList(req) {
   try {
     const includeMovedOut = new URL(req.url).searchParams.get('include_moved_out') === '1'
     const supabase = getAdminClient()
-    let query = supabase.from('equipment_tenants').select(TENANT_COLUMNS)
+    // profile は部屋番号を求めるためだけに読み、返さない（個人情報を含むので社員以外には出さない）
+    let query = supabase.from('equipment_tenants').select(`${TENANT_COLUMNS}, profile`)
     if (!includeMovedOut) query = query.eq('moved_out', false)
     const { data, error: err } = await query.order('floor', { ascending: true }).order('name', { ascending: true })
     if (err) {
       console.error('equipment-tenant-list:', err.message)
       return json({ error: 'テナント一覧の取得に失敗しました' }, 500)
     }
-    return json({ tenants: data || [] })
+    const tenants = (await withRoomNumbers(supabase, data || [])).map(({ profile: _profile, ...t }) => t)
+    return json({ tenants })
   } catch (err) {
     console.error('equipment-tenant-list 失敗:', err)
     return json({ error: 'テナント一覧の取得に失敗しました' }, 500)
