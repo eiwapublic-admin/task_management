@@ -2,6 +2,8 @@
 // ブラウザの音声合成（Web Speech API。無料・外部通信なし）で、数字を一桁ずつ読む
 // （「63796」→「ろく さん なな きゅう ろく」）。聞き違えにくいよう 4 は「よん」、7 は「なな」、9 は「きゅう」
 
+import { toHalfWidth } from './halfWidthInput'
+
 const DIGITS = ['ぜろ', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう']
 
 export function speechSupported() {
@@ -10,7 +12,8 @@ export function speechSupported() {
 
 // 数字の並びを読み上げ用の文に直す。数字以外（小数点など）は「てん」等に置き換える
 export function digitsToSpeech(value) {
-  return String(value ?? '')
+  // 全角の数字（日本語入力のまま打って欄を抜けたとき）も読む（2026-11-04）
+  return toHalfWidth(value)
     .split('')
     .map((c) => (c >= '0' && c <= '9' ? DIGITS[Number(c)] : c === '.' ? 'てん' : c === '-' ? 'まいなす' : ''))
     .filter(Boolean)
