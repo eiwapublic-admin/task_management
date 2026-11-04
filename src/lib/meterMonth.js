@@ -109,9 +109,11 @@ export function formatValue(n) {
   return Number.isInteger(v) ? v.toLocaleString('ja-JP') : v.toLocaleString('ja-JP', { maximumFractionDigits: 2 })
 }
 
+// 前月比の表示は増減の割合（2026-11-04 依頼。読み上げと揃える）: 120% → +20%、0.5 → -50%、同じなら 0%
 export function formatRatio(r) {
-  if (r == null) return ''
-  return `${Math.round(r * 100)}%`
+  if (r == null || !Number.isFinite(r)) return ''
+  const pct = Math.round((r - 1) * 100)
+  return pct > 0 ? `+${pct}%` : `${pct}%`
 }
 
 // 月度の電気の使用量の合計。外調機（共用の空調）は含めない（2026-10-20 依頼）。
