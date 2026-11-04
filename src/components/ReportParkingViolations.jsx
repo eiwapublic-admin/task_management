@@ -18,6 +18,7 @@ import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import Combobox from './Combobox'
 import { IconDownload, IconCamera, IconFolder } from './Icons'
+import { readPhotoDate } from '../lib/photoDate'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -170,7 +171,8 @@ export default function ReportParkingViolations({ reportId, readOnly, filterIds,
         filename: file.name,
         width: prepared.width,
         height: prepared.height,
-        takenAt: file.lastModified ? new Date(file.lastModified).toISOString() : null,
+        // 撮影日時は縮小前の元ファイルの EXIF（DateTimeOriginal）から読む。無ければファイルの日時（2026-11-04〜）
+        takenAt: (await readPhotoDate(file))?.iso || null,
       })
       setPhotosByViolation((prev) => ({ ...prev, [targetId]: [...(prev[targetId] || []), photo] }))
       // 撮影・選択した写真をそのまま拡大表示に開く（2026-09-01）。続けて「写真から読み取る」
