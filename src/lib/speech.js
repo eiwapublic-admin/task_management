@@ -21,7 +21,7 @@ export function digitsToSpeech(value) {
 }
 
 // 前月比の読み上げ（2026-11-02 依頼）。使用量（total）と前月の使用量（prevTotal）から増減の割合を出し、
-// 「前月比、20パーセント増加」「…減少」と読む。割合は四捨五入で 0% なら「前月比、変化なし」、
+// 「20パーセント増加」「…減少」と読む（「前月比」とは言わない。2026-11-04）。割合は四捨五入で 0% なら「変化なし」、
 // 今月も前月も使用量が 0 なら「未使用のまま変化なし」。前月の使用量が無い・0（今月は使用あり）のときは
 // 割合が出せないので読まない（空文字）
 export function ratioToSpeech(total, prevTotal) {
@@ -29,8 +29,8 @@ export function ratioToSpeech(total, prevTotal) {
   if (total === 0 && prevTotal === 0) return '未使用のまま変化なし'
   if (prevTotal <= 0) return ''
   const pct = Math.round((total / prevTotal - 1) * 100)
-  if (pct === 0) return '前月比、変化なし'
-  return `前月比、${Math.abs(pct)}パーセント${pct > 0 ? '増加' : '減少'}`
+  if (pct === 0) return '変化なし'
+  return `${Math.abs(pct)}パーセント${pct > 0 ? '増加' : '減少'}`
 }
 
 let japaneseVoice = null
