@@ -277,7 +277,7 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   const valueRef = useRef(null)
   // 入力欄に入ったときの値（離れたときに変わっていれば読み上げる）
   const focusValueRef = useRef({})
-  // 「保存して次へ」を押し始めた印。押したときは読み上げない（2026-11-02 依頼）。
+  // 「保存する」「保存して次へ」を押し始めた印。押したときは読み上げない（2026-11-02・11-04 依頼）。
   // ボタンを押すと入力欄から離れる（blur）のが click より先なので、pointerdown で先に立てておく
   const noSpeechRef = useRef(false)
 
@@ -354,8 +354,7 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
         ...(reading?.read_on ? {} : taken ? { read_on: taken.date, read_time: taken.time } : {}),
       })
       onSaved(saved)
-      // 「保存して次へ（Enter）」では読み上げない（2026-11-02 依頼）。「保存する」は従来どおり読む
-      if (!next) speakValue(spokenValues, { skipIfSpeaking: true, suffix: ratioSuffix })
+      // 保存では読み上げない（「保存して次へ（Enter）」は 2026-11-02、「保存する」は 2026-11-04 依頼）
       if (next) onGo(nextRow)
       else setSaving(false)
     } catch (err) {
@@ -493,7 +492,15 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
                 ♩ 読み上げ
               </button>
             )}
-            <button type="button" className="btn-plain" onClick={() => save({ next: false })} disabled={saving}>
+            <button
+              type="button"
+              className="btn-plain"
+              onPointerDown={() => {
+                noSpeechRef.current = true
+              }}
+              onClick={() => save({ next: false })}
+              disabled={saving}
+            >
               保存する
             </button>
             <button
