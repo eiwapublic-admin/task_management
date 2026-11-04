@@ -365,7 +365,8 @@ function MeterEntry({ month, row, position, prevRow, nextRow, onSaved, onGo }) {
   }
 
   function onKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.target.tagName !== 'TEXTAREA') {
+    // 日本語入力の確定の Enter では保存しない（Safari は確定の keydown で isComposing が false、keyCode が 229）
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229 && e.target.tagName !== 'TEXTAREA') {
       e.preventDefault()
       noSpeechRef.current = true
       save({ next: true })
