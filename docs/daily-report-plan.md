@@ -129,7 +129,7 @@ SVGアイコン**（`src/components/Icons.jsx`）に統一する（初回実装�
 | filename / mime / size | text/text/int | |
 | width / height | int | 表示レイアウト用 |
 | comment | text | 写真ごとのコメント |
-| taken_at | timestamptz | 撮影日時（EXIF、無ければアップロード時刻） |
+| taken_at | timestamptz | 撮影日時（縮小前の元ファイルの EXIF。無ければファイルの日時。2026-11-04〜 `src/lib/photoDate.js`） |
 
 ### parking_violations（不正駐車）
 | 列 | 型 | 備考 |

@@ -1,7 +1,10 @@
 // 写真の撮影日時を読む（2026-10-14〜。残留塩素等検査で、写真ライブラリから選んだ写真の撮影日時を
-// 測定日時にするため）。依存を増やさないよう、JPEG の EXIF から日時のタグだけを読む最小限の実装。
+// 測定日時にするため。2026-11-04〜 日報の作業写真・違反車両の写真でも使う）。
+// 依存を増やさないよう、EXIF から日時のタグだけを読む最小限の実装。
 //   1. EXIF の DateTimeOriginal（撮影日時）→ 無ければ DateTimeDigitized → DateTime（IFD0）
-//   2. EXIF が読めない（HEIC・PNG・EXIF を消された画像など）ときはファイルの日時（lastModified）で代用する
+//      JPEG は APP1 から読む。JPEG 以外（HEIC など）は "Exif\0\0" に続く TIFF ヘッダを探して読む
+//   2. EXIF が読めない（PNG・PDF・EXIF を消された画像など）ときはファイルの日時（lastModified）で代用する
+//      （ブラウザが渡すのは最終更新日時だけで、作成日時は取れない）
 // EXIF の日時はタイムゾーンを持たない「撮影した端末の現地時刻」なので、そのまま現地時刻として扱う。
 // 戻り値: { local: 'YYYY-MM-DDTHH:MM'（datetime-local の値）, iso, source: 'exif' | 'file' } または null
 
@@ -23,6 +26,21 @@ function readExifDates(buf) {
       return parseTiff(v, p + 10, Math.min(v.byteLength, p + 2 + size))
     }
     p += 2 + size
+  }
+  return null
+}
+
+// JPEG 以外（HEIC/HEIF・TIFF など）: "Exif\0\0" の直後に TIFF ヘッダ（II*\0 / MM\0*）がある箇所を探す
+function findExifTiff(buf) {
+  const v = new DataView(buf)
+  const n = v.byteLength
+  if (n >= 8 && (v.getUint32(0) === 0x49492a00 || v.getUint32(0) === 0x4d4d002a)) {
+    return parseTiff(v, 0, n) // TIFF そのもの
+  }
+  for (let i = 0; i + 14 <= n; i += 1) {
+    if (v.getUint32(i) !== 0x45786966 || v.getUint16(i + 4) !== 0) continue
+    const t = v.getUint32(i + 6)
+    if (t === 0x49492a00 || t === 0x4d4d002a) return parseTiff(v, i + 6, n)
   }
   return null
 }
@@ -67,12 +85,17 @@ function pad(n) {
 export async function readPhotoDate(file) {
   try {
     const head = await file.slice(0, 256 * 1024).arrayBuffer()
-    const raw = readExifDates(head)
-    const m = raw && raw.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/)
+    let raw = readExifDates(head)
+    // JPEG でなければ（HEIC は EXIF が後ろにあることもあるため）先頭 16MB まで探す
+    if (!raw && new DataView(head).byteLength >= 2 && new DataView(head).getUint16(0) !== 0xffd8) {
+      const buf = file.size > head.byteLength ? await file.slice(0, 16 * 1024 * 1024).arrayBuffer() : head
+      raw = findExifTiff(buf)
+    }
+    const m = raw && raw.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?/)
     if (m && m[1] !== '0000') {
-      const [, y, mo, d, h, mi] = m
+      const [, y, mo, d, h, mi, sec] = m
       const local = `${y}-${mo}-${d}T${h}:${mi}`
-      return { local, iso: new Date(local).toISOString(), source: 'exif' }
+      return { local, iso: new Date(`${local}:${sec || '00'}`).toISOString(), source: 'exif' }
     }
   } catch {
     // 読めなければファイルの日時で代用する

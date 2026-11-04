@@ -10,6 +10,7 @@ import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
 import { IconDownload, IconCamera, IconFolder } from './Icons'
+import { readPhotoDate } from '../lib/photoDate'
 
 // モバイル判定の分岐点。Dashboard.css の @media (max-width: 640px) と揃える
 const MOBILE_QUERY = '(max-width: 640px)'
@@ -100,8 +101,8 @@ export default function ReportPhotos({ reportId, readOnly }) {
           filename: file.name,
           width: prepared.width,
           height: prepared.height,
-          // 撮影日時は端末のファイル更新時刻で代用する（EXIF解析は依存を増やすため見送り）
-          takenAt: file.lastModified ? new Date(file.lastModified).toISOString() : null,
+          // 撮影日時は縮小前の元ファイルの EXIF（DateTimeOriginal）から読む。無ければファイルの日時（2026-11-04〜）
+          takenAt: (await readPhotoDate(file))?.iso || null,
         })
         setPhotos((prev) => [...prev, photo])
       } catch (err) {

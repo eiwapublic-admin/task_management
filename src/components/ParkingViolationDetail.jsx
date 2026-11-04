@@ -21,6 +21,7 @@ import Combobox from './Combobox'
 import TimeInput from './TimeInput'
 import { IconCamera, IconFolder } from './Icons'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
+import { readPhotoDate } from '../lib/photoDate'
 
 function uniqueSorted(list) {
   return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
@@ -156,7 +157,8 @@ export default function ParkingViolationDetail({ violation, readOnly, onClose, o
         filename: file.name,
         width: prepared.width,
         height: prepared.height,
-        takenAt: file.lastModified ? new Date(file.lastModified).toISOString() : null,
+        // 撮影日時は縮小前の元ファイルの EXIF（DateTimeOriginal）から読む。無ければファイルの日時（2026-11-04〜）
+        takenAt: (await readPhotoDate(file))?.iso || null,
       })
       setPhotos((prev) => [...prev, photo])
       // 撮影・選択した写真をそのまま拡大表示に開く（2026-09-01）。続けて「写真から読み取る」
