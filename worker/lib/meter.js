@@ -1379,22 +1379,34 @@ export async function handleMeterRepairData(req) {
 
 // ---------- 提出メール（D2。Gmail〔共有アドレス〕に添付付きの下書きを作る。送信は人が Gmail で） ----------
 
-// settings のキー。宛先は個人のメールアドレスなので、ログインした誰でも読める GET /api/settings からは外してある
-// （worker/index.js の handleSettingsRead。meter_mail_ で始まるキーを返さない）
-const MAIL_KEYS = {
-  to: 'meter_mail_to',
-  cc: 'meter_mail_cc',
-  subject: 'meter_mail_subject',
-  body: 'meter_mail_body',
-  reply_to: 'meter_mail_reply_to',
+// メールの種類ごとの設定（settings のキー）。宛先は個人のメールアドレスなので、ログインした誰でも読める GET /api/settings からは外してある
+// （worker/index.js の handleSettingsRead。meter_mail_ で始まるキーを返さない）。
+//   report … 検針データの提出メール（Phase 3。FileMaker のコンスタントマスタ「検針総合データ送信」A_*）
+//   gas    … ガス検針票の送付メール（Phase 4。2026-11-10〜。同「検針票」B_*）
+const MAIL_SETS = {
+  report: {
+    prefix: 'meter_mail_',
+    defaults: {
+      to: '',
+      cc: '',
+      subject: '検針データ（%YYYYMM%）',
+      body: 'お世話になっております。\n\n本日検針しました検針データをお送りしますのでご査収ください。\n\n以上、よろしくお願いいたします。',
+      reply_to: '',
+    },
+  },
+  gas: {
+    prefix: 'meter_mail_gas_',
+    defaults: {
+      to: '',
+      cc: '',
+      subject: 'BKBさくら殿ガス検針票',
+      body: 'お世話になっております。\n\n本日検針しましたガスメータの検針票をお送りしますのでご査収ください。\n\n以上、よろしくお願いいたします。',
+      reply_to: '',
+    },
+  },
 }
-const MAIL_DEFAULTS = {
-  to: '',
-  cc: '',
-  subject: '検針データ（%YYYYMM%）',
-  body: 'お世話になっております。\n\n本日検針しました検針データをお送りしますのでご査収ください。\n\n以上、よろしくお願いいたします。',
-  reply_to: '',
-}
+const MAIL_FIELDS = ['to', 'cc', 'subject', 'body', 'reply_to']
+const mailKey = (kind, name) => `${MAIL_SETS[kind].prefix}${name}`
 const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/
 
 // 「名前 <a@example.jp>; 名前 <b@example.jp>, c@example.jp」の形（FileMaker のコンスタントマスタと同じ書き方）を
@@ -1428,12 +1440,16 @@ export function parseAddressList(value) {
   return { list, bad }
 }
 
-async function loadMailSettings(supabase) {
-  const { data, error } = await supabase.from('settings').select('key, value').in('key', Object.values(MAIL_KEYS))
+async function loadMailSettings(supabase, kind = 'report') {
+  const keys = MAIL_FIELDS.map((f) => mailKey(kind, f))
+  const { data, error } = await supabase.from('settings').select('key, value').in('key', keys)
   if (error) throw new Error(error.message)
   const map = new Map((data || []).map((r) => [r.key, r.value]))
   const out = {}
-  for (const [name, key] of Object.entries(MAIL_KEYS)) out[name] = map.has(key) ? map.get(key) ?? '' : MAIL_DEFAULTS[name]
+  for (const f of MAIL_FIELDS) {
+    const key = mailKey(kind, f)
+    out[f] = map.has(key) ? map.get(key) ?? '' : MAIL_SETS[kind].defaults[f]
+  }
   return out
 }
 
@@ -1443,13 +1459,15 @@ function fillMonth(textValue, month) {
   return String(textValue || '').replaceAll('%YYYYMM%', `${y}年${Number(m)}月`)
 }
 
-// GET・PUT /api/meter/mail-settings — 提出メールの宛先（TO・CC）・件名・本文・返信先
+// GET・PUT /api/meter/mail-settings?kind=report|gas — 提出メール・ガス検針票メールの宛先（TO・CC）・件名・本文・返信先
 export async function handleMeterMailSettings(req) {
   const { error } = await requireStaff(req)
   if (error) return error
   try {
+    const kind = new URL(req.url).searchParams.get('kind') || 'report'
+    if (!MAIL_SETS[kind]) return json({ error: 'メールの種類が不正です' }, 400)
     const supabase = getAdminClient()
-    if (req.method === 'GET') return json({ settings: await loadMailSettings(supabase) })
+    if (req.method === 'GET') return json({ settings: await loadMailSettings(supabase, kind) })
 
     const p = await req.json().catch(() => null)
     const rows = []
@@ -1459,19 +1477,19 @@ export async function handleMeterMailSettings(req) {
       const { list, bad } = parseAddressList(value)
       if (bad.length) return json({ error: `${name === 'to' ? '宛先' : 'CC'}のアドレスの形式が正しくありません: ${bad.join('、')}` }, 400)
       if (list.length > 20) return json({ error: `${name === 'to' ? '宛先' : 'CC'}は20件までです` }, 400)
-      rows.push({ key: MAIL_KEYS[name], value: value.trim() })
+      rows.push({ key: mailKey(kind, name), value: value.trim() })
     }
-    if ('subject' in (p || {})) rows.push({ key: MAIL_KEYS.subject, value: String(p.subject ?? '').trim().slice(0, 200) })
-    if ('body' in (p || {})) rows.push({ key: MAIL_KEYS.body, value: String(p.body ?? '').replace(/\r\n?/g, '\n').slice(0, 5000) })
+    if ('subject' in (p || {})) rows.push({ key: mailKey(kind, 'subject'), value: String(p.subject ?? '').trim().slice(0, 200) })
+    if ('body' in (p || {})) rows.push({ key: mailKey(kind, 'body'), value: String(p.body ?? '').replace(/\r\n?/g, '\n').slice(0, 5000) })
     if ('reply_to' in (p || {})) {
       const v = String(p.reply_to ?? '').trim().toLowerCase()
       if (v && (v.length > 200 || !EMAIL_RE.test(v))) return json({ error: '返信先アドレスの形式が正しくありません' }, 400)
-      rows.push({ key: MAIL_KEYS.reply_to, value: v })
+      rows.push({ key: mailKey(kind, 'reply_to'), value: v })
     }
     if (rows.length === 0) return json({ error: '更新する項目がありません' }, 400)
     const { error: err } = await supabase.from('settings').upsert(rows, { onConflict: 'key' })
     if (err) throw new Error(err.message)
-    return json({ settings: await loadMailSettings(supabase) })
+    return json({ settings: await loadMailSettings(supabase, kind) })
   } catch (err) {
     console.error('meter-mail-settings 失敗:', err)
     return json({ error: '提出メールの設定の保存に失敗しました' }, 500)
@@ -1479,12 +1497,16 @@ export async function handleMeterMailSettings(req) {
 }
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-const DRAFT_FILE_MAX_BYTES = 5 * 1024 * 1024
+const DRAFT_FILE_MAX_BYTES = 10 * 1024 * 1024
+// 添付として受ける種類（拡張子 → Content-Type）
+const DRAFT_TYPES = {
+  report: { '.xlsx': XLSX_MIME },
+  gas: { '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' },
+}
 
-// POST /api/meter/report/draft（multipart: month, files＝xlsx 2つ）— 提出メールの下書きを Gmail に作る。
-// 宛先・件名・本文は画面から受け取らず、サーバーが設定から引き直す（ビルメンの案内メールと同じ考え方）。
+// 下書きを作る共通部分。宛先・件名・本文は画面から受け取らず、サーバーが設定から引き直す（ビルメンの案内メールと同じ考え方）。
 // 返信先は本文の末尾にも書き添える（Gmail の画面から送ると Reply-To ヘッダーが落ちるため。docs/bilmen-plan.md 7-3-3）
-export async function handleMeterReportDraft(req) {
+async function createMeterDraft(req, kind, label) {
   const { auth, error } = await requireStaff(req)
   if (error) return error
   try {
@@ -1493,47 +1515,44 @@ export async function handleMeterReportDraft(req) {
     const month = String(form.get('month') || '')
     if (!MONTH_PATTERN.test(month)) return json({ error: '検針月度が不正です' }, 400)
     const files = form.getAll('files').filter((f) => f && typeof f !== 'string')
-    if (files.length === 0) return json({ error: '添付する xlsx がありません' }, 400)
-    if (files.length > 3) return json({ error: '添付が多すぎます' }, 400)
+    if (files.length === 0) return json({ error: '添付するファイルがありません' }, 400)
+    if (files.length > 5) return json({ error: '添付は5つまでです' }, 400)
+    // Gmail で送れる添付は合計25MBまで
+    if (files.reduce((a, f) => a + f.size, 0) > 25 * 1024 * 1024) return json({ error: '添付の合計が大きすぎます（25MBまで）' }, 400)
+    const types = DRAFT_TYPES[kind]
+    const attachments = []
     for (const f of files) {
-      if (f.size > DRAFT_FILE_MAX_BYTES) return json({ error: '添付が大きすぎます（5MBまで）' }, 400)
-      if (!/\.xlsx$/i.test(String(f.name || ''))) return json({ error: '添付は xlsx だけです' }, 400)
+      if (f.size > DRAFT_FILE_MAX_BYTES) return json({ error: '添付が大きすぎます（1つ10MBまで）' }, 400)
+      const name = String(f.name || '')
+      const ext = (name.match(/\.[^.]+$/)?.[0] || '').toLowerCase()
+      if (!types[ext]) return json({ error: `添付できない種類のファイルです（${Object.keys(types).join('・')}）` }, 400)
+      attachments.push({ filename: name, contentType: types[ext], bytes: new Uint8Array(await f.arrayBuffer()) })
     }
 
     const supabase = getAdminClient()
     const [settings, { data: shared }] = await Promise.all([
-      loadMailSettings(supabase),
+      loadMailSettings(supabase, kind),
       supabase.from('settings').select('value').eq('key', 'shared_gmail').maybeSingle(),
     ])
     const to = parseAddressList(settings.to).list
     const cc = parseAddressList(settings.cc).list
-    if (to.length === 0) return json({ error: '宛先がありません。「提出メールの設定」で宛先を登録してください' }, 400)
+    if (to.length === 0) return json({ error: '宛先がありません。「宛先・件名・本文を変える」で宛先を登録してください' }, 400)
     const subject = fillMonth(settings.subject, month).trim()
-    if (!subject) return json({ error: '件名が空です。「提出メールの設定」で件名を登録してください' }, 400)
+    if (!subject) return json({ error: '件名が空です。「宛先・件名・本文を変える」で件名を登録してください' }, 400)
     const replyTo = EMAIL_RE.test(settings.reply_to || '') ? settings.reply_to : null
     const bodyText = fillMonth(settings.body, month).replace(/\s+$/, '')
     const body = replyTo ? `${bodyText}\n\nご返信は ${replyTo} までお願いいたします。\n` : `${bodyText}\n`
 
-    const attachments = []
-    for (const f of files) {
-      attachments.push({ filename: String(f.name), contentType: XLSX_MIME, bytes: new Uint8Array(await f.arrayBuffer()) })
-    }
-    const raw = buildMimeMessage({
-      to,
-      cc,
-      replyTo: replyTo ? [{ email: replyTo }] : [],
-      subject,
-      body,
-      attachments,
-    })
+    const raw = buildMimeMessage({ to, cc, replyTo: replyTo ? [{ email: replyTo }] : [], subject, body, attachments })
     const accessToken = await getAccessToken()
     const draft = await createDraft(accessToken, raw)
 
     const account = (shared?.value || '').trim()
     const base = `https://mail.google.com/mail/${account ? `?authuser=${encodeURIComponent(account)}` : 'u/0/'}`
     const messageId = draft?.message?.id || ''
-    await logMeter(supabase, actorOf(auth), `検針: ${month} の提出メールの下書きを作成しました（宛先 ${to.length}件・CC ${cc.length}件・添付 ${attachments.length}件）`, {
+    await logMeter(supabase, actorOf(auth), `検針: ${month} の${label}の下書きを作成しました（宛先 ${to.length}件・CC ${cc.length}件・添付 ${attachments.length}件）`, {
       month,
+      kind,
       draft_id: draft?.id || null,
       message_id: messageId || null,
     })
@@ -1542,11 +1561,22 @@ export async function handleMeterReportDraft(req) {
       subject,
       to_count: to.length,
       cc_count: cc.length,
+      attachment_count: attachments.length,
       draft_url: messageId ? `${base}#drafts?compose=${messageId}` : `${base}#drafts`,
       drafts_url: `${base}#drafts`,
     })
   } catch (err) {
-    console.error('meter-report-draft 失敗:', err)
+    console.error(`meter-draft(${kind}) 失敗:`, err)
     return json({ error: err instanceof Error ? err.message : '下書きの作成に失敗しました' }, 500)
   }
+}
+
+// POST /api/meter/report/draft（multipart: month, files＝xlsx 2つ）— 検針データの提出メールの下書き（Phase 3）
+export function handleMeterReportDraft(req) {
+  return createMeterDraft(req, 'report', '提出メール')
+}
+
+// POST /api/meter/gas/draft（multipart: month, files＝スキャンした検針票の PDF・画像）— ガス検針票の送付メールの下書き（Phase 4。2026-11-10〜）
+export function handleMeterGasDraft(req) {
+  return createMeterDraft(req, 'gas', 'ガス検針票メール')
 }

@@ -946,6 +946,7 @@ const VALID_PDF_KINDS = new Set([
   'waste-sheet',
   'meter-photos', // 検針の写真一覧（2026-10-20）
   'tenant-list', // テナント一覧表・緊急連絡先一覧表（2026-10-29）
+  'meter-gas', // 検針のガス・水道お渡し票（2026-11-10）
 ])
 
 function pdfPreviewKey(userId, kind) {

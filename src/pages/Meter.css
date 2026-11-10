@@ -373,3 +373,10 @@ button.meter-photo { cursor: zoom-in; }
 .meter-mail-body { white-space: pre-wrap; margin: var(--space-2) 0 0; font-size: var(--fs-sm); }
 .meter-facts.meter-mail-preview { grid-template-columns: 1fr; gap: var(--space-2); }
 .meter-facts.meter-mail-preview > div { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
+
+/* ガス・水道（Phase 4。2026-11-10〜） */
+.meter-gas-slip { margin-bottom: var(--space-3); }
+.meter-gas-slip-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-2); }
+.meter-gas-scans { list-style: none; margin: var(--space-2) 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.meter-gas-scans li { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.meter-gas-scans li > span:first-child { word-break: break-all; }

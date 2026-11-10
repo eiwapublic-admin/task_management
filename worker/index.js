@@ -113,6 +113,7 @@ import {
   handleMeterRepairData,
   handleMeterMailSettings,
   handleMeterReportDraft,
+  handleMeterGasDraft,
   cleanupMeterPhotos,
 } from './lib/meter.js'
 import {
@@ -1287,6 +1288,10 @@ async function route(req, env) {
   }
   if (pathname === '/api/meter/report/draft') {
     return req.method === 'POST' ? handleMeterReportDraft(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  // ガス・水道（Phase 4。2026-11-10〜）: ガス検針票の送付メールの下書き
+  if (pathname === '/api/meter/gas/draft') {
+    return req.method === 'POST' ? handleMeterGasDraft(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   // --- リマインダー（システム運用上の期限管理。2026-09-07〜。ハンドラは worker/lib/reminders.js） ---

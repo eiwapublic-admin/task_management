@@ -260,21 +260,26 @@ export function fetchMeterRepairData(month) {
   return authFetch(`/api/meter/repair?month=${encodeURIComponent(month)}`)
 }
 
-export function fetchMeterMailSettings() {
-  return authFetch('/api/meter/mail-settings').then((d) => d.settings)
+// kind: 'report'（検針データの提出メール）| 'gas'（ガス検針票の送付メール。Phase 4）
+export function fetchMeterMailSettings(kind = 'report') {
+  return authFetch(`/api/meter/mail-settings?kind=${kind}`).then((d) => d.settings)
 }
 
-export function saveMeterMailSettings(values) {
-  return authFetch('/api/meter/mail-settings', { method: 'PUT', body: JSON.stringify(values) }).then((d) => d.settings)
+export function saveMeterMailSettings(values, kind = 'report') {
+  return authFetch(`/api/meter/mail-settings?kind=${kind}`, { method: 'PUT', body: JSON.stringify(values) }).then((d) => d.settings)
 }
 
-// 提出メールの下書きを Gmail に作る。files: [{ blob, name }]（検針データ・修理データの xlsx）
-export async function createMeterReportDraft(month, files) {
+const DRAFT_PATHS = { report: '/api/meter/report/draft', gas: '/api/meter/gas/draft' }
+
+// メールの下書きを Gmail に作る。files: [{ blob, name }]
+//   report … 検針データ・修理データの xlsx（Phase 3）
+//   gas    … スキャンしたガス検針票の PDF・画像（Phase 4。2026-11-10〜）
+export async function createMeterDraft(kind, month, files) {
   const form = new FormData()
   form.append('month', month)
   for (const f of files) form.append('files', f.blob, f.name)
   // FormData は authFetch（JSON 用）を通さずに送る（写真の送信と同じ）
-  const res = await fetch('/api/meter/report/draft', {
+  const res = await fetch(DRAFT_PATHS[kind], {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
     body: form,
@@ -282,4 +287,8 @@ export async function createMeterReportDraft(month, files) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || '下書きの作成に失敗しました')
   return data
+}
+
+export function createMeterReportDraft(month, files) {
+  return createMeterDraft('report', month, files)
 }
