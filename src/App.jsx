@@ -27,6 +27,7 @@ import MeterMonth from './pages/MeterMonth'
 import MeterPhotos from './pages/MeterPhotos'
 import MeterAircon from './pages/MeterAircon'
 import MeterReport from './pages/MeterReport'
+import MeterGas from './pages/MeterGas'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
@@ -334,6 +335,15 @@ function App() {
           element={
             <RequireStaff>
               <MeterReport />
+            </RequireStaff>
+          }
+        />
+        {/* ガス・水道（Phase 4。2026-11-10〜）。お渡し票の PDF とガス検針票メールの下書き */}
+        <Route
+          path="/meter/:month/gas"
+          element={
+            <RequireStaff>
+              <MeterGas />
             </RequireStaff>
           }
         />

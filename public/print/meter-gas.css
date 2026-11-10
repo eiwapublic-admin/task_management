@@ -1,0 +1,23 @@
+/* ガス・水道お渡し票（メータ検針報告書）の印刷用 PDF の書式（src/lib/meterGasPdf.js が iframe に読み込む。2026-11-10〜）。
+   アプリの CSP（style-src 'self'）で埋め込みの <style> が効かないため、別ファイルにしている。
+   A4 縦1枚の上半分が「テナント様用」、下半分が「（控）」。FileMaker の「ガス・水道お渡し票」と同じ作り */
+@page { size: A4 portrait; margin: 0; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', serif; color: #111; }
+.page { width: 210mm; height: 297mm; overflow: hidden; background: #fff; }
+.slip { position: relative; height: 148.5mm; padding: 14mm 18mm 10mm; }
+.slip + .slip { border-top: 1px dashed #9ca3af; }
+.copy { position: absolute; top: 9mm; right: 18mm; font-size: 10.5pt; }
+h1 { margin: 6mm 0 9mm; text-align: center; font-size: 19pt; font-weight: bold; letter-spacing: .5em; text-indent: .5em; }
+.to { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 7mm; }
+.to .name { font-size: 15pt; padding: 0 2mm 1mm; border-bottom: 1px solid #111; min-width: 75mm; }
+.to .date { font-size: 11pt; }
+table { width: 100%; border-collapse: collapse; font-size: 12pt; }
+th, td { border: 1px solid #111; height: 11mm; padding: 0 4mm; }
+th { background: #e5e7eb; font-weight: normal; text-align: center; font-size: 11pt; }
+th.kind { width: 24mm; }
+td.kind { text-align: center; }
+td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+td .unit { margin-left: 2mm; font-size: 10pt; }
+.office { margin-top: 8mm; text-align: right; font-size: 11pt; }

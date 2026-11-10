@@ -1,5 +1,9 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
+最終更新: 2026-11-10（**検針 Phase 4＝ガス・水道のお渡し票 PDF・ガス検針票メールの Gmail 下書き**（依頼）。`/meter/:月度/gas`（`src/pages/MeterGas.jsx`。検針一覧のヘッダに「ガス・水道」ボタン）。
+①**お渡し票**（メータ検針報告書。`src/lib/meterGasPdf.js`・`public/print/meter-gas.css`）: ガス・水道のメータを持つテナントごとに A4 縦1枚（上がテナント様用・下が控）。今月の検針値・今月の使用量・前月の使用量は検針一覧と同じ `buildMonthRows`。PDF はアプリ内プレビュー（kind `meter-gas`）から印刷・ダウンロード。
+②**ガス検針票の送付メール**: スキャンした検針票（PDF・JPEG・PNG）を選ぶかドラッグ →「Gmail に下書きを作る」（`POST /api/meter/gas/draft`）。宛先・件名・本文は `settings` の `meter_mail_gas_*`（`/api/meter/mail-settings?kind=gas`）。提出メールと画面のカード（`src/components/MeterMailCard.jsx`）・サーバーの処理（`worker/lib/meter.js` の `MAIL_SETS`・`createMeterDraft`）を共通化。添付は1つ10MB・合計25MBまで。
+**確認**: 本番の 11月度（10/16 検針）の値で ガス 7,037.0／68.0／63.0・水道 4,514.0／28.0／31.0 ㎥ が出ること、PDF の見た目、下書きへの添付2つ・設定の kind=gas、提出メール（Phase 3）が変わらず動くことを模擬 API の Playwright（PC・iPhone 幅）で確認。**宛先の登録と Gmail への実際の下書きは本番で依頼元が行う**（6章）。DB の変更なし。353番）。
 最終更新: 2026-11-10（**検針 Phase 3＝空調データの取込・検針データ／修理データの xlsx・提出メールの Gmail 下書き**（依頼）。
 ①**空調データ**（`/meter/:月度/aircon`。`src/pages/MeterAircon.jsx`・`src/lib/meterAircon.js`）: 空調集中コントローラの CSV（Shift_JIS。例 20260901_20260930.csv）を選ぶかドラッグ → 期間・月度・台数・合計を確かめてから取込（`POST /api/meter/aircon`。開始日の翌月度に入れ、CSV に無い室内機の古い行は消す）。室内機の割当てメータは取り込んだ時点の検針マスタから引いて保存（FileMaker の「割当先メータ最新化」＝取り込み直し）。一覧はメータごとの昼間Wh・請求用kWh、行を開くと室内機の内訳、マスタの今の割当てと違う室内機・割当ての無い室内機は警告。開始日が1日でない・日数が月の日数と違う・開いている月度と違うときも警告。
 ②**出力と報告**（`/meter/:月度/report`。`src/pages/MeterReport.jsx`）: 出力前の確認（当月値の無いメータ・空調データの有無）、**検針データ_yyyy年m月分.xlsx**（47列。`buildMeterOutput` の結果を `src/lib/meterXlsx.js` が雛形 `public/templates/meter-data.xlsx` に書く）と FileMaker の xlsx との全セル突き合わせ、**修理データ_yyyy年m月分.xlsx**（7列。`GET /api/meter/repair`＝検針月度の前月のテナント設置分。`worker/lib/equipment.js` の `summarizeTenantBilling`・`loadTenantRepairBilling` を FileMaker 向け API と共用）、**提出メール**（`POST /api/meter/report/draft`。xlsx 2つを添付した下書きを共有 Gmail に作る。送信はしない）。宛先 TO・CC・件名（%YYYYMM% →「2026年10月」）・本文・返信先は画面の「宛先・件名・本文を変える」で `settings` の `meter_mail_*` に保存（`GET/PUT /api/meter/mail-settings`。個人のアドレスなので `GET /api/settings` からは外した）。
@@ -1582,7 +1586,9 @@ id はクエリ/ボディ」方式にしてある（計画6章のパスパラメ
   ③11月分の検針データ xlsx を FileMaker の xlsx と突き合わせ（全セル一致が条件）、④「Gmail に下書きを作る」で添付2つ入りの下書きができるか。
   **③は 2026-11-10 済み**: 11月分は FileMaker 側のマスタ（75・76号室の面積、空調機20・23・24 の割当て→「割当先メータ最新化」）と77号室の値をそろえたうえで、
   残りは請求に影響しない 検針時刻52（撮影が別々）・退去済み2（52-1・52-2。アプリのみ退去日あり）・67.68 の桁数1（アプリのみ修正）の55セルだけ（請求書Excelは46・23・34列を参照しない）。
-  次は Phase 4（ガス・水道のお渡し票PDF・ガス検針票のメール下書き）。12/1 から並行運用が目標
+  Phase 4（ガス・水道のお渡し票PDF・ガス検針票のメール下書き。353番）も入れた。**依頼元の確認待ち**: ①検針一覧 →「ガス・水道」→ ガス検針票の送付メールの
+  「宛先・件名・本文を変える」で FileMaker のコンスタントマスタ「検針票」（B_TO・B_CC・B_CONT）を貼って保存。②次の月の半ばの検針（12月度）で、写真取込・入力のあと
+  お渡し票 PDF を FileMaker のものと見比べ、スキャンした検針票を添付した下書きができるか。12/1 から並行運用が目標
 - [x] **検針の入力画面の自動の読み上げ（327番）**: 検針は PC だけで行うため、PC での確認で OK（2026-11-10 依頼元。iPhone の Safari は確かめない）
 - [ ] **【要確認】業務マニュアルの添付ファイルを実機で試してもらう（327番。2026-10-26）**: 追加・削除・画像/PDF のプレビュー・その他のダウンロード。
   Storage の使用量は Supabase のダッシュボード（supabase.com → プロジェクト「Eiwapublic Project」→ Storage）で見る（無料枠1GB）
