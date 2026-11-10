@@ -7,11 +7,14 @@
 //   node scripts/verify-meter-output.mjs <CSVのフォルダ> /tmp/expected.json 2026-10 [--recompute]
 // --recompute を付けると、移行した前月値・差分を使わずアプリの計算だけで組み立てる
 // （アプリで入力した月と同じ計算になるかの確認用）。
-import { readFileSync, readdirSync } from 'node:fs'
+// --write-xlsx <出力先.xlsx> を付けると、画面と同じ書き出し（src/lib/meterXlsx.js）で xlsx も作る
+// （2026-11-10〜。作った xlsx を dump-xlsx-json.py で JSON にして、もう一度この照合にかければ書き出しの確認になる）。
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readMigrationCsv } from '../src/lib/meterCsv.js'
 import { buildMeterOutput, METER_OUTPUT_COLUMNS } from '../src/lib/meterOutput.js'
 import { prepareMigration } from '../src/lib/meterMigration.js'
+import { buildMeterDataXlsx } from '../src/lib/meterXlsx.js'
 
 const [dir, expectedPath, month, ...flags] = process.argv.slice(2)
 if (!dir || !expectedPath || !/^\d{4}-\d{2}$/.test(month || '')) {
@@ -19,6 +22,7 @@ if (!dir || !expectedPath || !/^\d{4}-\d{2}$/.test(month || '')) {
   process.exit(1)
 }
 const recompute = flags.includes('--recompute')
+const xlsxOut = flags.includes('--write-xlsx') ? flags[flags.indexOf('--write-xlsx') + 1] : null
 
 const files = {}
 for (const name of readdirSync(dir)) {
@@ -48,6 +52,13 @@ const out = buildMeterOutput({
   acUsage: data.acUsage.filter((u) => u.month === month),
   oaCoefficient: 40,
 })
+
+if (xlsxOut) {
+  const tpl = readFileSync(new URL('../public/templates/meter-data.xlsx', import.meta.url))
+  const blob = await buildMeterDataXlsx(out, tpl.buffer.slice(tpl.byteOffset, tpl.byteOffset + tpl.byteLength))
+  writeFileSync(xlsxOut, Buffer.from(await blob.arrayBuffer()))
+  console.log(`xlsx を書き出しました: ${xlsxOut}`)
+}
 
 function shiftBack(m) {
   const [y, mm] = m.split('-').map(Number)
