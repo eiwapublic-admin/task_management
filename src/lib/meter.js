@@ -241,3 +241,45 @@ export function askChangeReason(message = '変更理由を入力してくださ�
   const r = window.prompt(message, '')
   return r == null ? null : r.trim()
 }
+
+// ---------- 空調と出力（Phase 3。2026-11-10〜） ----------
+
+export function fetchMeterAircon(month) {
+  return authFetch(`/api/meter/aircon?month=${encodeURIComponent(month)}`)
+}
+
+// 空調集中コントローラの CSV（parseAcControllerCsv の結果）をその月度の空調データとして保存する
+export function importMeterAircon({ month, periodStart, days, units }) {
+  return authFetch('/api/meter/aircon', {
+    method: 'POST',
+    body: JSON.stringify({ month, period_start: periodStart, days, units }),
+  })
+}
+
+export function fetchMeterRepairData(month) {
+  return authFetch(`/api/meter/repair?month=${encodeURIComponent(month)}`)
+}
+
+export function fetchMeterMailSettings() {
+  return authFetch('/api/meter/mail-settings').then((d) => d.settings)
+}
+
+export function saveMeterMailSettings(values) {
+  return authFetch('/api/meter/mail-settings', { method: 'PUT', body: JSON.stringify(values) }).then((d) => d.settings)
+}
+
+// 提出メールの下書きを Gmail に作る。files: [{ blob, name }]（検針データ・修理データの xlsx）
+export async function createMeterReportDraft(month, files) {
+  const form = new FormData()
+  form.append('month', month)
+  for (const f of files) form.append('files', f.blob, f.name)
+  // FormData は authFetch（JSON 用）を通さずに送る（写真の送信と同じ）
+  const res = await fetch('/api/meter/report/draft', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: form,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || '下書きの作成に失敗しました')
+  return data
+}

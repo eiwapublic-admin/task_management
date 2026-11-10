@@ -25,6 +25,8 @@ import Manuals from './pages/Manuals'
 import MeterMasters from './pages/MeterMasters'
 import MeterMonth from './pages/MeterMonth'
 import MeterPhotos from './pages/MeterPhotos'
+import MeterAircon from './pages/MeterAircon'
+import MeterReport from './pages/MeterReport'
 import Reminders from './pages/Reminders'
 import Waste from './pages/Waste'
 import Paper from './pages/Paper'
@@ -315,6 +317,23 @@ function App() {
           element={
             <RequireStaff>
               <MeterPhotos />
+            </RequireStaff>
+          }
+        />
+        {/* 空調と出力（Phase 3。2026-11-10〜）。空調データの取込と、検針データ・修理データの xlsx・提出メールの下書き */}
+        <Route
+          path="/meter/:month/aircon"
+          element={
+            <RequireStaff>
+              <MeterAircon />
+            </RequireStaff>
+          }
+        />
+        <Route
+          path="/meter/:month/report"
+          element={
+            <RequireStaff>
+              <MeterReport />
             </RequireStaff>
           }
         />

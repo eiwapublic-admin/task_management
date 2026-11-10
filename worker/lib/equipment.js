@@ -972,6 +972,58 @@ function formatInstallationSummary(dates, shortName) {
   return `${mdList.join(', ')} ${shortName || ''}`.trim()
 }
 
+// 請求連携用の月次集計（8-5-2。「修理データ」の中身）。テナント設置（reason='tenant'）だけを
+// 請求先コード×備品で合計し、設置日を「2/4, 2/12 FLR40SW」の形に並べる。
+// FileMaker 向けの API（handleEquipmentInstallations）と、検針の「修理データ_yyyy年mm月分」（worker/lib/meter.js。
+// 2026-11-10〜）の両方で使う
+export function summarizeTenantBilling(rows, itemMap) {
+  const itemLabel = (item) => item?.short_name || item?.name || null
+  const billingMap = new Map()
+  for (const r of rows) {
+    if (r.reason !== 'tenant') continue
+    const item = itemMap.get(r.item_id)
+    const key = `${r.tenant_code}:${item?.item_no}`
+    if (!billingMap.has(key)) {
+      billingMap.set(key, {
+        tenant_code: r.tenant_code,
+        tenant_name: r.tenant_name,
+        item_no: item?.item_no ?? null,
+        item_name: itemLabel(item),
+        quantity: 0,
+        dates: [],
+      })
+    }
+    const b = billingMap.get(key)
+    b.quantity += r.quantity
+    b.dates.push(r.occurred_at)
+  }
+  return [...billingMap.values()].map((b) => {
+    const dates = b.dates.sort()
+    return { ...b, dates, installation_summary: formatInstallationSummary(dates, b.item_name) }
+  })
+}
+
+// 実績月（YYYY-MM。日本時間）のテナント設置分の請求連携用の集計（修理データ）。無償交換は含めない
+export async function loadTenantRepairBilling(supabase, month) {
+  const { start, end } = jstMonthRangeUtc(month)
+  const [{ data: rows, error }, { data: items, error: itemsErr }] = await Promise.all([
+    supabase
+      .from('equipment_transactions')
+      .select('occurred_at, tenant_code, tenant_name, quantity, item_id, reason')
+      .eq('kind', 'out')
+      .eq('reason', 'tenant')
+      .eq('free_exchange', false)
+      .gte('occurred_at', start.toISOString())
+      .lt('occurred_at', end.toISOString())
+      .order('occurred_at', { ascending: true }),
+    supabase.from('equipment_items').select('id, item_no, name, short_name'),
+  ])
+  if (error) throw new Error(error.message)
+  if (itemsErr) throw new Error(itemsErr.message)
+  const itemMap = new Map((items || []).map((i) => [i.id, i]))
+  return summarizeTenantBilling(rows || [], itemMap)
+}
+
 // GET /api/equipment/installations?month=YYYY-MM&scope=tenant|common|all&tenant_code=…
 // FileMaker 向けの公開API（6-2。APIキー認証）。「テナントに設置したランプ情報を年月指定で取得」への回答。
 // 請求の元データになるため、reason は scope で明示的に絞り、replace（新規入替）・discard（不良品処分）は
@@ -1043,29 +1095,7 @@ export async function handleEquipmentInstallations(req, env) {
 
     // 請求連携用の月次集計（8-5-2。「修理データ」と同じ中身。請求対象＝テナント設置のみなので
     // scope に関わらずテナント設置分だけを集計する。呼び出し側が「実績月＝翌月請求」の変換を行う前提）
-    const billingMap = new Map()
-    for (const r of rows || []) {
-      if (r.reason !== 'tenant') continue
-      const item = itemMap.get(r.item_id)
-      const key = `${r.tenant_code}:${item?.item_no}`
-      if (!billingMap.has(key)) {
-        billingMap.set(key, {
-          tenant_code: r.tenant_code,
-          tenant_name: r.tenant_name,
-          item_no: item?.item_no ?? null,
-          item_name: itemLabel(item),
-          quantity: 0,
-          dates: [],
-        })
-      }
-      const b = billingMap.get(key)
-      b.quantity += r.quantity
-      b.dates.push(r.occurred_at)
-    }
-    const billing = [...billingMap.values()].map((b) => {
-      const dates = b.dates.sort()
-      return { ...b, dates, installation_summary: formatInstallationSummary(dates, b.item_name) }
-    })
+    const billing = summarizeTenantBilling(rows || [], itemMap)
 
     await logEquipmentApiCall(supabase, `設置実績取得: month=${month} scope=${scope} 件数=${installations.length}`)
 

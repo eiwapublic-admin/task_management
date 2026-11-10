@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import MeterPhoto from '../components/MeterPhoto'
-import { IconCamera, IconChevronLeft, IconChevronRight, IconDownload, IconList } from '../components/Icons'
+import { IconCamera, IconChevronLeft, IconChevronRight, IconDocument, IconDownload, IconList, IconRefresh } from '../components/Icons'
 import useMeterPhotoPdfExport from '../hooks/useMeterPhotoPdfExport'
 import { defaultMeterMonth, fetchMeterMonth, floorLabel, meterMonthLabel, saveMeterReading } from '../lib/meter'
 import { buildMonthRows, formatRatio, formatTaken, formatValue, jstDateTime, monthProgress } from '../lib/meterMonth'
@@ -140,6 +140,14 @@ export default function MeterMonth() {
               >
                 <IconDownload size={20} />
                 <span className="btn-plain-label">写真一覧PDF</span>
+              </button>
+              <button type="button" className="btn-plain" onClick={() => navigate(`/meter/${month}/aircon`)} title="空調データ（集中コントローラの CSV の取込）">
+                <IconRefresh size={20} />
+                <span className="btn-plain-label">空調データ</span>
+              </button>
+              <button type="button" className="btn-plain" onClick={() => navigate(`/meter/${month}/report`)} title="出力と報告（検針データ・修理データの xlsx、提出メールの下書き）">
+                <IconDocument size={20} />
+                <span className="btn-plain-label">出力と報告</span>
               </button>
               <button type="button" className="btn-plain" onClick={() => navigate('/meter/masters')} title="検針マスタ（テナント・メータ・空調機）">
                 <IconList size={20} />

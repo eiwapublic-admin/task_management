@@ -2,7 +2,7 @@
 // npm の `xlsx` パッケージは使わない方針（xlsxRead.js の冒頭）なので、雛形の xlsx を展開してシートの XML を
 // 書き換え、ZIP に詰め直すところまでを自前で持つ。ZIP は無圧縮（stored）で詰める（Excel はそのまま開ける）
 
-import { listZipEntries, readZipEntry } from './xlsxRead'
+import { listZipEntries, readZipEntry } from './xlsxRead.js'
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256)

@@ -108,6 +108,11 @@ import {
   handleMeterPhotoAssign,
   handleMeterPhotoDelete,
   handleMeterPhotoGet,
+  handleMeterAirconGet,
+  handleMeterAirconImport,
+  handleMeterRepairData,
+  handleMeterMailSettings,
+  handleMeterReportDraft,
   cleanupMeterPhotos,
 } from './lib/meter.js'
 import {
@@ -368,7 +373,8 @@ async function handleSettingsRead(req) {
       return json({ error: '設定の取得に失敗しました' }, 500)
     }
     const map = {}
-    for (const r of data || []) map[r.key] = r.value
+    // 検針の提出メールの宛先（個人のアドレス）は社員の検針画面だけで扱う（worker/lib/meter.js。2026-11-10〜）
+    for (const r of data || []) if (!r.key.startsWith('meter_mail_')) map[r.key] = r.value
     return json({ settings: map })
   } catch (err) {
     console.error('settings-read 失敗:', err)
@@ -1267,6 +1273,20 @@ async function route(req, env) {
   }
   if (pathname === '/api/meter/photo') {
     return req.method === 'GET' ? handleMeterPhotoGet(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 空調と出力（Phase 3。2026-11-10〜）: 空調データの取込・修理データの材料・提出メールの設定と下書き
+  if (pathname === '/api/meter/aircon') {
+    if (req.method === 'GET') return handleMeterAirconGet(req)
+    return req.method === 'POST' ? handleMeterAirconImport(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/repair') {
+    return req.method === 'GET' ? handleMeterRepairData(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/mail-settings') {
+    return req.method === 'GET' || req.method === 'PUT' ? handleMeterMailSettings(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/meter/report/draft') {
+    return req.method === 'POST' ? handleMeterReportDraft(req) : json({ error: 'Method Not Allowed' }, 405)
   }
 
   // --- リマインダー（システム運用上の期限管理。2026-09-07〜。ハンドラは worker/lib/reminders.js） ---

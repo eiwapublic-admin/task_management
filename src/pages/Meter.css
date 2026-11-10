@@ -351,3 +351,25 @@ button.meter-photo { cursor: zoom-in; }
 .meter-history-none { color: var(--text-muted); }
 .meter-history-reason-btn { background: none; border: none; padding: 2px var(--space-1); color: var(--color-brand); cursor: pointer; display: inline-flex; align-self: center; }
 .meter-history-reason-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* 空調データ・出力と報告（Phase 3。2026-11-10〜） */
+.meter-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-3);
+}
+.meter-facts dt { font-size: var(--fs-xs); color: var(--text-muted); }
+.meter-facts dd { margin: 0; font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.meter-drop-active { outline: 3px dashed var(--color-brand); outline-offset: -6px; }
+.meter-aircon-unit td { background: var(--bg-muted); font-size: var(--fs-sm); }
+.meter-report-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.meter-report-card > .ui-note { margin: 0 0 var(--space-3); }
+.meter-mail-preview { margin: 0 0 var(--space-3); }
+.meter-mail-preview dd { font-weight: 400; white-space: pre-wrap; }
+.meter-mail-form { display: flex; flex-direction: column; gap: var(--space-3); max-width: 720px; }
+.meter-mail-form .ui-textarea { min-height: 4.5em; }
+.meter-mail-form .ui-textarea.is-body { min-height: 10em; }
+.meter-mail-body { white-space: pre-wrap; margin: var(--space-2) 0 0; font-size: var(--fs-sm); }
+.meter-facts.meter-mail-preview { grid-template-columns: 1fr; gap: var(--space-2); }
+.meter-facts.meter-mail-preview > div { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
