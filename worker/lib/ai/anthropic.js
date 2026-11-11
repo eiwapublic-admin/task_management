@@ -8,7 +8,7 @@
 // `./prompts.js` へ、JSON取り出しだけを `./json.js` へ切り出した。
 // 呼び出し側は直接ここを import せず、`./index.js` 経由で使うこと。
 
-import { buildSystemPrompt, VEHICLE_SYSTEM_PROMPT } from './prompts.js'
+import { buildSystemPrompt, VEHICLE_SYSTEM_PROMPT, buildWastePhotoPrompt, WASTE_PHOTO_SCHEMA } from './prompts.js'
 import { extractJson } from './json.js'
 
 const API_ENDPOINT = 'https://api.anthropic.com/v1/messages'
@@ -172,4 +172,95 @@ export async function recognizeVehicle(imageBase64, mediaType) {
     output_tokens: data.usage?.output_tokens || 0,
   }
   return { result: parsed, usage }
+}
+
+// 廃棄物実測集計表（手書き）の写真から、日×階の実測値と「合計」欄を読み取る（2026-11-11〜。
+// docs/waste-plan.md 10-10）。月に1回・1枚だけの手動操作のため、ここだけは既定の Haiku ではなく
+// 手書きの読み取りに強い上位モデルを使う（2026-09 の初版は Haiku 4.5 で読み取りに失敗した）。
+// 1回あたり約$0.05〜0.15（約8〜25円）の見込み。CLAUDE_MODEL（分類用）の設定には左右されない。
+export const WASTE_PHOTO_MODEL = 'claude-opus-5-5'
+
+export async function recognizeWastePhoto(imageBase64, mediaType, { month, lastDay }) {
+  const { ANTHROPIC_API_KEY } = process.env
+  if (!ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY が設定されていません')
+  }
+  const system = buildWastePhotoPrompt({ month, lastDay })
+
+  let res
+  let lastErr
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        // 安全判定で断られた場合に、同じ依頼を自動で別モデルへ回す（server-side fallback）
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: WASTE_PHOTO_MODEL,
+        max_tokens: 16000,
+        system,
+        // Opus 5.5 は思考が常に有効（thinking は指定しない）。深さは effort で決める
+        output_config: {
+          effort: 'medium',
+          format: { type: 'json_schema', schema: WASTE_PHOTO_SCHEMA },
+        },
+        fallbacks: 'default',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+              { type: 'text', text: '添付の写真の集計表を読み取ってください。' },
+            ],
+          },
+        ],
+      }),
+    })
+    if (res.ok) break
+
+    const text = await res.text()
+    const err = new Error(`Claude API エラー (${res.status}): ${text}`)
+    if (res.status === 402 || (res.status === 400 && /credit balance|billing|insufficient|too low/i.test(text))) {
+      err.isBillingError = true
+      throw err
+    }
+    lastErr = err
+    const isLastAttempt = attempt === MAX_ATTEMPTS - 1
+    if (!RETRYABLE_STATUS.has(res.status) || isLastAttempt) throw err
+    await sleep(RETRY_DELAY_MS[attempt] || RETRY_DELAY_MS[RETRY_DELAY_MS.length - 1])
+  }
+  if (!res.ok) throw lastErr
+
+  const data = await res.json()
+  const usage = {
+    input_tokens: data.usage?.input_tokens || 0,
+    output_tokens: data.usage?.output_tokens || 0,
+    // 実際に応答したモデル（断られて別モデルへ回った場合に料金の単価を合わせるため）
+    model: typeof data.model === 'string' ? data.model : WASTE_PHOTO_MODEL,
+  }
+  if (data.stop_reason === 'refusal') {
+    const err = new Error('AIが読み取りを断りました')
+    err.usage = usage
+    throw err
+  }
+  if (data.stop_reason === 'max_tokens') {
+    const err = new Error('読み取り結果が長すぎて途中で切れました')
+    err.usage = usage
+    throw err
+  }
+  const text = (data.content || [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text || '')
+    .join('')
+  const parsed = extractJson(text)
+  if (!parsed || !Array.isArray(parsed.rows)) {
+    const err = new Error(`Claude の応答をJSONとして解釈できませんでした: ${text.slice(0, 200)}`)
+    err.usage = usage
+    throw err
+  }
+  return { rows: parsed.rows, usage }
 }

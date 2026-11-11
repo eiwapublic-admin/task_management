@@ -87,3 +87,61 @@ export const VEHICLE_SYSTEM_PROMPT = [
   '',
   '必ず有効なJSONのみを返してください。',
 ].join('\n')
+
+// 廃棄物実測集計表（手書き）の写真読み取り（2026-11-11〜。docs/waste-plan.md 10-10）。
+// 2026-09 の初版（Haiku 4.5・長辺2000px）は実際の筆跡で読み取りに失敗したため、
+// 読み取りだけ上位モデルを使い、手書きの「合計」欄も読ませて画面側で突き合わせる
+// （各階の和と合わない日を目立たせ、人が写真・現物と見比べて直してから登録する）。
+export function buildWastePhotoPrompt({ month, lastDay }) {
+  const [y, m] = month.split('-')
+  return [
+    'あなたはビル管理会社の事務を補助するアシスタントです。',
+    `添付の写真は「BKBビル 廃棄物実測集計表」の${Number(y)}年${Number(m)}月分（1日〜${lastDay}日）で、手書きで記入されています。`,
+    '表の列は左から「日」「曜日」「1F」「2F」「3F」「4F」「5F」「6F」「7F」「合計」です（1F〜7Fは「一般廃棄物」の見出しの下）。',
+    '各マスには一般廃棄物の重さ（kg）が小数で書かれています（例: 2.77、0.84、11.83）。',
+    '',
+    '【やること】',
+    `1日〜${lastDay}日の各行について、1F〜7Fと右端の「合計」欄に書かれた数値をそのまま読み取ってください。`,
+    '',
+    '【読み方の注意】',
+    '- 空欄、または線や記号だけで数字が書かれていないマスは null にしてください。',
+    '- 二重線などで訂正されているマスは、訂正後の数値を読んでください。',
+    '- 小数点は小さく書かれがちです。1F〜7Fは多くの場合0〜20kg程度なので、小数点の見落とし（例: 2.77 を 277 と読む）に注意してください。',
+    '- 数字が罫線をまたいでいる場合は、数字の大部分がある欄の値とします。列を取り違えないよう、縦の罫線と見出し（1F〜7F）を基準に確かめてください。',
+    '- 表のいちばん下の「合計」行（月の合計）は読まないでください。',
+    '- 各行で1F〜7Fの和と「合計」欄が合わないときは、その行をもう一度よく見直してください。見直しても合わなければ、見えたとおりの値を返してください（合計に合わせて数値を作らないこと）。',
+    '- 判読に自信がないマスは、いちばん可能性の高い読みを値に入れたうえで、unclear にその欄の名前（"1"〜"7"、または "total"）を入れてください。',
+    '',
+    `rows には1日〜${lastDay}日を1行ずつ、日の順に必ず${lastDay}行入れてください（記入のない日も全欄 null の行を入れる）。`,
+  ].join('\n')
+}
+
+// 構造化出力（output_config.format）のスキーマ。値は数値か null
+const NUM_OR_NULL = { anyOf: [{ type: 'number' }, { type: 'null' }] }
+export const WASTE_PHOTO_SCHEMA = {
+  type: 'object',
+  properties: {
+    rows: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          day: { type: 'integer' },
+          f1: NUM_OR_NULL,
+          f2: NUM_OR_NULL,
+          f3: NUM_OR_NULL,
+          f4: NUM_OR_NULL,
+          f5: NUM_OR_NULL,
+          f6: NUM_OR_NULL,
+          f7: NUM_OR_NULL,
+          total: NUM_OR_NULL,
+          unclear: { type: 'array', items: { type: 'string', enum: ['1', '2', '3', '4', '5', '6', '7', 'total'] } },
+        },
+        required: ['day', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'total', 'unclear'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['rows'],
+  additionalProperties: false,
+}

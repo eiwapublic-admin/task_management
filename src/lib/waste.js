@@ -70,6 +70,46 @@ export async function importWasteRecords(rows, month) {
   return { records: data.records || [], imported: data.imported || 0, removed: data.removed || 0 }
 }
 
+// 手書きの集計表の写真をAIで読み取る（2026-11-11〜。docs/waste-plan.md 10-10）。
+// 保存はせず、日ごとの { day, floors: {'1'..'7': kg|null}, total: kg|null, unclear: [] } を返す。
+// 画像はJSONに包まず、そのまま本文として送る（Worker側のCPU時間の節約）
+export async function recognizeWastePhoto(blob, month) {
+  const data = await authFetch(`/api/waste/photo/recognize?month=${encodeURIComponent(month)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': blob.type || 'image/jpeg' },
+    body: blob,
+  })
+  return data.rows || []
+}
+
+// 手書きの「合計」欄と、各階の和の差がこれ以下なら一致とみなす（合計欄を小数1桁で
+// 丸めて書くことがあるため。例: 8.17 → 8.2）
+export const WASTE_TOTAL_TOLERANCE = 0.05
+
+// 読み取り結果1行の各階の和（値が1つも無ければ null）
+export function wastePhotoRowSum(floors) {
+  let sum = 0
+  let any = false
+  for (const f of WASTE_FLOORS) {
+    const v = floors?.[f]
+    if (v === null || v === undefined || v === '') continue
+    const n = Number(v)
+    if (!Number.isFinite(n)) continue
+    sum += n
+    any = true
+  }
+  return any ? Math.round(sum * 100) / 100 : null
+}
+
+// 合計欄との突き合わせ。'ok' | 'mismatch' | 'none'（どちらかが空で比べられない）
+export function wastePhotoRowCheck(floors, total) {
+  const sum = wastePhotoRowSum(floors)
+  const t = total === null || total === undefined || total === '' ? null : Number(total)
+  if (t === null || !Number.isFinite(t)) return 'none'
+  if (sum === null) return t === 0 ? 'none' : 'mismatch'
+  return Math.abs(sum - t) <= WASTE_TOTAL_TOLERANCE + 1e-9 ? 'ok' : 'mismatch'
+}
+
 // Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）。
 // 名前に「廃棄物」を含むスプレッドシートを更新日の新しい順に返す
 export async function fetchWasteDriveFiles() {

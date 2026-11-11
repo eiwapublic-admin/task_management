@@ -134,3 +134,41 @@
   margin-top: var(--space-2);
   margin-bottom: 0;
 }
+
+/* 手書きの集計表の写真読み取り（WastePhotoImportModal.jsx。2026-11-11〜。docs/waste-plan.md 10-10） */
+.waste-photo-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 50vh;
+  margin: 0 auto var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  object-fit: contain;
+}
+/* 31行の表をモーダル内でスクロールさせ、見出しは固定する（縦スクロールの容器自身に sticky を効かせる） */
+.waste-photo-table-wrap { max-height: 60vh; overflow: auto; }
+.waste-photo-table thead th { position: sticky; top: 0; z-index: 1; }
+.waste-photo-table th,
+.waste-photo-table td { padding: var(--space-1) !important; }
+.waste-photo-input {
+  width: 4.2em;
+  padding: 2px var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.waste-photo-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-weak);
+}
+.waste-photo-input.is-total { color: var(--text-muted); }
+.waste-photo-input.is-unclear { background: var(--color-warn-surface); border-color: var(--color-warn-border); }
+.waste-photo-input.is-invalid { border-color: var(--color-danger); border-width: 2px; }
+.waste-photo-sum { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.waste-photo-table tbody tr.is-mismatch td { background: var(--color-danger-surface); }
+.waste-photo-table tbody tr.is-mismatch .waste-photo-sum { color: var(--color-danger); font-weight: 700; }

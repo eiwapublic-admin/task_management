@@ -5,6 +5,10 @@ import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { getAccessToken } from './gmail.js'
 import { searchSpreadsheets, getFileMetadata, downloadAsXlsx, DRIVE_SHEET_MIME, XLSX_MIME } from './drive.js'
+import { recognizeWastePhoto, estimateCostUSD } from './ai/index.js'
+import { PROVIDERS } from './ai/pricing.js'
+import { WASTE_PHOTO_MODEL } from './ai/anthropic.js'
+import { checkDailyLimit, setLimitAlert, addTodayUsage } from './usageLimit.js'
 
 export const WASTE_FLOORS = ['1', '2', '3', '4', '5', '6', '7']
 
@@ -235,6 +239,134 @@ export async function handleWasteRecordImport(req) {
   } catch (err) {
     console.error('waste-record-import 失敗:', err)
     return json({ error: '実測値の取り込みに失敗しました' }, 500)
+  }
+}
+
+// ============================================================
+// 手書きの集計表の写真読み取り（2026-11-11〜。docs/waste-plan.md 10-10）。
+// 日々の記録が紙の手書きになったため、記入済みの「廃棄物実測集計表」の写真をAIで読み取る。
+// ここでは読み取り結果を返すだけで保存はしない。画面（WastePhotoImportModal.jsx）で
+// 手書きの「合計」欄との突き合わせ・訂正をしてから、Excel取込と同じ
+// /api/waste/records/import で未確認の下書きとして登録する。写真も保存しない。
+//
+// 本文は画像そのもの（Content-Type: image/jpeg 等）、対象月はクエリ ?month=YYYY-MM。
+// JSONにbase64で包まないのは、Workerの無料プランのCPU時間（1回10ms）を
+// 大きな文字列のJSON解析で使い切らないため。
+// ============================================================
+
+const PHOTO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+// 画面側で長辺2576px・JPEGに縮小して送る（通常1MB前後）。Claude API の画像上限（5MB）より手前で止める
+const MAX_PHOTO_BYTES = 4.5 * 1024 * 1024
+
+function daysInMonthOf(month) {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0)).getUTCDate()
+}
+
+// 読み取り結果の1行を、日・階ごとの数値（またはnull）に整える
+function toWeight(raw) {
+  if (raw === null || raw === undefined || raw === '') return null
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0 || n > 999.99) return null
+  return Math.round(n * 100) / 100
+}
+
+export function normalizeWastePhotoRows(rawRows, lastDay) {
+  const byDay = new Map()
+  for (const r of Array.isArray(rawRows) ? rawRows : []) {
+    const day = Number(r?.day)
+    if (!Number.isInteger(day) || day < 1 || day > lastDay || byDay.has(day)) continue
+    const floors = {}
+    for (const f of WASTE_FLOORS) floors[f] = toWeight(r[`f${f}`])
+    const unclear = Array.isArray(r.unclear)
+      ? r.unclear.filter((u) => u === 'total' || WASTE_FLOORS.includes(String(u))).map(String)
+      : []
+    byDay.set(day, { day, floors, total: toWeight(r.total), unclear })
+  }
+  const rows = []
+  for (let day = 1; day <= lastDay; day += 1) {
+    const empty = Object.fromEntries(WASTE_FLOORS.map((f) => [f, null]))
+    rows.push(byDay.get(day) || { day, floors: empty, total: null, unclear: [] })
+  }
+  return rows
+}
+
+async function recordWastePhotoUsage(supabase, usage) {
+  const model = PROVIDERS.anthropic.models[usage.model] ? usage.model : WASTE_PHOTO_MODEL
+  const cost = estimateCostUSD('anthropic', usage.input_tokens, usage.output_tokens, model)
+  await addTodayUsage(supabase, {
+    input: usage.input_tokens,
+    output: usage.output_tokens,
+    calls: 1,
+    costUSD: cost,
+    provider: 'anthropic',
+  })
+  const { error: usageErr } = await supabase.rpc('add_api_usage', {
+    p_month: new Date().toISOString().slice(0, 7),
+    p_input: usage.input_tokens,
+    p_output: usage.output_tokens,
+    p_calls: 1,
+    p_fax_calls: 0,
+    p_fax_input: 0,
+    p_fax_output: 0,
+    p_parking_calls: 0,
+    p_waste_calls: 1,
+    p_cost: cost,
+  })
+  // 記録に失敗すると、実際には課金されているのに従量課金事項の画面に出ない状態になるため処理ログにも残す
+  if (usageErr) {
+    console.error('waste-photo(usage):', usageErr.message)
+    await supabase.from('activity_logs').insert({
+      log_type: 'error',
+      actor: 'システム（自動）',
+      message: `廃棄物の手書き表のAI読み取りの利用量記録に失敗しました（${usageErr.message}）。実際のAPI利用は発生しているため、従量課金事項の表示が実額より少なくなります。`,
+    })
+  }
+}
+
+// POST /api/waste/photo/recognize?month=YYYY-MM
+export async function handleWastePhotoRecognize(req) {
+  const { error } = await requireAuth(req, { write: true })
+  if (error) return error
+  const month = new URL(req.url).searchParams.get('month') || ''
+  if (!MONTH_PATTERN.test(month)) return json({ error: 'month の形式が不正です' }, 400)
+  const mime = (req.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()
+  if (!PHOTO_MIME.has(mime)) return json({ error: '対応していない画像形式です（JPEG・PNG・WebP）' }, 415)
+
+  const supabase = getAdminClient()
+  try {
+    const buf = await req.arrayBuffer()
+    if (buf.byteLength === 0) return json({ error: '写真が空です' }, 400)
+    if (buf.byteLength > MAX_PHOTO_BYTES) return json({ error: '写真が大きすぎます' }, 413)
+
+    // サーキットブレーカー（1日あたりのAI利用上限）。**Claudeを呼ぶ前に判定すること**
+    const { data: aiSettings } = await supabase
+      .from('settings')
+      .select('key, value')
+      .eq('key', 'daily_api_cost_limit_usd')
+    const limitState = await checkDailyLimit(supabase, aiSettings?.[0]?.value)
+    if (limitState.exceeded) {
+      await setLimitAlert(supabase, limitState.message)
+      return json({ error: limitState.message }, 429)
+    }
+
+    const lastDay = daysInMonthOf(month)
+    const base64 = Buffer.from(buf).toString('base64')
+    let result
+    try {
+      result = await recognizeWastePhoto(base64, mime, { month, lastDay })
+    } catch (err) {
+      // 応答は来たが中身が使えなかった場合も、料金は発生しているので記録する
+      if (err.usage) await recordWastePhotoUsage(supabase, err.usage)
+      throw err
+    }
+    await recordWastePhotoUsage(supabase, result.usage)
+
+    return json({ month, rows: normalizeWastePhotoRows(result.rows, lastDay) })
+  } catch (err) {
+    console.error('waste-photo-recognize 失敗:', err)
+    if (err.isBillingError) return json({ error: 'APIクレジット残高が不足しています' }, 402)
+    return json({ error: '写真の読み取りに失敗しました。明るい場所で表全体が写るように撮り直してお試しください。' }, 500)
   }
 }
 

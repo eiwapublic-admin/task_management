@@ -14,6 +14,10 @@ export const PROVIDERS = {
     // 2026-08 時点の公式価格。src/lib/pricing.js と一致していることを確認済み
     models: {
       'claude-haiku-4-5': { input: 1.0, output: 5.0 },
+      // 廃棄物の手書き表の写真読み取り専用（2026-11-11〜。docs/waste-plan.md 10-10）。
+      // 2026-11 時点の公式価格。opus-5 は断られた場合の自動切り替え先になり得るため載せておく
+      'claude-opus-5-5': { input: 4.0, output: 20.0 },
+      'claude-opus-5': { input: 5.0, output: 25.0 },
     },
   },
   // Phase 2 で実装を足す枠（2026-09-05 時点では未実装。単価は公式の料金ページで確認済み）

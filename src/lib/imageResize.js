@@ -14,6 +14,9 @@ export const RESIZE_PRESETS = {
   // 検針写真（2026-10-20）: 360×480・JPEG画質55・約20KB。実写真で数字が読める下限（300×400 は
   // ドラム式の回転途中の数字が読みにくい）。2年で消すので約30MBで頭打ち（docs/meter-plan.md 7章）
   meter: { maxEdge: 480, quality: 0.55, thumb: false },
+  // 廃棄物の手書き集計表（2026-11-11）: AIに読ませるだけで保存しない。小さな手書きの小数点まで
+  // 読めるよう、読み取りモデル（Claude Opus 5.5）が受け付ける最大の長辺2576pxで送る（通常1MB前後）
+  waste: { maxEdge: 2576, quality: 0.85, thumb: false },
 }
 
 // 一覧に写真が並ぶ用途だけサムネイルを作る
@@ -74,7 +77,7 @@ async function drawResized(img, maxEdge, quality) {
 /**
  * アップロード用に画像を整える。
  * @param {File} file 選択・撮影されたファイル
- * @param {'work'|'parking'|'chlorine'|'meter'} category 用途
+ * @param {'work'|'parking'|'chlorine'|'meter'|'waste'} category 用途
  * @returns {{file: Blob, thumb: Blob|null, width: number|null, height: number|null, resized: boolean}}
  */
 export async function prepareImage(file, category = 'work') {
