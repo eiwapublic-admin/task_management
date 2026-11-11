@@ -172,3 +172,8 @@
 .waste-photo-sum { font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .waste-photo-table tbody tr.is-mismatch td { background: var(--color-danger-surface); }
 .waste-photo-table tbody tr.is-mismatch .waste-photo-sum { color: var(--color-danger); font-weight: 700; }
+
+/* チャットでの読み取り結果の貼り付け（2026-11-11〜。docs/waste-plan.md 10-11） */
+.waste-chat-prompt { font-size: var(--fs-sm); color: var(--text-muted); resize: vertical; }
+.waste-chat-paste { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); resize: vertical; }
+.waste-chat-copy-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }

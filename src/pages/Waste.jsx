@@ -225,7 +225,7 @@ export default function Waste() {
                     type="button"
                     className="btn-plain is-primary"
                     onClick={() => setPhotoOpen(true)}
-                    title="手書きの集計表を撮影してAIで読み取る"
+                    title="手書きの集計表を読み取って登録する"
                   >
                     手書き表の読み取り
                   </button>
@@ -248,7 +248,7 @@ export default function Waste() {
               写真読み取り（10-10）を足したため文言を差し替えた。取込ボタンが見える人にだけ出す */}
           {viewMode === 'month' && !readOnly && (
             <p className="ui-note waste-head-note">
-              手書きの集計表は[手書き表の読み取り]で撮影すると、AIが読み取って確認画面に表示します。Excelにした表は[Excelアップロード]から取り込めます。
+              手書きの集計表は[手書き表の読み取り]から、Claudeのチャットで読み取った結果を貼り付けて確認・登録できます。Excelにした表は[Excelアップロード]から取り込めます。
             </p>
           )}
         </FeatureHeader>

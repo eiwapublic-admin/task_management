@@ -11,6 +11,8 @@ import {
   wastePhotoRowSum,
 } from '../lib/waste'
 import { shiftMonth, weekdayInfo } from '../lib/reports'
+import { buildWasteChatPrompt, parseWasteChatText } from '../lib/wasteChatImport'
+import { copyText } from '../lib/secureShares'
 
 // 手書きの集計表の写真読み取り（2026-11-11〜。docs/waste-plan.md 10-10）。
 // 日々の記録が紙の手書きになったため、記入済みの「廃棄物実測集計表」を撮影してAIで読み取る。
@@ -20,6 +22,11 @@ import { shiftMonth, weekdayInfo } from '../lib/reports'
 //   3.「登録する」で Excel取込と同じ /api/waste/records/import に送り、未確認の下書きとして保存
 //      （一覧で最終確認して「この月を確認済みにする」の流れは従来どおり）
 // 写真はAIに送るだけで、どこにも保存しない。
+//
+// 2026-11-11 追記（docs/waste-plan.md 10-11）: APIクレジットを節約したい・撮り直すたびに費用がかかる、
+// との依頼で、**Claudeのチャット（定額）で読み取った結果を貼り付ける方法を既定**にした。
+// 依頼文をコピー → チャットに写真と一緒に送る → 返ってきたCSVを貼り付け →「確認画面へ」。
+// 確認画面（2.〜3.）は共通。アプリでの読み取り（クレジット使用）は切り替えで残している。
 
 function toCellText(v) {
   return v === null || v === undefined ? '' : String(v)
@@ -37,6 +44,10 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
   useBodyScrollLock()
 
   const [month, setMonth] = useState(defaultMonth)
+  // 'chat'＝チャットの結果を貼り付け（既定・追加費用なし）／'api'＝アプリで読み取り（APIクレジット使用）
+  const [mode, setMode] = useState('chat')
+  const [pasted, setPasted] = useState('')
+  const [copyState, setCopyState] = useState('') // '' | 'copied' | 'failed'
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   // 読み取り結果（編集用に文字列で持つ）: [{ day, floors: {'1': '2.77', ...}, total: '11.83', unclear: [] }]
@@ -87,6 +98,22 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
     } finally {
       setBusy(false)
       setBusyLabel('')
+    }
+  }
+
+  const chatPrompt = useMemo(() => buildWasteChatPrompt(month), [month])
+
+  async function handleCopyPrompt() {
+    const ok = await copyText(chatPrompt)
+    setCopyState(ok ? 'copied' : 'failed')
+  }
+
+  function handleParsePasted() {
+    setError('')
+    try {
+      setRows(parseWasteChatText(pasted, month))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -199,6 +226,69 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
             </div>
 
             <div className="ui-field">
+              <label>読み取り方法</label>
+              <div>
+                <div className="ui-segmented" role="group" aria-label="読み取り方法">
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${mode === 'chat' ? ' is-active' : ''}`}
+                    aria-pressed={mode === 'chat'}
+                    onClick={() => {
+                      setMode('chat')
+                      setError('')
+                    }}
+                    disabled={busy}
+                  >
+                    チャットで読み取る
+                  </button>
+                  <button
+                    type="button"
+                    className={`ui-segmented-btn${mode === 'api' ? ' is-active' : ''}`}
+                    aria-pressed={mode === 'api'}
+                    onClick={() => {
+                      setMode('api')
+                      setError('')
+                    }}
+                    disabled={busy}
+                  >
+                    アプリで読み取る
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {mode === 'chat' ? (
+              <>
+                <div className="ui-field">
+                  <label>① 依頼文をコピーして、Claudeのチャットに集計表の写真と一緒に送る</label>
+                  <textarea className="ui-textarea waste-chat-prompt" value={chatPrompt} readOnly rows={5} />
+                  <div className="waste-chat-copy-row">
+                    <button type="button" className="btn-plain" onClick={handleCopyPrompt}>
+                      依頼文をコピー
+                    </button>
+                    {copyState === 'copied' && <span className="ui-note">コピーしました</span>}
+                    {copyState === 'failed' && (
+                      <span className="ui-note">コピーできませんでした。上の欄を長押し（PCは全選択）してコピーしてください</span>
+                    )}
+                  </div>
+                  <p className="ui-note">
+                    対象月が依頼文に入っています。月を変えたらコピーし直してください。チャットでの読み直しは何度でも追加費用なしでできます。
+                  </p>
+                </div>
+                <div className="ui-field">
+                  <label htmlFor="waste-chat-paste">② チャットが返したCSV（「日,1F,2F,…」の表）を貼り付ける</label>
+                  <textarea
+                    id="waste-chat-paste"
+                    className="ui-textarea waste-chat-paste"
+                    value={pasted}
+                    onChange={(e) => setPasted(e.target.value)}
+                    rows={8}
+                    placeholder={'日,1F,2F,3F,4F,5F,6F,7F,合計\n1,2.77,2.1,,1.07,2.71,,3.1,11.83\n…'}
+                  />
+                </div>
+              </>
+            ) : (
+            <div className="ui-field">
               <label>記入済みの集計表の写真</label>
               <input
                 ref={cameraRef}
@@ -247,8 +337,10 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
               <p className="ui-note">
                 1ヶ月分の表を1枚に収めて、明るい場所で真上から撮影してください（影や反射が数字にかからないように）。
                 写真はAIの読み取りにだけ使い、保存しません。読み取った値は次の画面で確認・訂正してから登録します。
+                <strong>この方法はAnthropicのAPIクレジットを使います（1回 約8〜25円。読み直すたびにかかります）。</strong>
               </p>
             </div>
+            )}
 
             {error && (
               <p className="dashboard-error dashboard-banner" role="alert">
@@ -346,7 +438,7 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
                 }}
                 disabled={busy}
               >
-                撮り直す
+                {mode === 'chat' ? '貼り付けに戻る' : '撮り直す'}
               </button>
             )}
           </div>
@@ -354,9 +446,13 @@ export default function WastePhotoImportModal({ defaultMonth, holidays = {}, onC
             <button type="button" className="btn-plain" onClick={onClose} disabled={busy}>
               キャンセル
             </button>
-            {!rows ? (
+            {!rows && mode === 'chat' ? (
+              <button type="button" className="btn-primary" onClick={handleParsePasted} disabled={!pasted.trim()}>
+                確認画面へ
+              </button>
+            ) : !rows ? (
               <button type="button" className="btn-primary" onClick={handleRecognize} disabled={busy || !file}>
-                {busy ? busyLabel || '処理中…' : '読み取る'}
+                {busy ? busyLabel || '処理中…' : '読み取る（クレジット使用）'}
               </button>
             ) : (
               <button
