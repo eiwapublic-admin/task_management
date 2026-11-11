@@ -38,5 +38,12 @@ export function recognizeVehicle(imageBase64, mediaType, provider = null) {
   return implOf(provider).recognizeVehicle(imageBase64, mediaType)
 }
 
+// 廃棄物実測集計表（手書き）の写真を読み取る。戻り値 { rows, usage }（usage.model に実際のモデル）。
+// 手書きの読み取り精度を優先し、ai_provider の設定に関わらず Anthropic の上位モデルを使う
+// （docs/waste-plan.md 10-10）
+export function recognizeWastePhoto(imageBase64, mediaType, options) {
+  return anthropic.recognizeWastePhoto(imageBase64, mediaType, options)
+}
+
 // 提供元まわりのユーティリティ（利用量の記録・画面表示で使う）
 export { resolveProvider, defaultModelOf, estimateCostUSD }

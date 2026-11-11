@@ -120,7 +120,7 @@ docs/                   本書・引き継ぎ書・旧設計書・UI標準・機
     ├── daily-report-plan.md             日報・自主検査表・違反車両・残留塩素の開発計画
     ├── equipment-plan.md                備品管理の開発計画（FileMaker移行の先例）
     ├── bilmen-plan.md                   ビルメンテナンス管理の開発計画（2026-09-02〜。Phase 1〜4・4'実装済み、Phase 5 未着手）
-    ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み。取込はExcel／Googleドライブ〈10-7〜10-9〉）
+    ├── waste-plan.md                    廃棄物実測値管理の開発計画（2026-09-03〜。Phase 1〜3実装済み。取込はExcel／Googleドライブ〈10-7〜10-9〉／手書き表の写真読み取り〈10-10〉）
     ├── google-oauth-scope-update.md     Google OAuth スコープ拡張の作業手順（トークン再発行）
     ├── disaster-recovery.md             Supabaseバックアップからの復旧手順
     └── ai-cost-and-alternatives.md      AI利用コストの試算と代替案（9章に2026-09-04の課金事故と再発防止）
@@ -459,7 +459,7 @@ Cron（5分ごと）または「今すぐ取得」（force=true）で起動し�
 | GET `/api/equipment/installations`・POST `/api/equipment/tenants/sync` | **APIキー**（`X-API-Key`。JWT 不要） | FileMaker 連携（設置実績の提供／テナント同期の受信）。**JWT の外側に開く唯一の口**。請求対象外の新規入替・不良品処分・無償交換は返さない（`docs/equipment-plan.md` 6-2・6-3） |
 | `/api/bilmen/*` | JWT（書込は staff/admin。メール設定は owner・備品出庫限定ロールに GET も不可） | ビルメン（作業マスタ・予定・自動作成・注釈・メール設定・Gmail 下書き・カレンダー反映）。一覧は `docs/HANDOFF.md` 3章「ビルメン API」。2026-10-29〜 `GET /api/bilmen/mail/settings` は件名・本文を雛型（kind='bilmen'）から返し、`PUT` は返信先だけを保存。宛先一覧は有効なのに宛先の無いテナント（`missing_tenants`）も返す |
 | GET/POST/PATCH/DELETE `/api/tenant-mail/templates`・POST `/api/tenant-mail/draft` | JWT（**staff/admin のみ。GET も不可**） | テナントへのメールの雛型の一覧・追加・修正・削除（ビルメンの雛型は削除不可）と、選んだ雛型からの Gmail 下書き作成（添付なし。4-21） |
-| `/api/waste/*` | JWT（書込は staff/admin） | 廃棄物実測値（記録・Excel 取込・Googleドライブ取込）。`docs/waste-plan.md` |
+| `/api/waste/*` | JWT（書込は staff/admin） | 廃棄物実測値（記録・Excel 取込・Googleドライブ取込・手書き表の写真読み取り〈2026-11-11〜〉）。`docs/waste-plan.md` |
 | その他 | — | dist/ の静的アセット（SPA フォールバック） |
 
 - 認証必須 API は `Authorization: Bearer <JWT>` を要求。署名・有効期限に加え、`users.token_version` との突合による失効チェックも行う（不一致・DB参照失敗はフェイルクローズで無効）。**トークン期限切れ（401）時はフロントが自動ログアウトして `/login?expired=1` へ誘導**（`authFetch`）
@@ -1480,8 +1480,9 @@ month(PK, 'YYYY-MM') / input_tokens / output_tokens / calls / **fax_calls / fax_
 「AI利用の1日あたり上限」で変更可。2026-09-04にタスク設定から移設）で
 指定した金額に、当日の推定利用額が達すると**その日のAI処理を自動停止する**。判定・加算は
 `worker/lib/usageLimit.js`（`checkDailyLimit` / `addTodayUsage`）に集約し、メール分類・違反車両の
-2経路で**Claudeを呼ぶ直前に**判定する（廃棄物は2026-09-09にExcel取込方式へ変更しClaudeを
-呼ばなくなったため対象外。14章参照）。メール分類は1件ごとに加算して
+経路で**Claudeを呼ぶ直前に**判定する（廃棄物は2026-09-09にExcel取込方式へ変更しいったん対象外に
+なったが、2026-11-11に手書きの集計表の写真読み取りを追加したため、その読み取りも判定・加算の対象。
+`docs/waste-plan.md` 10-10）。メール分類は1件ごとに加算して
 都度判定するため、1回の実行の中で暴走しても上限で止まる。停止時は `settings.api_limit_alert`
 に記録し、ダッシュボードにバナーを出す（日付が変われば自動的に解除・再開）。バナーの
 「上限を変更」リンクは上限の入力欄がある**従量課金事項の画面（`/usage`）**へ飛ぶ

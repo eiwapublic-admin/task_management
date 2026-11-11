@@ -164,6 +164,7 @@ import {
   handleWasteRecordImport,
   handleWasteDriveFileList,
   handleWasteDriveFileDownload,
+  handleWastePhotoRecognize,
 } from './lib/waste.js'
 import {
   handlePaperRecordList,
@@ -1393,6 +1394,11 @@ async function route(req, env) {
   }
   if (pathname === '/api/waste/records/import') {
     if (req.method === 'POST') return handleWasteRecordImport(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  // 手書きの集計表の写真読み取り（2026-11-11〜。docs/waste-plan.md 10-10）
+  if (pathname === '/api/waste/photo/recognize') {
+    if (req.method === 'POST') return handleWastePhotoRecognize(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
   // Googleドライブからの取込（2026-09-30〜。docs/waste-plan.md 10-7）

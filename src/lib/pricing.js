@@ -11,6 +11,9 @@
 // モデル追加時はここに足す。
 export const PRICING_USD_PER_MTOK = {
   'claude-haiku-4-5': { input: 1.0, output: 5.0 },
+  // 廃棄物の手書き表の写真読み取り専用（2026-11-11〜。docs/waste-plan.md 10-10）
+  'claude-opus-5-5': { input: 4.0, output: 20.0 },
+  'claude-opus-5': { input: 5.0, output: 25.0 },
 }
 
 const DEFAULT_MODEL = 'claude-haiku-4-5'

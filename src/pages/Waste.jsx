@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import WasteExcelImportModal from '../components/WasteExcelImportModal'
+import WastePhotoImportModal from '../components/WastePhotoImportModal'
 import useWasteSheetPdfExport from '../hooks/useWasteSheetPdfExport'
 import { IconChevronLeft, IconChevronRight } from '../components/Icons'
 import { getCurrentUser, isLimitedRole } from '../lib/auth'
@@ -21,7 +22,7 @@ import './Waste.css'
 
 // 廃棄物実測値管理（BKBビル・一般廃棄物。2026-09-03〜）。docs/waste-plan.md 参照。
 // 紙の「廃棄物実測集計表」（1ヶ月1枚・日×1〜7階）をそのまま画面の表として再現し、
-// セルの直接編集（手入力・訂正）とスキャン取込（Claude Vision）の両方をこの1つの表で
+// セルの直接編集（手入力・訂正）と取込（Excel・手書き表の写真読み取り）の両方をこの1つの表で
 // 受け止める。年度（4月〜翌3月）集計は別ビューとして切り替える。
 export default function Waste() {
   const user = getCurrentUser()
@@ -40,6 +41,8 @@ export default function Waste() {
   // load が作り直されないため、一覧が取込前の状態のまま（削除した下書きも表示されたまま）になっていた
   const [reloadKey, setReloadKey] = useState(0)
   const [importOpen, setImportOpen] = useState(false)
+  // 手書きの集計表の写真読み取り（2026-11-11〜。docs/waste-plan.md 10-10）
+  const [photoOpen, setPhotoOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const sheetExport = useWasteSheetPdfExport()
 
@@ -118,9 +121,10 @@ export default function Waste() {
     }
   }
 
-  function handleImportDone(targetMonth, importedCount, removedCount = 0) {
+  function handleImportDone(targetMonth, importedCount, removedCount = 0, sourceLabel = 'ファイル') {
     setImportOpen(false)
-    const removedNote = removedCount > 0 ? `（ファイルで空欄だった未確認の${removedCount}件は削除しました）` : ''
+    setPhotoOpen(false)
+    const removedNote = removedCount > 0 ? `（${sourceLabel}で空欄だった未確認の${removedCount}件は削除しました）` : ''
     setInfo(`${targetMonth.replace('-', '年')}月分を${importedCount}件取り込みました${removedNote}。内容を確認してください。`)
     setViewMode('month')
     setMonth(targetMonth)
@@ -219,6 +223,16 @@ export default function Waste() {
                 {!readOnly && (
                   <button
                     type="button"
+                    className="btn-plain is-primary"
+                    onClick={() => setPhotoOpen(true)}
+                    title="手書きの集計表を撮影してAIで読み取る"
+                  >
+                    手書き表の読み取り
+                  </button>
+                )}
+                {!readOnly && (
+                  <button
+                    type="button"
                     className="btn-plain"
                     onClick={() => setImportOpen(true)}
                     title="Excelアップロード"
@@ -230,11 +244,11 @@ export default function Waste() {
             )
           }
         >
-          {/* 取込の手順の案内（2026-09-30。依頼の文言そのまま。docs/waste-plan.md 10-9）。
-              Excelアップロードボタンが見える人（書き込み可・月別表示）にだけ出す */}
+          {/* 取込の手順の案内（2026-09-30。docs/waste-plan.md 10-9）。2026-11-11 に手書き表の
+              写真読み取り（10-10）を足したため文言を差し替えた。取込ボタンが見える人にだけ出す */}
           {viewMode === 'month' && !readOnly && (
             <p className="ui-note waste-head-note">
-              手書きの集計表をスキャンして取り込む場合、Claude ChatにExcelファイルとしてGoogleDriveに保存するよう指示したのちに[Excelアップロード]から取り込んでください。
+              手書きの集計表は[手書き表の読み取り]で撮影すると、AIが読み取って確認画面に表示します。Excelにした表は[Excelアップロード]から取り込めます。
             </p>
           )}
         </FeatureHeader>
@@ -279,6 +293,15 @@ export default function Waste() {
           defaultMonth={month}
           onClose={() => setImportOpen(false)}
           onDone={handleImportDone}
+        />
+      )}
+
+      {photoOpen && (
+        <WastePhotoImportModal
+          defaultMonth={month}
+          holidays={holidays}
+          onClose={() => setPhotoOpen(false)}
+          onDone={(m, imported, removed) => handleImportDone(m, imported, removed, '写真')}
         />
       )}
 
