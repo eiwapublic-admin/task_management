@@ -1696,7 +1696,6 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 
 .photo-comment {
   width: 100%;
-  height: 44px;
   padding: 5px 8px;
   font-size: var(--fs-sm);
   line-height: 1.5;
@@ -1705,7 +1704,9 @@ button.report-row-icon:hover { filter: brightness(1.15); }
   background: var(--bg-surface);
   color: var(--text-base);
   font-family: inherit;
-  resize: vertical;
+  /* 高さは内容に合わせて自動伸縮（AutoGrowTextarea。2026-11-11〜）。手動のつまみは出さない */
+  resize: none;
+  overflow: hidden;
 }
 
 /* 空枠の追加タイル。写真を追加するたびに末尾に残るので連続して追加できる（2026-08-05） */

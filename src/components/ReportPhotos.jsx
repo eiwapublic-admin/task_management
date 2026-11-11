@@ -9,6 +9,7 @@ import {
 import { prepareImage, formatBytes, formatMB } from '../lib/imageResize'
 import { formatDateTime } from '../lib/format'
 import ConfirmDeleteButton from './ConfirmDeleteButton'
+import AutoGrowTextarea from './AutoGrowTextarea'
 import { IconDownload, IconCamera, IconFolder } from './Icons'
 import { readPhotoDate } from '../lib/photoDate'
 
@@ -187,9 +188,10 @@ export default function ReportPhotos({ reportId, readOnly }) {
                     {p.taken_at && <span>{formatDateTime(p.taken_at)}</span>}
                   </div>
                 )}
-                <textarea
+                {/* 既定1行・内容に合わせて高さが伸びる（作業記録欄と同じ。2026-11-11） */}
+                <AutoGrowTextarea
                   className="photo-comment"
-                  rows={2}
+                  rows={1}
                   value={p.comment || ''}
                   placeholder="コメント"
                   disabled={readOnly}
