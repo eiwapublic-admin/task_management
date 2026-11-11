@@ -153,7 +153,7 @@ export default function MeterMonth() {
                 <IconDocument size={20} />
                 <span className="btn-plain-label">出力と報告</span>
               </button>
-              <button type="button" className="btn-plain" onClick={() => navigate('/meter/masters')} title="検針マスタ（テナント・メータ・空調機）">
+              <button type="button" className="btn-plain is-master" onClick={() => navigate('/meter/masters')} title="検針マスタ（テナント・メータ・空調機）">
                 <IconList size={20} />
                 <span className="btn-plain-label">検針マスタ</span>
               </button>

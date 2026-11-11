@@ -1,5 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
+最終更新: 2026-11-11（**検針の手直し**（依頼）。検針一覧の「検針マスタ」ボタンを濃いグレー地に（マスタ管理の入口と分かるように。`src/styles/ui.css` の `.btn-plain.is-master`）。お渡し票の表の内部罫線を細く（外枠 1.8px・内部 0.6px のグレー。html2canvas は border-collapse の細線を太く描くため separate＋右・下の線だけに。`public/print/meter-gas.css`）。354番）。
 最終更新: 2026-11-10（**検針 Phase 4＝ガス・水道のお渡し票 PDF・ガス検針票メールの Gmail 下書き**（依頼）。`/meter/:月度/gas`（`src/pages/MeterGas.jsx`。検針一覧のヘッダに「ガス・水道」ボタン）。
 ①**お渡し票**（メータ検針報告書。`src/lib/meterGasPdf.js`・`public/print/meter-gas.css`）: ガス・水道のメータを持つテナントごとに A4 縦1枚（上がテナント様用・下が控）。今月の検針値・今月の使用量・前月の使用量は検針一覧と同じ `buildMonthRows`。PDF はアプリ内プレビュー（kind `meter-gas`）から印刷・ダウンロード。
 ②**ガス検針票の送付メール**: スキャンした検針票（PDF・JPEG・PNG）を選ぶかドラッグ →「Gmail に下書きを作る」（`POST /api/meter/gas/draft`）。宛先・件名・本文は `settings` の `meter_mail_gas_*`（`/api/meter/mail-settings?kind=gas`）。提出メールと画面のカード（`src/components/MeterMailCard.jsx`）・サーバーの処理（`worker/lib/meter.js` の `MAIL_SETS`・`createMeterDraft`）を共通化。添付は1つ10MB・合計25MBまで。

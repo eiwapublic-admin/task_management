@@ -348,6 +348,19 @@
   color: var(--color-primary-ink);
 }
 
+/* マスタ管理への入口だけ濃いグレー地にする二次ボタン（2026-11-11。検針一覧の「検針マスタ」）。作業のボタンと見分けるため */
+.btn-plain.is-master {
+  border-color: #4b5563;
+  background: #4b5563;
+  color: #fff;
+}
+
+.btn-plain.is-master:hover:not(:disabled) {
+  background: #374151;
+  border-color: #374151;
+  color: #fff;
+}
+
 /* 破壊的操作の確定 */
 .btn-danger {
   height: var(--control-h);

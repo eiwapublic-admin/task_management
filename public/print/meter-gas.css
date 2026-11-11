@@ -13,8 +13,12 @@ h1 { margin: 6mm 0 9mm; text-align: center; font-size: 19pt; font-weight: bold; 
 .to { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 7mm; }
 .to .name { font-size: 15pt; padding: 0 2mm 1mm; border-bottom: 1px solid #111; min-width: 75mm; }
 .to .date { font-size: 11pt; }
-table { width: 100%; border-collapse: collapse; font-size: 12pt; }
-th, td { border: 1px solid #111; height: 11mm; padding: 0 4mm; }
+/* 外枠は太め、内部の罫線は細く（2026-11-11 依頼） */
+/* html2canvas は border-collapse の細い線を太く描くため、separate にして各セルは右と下の線だけを描く */
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12pt; border: 1.8px solid #111; }
+th, td { border: 0; border-right: 0.6px solid #666; border-bottom: 0.6px solid #666; height: 11mm; padding: 0 4mm; }
+th:last-child, td:last-child { border-right: 0; }
+tbody tr:last-child td { border-bottom: 0; }
 th { background: #e5e7eb; font-weight: normal; text-align: center; font-size: 11pt; }
 th.kind { width: 24mm; }
 td.kind { text-align: center; }
