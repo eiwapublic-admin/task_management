@@ -5,6 +5,7 @@ import SignaturePad from './SignaturePad'
 import useBodyScrollLock from '../lib/useBodyScrollLock'
 import { toDateTimeLocal } from '../lib/reports'
 import DateTimeInput from './DateTimeInput'
+import { getCurrentUser } from '../lib/auth'
 import {
   EQUIPMENT_OUT_REASONS,
   EQUIPMENT_FLOOR_OPTIONS,
@@ -13,6 +14,7 @@ import {
   fetchEquipmentSuggest,
   fetchEquipmentTenants,
   uploadEquipmentSignature,
+  signatureFileToPng,
   fetchEquipmentSignatureObjectUrl,
 } from '../lib/equipment'
 
@@ -81,6 +83,34 @@ export default function EquipmentOutForm({
   const locked = isSigned && !canEditSigned
   const [signatureUrl, setSignatureUrl] = useState('')
   const [signatureLoadError, setSignatureLoadError] = useState(false)
+  // 署名を画像ファイルから取り込む（admin のみ。2026-11-13）。旧 FileMaker で受け取ってしまった
+  // 署名を移すための口。importedSignature は PNG 化済みの Blob、importedSignedAt は受領日時
+  // （datetime-local の値。空ならサーバーの現在時刻）
+  const isAdmin = getCurrentUser()?.role === 'admin'
+  const [importedSignature, setImportedSignature] = useState(null)
+  const [importedPreview, setImportedPreview] = useState('')
+  const [importedSignedAt, setImportedSignedAt] = useState('')
+  useEffect(() => () => importedPreview && URL.revokeObjectURL(importedPreview), [importedPreview])
+
+  async function handleSignatureFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError('')
+    try {
+      const blob = await signatureFileToPng(file)
+      setImportedSignature(blob)
+      setImportedPreview(URL.createObjectURL(blob))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  function clearImportedSignature() {
+    setImportedSignature(null)
+    setImportedPreview('')
+    setImportedSignedAt('')
+  }
 
   // 署名済みの記録は画像を取得して表示する。このAPIはJWT認証必須のため、
   // <img src>に直接APIのURLを指定しても認証ヘッダが送れず読み込めない
@@ -208,7 +238,13 @@ export default function EquipmentOutForm({
       // 以前はここで捕捉したエラーの直後に必ずonSaved()を呼んでモーダルを閉じてしまい、
       // エラーメッセージが表示される前にコンポーネントごと消えて気づけなかった）
       let finalSaved = saved
-      if (reason === 'tenant' && signatureRef.current && !signatureRef.current.isEmpty()) {
+      if (reason === 'tenant' && importedSignature) {
+        finalSaved = await uploadEquipmentSignature(
+          saved.id,
+          importedSignature,
+          importedSignedAt ? new Date(importedSignedAt).toISOString() : '',
+        )
+      } else if (reason === 'tenant' && signatureRef.current && !signatureRef.current.isEmpty()) {
         const blob = await signatureRef.current.getBlob()
         if (blob) {
           finalSaved = await uploadEquipmentSignature(saved.id, blob)
@@ -431,10 +467,33 @@ export default function EquipmentOutForm({
                     </div>
                   ) : (
                     <>
-                      <SignaturePad ref={signatureRef} />
-                      <p className="ui-note">
-                        署名は必須ではありません。その場でもらえない場合は空欄のまま保存し、あとでこの記録を開いて署名だけ追加できます。
-                      </p>
+                      {importedSignature ? (
+                        <div className="equipment-signature-import">
+                          <div className="equipment-signature-status">
+                            <img className="equipment-signature-thumb" src={importedPreview} alt="取り込む受領サイン" />
+                            <button type="button" className="btn-plain" onClick={clearImportedSignature}>
+                              取消
+                            </button>
+                          </div>
+                          <label className="ui-field">
+                            <span className="ui-note">受領日時（旧システムの受領タイムスタンプ。空なら今の日時）</span>
+                            <DateTimeInput value={importedSignedAt} onChange={setImportedSignedAt} />
+                          </label>
+                        </div>
+                      ) : (
+                        <>
+                          <SignaturePad ref={signatureRef} />
+                          <p className="ui-note">
+                            署名は必須ではありません。その場でもらえない場合は空欄のまま保存し、あとでこの記録を開いて署名だけ追加できます。
+                          </p>
+                        </>
+                      )}
+                      {isAdmin && !importedSignature && (
+                        <label className="btn-plain equipment-signature-file">
+                          画像ファイルから取り込む（旧システムの署名の移行用）
+                          <input type="file" accept="image/png,image/jpeg" hidden onChange={handleSignatureFile} />
+                        </label>
+                      )}
                     </>
                   )}
                 </div>

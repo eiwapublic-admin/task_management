@@ -119,10 +119,12 @@ export async function fetchEquipmentTenants({ includeMovedOut = false } = {}) {
 // txnId の入出庫レコードに署名PNGを登録する（保存と同時・後付けの両方でこの1本を使う）。
 // multipart なので authFetch は使わない（Content-Type はブラウザに境界線付きで
 // 設定させる必要がある。uploadPhoto と同じ理由。src/lib/reports.js 参照）
-export async function uploadEquipmentSignature(txnId, blob) {
+export async function uploadEquipmentSignature(txnId, blob, signedAt = '') {
   const form = new FormData()
   form.append('txn_id', txnId)
   form.append('file', blob, 'signature.png')
+  // 受領日時（admin のみ。旧 FileMaker の署名を画像から移すとき。空ならサーバーの現在時刻）
+  if (signedAt) form.append('signed_at', signedAt)
   const res = await fetch('/api/equipment/signature', {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
@@ -167,4 +169,36 @@ export function formatEquipmentDateReiwa(value) {
   const [y, m, day] = parts
   const reiwaYear = y - 2018
   return `令和${reiwaYear}年 ${m}月${day}日`
+}
+
+// 署名の画像ファイル（旧 FileMaker から書き出した PNG・JPEG やスクリーンショット）を、
+// 署名パッドと同じ形（白背景・長辺600px以下の PNG）にする（2026-11-13。移行用）
+const SIGNATURE_IMPORT_MAX_EDGE = 600
+export async function signatureFileToPng(file) {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('画像を読み込めませんでした（PNG・JPEG を選んでください）'))
+      el.src = url
+    })
+    const w = img.naturalWidth
+    const h = img.naturalHeight
+    if (!w || !h) throw new Error('画像を読み込めませんでした')
+    const scale = Math.min(1, SIGNATURE_IMPORT_MAX_EDGE / Math.max(w, h))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(w * scale))
+    canvas.height = Math.max(1, Math.round(h * scale))
+    const ctx = canvas.getContext('2d')
+    // FileMaker の署名は背景が透明の PNG のことがあるため、白で塗ってから描く
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) throw new Error('画像の変換に失敗しました')
+    return blob
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }

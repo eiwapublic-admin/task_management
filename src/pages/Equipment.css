@@ -389,6 +389,14 @@
   border-radius: var(--radius-control);
   background: var(--bg-surface);
 }
+/* 署名を画像ファイルから取り込む（admin のみ・旧システムからの移行用。2026-11-13） */
+.equipment-signature-import { display: flex; flex-direction: column; gap: var(--space-2); }
+.equipment-signature-file {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
 
 .equipment-history-in { color: var(--color-brand); font-weight: 600; }
 .equipment-history-out { color: var(--color-primary); font-weight: 600; }

@@ -1,5 +1,6 @@
 # 引き継ぎ書（Cloudflare 版・本番稼働中）
 
+最終更新: 2026-11-13（**備品: 旧FileMakerで受け取った署名を画像ファイルから取り込む**（依頼。誤って旧システムで出庫〜署名を入力してしまった記録の移行のため）。出庫・設置記録のモーダル（テナント設置・未署名）に、**admin だけ**「画像ファイルから取り込む（旧システムの署名の移行用）」ボタン（`src/components/EquipmentOutForm.jsx`）。PNG・JPEG を選ぶと `signatureFileToPng`（`src/lib/equipment.js`。白背景・長辺600px以下の PNG に変換）でプレビューし、受領日時（旧システムの受領タイムスタンプ。空なら今）を入れて「記録する」。`POST /api/equipment/signature` は `signed_at` を任意で受け取る（admin 以外が送ると 403）。移行の手順: 新システムで同じ内容の出庫を入力 → 署名画像を取り込む → 旧FileMaker側の記録は削除（請求の二重を避ける）。359）
 最終更新: 2026-11-13（**備品画面の表示調整**（依頼）。`src/pages/Equipment.jsx` の「無効品込み」を既定オフに（2026-10-01 に既定オンにしたのを戻す）、ラベルの文字を明細行（`.ui-table` の `--fs-base`）と同じ大きさに（以前は `--fs-sm`）。「修理伝票を出力する場合は「年月順」表示にして下さい」の注釈を「無効品込み」の右から並べ順ボタン（備品順／年月順）の真下へ移動（`.equipment-view-group` で縦に積む。PC幅だけ表示は従来どおり）。358番）。
 最終更新: 2026-11-11（**日報詳細の写真のコメント欄を自動伸縮に**（依頼）。`src/components/ReportPhotos.jsx` のコメント欄を作業記録と同じ `AutoGrowTextarea`（既定1行・改行や文章量に合わせて高さが伸びる、幅が変わっても測り直す）に。`.photo-comment` の固定高さ 44px と手動つまみ（resize: vertical）をやめ、resize: none・overflow: hidden。357番）。
 最終更新: 2026-11-11（**廃棄物の手書き表: Claudeのチャットで読み取った結果の貼り付けを既定に**（依頼。APIクレジットの節約・読み直しのたびの費用を避けるため）。「手書き表の読み取り」のモーダルに読み取り方法の切替（既定「チャットで読み取る」＝依頼文をコピー→チャットに写真と送る→返ったCSVを貼り付け→同じ確認画面。「アプリで読み取る」はクレジット使用と明記して残した）。`src/lib/wasteChatImport.js`（`buildWasteChatPrompt`・`parseWasteChatText`。依頼文は API 用の `buildWastePhotoPrompt` と内容を揃える）。詳細は docs/waste-plan.md 10-11。356番）。
