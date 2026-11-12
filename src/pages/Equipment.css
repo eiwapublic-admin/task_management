@@ -180,7 +180,8 @@
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
-  font-size: var(--fs-sm);
+  /* 明細行（.ui-table の --fs-base）と同じ大きさに（2026-11-13の依頼。以前は --fs-sm） */
+  font-size: var(--fs-base);
   color: var(--text-muted);
   white-space: nowrap;
   cursor: pointer;
@@ -192,8 +193,17 @@
   .equipment-toggle-disabled { display: none; }
 }
 
-/* 修理伝票は年月順表示からしか出力できない旨の注釈（2026-09-02）。「無効品込み」の
-   すぐ右に置く。狭幅ではヘッダ行を1行に収めたいうえ、テキストが長く収まらないため
+/* 並べ順ボタンと、その下の修理伝票の注釈を縦に積む（2026-11-13） */
+.equipment-view-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 修理伝票は年月順表示からしか出力できない旨の注釈（2026-09-02）。2026-11-13から
+   並べ順ボタンの真下に置く（以前は「無効品込み」のすぐ右）。狭幅ではヘッダ行を1行に収めたいうえ、テキストが長く収まらないため
    PC幅（769px以上）だけに出す */
 .equipment-slip-hint {
   display: none;

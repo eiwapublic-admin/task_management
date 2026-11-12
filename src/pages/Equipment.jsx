@@ -62,8 +62,8 @@ export default function Equipment() {
   const [transactionsByItem, setTransactionsByItem] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // 無効品込みは既定でオン（2026-10-01の依頼）
-  const [showDisabled, setShowDisabled] = useState(true)
+  // 無効品込みは既定でオフ（2026-10-01に一度オンにしたが、2026-11-13の依頼で再びオフへ）
+  const [showDisabled, setShowDisabled] = useState(false)
   const [mode, setMode] = useState(null) // null | 'in' | 'out'
   // 並べ順（2026-08-26）。'item'＝備品順（既定・従来どおりカテゴリ→備品ごとの明細表）、
   // 'month'＝年月順（全備品の明細を年月でグルーピングし、直近から日付順に混在表示）
@@ -198,6 +198,8 @@ export default function Equipment() {
             <>
               {/* 並べ順（2026-08-26）。備品順＝従来の「カテゴリ→備品ごとの明細表」、
                   年月順＝全備品の明細を年月でグルーピングし直近から日付順に混在表示 */}
+              {/* 並べ順ボタンの真下に修理伝票の注釈を置くため縦に積む（2026-11-13の依頼） */}
+              <div className="equipment-view-group">
               <div className="ui-segmented" role="group" aria-label="並べ順">
                 <button
                   type="button"
@@ -215,6 +217,14 @@ export default function Equipment() {
                 >
                   年月順
                 </button>
+              </div>
+              {/* 修理伝票（テナント設置分）は年月順表示からしか出力できないため、
+                  備品順を見ている人にも気付けるよう注釈を添える（2026-09-02。
+                  PC幅限定。モバイル・タブレット幅はヘッダ行を1行に収める都合で省く。
+                  2026-11-13: 「無効品込み」の右から並べ順ボタンの下へ移動） */}
+              <span className="equipment-slip-hint">
+                修理伝票を出力する場合は「年月順」表示にして下さい
+              </span>
               </div>
               <select
                 className="equipment-period-select"
@@ -238,12 +248,6 @@ export default function Equipment() {
                 />
                 無効品込み
               </label>
-              {/* 修理伝票（テナント設置分）は年月順表示からしか出力できないため、
-                  備品順を見ている人にも気付けるよう注釈を添える（2026-09-02。
-                  PC幅限定。モバイル・タブレット幅はヘッダ行を1行に収める都合で省く） */}
-              <span className="equipment-slip-hint">
-                修理伝票を出力する場合は「年月順」表示にして下さい
-              </span>
               {/* 出庫・入庫はどちらも同格の主要操作（docs/ui-standard.md 3章の例外）。
                   表示期間・絞り込みと同じ行に収めるため、左右パディングを詰めた
                   専用クラスにしている（2026-08-13。標準の .btn-primary のままだと
