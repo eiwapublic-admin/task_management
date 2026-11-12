@@ -83,10 +83,12 @@ export default function EquipmentOutForm({
   const locked = isSigned && !canEditSigned
   const [signatureUrl, setSignatureUrl] = useState('')
   const [signatureLoadError, setSignatureLoadError] = useState(false)
-  // 署名を画像ファイルから取り込む（admin のみ。2026-11-13）。旧 FileMaker で受け取ってしまった
+  // 署名を画像ファイルから取り込む（staff のみ＝閲覧専用・備品出庫限定ロールは不可。2026-11-13）。旧 FileMaker で受け取ってしまった
   // 署名を移すための口。importedSignature は PNG 化済みの Blob、importedSignedAt は受領日時
   // （datetime-local の値。空ならサーバーの現在時刻）
-  const isAdmin = getCurrentUser()?.role === 'admin'
+  // 当システムに admin ロールの利用者はいないため、フル権限の staff に開放する（2026-11-13 修正）
+  const role = getCurrentUser()?.role || 'staff'
+  const canImportSignature = role !== 'owner' && role !== 'equipment_out_staff'
   const [importedSignature, setImportedSignature] = useState(null)
   const [importedPreview, setImportedPreview] = useState('')
   const [importedSignedAt, setImportedSignedAt] = useState('')
@@ -488,7 +490,7 @@ export default function EquipmentOutForm({
                           </p>
                         </>
                       )}
-                      {isAdmin && !importedSignature && (
+                      {canImportSignature && !importedSignature && (
                         <label className="btn-plain equipment-signature-file">
                           画像ファイルから取り込む（旧システムの署名の移行用）
                           <input type="file" accept="image/png,image/jpeg" hidden onChange={handleSignatureFile} />

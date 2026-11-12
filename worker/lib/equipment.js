@@ -1241,7 +1241,7 @@ export async function handleEquipmentTenantSync(req, env) {
 
 const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024 // 実際は長辺600px程度に縮小したPNGなので数十KB程度で収まる想定
 
-// POST /api/equipment/signature（multipart: txn_id, file, signed_at〔任意・admin のみ〕） — 署名の登録
+// POST /api/equipment/signature（multipart: txn_id, file, signed_at〔任意・staff のみ〕） — 署名の登録
 // 通常は canWrite（staff/admin）が必要だが、備品出庫限定ロールにも「当日入力分の出庫」への
 // 署名登録だけを開放する（2026-08-26。テナント設置の新規登録・当日修正で署名までできないと
 // 160番以降の一連の対応が完結しないため）。対象レコードのkind・occurred_atを見ないと
@@ -1279,12 +1279,12 @@ export async function handleEquipmentSignatureUpload(req) {
     if (txn.reason !== 'tenant') return json({ error: 'テナント設置以外には署名を登録できません' }, 400)
     if (txn.signed_at) return json({ error: 'この記録はすでに署名済みです' }, 400)
 
-    // 受領日時の指定（admin のみ。2026-11-13）。旧 FileMaker で受け取った署名を画像ファイルから
+    // 受領日時の指定（フル権限＝staff のみ。2026-11-13）。旧 FileMaker で受け取った署名を画像ファイルから
     // 移す場合に、FileMaker の「受領タイムスタンプ」を残すため。通常の署名はサーバーの現在時刻
     let signedAt = new Date().toISOString()
     const signedAtRaw = String(form?.get('signed_at') || '')
     if (signedAtRaw) {
-      if (auth.role !== 'admin') return json({ error: '受領日時の指定は管理者のみです' }, 403)
+      if (!fullWrite) return json({ error: 'この操作を行う権限がありません' }, 403)
       const d = new Date(signedAtRaw)
       if (Number.isNaN(d.getTime())) return json({ error: '受領日時が正しくありません' }, 400)
       signedAt = d.toISOString()

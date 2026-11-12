@@ -123,7 +123,7 @@ export async function uploadEquipmentSignature(txnId, blob, signedAt = '') {
   const form = new FormData()
   form.append('txn_id', txnId)
   form.append('file', blob, 'signature.png')
-  // 受領日時（admin のみ。旧 FileMaker の署名を画像から移すとき。空ならサーバーの現在時刻）
+  // 受領日時（staff のみ。旧 FileMaker の署名を画像から移すとき。空ならサーバーの現在時刻）
   if (signedAt) form.append('signed_at', signedAt)
   const res = await fetch('/api/equipment/signature', {
     method: 'POST',
