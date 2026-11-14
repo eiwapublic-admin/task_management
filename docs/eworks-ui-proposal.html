@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eWorks 画面イメージ案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=Zen+Old+Mincho:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* layout idea: 1カラムの資料。各章は「短い説明 → 図または画面モック」。モックは横幅固定で枠内だけ横スクロール */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#1b2330; --muted:#5a6575; --line:#dde2ea; --accent:#6b4fb3; --accent-soft:#ece7f8;
+  --ok:#1f7a4d; --warn:#a86400; --bad:#b3261e;
+  --f-display:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"IBM Plex Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a202a; --ink:#e8ecf2; --muted:#9aa5b5; --line:#2e3644; --accent:#b9a6ee; --accent-soft:#2a2440;
+  --ok:#6cc596; --warn:#e0a94a; --bad:#f08a80; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a202a; --ink:#e8ecf2; --muted:#9aa5b5; --line:#2e3644; --accent:#b9a6ee; --accent-soft:#2a2440;
+  --ok:#6cc596; --warn:#e0a94a; --bad:#f08a80; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 20px 80px;display:flex;flex-direction:column;gap:56px}
+header.top{display:flex;flex-direction:column;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:20px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted)}
+h1{font-family:var(--f-display);font-size:34px;line-height:1.3;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-size:24px;margin:0;line-height:1.4;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:600}
+p{margin:0;max-width:44em}
+.lead{color:var(--muted)}
+section{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+.num{font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.1em}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px}
+nav.toc a{font-size:13px;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:4px 12px;border-radius:999px}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.card p{font-size:14px;color:var(--muted)}
+.card .k{font-size:12px;color:var(--accent);font-weight:600}
+table.t{width:100%;border-collapse:collapse;font-size:14px;background:var(--surface)}
+table.t th,table.t td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+table.t th{background:var(--accent-soft);font-weight:600;white-space:nowrap}
+.scroll{overflow-x:auto;border-radius:8px}
+.pill{display:inline-block;font-size:12px;padding:1px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)} .pill.n{color:var(--muted)}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:13px;color:var(--muted)}
+svg.dia{max-width:100%;height:auto;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:820px}
+svg.dia text{font-family:var(--f-body);font-size:12px;fill:currentColor}
+svg.dia .b{fill:var(--surface);stroke:currentColor;stroke-width:1.2}
+svg.dia .bs{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+svg.dia .ln{stroke:currentColor;stroke-width:1.2;fill:none}
+svg.dia .la{font-size:11px;fill:var(--muted)}
+svg.dia .lane{font-size:11px;fill:var(--muted);letter-spacing:.1em}
+/* 機能構成 */
+.tree{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tree .col{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.tree ul{margin:0;padding-left:1.1em;font-size:13px;color:var(--muted);line-height:1.65}
+.tree .base{border-top-color:var(--muted)}
+/* テーマ切替 */
+.switch{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
+.switch span{font-size:13px;color:var(--muted)}
+.switch button{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;gap:8px;align-items:center}
+.switch button i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.switch button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:600}
+.switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shot{display:flex;flex-direction:column;gap:8px}
+.shot h3 small{font-weight:400;color:var(--muted);margin-left:8px}
+
+/* ===== ここからアプリ画面のモック（閲覧側の明暗に関係なく、アプリの見た目を固定で示す） ===== */
+.mock{--m-bg:#f4f3f8;--m-sf:#fff;--m-ink:#1e1b2e;--m-mu:#655f7a;--m-ln:#dfdcea;--m-ac:#6b4fb3;--m-ac-s:#ece7f8;--m-on:#fff;
+  --m-side:#fff;--m-side-ink:#1e1b2e;--m-side-mu:#655f7a;--m-side-on:#ece7f8;--m-r:6px;--m-pad:10px;
+  --m-in:#1f7a4d;--m-out:#b5621a;--m-ok:#1f7a4d;--m-warn:#a86400;--m-bad:#b3261e;--m-sales:#2f6fbd;--m-buy:#a8782a;
+  color:var(--m-ink);font-size:12px;line-height:1.5;color-scheme:light}
+.mock[data-mt="b"]{--m-bg:#f1f6f7;--m-ink:#17262b;--m-mu:#5a6d73;--m-ln:#d6e3e6;--m-ac:#0e7490;--m-ac-s:#dff1f5;--m-side-ink:#17262b;--m-side-mu:#5a6d73;--m-side-on:#dff1f5}
+.mock[data-mt="c"]{--m-bg:#f7f4f0;--m-ink:#26201b;--m-mu:#6e645b;--m-ln:#e4dcd3;--m-ac:#c2571a;--m-ac-s:#fbe9dd;--m-side-ink:#26201b;--m-side-mu:#6e645b;--m-side-on:#fbe9dd}
+.frame{min-width:1040px;border:1px solid var(--m-ln);border-radius:10px;overflow:hidden;background:var(--m-bg);box-shadow:0 6px 24px rgba(0,0,0,.08)}
+.app{display:grid;grid-template-columns:168px 1fr;min-height:520px}
+.side{background:var(--m-side);color:var(--m-side-ink);border-right:1px solid var(--m-ln);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.brand{font-weight:600;font-size:14px;padding:4px 8px 12px;display:flex;align-items:center;gap:8px}
+.brand b{width:22px;height:22px;border-radius:5px;background:var(--m-ac);color:var(--m-on);display:grid;place-items:center;font-size:12px}
+.side a{display:flex;justify-content:space-between;padding:6px 10px;border-radius:var(--m-r);color:var(--m-side-ink);text-decoration:none}
+.side a.on{background:var(--m-side-on);font-weight:600;box-shadow:inset 3px 0 0 var(--m-ac)}
+.side a em{font-style:normal;font-size:10px;background:var(--m-bad);color:#fff;border-radius:999px;padding:0 6px}
+.side .grp{font-size:10px;color:var(--m-side-mu);padding:10px 10px 2px;letter-spacing:.08em}
+.main{display:flex;flex-direction:column;min-width:0}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--m-sf);border-bottom:1px solid var(--m-ln)}
+.bar h4{margin:0;font-size:15px}
+.bar .sp{flex:1}
+.srch{border:1px solid var(--m-ln);border-radius:999px;padding:4px 12px;color:var(--m-mu);min-width:220px;background:var(--m-bg)}
+.btn{border:1px solid var(--m-ln);background:var(--m-sf);border-radius:var(--m-r);padding:5px 12px;white-space:nowrap}
+.btn.p{background:var(--m-ac);border-color:var(--m-ac);color:var(--m-on);font-weight:600}
+.body{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1}
+.mc{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:var(--m-pad)}
+.kp{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kp .mc{display:flex;flex-direction:column;gap:2px}
+.kp .l{color:var(--m-mu);font-size:11px}
+.kp .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.kp .s{font-size:11px}
+.two{display:grid;grid-template-columns:1.25fr 1fr;gap:12px}
+.ttl{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+.ttl span{color:var(--m-mu);font-weight:400}
+.mt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.mt th{font-weight:500;color:var(--m-mu);text-align:left;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--m-ln);white-space:nowrap}
+.mt td{padding:6px;border-bottom:1px solid var(--m-ln);white-space:nowrap}
+.mt tr.sel td{background:var(--m-ac-s)}
+.mt .r{text-align:right}
+.tg{display:inline-block;font-size:10px;padding:0 7px;border-radius:999px;line-height:17px;border:1px solid transparent}
+.tg.s{background:color-mix(in srgb,var(--m-sales) 14%,#fff);color:var(--m-sales)}
+.tg.b{background:color-mix(in srgb,var(--m-buy) 16%,#fff);color:var(--m-buy)}
+.tg.ok{background:color-mix(in srgb,var(--m-ok) 14%,#fff);color:var(--m-ok)}
+.tg.w{background:color-mix(in srgb,var(--m-warn) 16%,#fff);color:var(--m-warn)}
+.tg.x{background:color-mix(in srgb,var(--m-bad) 12%,#fff);color:var(--m-bad)}
+.tg.n{border-color:var(--m-ln);color:var(--m-mu)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:92px;padding-top:6px}
+.bars div{flex:1;display:flex;gap:2px;align-items:flex-end;height:100%}
+.bars i{flex:1;background:var(--m-ac);border-radius:2px 2px 0 0}
+.bars i.pv{background:var(--m-ln)}
+.axis{display:flex;gap:6px;color:var(--m-mu);font-size:10px}
+.axis span{flex:1;text-align:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--m-ln);border-radius:999px;padding:2px 10px;background:var(--m-sf)}
+.chip.on{background:var(--m-ac);color:var(--m-on);border-color:var(--m-ac)}
+.split{display:grid;grid-template-columns:264px minmax(0,1fr);flex:1;min-height:0}
+.lst{border-right:1px solid var(--m-ln);background:var(--m-sf);display:flex;flex-direction:column}
+.lst .f{padding:10px;border-bottom:1px solid var(--m-ln);display:flex;flex-direction:column;gap:8px}
+.row{padding:8px 10px;border-bottom:1px solid var(--m-ln);display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.row.sel{background:var(--m-ac-s);box-shadow:inset 3px 0 0 var(--m-ac)}
+.row .a{font-weight:600}.row .m{color:var(--m-mu);font-size:11px}.row .y{font-variant-numeric:tabular-nums;text-align:right}
+.det{padding:14px;display:flex;flex-direction:column;gap:10px;position:relative}
+.step{display:flex;gap:0;align-items:stretch}
+.step div{flex:1;padding:6px 10px 6px 18px;background:var(--m-sf);border:1px solid var(--m-ln);border-left:none;position:relative;font-size:11px;color:var(--m-mu)}
+.step div:first-child{border-left:1px solid var(--m-ln);border-radius:var(--m-r) 0 0 var(--m-r);padding-left:10px}
+.step div:last-child{border-radius:0 var(--m-r) var(--m-r) 0}
+.step b{display:block;color:var(--m-ink);font-size:12px}
+.step .done{background:var(--m-ac-s)} .step .done b{color:var(--m-ac)}
+.step .cur{background:var(--m-ac);color:var(--m-on);border-color:var(--m-ac)} .step .cur b{color:var(--m-on)}
+.fld{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px}
+.fld label{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--m-mu)}
+.fld label span{border:1px solid var(--m-ln);border-radius:var(--m-r);padding:5px 8px;font-size:12px;color:var(--m-ink);background:var(--m-sf);min-height:28px}
+.fld .w2{grid-column:span 2}
+.tot{display:flex;gap:18px;align-items:center;background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:8px 12px;box-shadow:0 -4px 14px rgba(0,0,0,.06)}
+.tot div{display:flex;flex-direction:column;font-size:10px;color:var(--m-mu)}
+.tot b{font-size:14px;color:var(--m-ink);font-variant-numeric:tabular-nums}
+.tot .big b{font-size:18px}
+.tot .sp{flex:1}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-size:10px}
+.cal span{border:1px solid var(--m-ln);border-radius:3px;min-height:34px;padding:2px 4px;background:var(--m-sf);color:var(--m-mu)}
+.cal span.h{background:none;border:none;min-height:0;text-align:center}
+.cal span i{display:block;font-style:normal;background:var(--m-ac-s);color:var(--m-ac);border-radius:2px;padding:0 3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dots{display:flex;gap:2px}
+.dots i{width:9px;height:9px;border-radius:2px;background:var(--m-ln)}
+.dots i.y{background:var(--m-ac)}
+.stamp{display:inline-grid;place-items:center;width:22px;height:22px;border:1.5px solid #c0392b;color:#c0392b;border-radius:50%;font-size:10px;font-weight:600}
+.stamp.off{border-color:var(--m-ln);color:var(--m-ln)}
+.phones{display:flex;gap:22px;flex-wrap:wrap;justify-content:center}
+.phone{width:286px;border:8px solid #20242b;border-radius:34px;overflow:hidden;background:var(--m-bg);display:flex;flex-direction:column;height:580px;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+.phone .bar{padding:10px 12px}
+.phone .pb{flex:1;overflow:hidden;padding:10px;display:flex;flex-direction:column;gap:8px}
+.pc{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:9px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.pc .a{font-weight:600;font-size:13px}.pc .m{color:var(--m-mu);font-size:11px}.pc .y{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.tab{display:grid;grid-template-columns:repeat(5,1fr);background:var(--m-sf);border-top:1px solid var(--m-ln);font-size:10px;text-align:center;color:var(--m-mu)}
+.tab span{padding:8px 0 10px}.tab .on{color:var(--m-ac);font-weight:600;box-shadow:inset 0 2px 0 var(--m-ac)}
+.act{display:flex;gap:8px;padding:8px 10px;background:var(--m-sf);border-top:1px solid var(--m-ln)}
+.act .btn{flex:1;text-align:center;padding:8px}
+.ph{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ph i{aspect-ratio:1;border-radius:var(--m-r);background:repeating-linear-gradient(135deg,var(--m-ln) 0 6px,var(--m-bg) 6px 12px);border:1px solid var(--m-ln)}
+.ph i.add{background:var(--m-ac-s);display:grid;place-items:center;color:var(--m-ac);font-style:normal;font-size:20px;border-style:dashed;border-color:var(--m-ac)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px}
+.sw{display:flex;gap:4px}.sw i{width:26px;height:26px;border-radius:4px;border:1px solid var(--line)}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+@media (max-width:520px){h1{font-size:26px}h2{font-size:20px}}
+/* ===== eWorks 用の追加部品 ===== */
+.brand b{border-radius:50%}
+.phone .pb{gap:9px}
+.hello{font-size:11px;color:var(--m-mu)}
+.today{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:12px;display:flex;flex-direction:column;gap:4px}
+.today .site{font-size:15px;font-weight:600}
+.today .tm{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.big{border-radius:14px;padding:18px 10px;text-align:center;color:#fff;font-size:18px;font-weight:600;display:flex;flex-direction:column;gap:2px}
+.big small{font-size:11px;font-weight:400;opacity:.9}
+.big.in{background:var(--m-in)} .big.out{background:var(--m-out)}
+.info{font-size:11px;color:var(--m-mu);background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:7px 9px;display:flex;gap:6px;align-items:flex-start}
+.info b{color:var(--m-ink);font-weight:600}
+.cam{flex:1;background:#14161a;border-radius:10px;display:grid;place-items:center;position:relative;color:#fff;font-size:11px;min-height:300px}
+.cam .fr{width:170px;height:170px;border-radius:14px;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset;position:relative}
+.cam .fr::before,.cam .fr::after{content:"";position:absolute;width:34px;height:34px;border:4px solid #fff}
+.cam .fr::before{left:-2px;top:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
+.cam .fr::after{right:-2px;bottom:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
+.cam .qr{position:absolute;inset:38px;background:
+  conic-gradient(#fff 25%,#0000 0 50%,#fff 0 75%,#0000 0) 0 0/24px 24px;opacity:.5;border-radius:4px}
+.cam .cap{position:absolute;bottom:14px;left:0;right:0;text-align:center}
+.done{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.done .ck{width:92px;height:92px;border-radius:50%;background:var(--m-in);color:#fff;display:grid;place-items:center;font-size:50px;line-height:1}
+.done .t{font-size:38px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.done .w{font-size:15px;font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px;width:100%}
+.kv span:nth-child(odd){color:var(--m-mu)}
+.kv span:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
+.pcal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:9px}
+.pcal .h{text-align:center;color:var(--m-mu);padding:2px 0}
+.pcal .d{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:4px;min-height:44px;padding:2px 3px;display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.pcal .d b{font-size:10px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.pcal .d.off{background:none;border-color:transparent}
+.pcal .d.hol b{color:var(--m-bad)}
+.pcal .d.now{border-color:var(--m-ac);box-shadow:inset 0 0 0 1px var(--m-ac)}
+.pcal .d u{text-decoration:none;color:var(--m-mu);font-variant-numeric:tabular-nums}
+.pcal .d s{text-decoration:none;font-variant-numeric:tabular-nums}
+.mk{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;font-size:9px;font-weight:700;font-style:normal;color:#fff;line-height:1}
+.mk.ok{background:var(--m-ok)} .mk.w{background:var(--m-warn)} .mk.x{background:var(--m-bad)}
+.mk.l{background:var(--m-ac)} .mk.p{background:none;border:1px solid var(--m-ln);color:var(--m-mu)}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--m-mu);align-items:center}
+.legend span{display:flex;gap:4px;align-items:center}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sum div{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:6px 8px;display:flex;flex-direction:column;font-size:10px;color:var(--m-mu)}
+.sum b{font-size:14px;color:var(--m-ink);font-variant-numeric:tabular-nums}
+.fm{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--m-mu)}
+.fm span{border:1px solid var(--m-ln);border-radius:var(--m-r);padding:7px 9px;font-size:13px;color:var(--m-ink);background:var(--m-sf);min-height:34px}
+.fm span.ph0{color:var(--m-mu)}
+.tab.t4{grid-template-columns:repeat(4,1fr)}
+/* デスクトップ */
+.kp.k4{grid-template-columns:repeat(4,1fr)}
+.sts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sts div{border:1px solid var(--m-ln);border-radius:var(--m-r);padding:8px 10px;background:var(--m-sf);display:flex;justify-content:space-between;align-items:baseline}
+.sts b{font-size:18px;font-variant-numeric:tabular-nums}
+.who{display:flex;align-items:center;gap:6px;border:1px solid var(--m-ln);border-radius:var(--m-r);background:var(--m-sf);padding:3px 4px}
+.who i{font-style:normal;padding:2px 8px;color:var(--m-mu)}
+.who b{padding:2px 10px;min-width:150px}
+.seg{display:flex;border:1px solid var(--m-ln);border-radius:var(--m-r);overflow:hidden;background:var(--m-sf)}
+.seg span{padding:5px 12px}
+.seg .on{background:var(--m-ac);color:var(--m-on);font-weight:600}
+.cal3{display:grid;grid-template-columns:minmax(0,1fr) 300px;flex:1;min-height:0}
+.dcal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px}
+.dcal .h{text-align:center;color:var(--m-mu);font-size:10px}
+.dcal .d{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:5px;min-height:66px;padding:4px 6px;display:flex;flex-direction:column;gap:2px;line-height:1.35}
+.dcal .d b{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.dcal .d.off{background:none;border-color:transparent}
+.dcal .d.hol b,.dcal .d.sun b{color:var(--m-bad)}
+.dcal .d.now{border-color:var(--m-ac);box-shadow:inset 0 0 0 1px var(--m-ac)}
+.dcal .d.sel{background:var(--m-ac-s)}
+.dcal u{text-decoration:none;color:var(--m-mu);font-variant-numeric:tabular-nums}
+.dcal s{text-decoration:none;font-variant-numeric:tabular-nums}
+.dcal em{font-style:normal;font-size:10px}
+.pane{border-left:1px solid var(--m-ln);background:var(--m-sf);padding:12px;display:flex;flex-direction:column;gap:10px}
+.pane h5{margin:0;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.tl{display:flex;flex-direction:column;gap:0;font-size:11px}
+.tl div{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:4px 0;border-bottom:1px dashed var(--m-ln)}
+.tl div span:first-child{font-variant-numeric:tabular-nums;font-weight:600}
+.tl small{color:var(--m-mu);display:block}
+.mx{border-collapse:collapse;font-size:10px;font-variant-numeric:tabular-nums;width:100%}
+.mx th,.mx td{border:1px solid var(--m-ln);text-align:center;padding:0;height:24px;min-width:24px;background:var(--m-sf)}
+.mx th{font-weight:500;color:var(--m-mu);font-size:10px}
+.mx th.we,.mx td.we{background:var(--m-bg)}
+.mx th.hd{color:var(--m-bad)}
+.mx td.nm{text-align:left;padding:0 8px;white-space:nowrap;font-size:11px;min-width:150px}
+.mx td.nm small{color:var(--m-mu);margin-left:6px}
+.mx td.ct{font-weight:600;min-width:34px}
+.mx td.c-ok{color:var(--m-ok)} 
+.mx td.c-w{background:color-mix(in srgb,var(--m-warn) 22%,#fff);color:var(--m-warn);font-weight:700}
+.mx td.c-x{background:color-mix(in srgb,var(--m-bad) 18%,#fff);color:var(--m-bad);font-weight:700}
+.mx td.c-l{background:var(--m-ac-s);color:var(--m-ac)}
+.mx td.c-p{color:var(--m-mu)}
+.mx td.td{box-shadow:inset 0 0 0 1.5px var(--m-ac)}
+.mt td.num,.mt th.num{text-align:right}
+.mt td.sat{color:var(--m-sales)} .mt td.sun{color:var(--m-bad)}
+.mt tr.rest td{background:var(--m-bg);color:var(--m-mu)}
+.tot2{display:flex;gap:22px;align-items:center;background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:8px 12px;flex-wrap:wrap}
+.tot2 div{display:flex;flex-direction:column;font-size:10px;color:var(--m-mu)}
+.tot2 b{font-size:14px;color:var(--m-ink);font-variant-numeric:tabular-nums}
+.inp{display:inline-block;border:1px solid var(--m-ln);border-radius:4px;padding:2px 8px;background:var(--m-sf);min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+.inp.ro{background:var(--m-bg);color:var(--m-mu)}
+.ck0{display:inline-block;width:13px;height:13px;border:1px solid var(--m-mu);border-radius:3px;vertical-align:-2px;margin-right:4px}
+.ck0.on{background:var(--m-ac);border-color:var(--m-ac)}
+.wk{border-collapse:collapse;width:100%;font-size:11px}
+.wk th,.wk td{border:1px solid var(--m-ln);padding:5px 4px;text-align:center;background:var(--m-sf);white-space:nowrap}
+.wk th{color:var(--m-mu);font-weight:500;font-size:10px}
+.wk td.nm{text-align:left}
+.wk td small{display:block;color:var(--m-mu);font-size:9px}
+.wk td.no{color:var(--m-ln)}
+.posters{display:flex;gap:14px;justify-content:center;align-items:flex-start}
+.poster{width:150px;background:#fff;border:1px solid var(--m-ln);border-top:14px solid var(--m-in);border-radius:4px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;color:#111;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+.poster.o{border-top-color:var(--m-out)}
+.poster .k{font-size:26px;font-weight:700;letter-spacing:.2em;color:var(--m-in)}
+.poster.o .k{color:var(--m-out)}
+.poster .q{width:96px;height:96px;background:
+  linear-gradient(#111,#111) 0 0/26px 26px no-repeat,linear-gradient(#111,#111) 100% 0/26px 26px no-repeat,linear-gradient(#111,#111) 0 100%/26px 26px no-repeat,
+  conic-gradient(#111 25%,#fff 0 50%,#111 0 75%,#fff 0) 0 0/12px 12px}
+.poster .n{font-size:11px;font-weight:600}
+.poster .s{font-size:8px;color:#666;text-align:center}
+.apps{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.apps figure{align-items:center;gap:6px}
+.apps .ic{width:64px;height:64px;border-radius:15px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:30px;box-shadow:0 3px 10px rgba(0,0,0,.15)}
+.apps .ic.rnd span{width:40px;height:40px;border:4px solid #fff;border-radius:50%;position:relative;display:block}
+.apps .ic.rnd span::before{content:"";position:absolute;left:50%;top:50%;width:4px;height:13px;background:#fff;transform:translate(-50%,-100%);border-radius:2px}
+.apps .ic.rnd span::after{content:"";position:absolute;left:50%;top:50%;width:11px;height:4px;background:#fff;transform:translate(0,-50%);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">勤怠管理 eWorks ／ FileMaker「eWork2」移行と QR 打刻 ／ 2026-11-14 第1案</div>
+  <h1>eWorks 画面イメージ案と機能構成</h1>
+  <p class="lead">新しい勤怠管理アプリの見た目と流れを、決定前のたたき台として示します。画面内の氏名・現場名・時刻はすべて架空のサンプルです。</p>
+  <nav class="toc" aria-label="目次">
+    <a href="#features">1 特徴</a><a href="#structure">2 機能構成図</a><a href="#flow">3 画面フロー</a>
+    <a href="#screens">4 画面イメージ</a><a href="#themes">5 色とアイコン</a><a href="#ideas">6 新機能・工夫の候補</a><a href="#next">7 決めていただくこと</a>
+  </nav>
+</header>
+
+<section id="features">
+  <div class="sec-head"><div class="num">1</div><h2>システムの特徴</h2></div>
+  <div class="grid g3">
+    <div class="card"><div class="k">打刻</div><h3>現場の QR を読むだけで出勤・退勤</h3><p>現場に貼った出勤用・退勤用の QR をアプリのカメラで読みます。時刻はサーバー側で記録し、勤務表の実績にそのまま入ります。</p></div>
+    <div class="card"><div class="k">予定</div><h3>勤務体系から毎月の予定を自動作成</h3><p>曜日別の出退勤パターンから翌月の出勤日と時刻を組みます。手で直した日は再作成しても上書きしません。</p></div>
+    <div class="card"><div class="k">相違</div><h3>予定と実績の違いがいつでも見える</h3><p>未出勤・遅刻・早退・退勤漏れ・現場違いを自動で見つけ、管理者の「要確認」に出します。始業を過ぎても出勤がなければ通知します。</p></div>
+    <div class="card"><div class="k">本人</div><h3>自分の予定と実績をカレンダーで確認</h3><p>現場スタッフは自分の 1 か月を見て、打刻の修正や休暇を申請できます。管理者はスタッフを切り替えて同じ画面を見ます。</p></div>
+    <div class="card"><div class="k">出勤簿</div><h3>現行の計算と帳票をそのまま</h3><p>休憩の自動控除、通常・残業・休日、有休の付与と繰越は現行どおり。過去月を新旧で突き合わせて一致を確かめてから切り替えます。</p></div>
+    <div class="card"><div class="k">利用者</div><h3>招待制で登録、退職時は即停止</h3><p>管理者が出した招待 QR を本人が読み、ID とパスワードを決めます。現場スタッフはタスク管理・eSales には入れません。</p></div>
+  </div>
+</section>
+
+<section id="structure">
+  <div class="sec-head"><div class="num">2</div><h2>機能構成図</h2>
+  <p class="lead">上段が現場スタッフと管理者の毎日の操作、下段が月次の業務と土台です。</p></div>
+  <div class="tree">
+    <div class="col"><h3>勤怠入力</h3><ul><li>QR 打刻（出勤・退勤）</li><li>位置情報の記録</li><li>圏外時の一時保存</li><li>打刻の修正申請</li><li>管理者の代理入力</li></ul></div>
+    <div class="col"><h3>勤務予定</h3><ul><li>出退勤パターン</li><li>勤務体系（曜日別・適用開始日）</li><li>月次予定の自動作成</li><li>祝日・会社休日</li><li>予定の個別変更</li></ul></div>
+    <div class="col"><h3>予定と実績</h3><ul><li>本人用カレンダー</li><li>スタッフ切替・全員表示</li><li>相違の検知</li><li>要確認一覧</li><li>未出勤・打刻忘れの通知</li></ul></div>
+    <div class="col"><h3>勤務表・月締め</h3><ul><li>月締め一覧</li><li>個人の月（1 日 1 行）</li><li>日別入力</li><li>交通費・皆勤・通勤</li><li>月締めの確定</li></ul></div>
+    <div class="col"><h3>休暇</h3><ul><li>有休の付与・繰越・残</li><li>特別休暇・欠勤</li><li>休暇の申請と承認</li><li>有給休暇申請書</li></ul></div>
+    <div class="col"><h3>帳票・出力</h3><ul><li>出勤簿（個別・一括）</li><li>QR 掲示物</li><li>有休管理簿</li><li>給与ソフト向け CSV</li></ul></div>
+    <div class="col"><h3>マスタ・利用者</h3><ul><li>現場（位置・QR）</li><li>スタッフ</li><li>招待・利用停止</li><li>設定（休憩時間帯・許容範囲）</li></ul></div>
+    <div class="col base"><h3>引き継ぐ土台</h3><ul><li>ログイン・権限</li><li>帳票 PDF の出力</li><li>メール・通知</li><li>写真の添付と保管</li><li>ログ・日次バックアップ</li></ul></div>
+  </div>
+</section>
+
+<section id="flow">
+  <div class="sec-head"><div class="num">3</div><h2>画面フロー</h2>
+  <p class="lead">上の段が現場スタッフ、下の段が管理者の流れです。破線は、打刻や申請が管理者の画面に届く経路を表します。</p></div>
+  <figure>
+    <div class="scroll">
+    <svg class="dia" viewBox="0 0 1000 400" role="img" aria-label="現場スタッフは招待から登録しホームで QR を読んで打刻する。管理者はホームから要確認・カレンダー・勤務表・月締め・出勤簿へ進む">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <text class="lane" x="20" y="28">現場スタッフ</text><text class="lane" x="20" y="228">管理者</text>
+      <rect class="b" x="20" y="50" width="110" height="56" rx="6"/><text x="75" y="74" text-anchor="middle">招待を開く</text><text class="la" x="75" y="92" text-anchor="middle">ID・パスワード</text>
+      <rect class="bs" x="170" y="50" width="120" height="56" rx="6"/><text x="230" y="74" text-anchor="middle">ホーム</text><text class="la" x="230" y="92" text-anchor="middle">今日の予定</text>
+      <rect class="b" x="330" y="50" width="110" height="56" rx="6"/><text x="385" y="74" text-anchor="middle">QR 読み取り</text><text class="la" x="385" y="92" text-anchor="middle">出勤／退勤</text>
+      <rect class="b" x="480" y="50" width="110" height="56" rx="6"/><text x="535" y="74" text-anchor="middle">記録完了</text><text class="la" x="535" y="92" text-anchor="middle">時刻・予定との差</text>
+      <rect class="b" x="170" y="128" width="120" height="50" rx="6"/><text x="230" y="150" text-anchor="middle">カレンダー</text><text class="la" x="230" y="166" text-anchor="middle">予定・実績</text>
+      <rect class="b" x="330" y="128" width="110" height="50" rx="6"/><text x="385" y="150" text-anchor="middle">日の詳細</text><text class="la" x="385" y="166" text-anchor="middle">打刻・メモ・写真</text>
+      <rect class="b" x="480" y="128" width="110" height="50" rx="6"/><text x="535" y="150" text-anchor="middle">申請</text><text class="la" x="535" y="166" text-anchor="middle">打刻修正・休暇</text>
+      <path class="ln" d="M130 78H168" marker-end="url(#ar)"/><path class="ln" d="M290 78H328" marker-end="url(#ar)"/><path class="ln" d="M440 78H478" marker-end="url(#ar)"/>
+      <path class="ln" d="M230 106V126" marker-end="url(#ar)"/><path class="ln" d="M290 153H328" marker-end="url(#ar)"/><path class="ln" d="M440 153H478" marker-end="url(#ar)"/>
+
+      <rect class="bs" x="20" y="250" width="110" height="56" rx="6"/><text x="75" y="274" text-anchor="middle">ホーム</text><text class="la" x="75" y="292" text-anchor="middle">本日の勤務状況</text>
+      <rect class="b" x="170" y="250" width="120" height="56" rx="6"/><text x="230" y="274" text-anchor="middle">要確認</text><text class="la" x="230" y="292" text-anchor="middle">相違・承認待ち</text>
+      <rect class="b" x="330" y="250" width="110" height="56" rx="6"/><text x="385" y="274" text-anchor="middle">カレンダー</text><text class="la" x="385" y="292" text-anchor="middle">スタッフ切替・全員</text>
+      <rect class="b" x="480" y="250" width="110" height="56" rx="6"/><text x="535" y="274" text-anchor="middle">日別入力</text><text class="la" x="535" y="292" text-anchor="middle">確認・訂正</text>
+      <rect class="b" x="630" y="250" width="110" height="56" rx="6"/><text x="685" y="274" text-anchor="middle">勤務表</text><text class="la" x="685" y="292" text-anchor="middle">一覧・個人の月</text>
+      <rect class="b" x="780" y="250" width="100" height="56" rx="6"/><text x="830" y="274" text-anchor="middle">月締め</text><text class="la" x="830" y="292" text-anchor="middle">確定（鍵）</text>
+      <rect class="b" x="900" y="250" width="84" height="56" rx="6"/><text x="942" y="274" text-anchor="middle">出勤簿</text><text class="la" x="942" y="292" text-anchor="middle">PDF</text>
+      <path class="ln" d="M130 278H168" marker-end="url(#ar)"/><path class="ln" d="M290 278H328" marker-end="url(#ar)"/><path class="ln" d="M440 278H478" marker-end="url(#ar)"/><path class="ln" d="M590 278H628" marker-end="url(#ar)"/><path class="ln" d="M740 278H778" marker-end="url(#ar)"/><path class="ln" d="M880 278H898" marker-end="url(#ar)"/>
+      <path class="ln" stroke-dasharray="4 4" d="M620 78H660V220H230V248" marker-end="url(#ar)"/><path class="ln" stroke-dasharray="4 4" d="M590 78H620"/><path class="ln" stroke-dasharray="4 4" d="M590 153H660"/>
+      <text class="la" x="668" y="150">打刻・申請が届く</text>
+      <rect class="b" x="20" y="336" width="110" height="46" rx="6"/><text x="75" y="364" text-anchor="middle">マスタ</text>
+      <rect class="b" x="170" y="336" width="120" height="46" rx="6"/><text x="230" y="358" text-anchor="middle">予定の自動作成</text><text class="la" x="230" y="373" text-anchor="middle">毎月・手動</text>
+      <rect class="b" x="470" y="336" width="110" height="46" rx="6"/><text x="525" y="364" text-anchor="middle">利用者・招待</text>
+      <path class="ln" d="M130 359H168" marker-end="url(#ar)"/><path class="ln" d="M290 359H385V308" marker-end="url(#ar)"/>
+      <text class="la" x="590" y="364">招待 QR → 現場スタッフの登録へ</text>
+    </svg>
+    </div>
+    <figcaption>管理者も自分の勤務を持つため、管理者の画面にも「自分の勤務」（上段と同じホーム・カレンダー・申請）への入口を置きます。</figcaption>
+  </figure>
+</section>
+
+<section id="screens">
+  <div class="sec-head"><div class="num">4</div><h2>画面イメージ</h2>
+  <p class="lead">下のボタンでアクセント色を切り替えると、すべての画面が同時に変わります。配置と機能は 3 案とも同じで、角の丸みと余白は eSales と共通です。</p></div>
+
+  <div class="switch" role="group" aria-label="アクセント色の切替">
+    <span>アクセント色</span>
+    <button type="button" data-set="a" aria-pressed="true"><i style="background:#6b4fb3"></i>A 藤紫</button>
+    <button type="button" data-set="b" aria-pressed="false"><i style="background:#0e7490"></i>B 青緑</button>
+    <button type="button" data-set="c" aria-pressed="false"><i style="background:#c2571a"></i>C 柿色</button>
+  </div>
+
+  <div class="shot">
+    <h3>4-1 現場スタッフ：出勤の記録<small>iPhone。1 画面 1 操作</small></h3>
+    <div class="phones">
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><div class="brand" style="padding:0"><b></b>eWorks</div><span class="sp"></span><span style="color:var(--m-mu)">上野さん</span></div>
+        <div class="pb">
+          <span class="hello">2027年2月17日（水）</span>
+          <div class="today"><span style="color:var(--m-mu);font-size:11px">今日の予定</span><span class="site">緑町ビル</span><span class="tm">6:15 – 12:15</span><span><span class="tg n">未出勤</span></span></div>
+          <div class="big in">出勤を記録<small>現場の「出勤」の QR を読みます</small></div>
+          <div class="info"><span>🔔</span><span><b>予定の変更</b>　2/19（金）は 7:00 開始に変わりました</span></div>
+          <div class="sum"><div>今月の勤務<b>66.0h</b></div><div>有休の残<b>12日</b></div><div>要確認<b style="color:var(--m-warn)">2</b></div></div>
+        </div>
+        <div class="tab t4"><span class="on">ホーム</span><span>カレンダー</span><span>申請</span><span>設定</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>出勤の QR を読む</h4></div>
+        <div class="pb">
+          <div class="cam"><div class="fr"><div class="qr"></div></div><div class="cap">枠の中に QR を入れてください</div></div>
+          <div class="info"><span>📍</span><span>記録のときだけ位置情報を使います</span></div>
+        </div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><h4>出勤を記録しました</h4></div>
+        <div class="pb">
+          <div class="done">
+            <div class="ck">✓</div>
+            <div class="t">6:12</div>
+            <div class="w">緑町ビル　出勤</div>
+            <div class="mc" style="width:100%"><div class="kv"><span>予定</span><span>6:15 – 12:15</span><span>予定との差</span><span>3分前</span><span>位置</span><span>現場内</span></div></div>
+          </div>
+          <div class="btn p" style="text-align:center;padding:10px">ホームへ戻る</div>
+        </div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><div class="brand" style="padding:0"><b></b>eWorks</div><span class="sp"></span><span style="color:var(--m-mu)">上野さん</span></div>
+        <div class="pb">
+          <span class="hello">2027年2月17日（水）</span>
+          <div class="today"><span style="color:var(--m-mu);font-size:11px">今日の予定</span><span class="site">緑町ビル</span><span class="tm">6:15 – 12:15</span><span><span class="tg ok">勤務中　6:12 から</span></span></div>
+          <div class="big out">退勤を記録<small>現場の「退勤」の QR を読みます</small></div>
+          <div class="info"><span>✎</span><span>作業のメモ・写真を追加</span></div>
+          <div class="sum"><div>今月の勤務<b>66.0h</b></div><div>有休の残<b>12日</b></div><div>要確認<b style="color:var(--m-warn)">2</b></div></div>
+        </div>
+        <div class="tab t4"><span class="on">ホーム</span><span>カレンダー</span><span>申請</span><span>設定</span></div>
+      </div>
+    </div>
+    <p class="note">ボタンは今の状態に合わせて 1 つだけ出します。出勤は緑、退勤は橙で、現場に貼る QR の掲示物と同じ色です。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-2 現場スタッフ：カレンダー・申請・登録<small>iPhone</small></h3>
+    <div class="phones">
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>2027年2月</h4><span>›</span><span class="sp"></span><span class="tg w">要確認 2</span></div>
+        <div class="pb">
+          <div class="pcal"><span class="h">日</span><span class="h">月</span><span class="h">火</span><span class="h">水</span><span class="h">木</span><span class="h">金</span><span class="h">土</span><span class="d off"></span><span class="d"><b>1<i class="mk ok">✓</i></b><u>6:15</u><s>6:11</s></span><span class="d"><b>2<i class="mk ok">✓</i></b><u>6:15</u><s>6:12</s></span><span class="d"><b>3<i class="mk ok">✓</i></b><u>6:15</u><s>6:13</s></span><span class="d"><b>4<i class="mk w">!</i></b><u>6:15</u><s>6:31</s></span><span class="d"><b>5<i class="mk ok">✓</i></b><u>6:15</u><s>6:10</s></span><span class="d"><b>6</b></span><span class="d"><b>7</b></span><span class="d"><b>8<i class="mk ok">✓</i></b><u>6:15</u><s>6:13</s></span><span class="d"><b>9<i class="mk w">!</i></b><u>6:15</u><s>退 −</s></span><span class="d"><b>10<i class="mk ok">✓</i></b><u>6:15</u><s>6:10</s></span><span class="d hol"><b>11</b></span><span class="d"><b>12<i class="mk l">休</i></b><u>有休</u></span><span class="d"><b>13</b></span><span class="d"><b>14</b></span><span class="d"><b>15<i class="mk ok">✓</i></b><u>6:15</u><s>6:10</s></span><span class="d"><b>16<i class="mk ok">✓</i></b><u>6:15</u><s>6:11</s></span><span class="d now"><b>17<i class="mk p">・</i></b><u>6:15</u><s>6:12</s></span><span class="d"><b>18</b><u>6:15</u><u>12:15</u></span><span class="d"><b>19</b><u>6:15</u><u>12:15</u></span><span class="d"><b>20</b></span><span class="d"><b>21</b></span><span class="d"><b>22</b><u>6:15</u><u>12:15</u></span><span class="d hol"><b>23</b></span><span class="d"><b>24</b><u>6:15</u><u>12:15</u></span><span class="d"><b>25</b><u>6:15</u><u>12:15</u></span><span class="d"><b>26</b><u>6:15</u><u>12:15</u></span><span class="d"><b>27</b></span><span class="d"><b>28</b></span></div>
+          <div class="legend"><span><i class="mk ok">✓</i>予定どおり</span><span><i class="mk w">!</i>相違あり</span><span><i class="mk l">休</i>休暇</span></div>
+          <div class="sum"><div>予定<b>108.0h</b></div><div>実績<b>66.0h</b></div><div>有休<b>1日</b></div></div>
+        </div>
+        <div class="tab t4"><span>ホーム</span><span class="on">カレンダー</span><span>申請</span><span>設定</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>2月4日（木）</h4><span class="sp"></span><span class="tg w">遅刻 16分</span></div>
+        <div class="pb">
+          <div class="mc"><div class="kv"><span>現場</span><span>緑町ビル</span><span>予定</span><span>6:15 – 12:15</span><span>実績</span><span>6:31 – 12:16</span><span>休憩</span><span>0.00h</span><span>勤務時間</span><span>5.75h</span></div></div>
+          <div class="mc"><div class="ttl" style="font-size:12px">打刻の記録</div>
+            <div class="tl"><div><span>6:31</span><span>出勤　QR<small>緑町ビル・現場内</small></span></div><div><span>12:16</span><span>退勤　QR<small>緑町ビル・現場内</small></span></div></div></div>
+          <div class="info"><span>✎</span><span>電車の遅延のため</span></div>
+          <div class="btn" style="text-align:center;padding:9px">打刻の修正を申請する</div>
+        </div>
+        <div class="tab t4"><span>ホーム</span><span class="on">カレンダー</span><span>申請</span><span>設定</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>打刻の修正を申請</h4></div>
+        <div class="pb">
+          <div class="fm">日付<span>2027/02/09（火）　緑町ビル</span></div>
+          <div class="fm">いまの記録<span class="ph0">出勤 6:13　退勤 記録なし</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="fm">出勤<span>6:13</span></div><div class="fm">退勤<span>12:15</span></div></div>
+          <div class="fm">理由<span style="min-height:64px">退勤の QR を読み忘れました</span></div>
+          <div class="info"><span>ⓘ</span><span>管理者が承認すると勤務表に反映されます</span></div>
+        </div>
+        <div class="act"><span class="btn">やめる</span><span class="btn p">申請する</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><div class="brand" style="padding:0"><b></b>eWorks</div></div>
+        <div class="pb">
+          <div style="font-size:15px;font-weight:600">ようこそ、上野 さくら さん</div>
+          <div class="hello">招待を確認しました。ログインに使う ID とパスワードを決めてください。</div>
+          <div class="fm">ログイン ID<span>ueno</span></div>
+          <div class="fm">パスワード<span>••••••••••</span></div>
+          <div class="fm">パスワード（確認）<span>••••••••••</span></div>
+          <div class="info"><span>📍</span><span>出勤・退勤を記録するときだけ位置情報を記録します。それ以外の時間は取得しません。</span></div>
+          <div><span class="ck0 on"></span>上の内容に同意します</div>
+        </div>
+        <div class="act"><span class="btn p">登録して始める</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="shot">
+    <h3>4-3 管理者：ホーム<small>Mac・Windows・iPad 横</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b></b>eWorks</div>
+        <a class="on">ホーム</a><a>要確認 <em>7</em></a><a>カレンダー</a>
+        <div class="grp">月次</div><a>勤務表</a><a>休暇</a>
+        <div class="grp">記録</div><a>現場写真</a>
+        <div class="grp">管理</div><a>マスタ</a><a>利用者</a><a>設定</a>
+        <div class="grp">自分</div><a>自分の勤務</a>
+      </div>
+      <div class="main">
+        <div class="bar"><h4>ホーム</h4><span style="color:var(--m-mu)">2027年2月17日（水）　9:40</span><span class="sp"></span><span class="srch">スタッフ名・コードで検索</span></div>
+        <div class="body">
+          <div class="kp k4">
+            <div class="mc"><span class="l">要確認</span><span class="v" style="color:var(--m-bad)">7</span><span class="s"><span class="tg x">未出勤 1</span> <span class="tg w">相違 6</span></span></div>
+            <div class="mc"><span class="l">承認待ちの申請</span><span class="v" style="color:var(--m-warn)">3</span><span class="s" style="color:var(--m-mu)">打刻修正 2・休暇 1</span></div>
+            <div class="mc"><span class="l">本日の出勤予定</span><span class="v">21<small style="font-size:11px"> 人</small></span><span class="s" style="color:var(--m-mu)">出勤済み 17・これから 3</span></div>
+            <div class="mc"><span class="l">1月分の月締め</span><span class="v">22<small style="font-size:11px"> / 24 人</small></span><span class="s" style="color:var(--m-mu)">未締め 2 人</span></div>
+          </div>
+          <div class="two">
+            <div class="mc"><div class="ttl">要確認<span>すべて見る ›</span></div>
+              <table class="mt">
+                <tr><th>日付</th><th>スタッフ</th><th>現場</th><th>予定</th><th>実績</th><th>内容</th></tr>
+                <tr class="sel"><td>2/17</td><td>木下 茂</td><td>港南ビル</td><td>8:00–11:00</td><td>−</td><td><span class="tg x">未出勤　1時間40分経過</span></td></tr>
+                <tr><td>2/16</td><td>石川 誠</td><td>本社ビル</td><td>6:30–14:30</td><td>6:28–15:13</td><td><span class="tg w">超過 43分</span></td></tr>
+                <tr><td>2/15</td><td>中野 博</td><td>事務所</td><td>9:00–18:00</td><td>9:00–　−</td><td><span class="tg w">退勤漏れ</span></td></tr>
+                <tr><td>2/13</td><td>佐々木 進</td><td>相生病院</td><td>−</td><td>5:28–10:02</td><td><span class="tg w">予定外の出勤</span></td></tr>
+                <tr><td>2/10</td><td>大西 健</td><td>緑町ビル</td><td>6:15–14:15</td><td>6:10–14:20</td><td><span class="tg w">現場違い（本社ビルの QR）</span></td></tr>
+              </table>
+            </div>
+            <div class="mc"><div class="ttl">本日の勤務状況<span>9:40 現在</span></div>
+              <div class="sts"><div>勤務中<b style="color:var(--m-ok)">12</b></div><div>退勤済み<b>5</b></div><div>これから<b>3</b></div><div>未出勤<b style="color:var(--m-bad)">1</b></div></div>
+              <table class="mt" style="margin-top:8px">
+                <tr><th>現場</th><th class="num">予定</th><th class="num">出勤</th><th>状況</th></tr>
+                <tr><td>本社ビル</td><td class="num">5</td><td class="num">5</td><td><span class="tg ok">全員出勤</span></td></tr>
+                <tr><td>緑町ビル</td><td class="num">4</td><td class="num">4</td><td><span class="tg ok">全員出勤</span></td></tr>
+                <tr><td>港南ビル</td><td class="num">3</td><td class="num">2</td><td><span class="tg x">未出勤 1</span></td></tr>
+                <tr><td>相生病院</td><td class="num">3</td><td class="num">3</td><td><span class="tg ok">全員出勤</span></td></tr>
+                <tr><td>すみれ薬局</td><td class="num">1</td><td class="num">1</td><td><span class="tg n">退勤済み</span></td></tr>
+                <tr><td>事務所・社内便</td><td class="num">5</td><td class="num">2</td><td><span class="tg n">これから 3</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <p class="note">「要確認」の件数は、ホームの先頭とサイドバーの両方に出ます。どの画面にいても、相違のある勤務者がいることがわかります。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-4 管理者：カレンダー（スタッフ切替）<small>日を押すと右に詳細</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b></b>eWorks</div>
+        <a>ホーム</a><a>要確認 <em>7</em></a><a class="on">カレンダー</a>
+        <div class="grp">月次</div><a>勤務表</a><a>休暇</a>
+        <div class="grp">記録</div><a>現場写真</a>
+        <div class="grp">管理</div><a>マスタ</a><a>利用者</a><a>設定</a>
+        <div class="grp">自分</div><a>自分の勤務</a>
+      </div>
+      <div class="main">
+        <div class="bar"><h4>カレンダー</h4>
+          <div class="who"><i>‹</i><b>1007　上野 さくら</b><i>⌄</i><i>›</i></div>
+          <div class="who"><i>‹</i><b style="min-width:86px">2027年2月</b><i>›</i></div>
+          <span class="sp"></span><div class="seg"><span class="on">1 人</span><span>全員</span></div><span class="btn">勤務表を開く</span></div>
+        <div class="cal3">
+          <div class="body">
+            <div class="dcal"><span class="h">日</span><span class="h">月</span><span class="h">火</span><span class="h">水</span><span class="h">木</span><span class="h">金</span><span class="h">土</span><span class="d off"></span><span class="d"><b>1<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:11–12:13</s></span><span class="d"><b>2<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:12–12:16</s></span><span class="d"><b>3<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:13–12:10</s></span><span class="d sel"><b>4<span class="tg w">遅刻 16分</span></b><u>予 6:15–12:15</u><s>実 6:31–12:16</s></span><span class="d"><b>5<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:10–12:16</s></span><span class="d"><b>6</b></span><span class="d sun"><b>7</b></span><span class="d"><b>8<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:13–12:16</s></span><span class="d"><b>9<span class="tg w">退勤漏れ</span></b><u>予 6:15–12:15</u><s>実 6:13–　−</s></span><span class="d"><b>10<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:10–12:13</s></span><span class="d hol"><b>11</b><em style="color:var(--m-bad)">建国記念の日</em></span><span class="d"><b>12<span class="tg" style="background:var(--m-ac-s);color:var(--m-ac)">有休</span></b><u>予 6:15–12:15</u></span><span class="d"><b>13</b></span><span class="d sun"><b>14</b></span><span class="d"><b>15<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:10–12:10</s></span><span class="d"><b>16<i class="mk ok">✓</i></b><u>予 6:15–12:15</u><s>実 6:11–12:13</s></span><span class="d now"><b>17<span class="tg n">勤務中</span></b><u>予 6:15–12:15</u><s>実 6:12–</s></span><span class="d"><b>18</b><u>予 6:15–12:15</u></span><span class="d"><b>19</b><u>予 6:15–12:15</u></span><span class="d"><b>20</b></span><span class="d sun"><b>21</b></span><span class="d"><b>22</b><u>予 6:15–12:15</u></span><span class="d hol"><b>23</b><em style="color:var(--m-bad)">天皇誕生日</em></span><span class="d"><b>24</b><u>予 6:15–12:15</u></span><span class="d"><b>25</b><u>予 6:15–12:15</u></span><span class="d"><b>26</b><u>予 6:15–12:15</u></span><span class="d"><b>27</b></span><span class="d sun"><b>28</b></span></div>
+            <div class="tot2"><div>予定<b>108.00h</b></div><div>実績（確定分）<b>65.75h</b></div><div>相違<b style="color:var(--m-warn)">2 件</b></div><div>有休<b>1 日</b></div><div>有休の残<b>12 日</b></div></div>
+          </div>
+          <div class="pane">
+            <h5>2月4日（木）<span class="tg w">遅刻 16分</span></h5>
+            <div class="kv"><span>現場</span><span>緑町ビル</span><span>予定</span><span>6:15 – 12:15</span><span>採用時刻</span><span>6:31 – 12:15</span><span>勤務時間</span><span>5.75h</span></div>
+            <div class="ttl" style="margin:0;font-size:12px">打刻の記録</div>
+            <div class="tl"><div><span>6:31</span><span>出勤　QR<small>緑町ビル・現場内（40m）</small></span></div><div><span>12:16</span><span>退勤　QR<small>緑町ビル・現場内（35m）</small></span></div></div>
+            <div class="info"><span>✎</span><span>本人メモ：電車の遅延のため</span></div>
+            <div style="display:flex;gap:8px"><span class="btn" style="flex:1;text-align:center">日別入力で訂正</span><span class="btn p" style="flex:1;text-align:center">確認済みにする</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+  </div>
+
+  <div class="shot">
+    <h3>4-5 管理者：カレンダー（全員表示）<small>1 か月を 1 画面で見渡す</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b></b>eWorks</div>
+        <a>ホーム</a><a>要確認 <em>7</em></a><a class="on">カレンダー</a>
+        <div class="grp">月次</div><a>勤務表</a><a>休暇</a>
+        <div class="grp">記録</div><a>現場写真</a>
+        <div class="grp">管理</div><a>マスタ</a><a>利用者</a><a>設定</a>
+        <div class="grp">自分</div><a>自分の勤務</a>
+      </div>
+      <div class="main">
+        <div class="bar"><h4>カレンダー</h4>
+          <div class="who"><i>‹</i><b style="min-width:86px">2027年2月</b><i>›</i></div>
+          <div class="chips"><span class="chip on">すべての現場</span><span class="chip">相違のある人だけ</span></div>
+          <span class="sp"></span><div class="seg"><span>1 人</span><span class="on">全員</span></div></div>
+        <div class="body">
+          <table class="mx"><tr><th style="text-align:left;padding:0 8px">スタッフ<small style="margin-left:6px">主な現場</small></th><th>1<br>月</th><th>2<br>火</th><th>3<br>水</th><th>4<br>木</th><th>5<br>金</th><th class="we">6<br>土</th><th class="we">7<br>日</th><th>8<br>月</th><th>9<br>火</th><th>10<br>水</th><th class="we hd">11<br>木</th><th>12<br>金</th><th class="we">13<br>土</th><th class="we">14<br>日</th><th>15<br>月</th><th>16<br>火</th><th>17<br>水</th><th>18<br>木</th><th>19<br>金</th><th class="we">20<br>土</th><th class="we">21<br>日</th><th>22<br>月</th><th class="we hd">23<br>火</th><th>24<br>水</th><th>25<br>木</th><th>26<br>金</th><th class="we">27<br>土</th><th class="we">28<br>日</th><th>相違</th></tr><tr><td class="nm">青木 和子<small>本社ビル</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-l">休</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">石川 誠<small>本社ビル</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-w">!</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-bad)">1</td></tr><tr><td class="nm">上野 さくら<small>緑町ビル</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-w">!</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-w">!</td><td class="c-ok">✓</td><td class="we"></td><td class="c-l">休</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-bad)">2</td></tr><tr><td class="nm">大西 健<small>緑町ビル</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-w">!</td><td class="we"></td><td class="c-ok">✓</td><td class="we c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we c-p">・</td><td class="we"></td><td class="ct" style="color:var(--m-bad)">1</td></tr><tr><td class="nm">加藤 美穂<small>港南ビル</small></td><td class="c-ok">✓</td><td class=""></td><td class="c-ok">✓</td><td class=""></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class=""></td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class=""></td><td class="c-ok td">中</td><td class=""></td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-l">休</td><td class="we"></td><td class="c-p">・</td><td class=""></td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">木下 茂<small>港南ビル</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-x td">×</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-bad)">1</td></tr><tr><td class="nm">小林 恵<small>相生病院</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we c-p">・</td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">佐々木 進<small>相生病院</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-l">休</td><td class="c-l">休</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">田村 洋子<small>すみれ薬局</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">中野 博<small>事務所</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-w">!</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-l">休</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-bad)">1</td></tr><tr><td class="nm">西村 由美<small>事務所</small></td><td class=""></td><td class=""></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class=""></td><td class=""></td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class=""></td><td class=""></td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class=""></td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr><tr><td class="nm">野口 正<small>社内便</small></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="we"></td><td class="c-ok">✓</td><td class="we"></td><td class="we"></td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok td">中</td><td class="c-p">・</td><td class="c-p">・</td><td class="we"></td><td class="we"></td><td class="c-p">・</td><td class="we"></td><td class="c-p">・</td><td class="c-p">・</td><td class="c-l">休</td><td class="we"></td><td class="we"></td><td class="ct" style="color:var(--m-mu)">−</td></tr></table>
+          <div class="legend" style="font-size:11px"><span><b style="color:var(--m-ok)">✓</b>予定どおり</span><span><b style="color:var(--m-warn)">!</b>相違あり（遅刻・早退・退勤漏れ など）</span><span><b style="color:var(--m-bad)">×</b>未出勤</span><span><b style="color:var(--m-ac)">休</b>休暇</span><span><b style="color:var(--m-ok)">中</b>勤務中</span><span>・これからの予定</span><span>枠つきの列が今日</span></div>
+        </div>
+      </div>
+    </div></div></div>
+    <p class="note">マスを押すと、その人のその日の詳細が 4-4 と同じ形で開きます。サンプルは 12 人ですが、実際には全スタッフが並びます。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-6 管理者：勤務表（個人の月）と日別入力<small>現行「出勤簿 月締め」「日別入力窓」に相当</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b></b>eWorks</div>
+        <a>ホーム</a><a>要確認 <em>7</em></a><a>カレンダー</a>
+        <div class="grp">月次</div><a class="on">勤務表</a><a>休暇</a>
+        <div class="grp">記録</div><a>現場写真</a>
+        <div class="grp">管理</div><a>マスタ</a><a>利用者</a><a>設定</a>
+        <div class="grp">自分</div><a>自分の勤務</a>
+      </div>
+      <div class="main">
+        <div class="bar"><span>‹ 月締め一覧</span><h4>勤務表</h4>
+          <div class="who"><i>‹</i><b>1007　上野 さくら</b><i>⌄</i><i>›</i></div>
+          <div class="who"><i>‹</i><b style="min-width:86px">2027年2月</b><i>›</i></div>
+          <span class="tg n">未締め</span><span class="sp"></span><span class="btn">出勤簿 PDF</span><span class="btn p">月締め</span></div>
+        <div class="cal3" style="grid-template-columns:minmax(0,1fr) 330px">
+          <div class="body">
+            <div class="mc" style="padding:0;max-height:440px;overflow:hidden">
+              <table class="mt">
+                <tr><th>日</th><th>祝日</th><th>予定</th><th>実績</th><th class="num">通常</th><th class="num">残業</th><th class="num">休日</th><th>休暇</th><th class="num">交通費</th><th>件名・備考</th><th>状態</th></tr>
+                <tr><td>1　月</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:11–12:13</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr><td>2　火</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:12–12:16</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr><td>3　水</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:13–12:10</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr class="sel"><td>4　木</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:31–12:16</td><td class="num">5.75</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><span class="tg w">遅刻</span></td></tr><tr><td>5　金</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:10–12:16</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr class="rest"><td class="sat">6　土</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr class="rest"><td class="sun">7　日</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr><td>8　月</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:13–12:16</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr><td>9　火</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:13–　−</td><td class="num">−</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><span class="tg w">退勤漏れ</span></td></tr><tr><td>10　水</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:10–12:13</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr class="rest"><td class="sun">11　木</td><td style="color:var(--m-bad)">建国記念の日</td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr><td>12　金</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>−</td><td class="num">−</td><td class="num"></td><td class="num"></td><td><span class="tg" style="background:var(--m-ac-s);color:var(--m-ac)">有休</span></td><td class="num"></td><td>私事都合</td><td></td></tr><tr class="rest"><td class="sat">13　土</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr class="rest"><td class="sun">14　日</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr><td>15　月</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:10–12:10</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr><td>16　火</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:11–12:13</td><td class="num">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><i class="mk ok">✓</i></td></tr><tr><td>17　水</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td>6:12–</td><td class="num">−</td><td class="num"></td><td class="num"></td><td></td><td class="num">480</td><td>緑町ビル</td><td><span class="tg n">勤務中</span></td></tr><tr><td>18　木</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr><td>19　金</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr class="rest"><td class="sat">20　土</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr class="rest"><td class="sun">21　日</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr><td>22　月</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr class="rest"><td class="sun">23　火</td><td style="color:var(--m-bad)">天皇誕生日</td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr><td>24　水</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr><td>25　木</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr><td>26　金</td><td></td><td style="color:var(--m-mu)">6:15–12:15</td><td style="color:var(--m-mu)">−</td><td class="num" style="color:var(--m-mu)">6.00</td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td>緑町ビル</td><td><span class="tg n">予定</span></td></tr><tr class="rest"><td class="sat">27　土</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr><tr class="rest"><td class="sun">28　日</td><td style="color:var(--m-bad)"></td><td></td><td></td><td class="num"></td><td class="num"></td><td class="num"></td><td></td><td class="num"></td><td></td><td></td></tr>
+              </table>
+            </div>
+            <div class="tot2"><div>通常時間<b>65.75</b></div><div>残業時間<b>0.00</b></div><div>休日時間<b>0.00</b></div><div>交通費計<b>¥5,280</b></div><div><span><span class="ck0"></span>皆勤</span><span><span class="ck0 on"></span>通勤</span></div><div>有休　付与 22（内 繰越 10）<b>取得 1 ／ 残 12</b></div></div>
+          </div>
+          <div class="pane">
+            <h5>2月4日（木）<span style="color:var(--m-mu);font-weight:400">‹ 前日　翌日 ›</span></h5>
+            <div><span class="ck0"></span>欠勤　<span class="ck0"></span>有休　<span class="ck0"></span>特別休暇</div>
+            <div style="display:flex;gap:6px"><span class="btn">前回と同じ入力</span><span class="btn">テレワーク</span></div>
+            <div class="mc" style="background:var(--m-bg)">
+              <div class="ttl" style="font-size:12px">緑町ビル<span>勤務区間 1</span></div>
+              <div class="kv" style="row-gap:6px;align-items:center">
+                <span>予定</span><span><span class="inp ro">6:15</span> – <span class="inp ro">12:15</span></span>
+                <span>実績</span><span><span class="inp">6:31</span> – <span class="inp">12:15</span></span>
+                <span>追加休憩</span><span><span class="inp">0.00</span></span>
+                <span>残業 ／ 休日</span><span><span class="inp">0.00</span>　<span class="inp">0.00</span></span>
+                <span>作業時間</span><span><b>5.75</b></span>
+              </div>
+            </div>
+            <div class="kv" style="row-gap:6px;align-items:center"><span>交通費</span><span><span class="inp">480</span></span><span>備考</span><span><span class="inp" style="min-width:170px;text-align:left">電車の遅延</span></span></div>
+            <div class="info"><span>🕘</span><span>打刻 6:31／12:16（QR）。退勤は許容範囲内のため予定時刻を採用</span></div>
+            <div style="display:flex;gap:8px"><span class="btn" style="flex:1;text-align:center">＋ 勤務区間</span><span class="btn p" style="flex:1;text-align:center">保存</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <p class="note">列の並びと下部の合計は現行の画面に合わせています。時刻は「631」のように数字だけ打てば整形されます（現行どおり）。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-7 管理者：勤務体系と QR の掲示物<small>現行「担当者の勤務設定」に相当</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b></b>eWorks</div>
+        <a>ホーム</a><a>要確認 <em>7</em></a><a>カレンダー</a>
+        <div class="grp">月次</div><a>勤務表</a><a>休暇</a>
+        <div class="grp">記録</div><a>現場写真</a>
+        <div class="grp">管理</div><a class="on">マスタ</a><a>利用者</a><a>設定</a>
+        <div class="grp">自分</div><a>自分の勤務</a>
+      </div>
+      <div class="main">
+        <div class="bar"><h4>マスタ</h4><div class="seg"><span class="on">勤務体系</span><span>出退勤パターン</span><span>現場</span><span>休憩・休日</span></div><span class="sp"></span><span class="btn">3月分の予定を作成</span><span class="btn p">＋ スタッフ</span></div>
+        <div class="body">
+          <div class="two" style="grid-template-columns:2.1fr 1fr">
+            <div class="mc" style="padding:0;overflow:hidden">
+              <table class="wk">
+                <tr><th style="text-align:left">スタッフ／主な現場</th><th>適用開始</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th><th>祝日</th></tr>
+                <tr><td class="nm">1001　青木 和子<small>本社ビル</small></td><td>2025/04/01</td><td>日勤02<small>6:30–14:30</small></td><td>日勤02<small>6:30–14:30</small></td><td>日勤02<small>6:30–14:30</small></td><td>日勤02<small>6:30–14:30</small></td><td>日勤02<small>6:30–14:30</small></td><td class="no">−</td><td class="no">−</td><td>休み</td></tr>
+                <tr><td class="nm">1007　上野 さくら<small>緑町ビル</small></td><td>2026/10/01</td><td>6時間2<small>6:15–12:15</small></td><td>6時間2<small>6:15–12:15</small></td><td>6時間2<small>6:15–12:15</small></td><td>6時間2<small>6:15–12:15</small></td><td>6時間2<small>6:15–12:15</small></td><td class="no">−</td><td class="no">−</td><td>休み</td></tr>
+                <tr><td class="nm">1012　大西 健<small>緑町ビル</small></td><td>2027/03/01<br><span class="tg w">来月から</span></td><td>日勤04<small>6:15–14:15</small></td><td>日勤04<small>6:15–14:15</small></td><td>日勤04<small>6:15–14:15</small></td><td>日勤04<small>6:15–14:15</small></td><td>日勤04<small>6:15–14:15</small></td><td>5H01<small>6:30–11:30</small></td><td class="no">−</td><td>休み</td></tr>
+                <tr><td class="nm">1015　加藤 美穂<small>港南ビル</small></td><td>2026/06/01</td><td>3H02<small>6:30–9:30</small></td><td class="no">−</td><td>3H02<small>6:30–9:30</small></td><td class="no">−</td><td>3H02<small>6:30–9:30</small></td><td class="no">−</td><td class="no">−</td><td>休み</td></tr>
+                <tr><td class="nm">1021　小林 恵<small>相生病院</small></td><td>2024/09/01</td><td>4.5H<small>5:30–10:00</small></td><td>4.5H<small>5:30–10:00</small></td><td>4.5H<small>5:30–10:00</small></td><td>4.5H<small>5:30–10:00</small></td><td>4.5H<small>5:30–10:00</small></td><td>4H05<small>5:30–9:30</small></td><td class="no">−</td><td><span class="tg ok">勤務</span></td></tr>
+                <tr><td class="nm">1033　中野 博<small>事務所</small></td><td>2023/04/01</td><td>正社員<small>9:00–18:00</small></td><td>正社員<small>9:00–18:00</small></td><td>正社員<small>9:00–18:00</small></td><td>正社員<small>9:00–18:00</small></td><td>正社員<small>9:00–18:00</small></td><td class="no">−</td><td class="no">−</td><td>休み</td></tr>
+              </table>
+            </div>
+            <div class="mc"><div class="ttl">QR の掲示物（A4）<span>現場：緑町ビル</span></div>
+              <div class="posters">
+                <div class="poster"><div class="k">出勤</div><div class="q"></div><div class="n">緑町ビル</div><div class="s">eWorks の「出勤を記録」で読んでください</div></div>
+                <div class="poster o"><div class="k">退勤</div><div class="q"></div><div class="n">緑町ビル</div><div class="s">eWorks の「退勤を記録」で読んでください</div></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px"><span class="btn" style="flex:1;text-align:center">QR を再発行</span><span class="btn p" style="flex:1;text-align:center">PDF をダウンロード</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <p class="note">「適用開始」を持たせるので、来月からの勤務変更を前もって登録でき、過去の月の予定は変わりません。QR を再発行すると古い掲示物は使えなくなります。</p>
+  </div>
+</section>
+
+<section id="themes">
+  <div class="sec-head"><div class="num">5</div><h2>色とアイコン</h2>
+  <p class="lead">角の丸み・余白・文字・部品は eSales と共通にし、アクセント色とアイコンで別のアプリだとわかるようにします。相違を知らせる赤・黄と紛れないことを条件に 3 案を用意しました。</p></div>
+  <div class="scroll"><table class="t">
+    <tr><th>案</th><th>色</th><th>印象</th><th>向いている点</th><th>気をつける点</th></tr>
+    <tr><td><b>A 藤紫</b><br><span class="pill ok">推奨</span></td><td><div class="sw"><i style="background:#6b4fb3"></i><i style="background:#ece7f8"></i><i style="background:#f4f3f8"></i><i style="background:#1e1b2e"></i></div></td><td>落ち着いた紫。人に関わる業務らしい穏やかさ</td><td>タスク管理の深緑、eSales の藍、警告の赤・黄のどれとも紛れない</td><td>藍と同じ寒色系のため、アイコンの形でも区別する</td></tr>
+    <tr><td><b>B 青緑</b></td><td><div class="sw"><i style="background:#0e7490"></i><i style="background:#dff1f5"></i><i style="background:#f1f6f7"></i><i style="background:#17262b"></i></div></td><td>清潔で現場らしい</td><td>明るい屋外でも読みやすい</td><td>藍と深緑の中間にあたり、3 つのアプリを並べると区別が弱い</td></tr>
+    <tr><td><b>C 柿色</b></td><td><div class="sw"><i style="background:#c2571a"></i><i style="background:#fbe9dd"></i><i style="background:#f7f4f0"></i><i style="background:#26201b"></i></div></td><td>活発で目立つ</td><td>ほかの 2 つのアプリとの区別は最も強い</td><td>「注意」の黄・「未出勤」の赤、退勤ボタンの橙と近く、相違の表示が埋もれやすい</td></tr>
+  </table></div>
+  <div class="grid g2">
+    <div class="card"><div class="k">アイコン</div><h3>3 つのアプリを色と形で区別</h3>
+      <div class="apps" style="margin-top:6px">
+        <figure><div class="ic" style="background:#33604d;font-size:22px">栄和</div><figcaption>タスク管理</figcaption></figure>
+        <figure><div class="ic" style="background:#1d4f91">e</div><figcaption>eSales</figcaption></figure>
+        <figure><div class="ic rnd mock" data-mt="a" style="background:var(--m-ac)"><span></span></div><figcaption>eWorks</figcaption></figure>
+      </div>
+      <p>eSales は四角い地に「e」、eWorks は時計をかたどった丸い印にします。サイドバーの先頭とログイン画面にも同じ印を出します。</p></div>
+    <div class="card"><div class="k">共通にするもの</div><h3>eSales と揃えるデザインの土台</h3><p>余白・角丸・文字の大きさ、ボタン・入力欄・表・バッジ・モーダル、PC と iPad は左のサイドバー、iPhone は下のタブ、明るい画面に固定。状態の色（良＝緑、注意＝黄、要対応＝赤）も共通です。</p></div>
+  </div>
+</section>
+
+<section id="ideas">
+  <div class="sec-head"><div class="num">6</div><h2>新機能・工夫の候補</h2>
+  <p class="lead">「入れる」は初期範囲に含めたいもの、「候補」は切替後に判断するもの、「費用あり」は既定では入れないものです。</p></div>
+  <div class="scroll"><table class="t">
+    <tr><th>区分</th><th>機能</th><th>内容</th><th>費用</th></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>未出勤の即時通知</td><td>始業 10 分後に出勤がなければ管理者へ通知。代わりの手配に間に合わせる</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>打刻忘れの通知</td><td>退勤予定の 60 分後に退勤がなければ本人へ通知</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>打刻の修正申請</td><td>本人が理由を添えて申請、管理者が承認。訂正の経緯が残る</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>休暇の申請と承認</td><td>カレンダーから日を選んで申請。承認で勤務表と残日数に反映。申請書 PDF も出せる</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>月締めの確定と本人確認</td><td>本人が内容を確認 → 管理者が締め → 編集不可。解除は記録に残る</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>圏外時の一時保存</td><td>地下や機械室でも打刻でき、電波が戻ったら自動で送信</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>全員表示</td><td>スタッフ × 日の表で 1 か月を見渡す（4-5）</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>年 5 日の有休取得の見守り</td><td>付与から 1 年で 5 日に届かない見込みの人を管理者に表示</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>勤務ルールの見守り</td><td>休憩の不足、残業の多さ、長い連続勤務を表示</td><td>0 円</td></tr>
+    <tr><td><span class="pill ok">入れる</span></td><td>予定変更の本人通知</td><td>管理者が予定を変えたら本人へ通知し、カレンダーに印</td><td>0 円</td></tr>
+    <tr><td><span class="pill n">候補</span></td><td>顔認証・指紋認証でログイン</td><td>パスワードを覚えなくてよい。現場スタッフ向け</td><td>0 円</td></tr>
+    <tr><td><span class="pill n">候補</span></td><td>代勤の候補表示</td><td>未出勤・休暇が出た時間帯に予定のないスタッフを一覧表示</td><td>0 円</td></tr>
+    <tr><td><span class="pill n">候補</span></td><td>予定のカレンダー配信</td><td>本人のスマートフォンのカレンダーアプリに勤務予定を表示</td><td>0 円</td></tr>
+    <tr><td><span class="pill n">候補</span></td><td>現場別の実績時間の集計</td><td>現場 × 月の予定時間と実績時間。eSales 稼働後は受注との対比に使える</td><td>0 円</td></tr>
+    <tr><td><span class="pill n">候補</span></td><td>共用タブレットでの打刻</td><td>スマートフォンを持たない方向け。現場の端末で氏名を選んで打刻</td><td>0 円（端末は別）</td></tr>
+    <tr><td><span class="pill warn">費用あり</span></td><td>AI による月次の要約・質問</td><td>相違の傾向や確認が要る人を文章で要約</td><td>Claude API の従量課金</td></tr>
+    <tr><td><span class="pill warn">費用あり</span></td><td>LINE WORKS への通知</td><td>未出勤などをトークに通知</td><td>プランにより制限・費用の可能性</td></tr>
+  </table></div>
+  <p class="note">通知は、iPhone では eWorks をホーム画面に追加した場合に届きます。招待後の案内に手順を入れます。</p>
+</section>
+
+<section id="next">
+  <div class="sec-head"><div class="num">7</div><h2>決めていただくこと</h2>
+  <p class="lead">この資料に関わるのは次の 5 つです。そのほかの確認事項は開発計画書の 17章にあります。</p></div>
+  <div class="scroll"><table class="t">
+    <tr><th>#</th><th>項目</th><th>推奨</th></tr>
+    <tr><td>1</td><td>アクセント色（A 藤紫／B 青緑／C 柿色）とアイコン</td><td>A 藤紫、時計をかたどった丸い印</td></tr>
+    <tr><td>2</td><td>現場スタッフの画面は「ホーム・カレンダー・申請・設定」の 4 つでよいか</td><td>この 4 つ</td></tr>
+    <tr><td>3</td><td>打刻が予定と少しずれたとき、予定時刻にそろえるか（4-6 右下の例）</td><td>許容範囲内はそろえる。範囲外は打刻の時刻のまま要確認へ</td></tr>
+    <tr><td>4</td><td>全員の勤怠を見られる管理者を誰にするか</td><td>既存の利用者のうち指定した方だけ</td></tr>
+    <tr><td>5</td><td>6章の「入れる」10 件を初期範囲に含めるか</td><td>含める</td></tr>
+  </table></div>
+</section>
+
+<footer>この資料は検討用の第1案です。画面は実装前のイメージで、項目や配置は確認を受けて変わります。</footer>
+</div>
+<script>
+(function(){
+  var btns=document.querySelectorAll('.switch button');
+  function set(t){
+    document.querySelectorAll('.mock').forEach(function(m){m.setAttribute('data-mt',t)});
+    btns.forEach(function(b){b.setAttribute('aria-pressed',b.dataset.set===t?'true':'false')});
+    try{localStorage.setItem('eworks-mt',t)}catch(e){}
+  }
+  btns.forEach(function(b){b.addEventListener('click',function(){set(b.dataset.set)})});
+  try{var s=localStorage.getItem('eworks-mt');if(s==='b'||s==='c')set(s)}catch(e){}
+})();
+</script>
+</body>
+</html>
