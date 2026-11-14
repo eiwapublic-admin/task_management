@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eSales 画面イメージ案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=Zen+Old+Mincho:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* layout idea: 1カラムの資料。各章は「短い説明 → 図または画面モック」。モックは横幅固定で枠内だけ横スクロール */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#1b2330; --muted:#5a6575; --line:#dde2ea; --accent:#1d4f91; --accent-soft:#e6eef9;
+  --ok:#1f7a4d; --warn:#a86400; --bad:#b3261e;
+  --f-display:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"IBM Plex Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a202a; --ink:#e8ecf2; --muted:#9aa5b5; --line:#2e3644; --accent:#7fb0ee; --accent-soft:#1f2c40;
+  --ok:#6cc596; --warn:#e0a94a; --bad:#f08a80; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a202a; --ink:#e8ecf2; --muted:#9aa5b5; --line:#2e3644; --accent:#7fb0ee; --accent-soft:#1f2c40;
+  --ok:#6cc596; --warn:#e0a94a; --bad:#f08a80; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 20px 80px;display:flex;flex-direction:column;gap:56px}
+header.top{display:flex;flex-direction:column;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:20px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted)}
+h1{font-family:var(--f-display);font-size:34px;line-height:1.3;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-size:24px;margin:0;line-height:1.4;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:600}
+p{margin:0;max-width:44em}
+.lead{color:var(--muted)}
+section{display:flex;flex-direction:column;gap:18px}
+.sec-head{display:flex;flex-direction:column;gap:6px}
+.num{font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.1em}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px}
+nav.toc a{font-size:13px;color:var(--ink);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:4px 12px;border-radius:999px}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.card p{font-size:14px;color:var(--muted)}
+.card .k{font-size:12px;color:var(--accent);font-weight:600}
+table.t{width:100%;border-collapse:collapse;font-size:14px;background:var(--surface)}
+table.t th,table.t td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+table.t th{background:var(--accent-soft);font-weight:600;white-space:nowrap}
+.scroll{overflow-x:auto;border-radius:8px}
+.pill{display:inline-block;font-size:12px;padding:1px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)} .pill.n{color:var(--muted)}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:13px;color:var(--muted)}
+svg.dia{max-width:100%;height:auto;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:820px}
+svg.dia text{font-family:var(--f-body);font-size:12px;fill:currentColor}
+svg.dia .b{fill:var(--surface);stroke:currentColor;stroke-width:1.2}
+svg.dia .bs{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+svg.dia .ln{stroke:currentColor;stroke-width:1.2;fill:none}
+svg.dia .la{font-size:11px;fill:var(--muted)}
+svg.dia .lane{font-size:11px;fill:var(--muted);letter-spacing:.1em}
+/* 機能構成 */
+.tree{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tree .col{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.tree ul{margin:0;padding-left:1.1em;font-size:13px;color:var(--muted);line-height:1.65}
+.tree .base{border-top-color:var(--muted)}
+/* テーマ切替 */
+.switch{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
+.switch span{font-size:13px;color:var(--muted)}
+.switch button{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;gap:8px;align-items:center}
+.switch button i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.switch button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:600}
+.switch button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shot{display:flex;flex-direction:column;gap:8px}
+.shot h3 small{font-weight:400;color:var(--muted);margin-left:8px}
+
+/* ===== ここからアプリ画面のモック（閲覧側の明暗に関係なく、アプリの見た目を固定で示す） ===== */
+.mock{--m-bg:#f2f4f8;--m-sf:#fff;--m-ink:#18212f;--m-mu:#627084;--m-ln:#dde3ec;--m-ac:#1d4f91;--m-ac-s:#e4edf9;--m-on:#fff;
+  --m-side:#fff;--m-side-ink:#18212f;--m-side-mu:#627084;--m-side-on:#e4edf9;--m-r:6px;--m-pad:10px;
+  --m-sales:#2f6fbd;--m-buy:#a8782a;--m-ok:#1f7a4d;--m-warn:#b06c00;--m-bad:#b3261e;
+  color:var(--m-ink);font-size:12px;line-height:1.5;color-scheme:light}
+.mock[data-mt="b"]{--m-bg:#f1f6f3;--m-ink:#1b2925;--m-mu:#5c6f68;--m-ln:#d7e3dd;--m-ac:#0e7663;--m-ac-s:#dcf0ea;
+  --m-side:#e9f1ed;--m-side-ink:#1b2925;--m-side-mu:#5c6f68;--m-side-on:#fff;--m-r:12px;--m-pad:13px}
+.mock[data-mt="c"]{--m-bg:#f4f3f0;--m-ink:#22201e;--m-mu:#6b6661;--m-ln:#e0dcd5;--m-ac:#bf3f2b;--m-ac-s:#f8e6e1;
+  --m-side:#262321;--m-side-ink:#f2eee8;--m-side-mu:#a8a199;--m-side-on:#3a3531;--m-r:3px;--m-pad:9px}
+.frame{min-width:1040px;border:1px solid var(--m-ln);border-radius:10px;overflow:hidden;background:var(--m-bg);box-shadow:0 6px 24px rgba(0,0,0,.08)}
+.app{display:grid;grid-template-columns:168px 1fr;min-height:520px}
+.side{background:var(--m-side);color:var(--m-side-ink);border-right:1px solid var(--m-ln);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.brand{font-weight:600;font-size:14px;padding:4px 8px 12px;display:flex;align-items:center;gap:8px}
+.brand b{width:22px;height:22px;border-radius:5px;background:var(--m-ac);color:var(--m-on);display:grid;place-items:center;font-size:12px}
+.side a{display:flex;justify-content:space-between;padding:6px 10px;border-radius:var(--m-r);color:var(--m-side-ink);text-decoration:none}
+.side a.on{background:var(--m-side-on);font-weight:600;box-shadow:inset 3px 0 0 var(--m-ac)}
+.side a em{font-style:normal;font-size:10px;background:var(--m-bad);color:#fff;border-radius:999px;padding:0 6px}
+.side .grp{font-size:10px;color:var(--m-side-mu);padding:10px 10px 2px;letter-spacing:.08em}
+.main{display:flex;flex-direction:column;min-width:0}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--m-sf);border-bottom:1px solid var(--m-ln)}
+.bar h4{margin:0;font-size:15px}
+.bar .sp{flex:1}
+.srch{border:1px solid var(--m-ln);border-radius:999px;padding:4px 12px;color:var(--m-mu);min-width:220px;background:var(--m-bg)}
+.btn{border:1px solid var(--m-ln);background:var(--m-sf);border-radius:var(--m-r);padding:5px 12px;white-space:nowrap}
+.btn.p{background:var(--m-ac);border-color:var(--m-ac);color:var(--m-on);font-weight:600}
+.body{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1}
+.mc{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:var(--m-pad)}
+.kp{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kp .mc{display:flex;flex-direction:column;gap:2px}
+.kp .l{color:var(--m-mu);font-size:11px}
+.kp .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.kp .s{font-size:11px}
+.two{display:grid;grid-template-columns:1.25fr 1fr;gap:12px}
+.ttl{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+.ttl span{color:var(--m-mu);font-weight:400}
+.mt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.mt th{font-weight:500;color:var(--m-mu);text-align:left;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--m-ln);white-space:nowrap}
+.mt td{padding:6px;border-bottom:1px solid var(--m-ln);white-space:nowrap}
+.mt tr.sel td{background:var(--m-ac-s)}
+.mt .r{text-align:right}
+.tg{display:inline-block;font-size:10px;padding:0 7px;border-radius:999px;line-height:17px;border:1px solid transparent}
+.tg.s{background:color-mix(in srgb,var(--m-sales) 14%,#fff);color:var(--m-sales)}
+.tg.b{background:color-mix(in srgb,var(--m-buy) 16%,#fff);color:var(--m-buy)}
+.tg.ok{background:color-mix(in srgb,var(--m-ok) 14%,#fff);color:var(--m-ok)}
+.tg.w{background:color-mix(in srgb,var(--m-warn) 16%,#fff);color:var(--m-warn)}
+.tg.x{background:color-mix(in srgb,var(--m-bad) 12%,#fff);color:var(--m-bad)}
+.tg.n{border-color:var(--m-ln);color:var(--m-mu)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:92px;padding-top:6px}
+.bars div{flex:1;display:flex;gap:2px;align-items:flex-end;height:100%}
+.bars i{flex:1;background:var(--m-ac);border-radius:2px 2px 0 0}
+.bars i.pv{background:var(--m-ln)}
+.axis{display:flex;gap:6px;color:var(--m-mu);font-size:10px}
+.axis span{flex:1;text-align:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--m-ln);border-radius:999px;padding:2px 10px;background:var(--m-sf)}
+.chip.on{background:var(--m-ac);color:var(--m-on);border-color:var(--m-ac)}
+.split{display:grid;grid-template-columns:264px minmax(0,1fr);flex:1;min-height:0}
+.lst{border-right:1px solid var(--m-ln);background:var(--m-sf);display:flex;flex-direction:column}
+.lst .f{padding:10px;border-bottom:1px solid var(--m-ln);display:flex;flex-direction:column;gap:8px}
+.row{padding:8px 10px;border-bottom:1px solid var(--m-ln);display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.row.sel{background:var(--m-ac-s);box-shadow:inset 3px 0 0 var(--m-ac)}
+.row .a{font-weight:600}.row .m{color:var(--m-mu);font-size:11px}.row .y{font-variant-numeric:tabular-nums;text-align:right}
+.det{padding:14px;display:flex;flex-direction:column;gap:10px;position:relative}
+.step{display:flex;gap:0;align-items:stretch}
+.step div{flex:1;padding:6px 10px 6px 18px;background:var(--m-sf);border:1px solid var(--m-ln);border-left:none;position:relative;font-size:11px;color:var(--m-mu)}
+.step div:first-child{border-left:1px solid var(--m-ln);border-radius:var(--m-r) 0 0 var(--m-r);padding-left:10px}
+.step div:last-child{border-radius:0 var(--m-r) var(--m-r) 0}
+.step b{display:block;color:var(--m-ink);font-size:12px}
+.step .done{background:var(--m-ac-s)} .step .done b{color:var(--m-ac)}
+.step .cur{background:var(--m-ac);color:var(--m-on);border-color:var(--m-ac)} .step .cur b{color:var(--m-on)}
+.fld{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 12px}
+.fld label{display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--m-mu)}
+.fld label span{border:1px solid var(--m-ln);border-radius:var(--m-r);padding:5px 8px;font-size:12px;color:var(--m-ink);background:var(--m-sf);min-height:28px}
+.fld .w2{grid-column:span 2}
+.tot{display:flex;gap:18px;align-items:center;background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:8px 12px;box-shadow:0 -4px 14px rgba(0,0,0,.06)}
+.tot div{display:flex;flex-direction:column;font-size:10px;color:var(--m-mu)}
+.tot b{font-size:14px;color:var(--m-ink);font-variant-numeric:tabular-nums}
+.tot .big b{font-size:18px}
+.tot .sp{flex:1}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;font-size:10px}
+.cal span{border:1px solid var(--m-ln);border-radius:3px;min-height:34px;padding:2px 4px;background:var(--m-sf);color:var(--m-mu)}
+.cal span.h{background:none;border:none;min-height:0;text-align:center}
+.cal span i{display:block;font-style:normal;background:var(--m-ac-s);color:var(--m-ac);border-radius:2px;padding:0 3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dots{display:flex;gap:2px}
+.dots i{width:9px;height:9px;border-radius:2px;background:var(--m-ln)}
+.dots i.y{background:var(--m-ac)}
+.stamp{display:inline-grid;place-items:center;width:22px;height:22px;border:1.5px solid #c0392b;color:#c0392b;border-radius:50%;font-size:10px;font-weight:600}
+.stamp.off{border-color:var(--m-ln);color:var(--m-ln)}
+.phones{display:flex;gap:22px;flex-wrap:wrap;justify-content:center}
+.phone{width:286px;border:8px solid #20242b;border-radius:34px;overflow:hidden;background:var(--m-bg);display:flex;flex-direction:column;height:580px;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+.phone .bar{padding:10px 12px}
+.phone .pb{flex:1;overflow:hidden;padding:10px;display:flex;flex-direction:column;gap:8px}
+.pc{background:var(--m-sf);border:1px solid var(--m-ln);border-radius:var(--m-r);padding:9px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.pc .a{font-weight:600;font-size:13px}.pc .m{color:var(--m-mu);font-size:11px}.pc .y{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.tab{display:grid;grid-template-columns:repeat(5,1fr);background:var(--m-sf);border-top:1px solid var(--m-ln);font-size:10px;text-align:center;color:var(--m-mu)}
+.tab span{padding:8px 0 10px}.tab .on{color:var(--m-ac);font-weight:600;box-shadow:inset 0 2px 0 var(--m-ac)}
+.act{display:flex;gap:8px;padding:8px 10px;background:var(--m-sf);border-top:1px solid var(--m-ln)}
+.act .btn{flex:1;text-align:center;padding:8px}
+.ph{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ph i{aspect-ratio:1;border-radius:var(--m-r);background:repeating-linear-gradient(135deg,var(--m-ln) 0 6px,var(--m-bg) 6px 12px);border:1px solid var(--m-ln)}
+.ph i.add{background:var(--m-ac-s);display:grid;place-items:center;color:var(--m-ac);font-style:normal;font-size:20px;border-style:dashed;border-color:var(--m-ac)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px}
+.sw{display:flex;gap:4px}.sw i{width:26px;height:26px;border-radius:4px;border:1px solid var(--line)}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+@media (max-width:520px){h1{font-size:26px}h2{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">販売管理 eSales ／ FileMaker「eSales2」移行 ／ 2026-11-14 第1案</div>
+  <h1>eSales 画面イメージ案と機能構成</h1>
+  <p class="lead">新しい販売管理アプリの見た目と流れを、決定前のたたき台として示します。画面内の会社名・金額はすべて架空のサンプルです。</p>
+  <nav class="toc" aria-label="目次">
+    <a href="#features">1 特徴</a><a href="#structure">2 機能構成図</a><a href="#flow">3 画面フロー</a>
+    <a href="#screens">4 画面イメージ</a><a href="#themes">5 デザインテーマ候補</a><a href="#ideas">6 新機能・工夫の候補</a><a href="#next">7 決めていただくこと</a>
+  </nav>
+</header>
+
+<section id="features">
+  <div class="sec-head"><div class="num">1</div><h2>システムの特徴</h2></div>
+  <div class="grid g3">
+    <div class="card"><div class="k">入口</div><h3>販売管理だけの独立したアプリ</h3><p>専用のURL・アイコン・ホーム画面を持ち、Dock やホーム画面に「eSales」として追加できます。ログインIDとパスワードはタスク管理と共通です。</p></div>
+    <div class="card"><div class="k">流れ</div><h3>見積から入金までが1本の線で見える</h3><p>伝票を開くと、見積・受注・売上・請求・入金のどこまで進んだかが上部に並びます。押すとその伝票へ移ります。</p></div>
+    <div class="card"><div class="k">操作</div><h3>1つの画面で完結、キーボードで速い</h3><p>伝票ごとに別ウインドウを開きません。一覧の横に詳細が開き、明細は Enter と Tab で打ち進められます。</p></div>
+    <div class="card"><div class="k">端末</div><h3>Mac・Windows・iPad・iPhone で同じ機能</h3><p>iPhone 専用の画面を作り分けず、同じ画面が幅に合わせて並び替わります。現場での写真つき作業報告もそのまま使えます。</p></div>
+    <div class="card"><div class="k">正確さ</div><h3>金額は現行と1円単位で突き合わせ</h3><p>消費税と請求金額の計算を1か所にまとめ、過去の締め月を締め直して FileMaker の結果と一致するかを自動で確かめます。</p></div>
+    <div class="card"><div class="k">費用</div><h3>無料枠で運用</h3><p>既存の Cloudflare と Supabase の無料枠に収めます。写真と帳票は Cloudflare R2（10GBまで無料）に置き、使用量を管理画面に表示します。</p></div>
+  </div>
+</section>
+
+<section id="structure">
+  <div class="sec-head"><div class="num">2</div><h2>機能構成図</h2>
+  <p class="lead">上段が業務機能、下段が既存のタスク管理アプリから引き継ぐ土台です。</p></div>
+  <div class="tree">
+    <div class="col"><h3>売上</h3><ul><li>見積（失注管理）</li><li>受注</li><li>売上（値引・承認）</li><li>入金（差額の値引伝票）</li><li>伝票の複写・進行</li></ul></div>
+    <div class="col"><h3>定期作業</h3><ul><li>受注雛形</li><li>予定発行（展開パターン4種）</li><li>受注予定から受注へ</li><li>日程調整</li><li>作業予定・予定案内</li></ul></div>
+    <div class="col"><h3>仕入</h3><ul><li>発注</li><li>仕入</li><li>支払</li><li>売上系からの一括生成</li><li>仕入先への作業一覧</li></ul></div>
+    <div class="col"><h3>請求・元帳</h3><ul><li>請求締め（15・20・末日）</li><li>確認・承認</li><li>請求書4種</li><li>得意先元帳</li><li>仕入先元帳・元帳締め</li></ul></div>
+    <div class="col"><h3>作業</h3><ul><li>作業カレンダー</li><li>実績入力</li><li>写真の撮影・登録</li><li>作業報告書</li></ul></div>
+    <div class="col"><h3>分析・連携</h3><ul><li>ホームの集計</li><li>売上・仕入の推移</li><li>得意先別伝票遷移</li><li>経理ソフト向けCSV</li></ul></div>
+    <div class="col"><h3>マスタ・設定</h3><ul><li>得意先（納品先・請求単位・担当者）</li><li>仕入先・商品・担当者</li><li>会社情報・消費税率</li><li>区分・設定値</li></ul></div>
+    <div class="col base"><h3>引き継ぐ土台</h3><ul><li>ログイン・権限</li><li>帳票PDFの出力</li><li>Gmail 下書きと添付</li><li>写真の縮小・プレビュー</li><li>操作ログ・通知</li><li>毎日のバックアップ</li></ul></div>
+  </div>
+</section>
+
+<section id="flow">
+  <div class="sec-head"><div class="num">3</div><h2>画面フロー</h2>
+  <p class="lead">各箱は「一覧と詳細」の1組の画面です。矢印は伝票を次の段階へ進める操作を表します。</p></div>
+  <figure>
+    <div class="scroll">
+    <svg class="dia" viewBox="0 0 1000 440" role="img" aria-label="ホームから売上・定期作業・仕入の各伝票画面へ進み、請求締めと元帳に至る画面の流れ">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <text class="lane" x="150" y="40">定期作業</text><text class="lane" x="150" y="170">売上</text><text class="lane" x="150" y="325">仕入</text>
+      <rect class="b" x="20" y="150" width="96" height="60" rx="6"/><text x="68" y="176" text-anchor="middle">ログイン</text><text x="68" y="194" text-anchor="middle">→ ホーム</text>
+      <path class="ln" d="M116 180H140M140 80V335M140 80H150M140 180H150" marker-end="url(#ar)"/>
+      <!-- 定期 -->
+      <rect class="b" x="150" y="50" width="120" height="50" rx="6"/><text x="210" y="80" text-anchor="middle">受注雛形</text>
+      <rect class="b" x="330" y="50" width="120" height="50" rx="6"/><text x="390" y="80" text-anchor="middle">予定発行</text>
+      <rect class="b" x="510" y="50" width="120" height="50" rx="6"/><text x="570" y="80" text-anchor="middle">受注予定</text>
+      <path class="ln" d="M270 75H328" marker-end="url(#ar)"/><text class="la" x="299" y="68" text-anchor="middle">期間指定</text>
+      <path class="ln" d="M450 75H508" marker-end="url(#ar)"/><text class="la" x="479" y="68" text-anchor="middle">一括発行</text>
+      <path class="ln" d="M570 100V130H390V178" marker-end="url(#ar)"/><text class="la" x="480" y="124" text-anchor="middle">受注へ（日程調整）</text>
+      <!-- 売上 -->
+      <rect class="bs" x="150" y="180" width="120" height="50" rx="6"/><text x="210" y="210" text-anchor="middle">見積</text>
+      <rect class="bs" x="330" y="180" width="120" height="50" rx="6"/><text x="390" y="210" text-anchor="middle">受注</text>
+      <rect class="bs" x="510" y="180" width="120" height="50" rx="6"/><text x="570" y="210" text-anchor="middle">売上</text>
+      <rect class="bs" x="690" y="180" width="120" height="50" rx="6"/><text x="750" y="210" text-anchor="middle">請求締め</text>
+      <rect class="bs" x="870" y="180" width="110" height="50" rx="6"/><text x="925" y="210" text-anchor="middle">入金</text>
+      <path class="ln" d="M270 205H328" marker-end="url(#ar)"/><text class="la" x="299" y="198" text-anchor="middle">複写</text>
+      <path class="ln" d="M450 205H508" marker-end="url(#ar)"/><text class="la" x="479" y="198" text-anchor="middle">進行</text>
+      <path class="ln" d="M630 205H688" marker-end="url(#ar)"/><text class="la" x="659" y="198" text-anchor="middle">月次締め</text>
+      <path class="ln" d="M810 205H868" marker-end="url(#ar)"/><text class="la" x="839" y="198" text-anchor="middle">請求書</text>
+      <path class="ln" d="M925 180V150H570V178" marker-end="url(#ar)"/><text class="la" x="750" y="144" text-anchor="middle">入金差額 → 値引の売上伝票</text>
+      <!-- 仕入 -->
+      <rect class="b" x="330" y="310" width="120" height="50" rx="6"/><text x="390" y="340" text-anchor="middle">発注</text>
+      <rect class="b" x="510" y="310" width="120" height="50" rx="6"/><text x="570" y="340" text-anchor="middle">仕入</text>
+      <rect class="b" x="690" y="310" width="120" height="50" rx="6"/><text x="750" y="340" text-anchor="middle">仕入先元帳</text>
+      <rect class="b" x="870" y="310" width="110" height="50" rx="6"/><text x="925" y="340" text-anchor="middle">支払</text>
+      <path class="ln" d="M390 230V308" marker-end="url(#ar)"/><text class="la" x="398" y="274">発注・仕入を一括生成</text>
+      <path class="ln" d="M450 335H508" marker-end="url(#ar)"/><text class="la" x="479" y="328" text-anchor="middle">進行</text>
+      <path class="ln" d="M630 335H688" marker-end="url(#ar)"/><text class="la" x="659" y="328" text-anchor="middle">元帳締め</text>
+      <path class="ln" d="M810 335H868" marker-end="url(#ar)"/>
+      <path class="ln" d="M140 335H328" marker-end="url(#ar)"/>
+      <!-- 共通 -->
+      <rect class="b" x="150" y="390" width="830" height="34" rx="6" stroke-dasharray="4 4"/>
+      <text x="565" y="412" text-anchor="middle">どの伝票の詳細からも： 帳票PDF ／ メール下書き ／ 関連書類 ／ 作業報告 ／ 変更履歴</text>
+    </svg>
+    </div>
+    <figcaption>色つきの箱が売上の主経路です。定期作業は雛形から受注を作る入口、仕入は受注から枝分かれする経路で、どちらも売上の線に合流します。</figcaption>
+  </figure>
+</section>
+
+<section id="screens">
+  <div class="sec-head"><div class="num">4</div><h2>画面イメージ</h2>
+  <p class="lead">下のボタンでデザインテーマを切り替えると、すべての画面が同時に変わります。配置と機能は3案とも同じです。</p></div>
+
+  <div class="switch" role="group" aria-label="デザインテーマの切替">
+    <span>テーマ</span>
+    <button type="button" id="mt-a" data-set="a" aria-pressed="true"><i style="background:#1d4f91"></i>A 藍</button>
+    <button type="button" id="mt-b" data-set="b" aria-pressed="false"><i style="background:#0e7663"></i>B 若竹</button>
+    <button type="button" id="mt-c" data-set="c" aria-pressed="false"><i style="background:#bf3f2b"></i>C 墨と朱</button>
+  </div>
+
+  <div class="shot">
+    <h3>4-1 ホーム<small>Mac・Windows・iPad 横</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app">
+      <div class="side">
+        <div class="brand"><b>e</b>eSales</div>
+        <a class="on">ホーム</a>
+        <div class="grp">売上</div><a>見積</a><a>受注</a><a>売上</a><a>入金</a>
+        <div class="grp">定期作業</div><a>雛形・予定発行</a><a>予定から受注へ <em>4</em></a><a>作業予定案内</a>
+        <div class="grp">仕入</div><a>発注</a><a>仕入</a><a>支払</a>
+        <div class="grp">月次</div><a>請求締め</a><a>元帳</a>
+        <div class="grp">その他</div><a>作業・報告</a><a>帳票・書類</a><a>分析</a><a>マスタ</a>
+      </div>
+      <div class="main">
+        <div class="bar"><h4>ホーム</h4><span style="color:var(--m-mu)">2027年11月15日（月）</span><span class="sp"></span><span class="srch">伝票番号・得意先・件名で検索　Ctrl+K</span><span class="btn p">＋ 新しい見積</span></div>
+        <div class="body">
+          <div class="kp">
+            <div class="mc"><span class="l">今日の作業</span><span class="v">6<small style="font-size:11px"> 件</small></span><span class="s" style="color:var(--m-mu)">うち協力会社 4</span></div>
+            <div class="mc"><span class="l">日程未調整</span><span class="v" style="color:var(--m-bad)">4</span><span class="s"><span class="tg x">12月分</span></span></div>
+            <div class="mc"><span class="l">見積の期限間近</span><span class="v" style="color:var(--m-warn)">2</span><span class="s" style="color:var(--m-mu)">7日以内</span></div>
+            <div class="mc"><span class="l">未請求の売上</span><span class="v">¥1,284,000</span><span class="s" style="color:var(--m-mu)">12 件・10月締め分</span></div>
+            <div class="mc"><span class="l">入金予定日超過</span><span class="v" style="color:var(--m-bad)">1</span><span class="s" style="color:var(--m-mu)">¥155,238</span></div>
+          </div>
+          <div class="two">
+            <div class="mc"><div class="ttl">今日・明日の作業<span>すべて見る</span></div>
+              <table class="mt"><tr><th>日時</th><th>納品先</th><th>件名</th><th>作業担当</th><th>状態</th></tr>
+              <tr><td>11/15 9:00</td><td>山手第一ビル</td><td>日常清掃</td><td>社員 佐藤</td><td><span class="tg ok">実績済</span></td></tr>
+              <tr><td>11/15 13:00</td><td>青葉薬局 本店</td><td>2週間レンタル1回目</td><td>北浜商事</td><td><span class="tg n">予定</span></td></tr>
+              <tr><td>11/15 18:00</td><td>みなと倉庫</td><td>定期清掃（床洗浄）</td><td>南クリーン</td><td><span class="tg n">予定</span></td></tr>
+              <tr><td>11/16 8:30</td><td>桜町ビル 6階</td><td>カーペット洗浄</td><td>南クリーン</td><td><span class="tg x">日程未調整</span></td></tr>
+              <tr><td>11/16 10:00</td><td>山手第二ビル</td><td>ガラス清掃</td><td>社員 高橋</td><td><span class="tg n">予定</span></td></tr></table>
+            </div>
+            <div class="mc"><div class="ttl">売上の推移（税抜）<span>■ 今年　□ 前年同月</span></div>
+              <div class="bars"><div><i class="pv" style="height:68%"></i><i style="height:53%"></i></div><div><i class="pv" style="height:46%"></i><i style="height:52%"></i></div><div><i class="pv" style="height:54%"></i><i style="height:58%"></i></div><div><i class="pv" style="height:57%"></i><i style="height:48%"></i></div><div><i class="pv" style="height:45%"></i><i style="height:56%"></i></div><div><i class="pv" style="height:50%"></i><i style="height:88%"></i></div><div><i class="pv" style="height:42%"></i><i style="height:62%"></i></div><div><i class="pv" style="height:49%"></i><i style="height:65%"></i></div></div>
+              <div class="axis"><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span><span>9月</span><span>10月</span><span>11月</span></div>
+              <div style="margin-top:8px;display:flex;gap:16px"><span>今月 <b>¥5,172,000</b></span><span>粗利率 <b>34.1%</b></span><span style="color:var(--m-ok)">前年同月比 +12.4%</span></div>
+            </div>
+          </div>
+          <div class="mc"><div class="ttl">最近さわった伝票<span>自分の操作</span></div>
+            <table class="mt"><tr><th>区分</th><th>番号</th><th>日付</th><th>得意先</th><th>件名</th><th class="r">税抜金額</th><th>状態</th><th>更新</th></tr>
+            <tr><td><span class="tg s">受注</span></td><td>44961</td><td>11/02</td><td>桜町不動産</td><td>床洗浄・ガラス清掃</td><td class="r">136,200</td><td><span class="tg b">発注済</span></td><td>10:42</td></tr>
+            <tr><td><span class="tg s">見積</span></td><td>23789</td><td>11/13</td><td>山手ビル管理</td><td>テナント原状回復工事 5階</td><td class="r">372,750</td><td><span class="tg w">受注待ち</span></td><td>昨日</td></tr>
+            <tr><td><span class="tg b">発注</span></td><td>59462</td><td>11/02</td><td>南クリーン</td><td>床洗浄・ガラス清掃</td><td class="r">87,600</td><td><span class="tg n">納期 11/16</span></td><td>昨日</td></tr>
+            <tr><td><span class="tg s">入金</span></td><td>27070</td><td>10/31</td><td>青葉薬局</td><td>9月分</td><td class="r">36,520</td><td><span class="tg w">手数料差額 660</span></td><td>11/01</td></tr></table>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+    <p class="note">現行のメニュー（ボタンの一覧）を、対応が要るものを先に見せるホームへ置き換えます。数字を押すと該当の一覧が開きます。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-2 伝票一覧と詳細<small>受注伝票の例・2ペイン</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a" style="min-width:1200px"><div class="app">
+      <div class="side">
+        <div class="brand"><b>e</b>eSales</div><a>ホーム</a>
+        <div class="grp">売上</div><a>見積</a><a class="on">受注</a><a>売上</a><a>入金</a>
+        <div class="grp">定期作業</div><a>雛形・予定発行</a><a>予定から受注へ <em>4</em></a><a>作業予定案内</a>
+        <div class="grp">仕入</div><a>発注</a><a>仕入</a><a>支払</a>
+        <div class="grp">月次</div><a>請求締め</a><a>元帳</a>
+      </div>
+      <div class="main"><div class="split">
+        <div class="lst">
+          <div class="f"><span class="srch" style="min-width:0">得意先・件名・番号</span>
+            <div class="chips"><span class="chip on">今月</span><span class="chip">未売上</span><span class="chip">日程未調整</span><span class="chip">自分の担当</span></div></div>
+          <div class="row"><span class="a">山手ビル管理</span><span class="y">¥431,270</span><span class="m">44963　11/15　日常清掃</span><span><span class="tg ok">売上済</span></span></div>
+          <div class="row sel"><span class="a">桜町不動産</span><span class="y">¥136,200</span><span class="m">44961　11/16　床洗浄・ガラス清掃</span><span><span class="tg b">発注済</span></span></div>
+          <div class="row"><span class="a">青葉薬局</span><span class="y">¥4,650</span><span class="m">44958　11/15　2週間レンタル1回目</span><span><span class="tg n">予定</span></span></div>
+          <div class="row"><span class="a">みなと倉庫</span><span class="y">¥38,650</span><span class="m">44955　11/15　定期清掃</span><span><span class="tg n">予定</span></span></div>
+          <div class="row"><span class="a">桜町不動産</span><span class="y">¥85,000</span><span class="m">44951　11/16　カーペット洗浄</span><span><span class="tg x">日程未調整</span></span></div>
+          <div class="row"><span class="a">東和電機</span><span class="y">¥222,700</span><span class="m">44947　11/12　リニューアルプレート</span><span><span class="tg b">発注済</span></span></div>
+          <div class="row"><span class="a">山手ビル管理</span><span class="y">¥62,740</span><span class="m">44940　11/10　日常清掃（別棟）</span><span><span class="tg ok">売上済</span></span></div>
+        </div>
+        <div class="det">
+          <div style="display:flex;align-items:center;gap:8px"><span class="tg s">受注</span><b style="font-size:15px">44961　床洗浄・ガラス清掃</b><span class="sp" style="flex:1"></span><span class="btn">帳票 ▾</span><span class="btn">メール</span><span class="btn">複写 ▾</span><span class="btn p">売上へ進める</span></div>
+          <div class="step"><div class="done"><b>見積 23771</b>10/28</div><div class="cur"><b>受注 44961</b>11/02</div><div><b>売上</b>未</div><div><b>請求</b>11月末締め</div><div><b>入金</b>翌月20日予定</div><div class="done"><b>発注 59462</b>南クリーン</div></div>
+          <div class="mc"><div class="fld">
+            <label class="w2">得意先<span>00231　桜町不動産株式会社</span></label><label>得意先担当<span>田中 様</span></label><label>受注日<span>2027/11/02</span></label>
+            <label class="w2">納品先<span>B2　桜町ビル 6階　<u style="color:var(--m-ac)">地図</u></span></label><label>作業予定<span>11/16 8:30–12:00</span></label><label>サービス区分<span>特別作業</span></label>
+            <label>営業担当<span>営業部 鈴木</span></label><label>作業担当<span>南クリーン（協力会社）</span></label><label>消費税<span>標準10%・外税</span></label><label>請求単位<span>本社一括</span></label>
+          </div></div>
+          <div class="mc" style="padding:0"><table class="mt">
+            <tr><th>#</th><th>区分</th><th>商品</th><th class="r">数量</th><th class="r">販売単価</th><th class="r">販売金額</th><th class="r">仕入単価</th><th class="r">仕入金額</th><th>税</th><th>仕入先</th></tr>
+            <tr><td>1</td><td>売上</td><td>001001　床洗いワックスがけ</td><td class="r">120 m2</td><td class="r">260</td><td class="r">31,200</td><td class="r">80</td><td class="r">9,600</td><td>10% 外</td><td>南クリーン</td></tr>
+            <tr class="sel"><td>2</td><td>売上</td><td>001012　ガラス清掃</td><td class="r">1 式</td><td class="r">45,000</td><td class="r">45,000</td><td class="r">30,000</td><td class="r">30,000</td><td>10% 外</td><td>南クリーン</td></tr>
+            <tr><td>3</td><td>売上</td><td>000007　産廃処分費・運搬費</td><td class="r">2 m3</td><td class="r">30,000</td><td class="r">60,000</td><td class="r">24,000</td><td class="r">48,000</td><td>10% 外</td><td>南クリーン</td></tr>
+            <tr><td style="color:var(--m-mu)">4</td><td colspan="9" style="color:var(--m-mu)">商品名かコードを入力（Enter で次の欄、最終欄で行を追加）</td></tr>
+          </table></div>
+          <div class="tot"><div>税抜<b>¥136,200</b></div><div>消費税<b>¥13,620</b></div><div class="big">税込<b>¥149,820</b></div><div>仕入<b>¥87,600</b></div><div>粗利<b>¥48,600</b></div><div>粗利率<b>35.7%</b></div><span class="sp"></span><span style="color:var(--m-mu)">保存済み 10:42</span><span class="btn p">保存　Ctrl+S</span></div>
+        </div>
+      </div></div>
+    </div></div></div>
+    <p class="note">上部の帯が進行状況です。現行の「コピー元・先」タブを開かなくても、見積・発注との関係が分かります。合計は画面下に固定します。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-3 雛形・予定発行<small>発行前にカレンダーで確認</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app" style="min-height:400px">
+      <div class="side"><div class="brand"><b>e</b>eSales</div><a>ホーム</a><div class="grp">定期作業</div><a class="on">雛形・予定発行</a><a>予定から受注へ <em>4</em></a><a>作業予定案内</a></div>
+      <div class="main">
+        <div class="bar"><h4>雛形・予定発行</h4><span class="chip on">2027年12月</span><span class="chip">締め日 すべて</span><span class="sp"></span><span style="color:var(--m-mu)">発行予定 56 件・¥1,912,400</span><span class="btn p">受注予定を発行</span></div>
+        <div class="body"><div class="two" style="grid-template-columns:1.5fr 1fr">
+          <div class="mc" style="padding:0"><table class="mt">
+            <tr><th>得意先 / 納品先</th><th>件名</th><th>パターン</th><th>対象月（1〜12月）</th><th class="r">金額</th><th>次回</th></tr>
+            <tr class="sel"><td>山手ビル管理 / 第一ビル</td><td>日常清掃</td><td>月末</td><td><span class="dots"><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i></span></td><td class="r">160,000</td><td>12/31</td></tr>
+            <tr><td>青葉薬局 / 本店</td><td>2週間レンタル</td><td>隔週 木</td><td><span class="dots"><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i></span></td><td class="r">4,650</td><td>12/02</td></tr>
+            <tr><td>みなと倉庫 / 本棟</td><td>定期清掃</td><td>第3 土</td><td><span class="dots"><i></i><i class="y"></i><i></i><i class="y"></i><i></i><i class="y"></i><i></i><i class="y"></i><i></i><i class="y"></i><i></i><i class="y"></i></span></td><td class="r">38,650</td><td>12/18</td></tr>
+            <tr><td>桜町不動産 / 桜町ビル</td><td>カーペット洗浄</td><td>指定月 1日</td><td><span class="dots"><i></i><i></i><i class="y"></i><i></i><i></i><i class="y"></i><i></i><i></i><i class="y"></i><i></i><i></i><i class="y"></i></span></td><td class="r">85,000</td><td>12/01 <span class="tg x">都度調整</span></td></tr>
+            <tr><td>山手ビル管理 / 第二ビル</td><td>巡回清掃 週3回</td><td>毎週 月水金</td><td><span class="dots"><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i><i class="y"></i></span></td><td class="r">4,600</td><td>12/01</td></tr>
+          </table></div>
+          <div class="mc"><div class="ttl">12月の発行プレビュー<span>祝日を考慮</span></div>
+            <div class="cal"><span class="h">日</span><span class="h">月</span><span class="h">火</span><span class="h">水</span><span class="h">木</span><span class="h">金</span><span class="h">土</span>
+            <span></span><span></span><span></span><span>1<i>3件</i></span><span>2<i>2件</i></span><span>3<i>1件</i></span><span>4</span>
+            <span>5</span><span>6<i>1件</i></span><span>7</span><span>8<i>1件</i></span><span>9</span><span>10<i>1件</i></span><span>11</span>
+            <span>12</span><span>13<i>1件</i></span><span>14</span><span>15<i>1件</i></span><span>16<i>2件</i></span><span>17<i>1件</i></span><span>18<i>1件</i></span>
+            <span>19</span><span>20<i>1件</i></span><span>21</span><span>22<i>1件</i></span><span>23</span><span>24<i>1件</i></span><span>25</span>
+            <span>26</span><span>27<i>1件</i></span><span>28</span><span>29<i>1件</i></span><span>30<i>2件</i></span><span>31<i>9件</i></span><span></span></div>
+          </div>
+        </div></div>
+      </div>
+    </div></div></div>
+  </div>
+
+  <div class="shot">
+    <h3>4-4 請求締め<small>下書きで確かめてから確定</small></h3>
+    <div class="scroll"><div class="mock frame" data-mt="a"><div class="app" style="min-height:360px">
+      <div class="side"><div class="brand"><b>e</b>eSales</div><a>ホーム</a><div class="grp">月次</div><a class="on">請求締め</a><a>元帳</a></div>
+      <div class="main">
+        <div class="bar"><h4>請求締め</h4><span class="chip on">2027年10月</span><span class="chip">15日</span><span class="chip">20日</span><span class="chip on">末日</span><span class="sp"></span><span class="tg w">下書き（未確定）</span><span class="btn">請求書をまとめて表示</span><span class="btn">メール下書きを一括作成</span><span class="btn p">締めを確定</span></div>
+        <div class="body"><div class="mc" style="padding:0"><table class="mt">
+          <tr><th>得意先</th><th>請求書の種類</th><th class="r">前月残高</th><th class="r">入金</th><th class="r">繰越</th><th class="r">当月販売（税込）</th><th class="r">今回請求額</th><th>確認1</th><th>確認2</th><th>承認</th><th>送付</th></tr>
+          <tr><td>00004　川北診療所</td><td>得意先別</td><td class="r">176,000</td><td class="r">176,000</td><td class="r">0</td><td class="r">176,000</td><td class="r"><b>176,000</b></td><td><span class="stamp">佐</span></td><td><span class="stamp">高</span></td><td><span class="stamp">承</span></td><td><span class="tg ok">送付済</span></td></tr>
+          <tr class="sel"><td>00231　桜町不動産</td><td>得意先＋納品先別</td><td class="r">323,546</td><td class="r">167,647</td><td class="r">155,899</td><td class="r">155,569</td><td class="r"><b>311,468</b></td><td><span class="stamp">佐</span></td><td><span class="stamp off">–</span></td><td><span class="stamp off">–</span></td><td><span class="tg x">繰越あり</span></td></tr>
+          <tr><td>00007　みなと倉庫</td><td>得意先＋納品先別</td><td class="r">39,270</td><td class="r">39,270</td><td class="r">0</td><td class="r">85,646</td><td class="r"><b>85,646</b></td><td><span class="stamp">佐</span></td><td><span class="stamp">高</span></td><td><span class="stamp off">–</span></td><td><span class="tg n">承認待ち</span></td></tr>
+          <tr><td>00089　青葉薬局</td><td>納品先別（明細表示）</td><td class="r">37,180</td><td class="r">36,520</td><td class="r">660</td><td class="r">62,700</td><td class="r"><b>63,360</b></td><td><span class="stamp off">–</span></td><td><span class="stamp off">–</span></td><td><span class="stamp off">–</span></td><td><span class="tg w">手数料差額</span></td></tr>
+          <tr><td>00196　東和電機</td><td>得意先別</td><td class="r">121,000</td><td class="r">121,000</td><td class="r">0</td><td class="r">244,970</td><td class="r"><b>244,970</b></td><td><span class="stamp">佐</span></td><td><span class="stamp">高</span></td><td><span class="stamp">承</span></td><td><span class="tg n">未送付</span></td></tr>
+        </table></div></div>
+      </div>
+    </div></div></div>
+    <p class="note">確定するまでは何度でも計算し直せます。確定後はその月の伝票に鍵がかかり、請求書と元帳が食い違いません。</p>
+  </div>
+
+  <div class="shot">
+    <h3>4-5 iPhone<small>同じ機能を縦1列に</small></h3>
+    <div class="phones">
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><h4>受注</h4><span class="sp"></span><span class="btn p">＋</span></div>
+        <div class="pb"><span class="srch" style="min-width:0">得意先・件名・番号</span>
+          <div class="chips"><span class="chip on">今月</span><span class="chip">未売上</span><span class="chip">日程未調整</span></div>
+          <div class="pc"><span class="a">桜町不動産</span><span class="y">¥136,200</span><span class="m">44961・11/16　床洗浄・ガラス清掃</span><span><span class="tg b">発注済</span></span></div>
+          <div class="pc"><span class="a">青葉薬局</span><span class="y">¥4,650</span><span class="m">44958・11/15　2週間レンタル1回目</span><span><span class="tg n">予定</span></span></div>
+          <div class="pc"><span class="a">みなと倉庫</span><span class="y">¥38,650</span><span class="m">44955・11/15　定期清掃</span><span><span class="tg n">予定</span></span></div>
+          <div class="pc"><span class="a">桜町不動産</span><span class="y">¥85,000</span><span class="m">44951・11/16　カーペット洗浄</span><span><span class="tg x">日程未調整</span></span></div>
+          <div class="pc"><span class="a">東和電機</span><span class="y">¥222,700</span><span class="m">44947・11/12　リニューアルプレート</span><span><span class="tg b">発注済</span></span></div>
+        </div>
+        <div class="tab"><span>ホーム</span><span class="on">売上</span><span>作業</span><span>請求</span><span>その他</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>受注 44961</h4><span class="sp"></span><span class="tg b">発注済</span></div>
+        <div class="pb">
+          <div class="step" style="font-size:10px"><div class="done" style="padding:4px 6px"><b>見積</b></div><div class="cur" style="padding:4px 6px"><b>受注</b></div><div style="padding:4px 6px"><b>売上</b></div><div style="padding:4px 6px"><b>請求</b></div><div style="padding:4px 6px"><b>入金</b></div></div>
+          <div class="pc" style="grid-template-columns:1fr"><span class="a">桜町不動産株式会社</span><span class="m">桜町ビル 6階　<u style="color:var(--m-ac)">地図</u>　<u style="color:var(--m-ac)">電話</u></span><span class="m">11/16 8:30–12:00　南クリーン</span></div>
+          <div class="pc"><span class="a">床洗いワックスがけ</span><span class="y">¥31,200</span><span class="m">120 m2 × ¥260</span><span class="m">10% 外</span></div>
+          <div class="pc"><span class="a">ガラス清掃</span><span class="y">¥45,000</span><span class="m">1 式 × ¥45,000</span><span class="m">10% 外</span></div>
+          <div class="pc"><span class="a">産業廃棄物処分費・運搬費</span><span class="y">¥60,000</span><span class="m">2 m3 × ¥30,000</span><span class="m">10% 外</span></div>
+          <div class="pc" style="background:var(--m-ac-s)"><span class="m">税抜 ¥136,200　税 ¥13,620</span><span class="y">¥149,820</span><span class="m">粗利 ¥48,600（35.7%）</span><span></span></div>
+        </div>
+        <div class="act"><span class="btn">帳票</span><span class="btn">メール</span><span class="btn p">売上へ</span></div>
+      </div>
+      <div class="mock phone" data-mt="a">
+        <div class="bar"><span>‹</span><h4>作業報告</h4><span class="sp"></span><span class="tg w">作業中</span></div>
+        <div class="pb">
+          <div class="pc" style="grid-template-columns:1fr"><span class="a">桜町ビル 6階</span><span class="m">床洗浄・ガラス清掃　受注 44961</span></div>
+          <div class="fld" style="grid-template-columns:1fr 1fr"><label>開始<span>11/16 8:35</span></label><label>終了<span>—</span></label><label class="w2">特記事項<span style="min-height:52px">共用部の床洗浄を終了。窓は午後に実施。</span></label></div>
+          <div class="ttl" style="margin:4px 0 0">写真 5 枚<span>端末で縮小して保存</span></div>
+          <div class="ph"><i></i><i></i><i></i><i></i><i></i><i class="add">＋</i></div>
+        </div>
+        <div class="act"><span class="btn">写真を撮る</span><span class="btn p">作業を完了</span></div>
+      </div>
+    </div>
+    <p class="note">作業報告の画面には金額を出しません。協力会社や現場担当に渡す場合も安全です。</p>
+  </div>
+</section>
+
+<section id="themes">
+  <div class="sec-head"><div class="num">5</div><h2>デザインテーマ候補</h2>
+  <p class="lead">3案とも、状態を表す色（済＝緑、注意＝黄、要対応＝赤）と、売上系＝青・仕入系＝茶の区別は共通です。違いは基調色、角の丸み、余白、ナビの濃さです。</p></div>
+  <div class="scroll"><table class="t">
+    <tr><th>案</th><th>色</th><th>印象</th><th>向いている使い方</th><th>気をつける点</th></tr>
+    <tr><td><b>A 藍</b><br><span class="pill ok">推奨</span></td><td><div class="sw"><i style="background:#1d4f91"></i><i style="background:#e4edf9"></i><i style="background:#f2f4f8"></i><i style="background:#18212f"></i></div></td><td>白地に藍。帳簿のように落ち着いた、標準的な業務画面</td><td>PC で一覧と明細を長時間見る使い方。1画面に多くの行を出せる</td><td>現行の青と近く、変わった実感は控えめ</td></tr>
+    <tr><td><b>B 若竹</b></td><td><div class="sw"><i style="background:#0e7663"></i><i style="background:#dcf0ea"></i><i style="background:#f1f6f3"></i><i style="background:#1b2925"></i></div></td><td>淡い緑と大きめの角丸。やわらかく明るい</td><td>iPad・iPhone での指操作。余白が広く押しやすい</td><td>1画面の行数が約1〜2割減る。「済」の緑と基調色が近いので、状態は必ず文字でも示す</td></tr>
+    <tr><td><b>C 墨と朱</b></td><td><div class="sw"><i style="background:#bf3f2b"></i><i style="background:#262321"></i><i style="background:#f4f3f0"></i><i style="background:#22201e"></i></div></td><td>墨色のナビに朱の差し色。印影を思わせる引き締まった画面</td><td>ナビと作業領域がはっきり分かれ、大きな画面で映える</td><td>朱が「要対応」の赤と近い。警告は赤の塗りではなく、記号と文字で区別する必要がある</td></tr>
+  </table></div>
+  <div class="grid g3">
+    <div class="card"><div class="k">共通の選択肢 1</div><h3>表示密度</h3><p>「標準」と「コンパクト」を利用者ごとに切り替えられるようにします。PC では コンパクト、タブレットでは標準が既定です。</p></div>
+    <div class="card"><div class="k">共通の選択肢 2</div><h3>ダークモード</h3><p>端末の設定に合わせて自動で切り替える案と、明るい画面に固定する案があります。帳票の見え方は変わりません。</p></div>
+    <div class="card"><div class="k">共通の選択肢 3</div><h3>タスク管理との関係</h3><p>別アプリとして見分けやすくするため、基調色はタスク管理と変えることを勧めます。部品の形と操作は揃えます。</p></div>
+  </div>
+</section>
+
+<section id="ideas">
+  <div class="sec-head"><div class="num">6</div><h2>新機能・工夫の候補</h2>
+  <p class="lead">現行機能の踏襲を優先し、その上に足す候補です。費用の列が「従量」のものは使った分だけ課金されます。</p></div>
+  <div class="scroll"><table class="t">
+    <tr><th>候補</th><th>内容</th><th>効果</th><th>費用</th><th>提案</th></tr>
+    <tr><td>進行バー</td><td>見積から入金までの現在地を伝票上部に表示</td><td>関連伝票を探す手間がなくなる</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>横断検索</td><td>番号・得意先・件名・納品先を1つの窓から検索</td><td>メニューをたどらず目的の伝票へ</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>請求締めの下書き</td><td>確定前に結果を確認し、やり直せる</td><td>締め直しの負担が減る</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>締め済みの鍵</td><td>確定した月の伝票を変更できなくする</td><td>請求書と元帳の不一致を防ぐ</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>変更履歴</td><td>誰がいつ何を変えたかを伝票ごとに記録</td><td>金額相違の原因を追える</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>メール送付の記録</td><td>いつ誰にどの帳票を送ったかを伝票に残す</td><td>送付の確認が不要になる</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>請求書メールの一括下書き</td><td>送付先のある得意先分を Gmail の下書きへまとめて作成</td><td>月次の送付作業が短くなる</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>通知</td><td>日程未調整・見積期限・入金遅延を端末へ通知</td><td>抜け漏れを防ぐ</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>得意先の取引履歴</td><td>得意先ごとの伝票と残高の推移を1画面に</td><td>問い合わせ対応が速くなる</td><td>0円</td><td><span class="pill ok">入れる</span></td></tr>
+    <tr><td>よく使う明細の呼び出し</td><td>得意先ごとに過去の明細を候補として表示</td><td>見積の入力が速くなる</td><td>0円</td><td><span class="pill n">候補</span></td></tr>
+    <tr><td>取引先への共有リンク</td><td>期限つきURLで予定表や受注内容を見てもらう（現行ポータルの代わり）</td><td>取引先のアカウント管理が不要になる</td><td>0円</td><td><span class="pill n">候補</span></td></tr>
+    <tr><td>入金の消込支援</td><td>銀行の明細CSVを読み込み、請求と突き合わせて入金伝票の候補を作る</td><td>入金入力と手数料差額の処理が速くなる</td><td>0円</td><td><span class="pill n">候補</span></td></tr>
+    <tr><td>総合振込データ</td><td>支払伝票から全銀形式のファイルを出力</td><td>振込の入力が不要になる</td><td>0円</td><td><span class="pill n">候補</span></td></tr>
+    <tr><td>Google カレンダー反映</td><td>作業予定を共有カレンダーへ自動登録</td><td>予定をカレンダーで確認できる</td><td>0円</td><td><span class="pill n">候補</span></td></tr>
+    <tr><td>見積の下書き支援（AI）</td><td>件名と得意先から過去の類似見積を探し、明細案を出す</td><td>見積作成の初動が速くなる</td><td>従量（1回1円未満の見込み）</td><td><span class="pill warn">切替後に判断</span></td></tr>
+    <tr><td>メール文面の下書き（AI）</td><td>状況に合わせた案内文を作る</td><td>文面作成が速くなる</td><td>従量</td><td><span class="pill warn">切替後に判断</span></td></tr>
+    <tr><td>作業報告の文面整形（AI）</td><td>写真とメモから報告書の文章を整える</td><td>報告書の体裁が揃う</td><td>従量（写真を送るため割高）</td><td><span class="pill warn">切替後に判断</span></td></tr>
+  </table></div>
+</section>
+
+<section id="next">
+  <div class="sec-head"><div class="num">7</div><h2>決めていただくこと</h2></div>
+  <div class="scroll"><table class="t">
+    <tr><th>#</th><th>項目</th><th>選択肢</th><th>提案</th></tr>
+    <tr><td>1</td><td>デザインテーマ</td><td>A 藍 ／ B 若竹 ／ C 墨と朱</td><td>A</td></tr>
+    <tr><td>2</td><td>ダークモード</td><td>端末に合わせる ／ 明るい画面に固定</td><td>明るい画面に固定で始める</td></tr>
+    <tr><td>3</td><td>新機能の候補</td><td>6章の「候補」のうち、初期から欲しいもの</td><td>「入れる」の9件で始める</td></tr>
+    <tr><td>4</td><td>入口の分け方</td><td>別のURLで配信（アプリごとにログイン1回）／ 同じURLの配下</td><td>別のURL。Dock やホーム画面へ確実に別アプリとして追加できる</td></tr>
+    <tr><td>5</td><td>アプリの名前とアイコン</td><td>eSales ／ 販売管理 ／ そのほか</td><td>eSales</td></tr>
+  </table></div>
+  <p class="note">決定済み: ファイルは Cloudflare R2 に置く。内部は既存基盤に統合し、入口とホーム画面追加は別アプリにする。経費申請・支払締め・はがきは対象外。権限は既存と同じ（staff が業務全般、owner は閲覧のみ）。切替は2028年1月。</p>
+</section>
+
+<footer>この資料は検討用の第1案です。画面は実装前のイメージで、項目や配置は確認を受けて変わります。</footer>
+</div>
+<script>
+(function(){
+  var btns=document.querySelectorAll('.switch button');
+  function set(t){
+    document.querySelectorAll('.mock').forEach(function(m){m.setAttribute('data-mt',t)});
+    btns.forEach(function(b){b.setAttribute('aria-pressed',b.dataset.set===t?'true':'false')});
+    try{localStorage.setItem('esales-mt',t)}catch(e){}
+  }
+  btns.forEach(function(b){b.addEventListener('click',function(){set(b.dataset.set)})});
+  try{var s=localStorage.getItem('esales-mt');if(s==='b'||s==='c')set(s)}catch(e){}
+})();
+</script>
+</body>
+</html>
