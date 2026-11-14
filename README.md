@@ -7,6 +7,7 @@ Gmail から業務メールを自動取得し、Claude API で担当者振り分
 - 設計書（現行・Cloudflare 版）: [`docs/task-management-spec-cloudflare.md`](./docs/task-management-spec-cloudflare.md)
 - 引き継ぎ書: [`docs/HANDOFF.md`](./docs/HANDOFF.md)
 - ビルメンテナンス管理（ビルメン）開発計画: [`docs/bilmen-plan.md`](./docs/bilmen-plan.md)
+- 勤怠管理（eWorks。FileMaker「eWork2」の移行と QR 打刻）開発計画: [`docs/eworks-plan.md`](./docs/eworks-plan.md)
 - 障害復旧手順書（バックアップ・復元）: [`docs/disaster-recovery.md`](./docs/disaster-recovery.md)
 - 旧設計書（Netlify 版・初期計画の記録）: [`docs/task-management-spec.md`](./docs/task-management-spec.md)
 
