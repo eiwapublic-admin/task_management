@@ -2,7 +2,7 @@
 
 - 作成日: 2026-11-14（初版）
 - 状態: **計画段階（未着手）**。判断が要る項目は 17章
-- 関連文書: 同時に進めている販売管理の計画 `docs/esales-plan.md`（ブランチ `claude/esales2-migration-plan-gpgno3`）／UI 標準 [`ui-standard.md`](./ui-standard.md)／引き継ぎ書 [`HANDOFF.md`](./HANDOFF.md)
+- 関連文書: 画面イメージ案 [`eworks-ui-proposal.html`](./eworks-ui-proposal.html)／同時に進めている販売管理の計画 `docs/esales-plan.md`（ブランチ `claude/esales2-migration-plan-gpgno3`）／UI 標準 [`ui-standard.md`](./ui-standard.md)／引き継ぎ書 [`HANDOFF.md`](./HANDOFF.md)
 - 調査に使った資料（依頼元から受領。**個人名・勤務実績を含むためリポジトリには入れていない**）
   - FileMaker データベースデザインレポート（`eWork2.fmp12`。参照先として `eSales_data.fmp12`）
   - 現行画面のスクリーンショット 11枚（eWork2 8枚、出退勤システム 3枚）
