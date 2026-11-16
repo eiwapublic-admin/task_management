@@ -52,7 +52,7 @@ const FEATURE_TITLES = [
   { path: '/documents', title: '雛形ファイル' },
   { path: '/contacts', title: '連絡帳' },
   { path: '/manuals', title: '業務マニュアル' },
-  { path: '/tenant-mail', title: 'テナントへのメール' },
+  { path: '/tenant-mail', title: 'メール送付管理' },
   { path: '/meter/masters', title: '検針マスタ', exact: true },
   { path: '/meter', title: '検針' },
   { path: '/reminders', title: 'リマインダー' },
@@ -309,7 +309,7 @@ export default function AppHeader({
         <button onClick={() => goTo('/bilmen')}>メンテナンス予定</button>
         <button onClick={() => goTo('/bilmen/masters')}>作業マスタ</button>
         {/* メール設定は2026-10-29に「テナントへのメール」（/tenant-mail）へ合流 */}
-        {!isOwner && <button onClick={() => goTo('/tenant-mail')}>テナントへのメール</button>}
+        {!isOwner && <button onClick={() => goTo('/tenant-mail')}>メール送付管理</button>}
       </>
     )
   } else if (section === 'equipment') {

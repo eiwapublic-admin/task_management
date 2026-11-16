@@ -23,11 +23,16 @@ import {
   expandTenantMailVariables,
   TENANT_MAIL_VARIABLES,
 } from '../lib/tenantMail'
+import { defaultMeterMonth, fetchMeterMailSettings, saveMeterMailSettings } from '../lib/meter'
+import { meterFileMonth } from '../lib/meterXlsx'
 import './Dashboard.css'
 import './Bilmen.css'
 import './TenantMail.css'
 
-// テナントへのメール（雛型からの一斉メール。2026-10-29〜）。
+// メール送付管理（旧「テナントへのメール」。2026-11-16 改名。雛型からの一斉メール。2026-10-29〜）。
+// 2026-11-16〜 ガス検針票の送付メール（検針 Phase 4）も雛型の1つとして出す（GAS_TEMPLATE_ID）。
+// 中身は従来どおり settings の meter_mail_gas_*（/api/meter/mail-settings?kind=gas）で、ここでは宛先（TO・CC）・
+// 件名・本文・返信先を登録・修正するだけ。作成はスキャンした検針票を添付するため検針の「ガス・水道」画面から。
 // 件名・本文の雛型を複数登録し、選んだ雛型から「有効なテナント全員を BCC」にしたメールを作る。
 // 方式はビルメンの「テナントへ報知」と同じ2つ（メールソフト方式＝mailto:／Gmail方式＝共有アドレスの下書き）。
 // 旧「ビルメン メール設定」（/bilmen/mail）はこの画面の「宛先・返信先」タブに合流し、
@@ -40,6 +45,11 @@ const TABS = [
   { key: 'recipients', label: '宛先・返信先' },
 ]
 
+// ガス検針票の送付メールの雛型（tenant_mail_templates の行ではなく settings。上の説明）
+const GAS_TEMPLATE_ID = 'meter-gas'
+const GAS_TEMPLATE_NAME = 'ガス検針票の送付メール'
+const gasPageUrl = () => `/meter/${defaultMeterMonth()}/gas`
+
 const floorLabel = (f) => (f ? (f === 'B' ? 'B1F' : `${f}F`) : '')
 
 export default function TenantMail() {
@@ -49,6 +59,7 @@ export default function TenantMail() {
   const [templates, setTemplates] = useState([])
   const [settings, setSettings] = useState(null)
   const [recipients, setRecipients] = useState(null)
+  const [gasMail, setGasMail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -56,10 +67,16 @@ export default function TenantMail() {
     setLoading(true)
     setError('')
     try {
-      const [t, s, r] = await Promise.all([fetchTenantMailTemplates(), fetchBilmenMailSettings(), fetchBilmenMailRecipients()])
+      const [t, s, r, g] = await Promise.all([
+        fetchTenantMailTemplates(),
+        fetchBilmenMailSettings(),
+        fetchBilmenMailRecipients(),
+        fetchMeterMailSettings('gas'),
+      ])
       setTemplates(t)
       setSettings(s)
       setRecipients(r)
+      setGasMail(g)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -102,11 +119,17 @@ export default function TenantMail() {
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
         ) : tab === 'templates' ? (
-          <TemplatesTab templates={templates} setTemplates={setTemplates} />
+          <TemplatesTab
+            templates={templates}
+            setTemplates={setTemplates}
+            gasMail={gasMail}
+            setGasMail={setGasMail}
+            initialEditId={searchParams.get('edit')}
+          />
         ) : tab === 'recipients' ? (
           <RecipientsTab settings={settings} setSettings={setSettings} recipients={recipients} setRecipients={setRecipients} />
         ) : (
-          <ComposeTab templates={templates} settings={settings} recipients={recipients} />
+          <ComposeTab templates={templates} settings={settings} recipients={recipients} gasMail={gasMail} />
         )}
       </div>
     </div>
@@ -114,9 +137,10 @@ export default function TenantMail() {
 }
 
 // ---- メール作成 ----
-function ComposeTab({ templates, settings, recipients }) {
+function ComposeTab({ templates, settings, recipients, gasMail }) {
   const generalTemplates = templates.filter((t) => t.kind !== 'bilmen')
-  const [templateId, setTemplateId] = useState(generalTemplates[0]?.id || templates[0]?.id || '')
+  const [templateId, setTemplateId] = useState(generalTemplates[0]?.id || templates[0]?.id || (gasMail ? GAS_TEMPLATE_ID : ''))
+  const isGas = templateId === GAS_TEMPLATE_ID
   const template = templates.find((t) => t.id === templateId) || null
   const isBilmen = template?.kind === 'bilmen'
 
@@ -145,7 +169,7 @@ function ComposeTab({ templates, settings, recipients }) {
   )
   const rows = groupBilmenRecipients(active)
   const replyTo = settings?.reply_to || ''
-  const cannotSend = !template || isBilmen || active.length === 0 || !subject.trim() || !body.trim()
+  const cannotSend = !template || isBilmen || isGas || active.length === 0 || !subject.trim() || !body.trim()
   const mailtoUrl = cannotSend ? '#' : buildBilmenNoticeMailto(subject, body, active, replyTo)
 
   async function handleCreateDraft() {
@@ -162,7 +186,7 @@ function ComposeTab({ templates, settings, recipients }) {
     }
   }
 
-  if (templates.length === 0) {
+  if (templates.length === 0 && !gasMail) {
     return (
       <p className="bilmen-undecided">
         雛型がありません。<Link to="/tenant-mail?tab=templates">雛型</Link>のタブで登録してください。
@@ -190,9 +214,10 @@ function ComposeTab({ templates, settings, recipients }) {
                 {t.kind === 'bilmen' ? `【ビルメン】${t.name}` : t.name}
               </option>
             ))}
+            {gasMail && <option value={GAS_TEMPLATE_ID}>【検針】{GAS_TEMPLATE_NAME}</option>}
           </select>
         </div>
-        {!isBilmen && (
+        {!isBilmen && !isGas && (
           <div className="ui-field">
             <label>返信先</label>
             <input className="ui-input" value={replyTo || '（未設定：送信元のアドレスに返信されます）'} readOnly />
@@ -201,7 +226,22 @@ function ComposeTab({ templates, settings, recipients }) {
       </div>
       <hr className="tenant-mail-divider" />
 
-      {isBilmen ? (
+      {isGas ? (
+        <div className="bilmen-undecided">
+          <p>
+            この雛型はスキャンしたガス検針票を添付するため、<Link to={gasPageUrl()}>検針の「ガス・水道」</Link>の画面の
+            「ガス検針票の送付メール」から作成してください（宛先・件名・本文は「雛型」タブで登録・修正できます）。
+          </p>
+          <dl className="tenant-mail-gas-facts">
+            <dt>宛先（TO）</dt>
+            <dd>{gasMail.to || '（未登録）'}</dd>
+            <dt>CC</dt>
+            <dd>{gasMail.cc || '（なし）'}</dd>
+            <dt>件名</dt>
+            <dd>{gasMail.subject}</dd>
+          </dl>
+        </div>
+      ) : isBilmen ? (
         <p className="bilmen-undecided">
           この雛型は連絡票PDFを添付するため、<Link to="/bilmen">ビルメンテナンス管理</Link>の画面で月を選び、
           「テナントへ報知」から作成してください（件名・本文は「雛型」タブで直せます）。
@@ -344,9 +384,11 @@ function templateDraftOf(t) {
   return { name: t.name, subject: t.subject, body: t.body, include_others: t.include_others, sort_order: t.sort_order }
 }
 
-function TemplatesTab({ templates, setTemplates }) {
-  const [editingId, setEditingId] = useState(null) // 'new' か雛型の id
+function TemplatesTab({ templates, setTemplates, gasMail, setGasMail, initialEditId }) {
+  // 'new' か雛型の id（GAS_TEMPLATE_ID はガス検針票の送付メール。検針の画面の「宛先・件名・本文を変える」から ?edit=meter-gas で開く）
+  const [editingId, setEditingId] = useState(initialEditId === GAS_TEMPLATE_ID && gasMail ? GAS_TEMPLATE_ID : null)
   const [draft, setDraft] = useState(EMPTY_TEMPLATE)
+  const [gasDraft, setGasDraft] = useState(initialEditId === GAS_TEMPLATE_ID && gasMail ? { ...gasMail } : null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -372,6 +414,28 @@ function TemplatesTab({ templates, setTemplates }) {
         setTemplates((prev) => prev.map((t) => (t.id === saved.id ? saved : t)))
       }
       setInfo(`「${draft.name}」を保存しました。`)
+      setEditingId(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function startGasEdit() {
+    setError('')
+    setInfo('')
+    setEditingId(GAS_TEMPLATE_ID)
+    setGasDraft({ ...gasMail })
+  }
+
+  async function handleGasSave() {
+    setSaving(true)
+    setError('')
+    setInfo('')
+    try {
+      setGasMail(await saveMeterMailSettings(gasDraft, 'gas'))
+      setInfo(`「${GAS_TEMPLATE_NAME}」を保存しました。`)
       setEditingId(null)
     } catch (err) {
       setError(err.message)
@@ -471,6 +535,76 @@ function TemplatesTab({ templates, setTemplates }) {
     </div>
   )
 
+  // ガス検針票の送付メール（宛先が決まったメール。TO・CC・返信先も雛型に持つ）
+  const gasEditor = gasDraft && (
+    <div className="tenant-mail-template-editor">
+      <div className="ui-field">
+        <label htmlFor="tenant-mail-gas-to">宛先（TO）</label>
+        <textarea
+          id="tenant-mail-gas-to"
+          className="ui-textarea"
+          rows={2}
+          value={gasDraft.to}
+          placeholder="名前 <name@example.co.jp>; 名前 <name2@example.co.jp>"
+          onChange={(e) => setGasDraft((d) => ({ ...d, to: e.target.value }))}
+        />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="tenant-mail-gas-cc">CC</label>
+        <textarea
+          id="tenant-mail-gas-cc"
+          className="ui-textarea"
+          rows={2}
+          value={gasDraft.cc}
+          onChange={(e) => setGasDraft((d) => ({ ...d, cc: e.target.value }))}
+        />
+        <p className="ui-note">
+          複数は「;」「,」か改行で区切ります。「名前 &lt;アドレス&gt;」の形でも、アドレスだけでもかまいません（FileMaker のコンスタントマスタの値をそのまま貼れます）。各20件まで。
+        </p>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="tenant-mail-gas-subject">件名</label>
+        <input
+          id="tenant-mail-gas-subject"
+          className="ui-input"
+          value={gasDraft.subject}
+          onChange={(e) => setGasDraft((d) => ({ ...d, subject: e.target.value }))}
+        />
+      </div>
+      <div className="ui-field">
+        <label htmlFor="tenant-mail-gas-body">本文</label>
+        <textarea
+          id="tenant-mail-gas-body"
+          className="ui-textarea"
+          rows={8}
+          value={gasDraft.body}
+          onChange={(e) => setGasDraft((d) => ({ ...d, body: e.target.value }))}
+        />
+        <p className="ui-note">
+          使える変数: <code>%YYYYMM%</code>（検針月度。例: {meterFileMonth(defaultMeterMonth())}）
+        </p>
+      </div>
+      <div className="ui-field">
+        <label htmlFor="tenant-mail-gas-reply">返信先（任意。本文の最後に「ご返信は〜までお願いいたします。」と書き添えます）</label>
+        <input
+          id="tenant-mail-gas-reply"
+          className="ui-input"
+          inputMode="email"
+          value={gasDraft.reply_to}
+          onChange={(e) => setGasDraft((d) => ({ ...d, reply_to: e.target.value }))}
+        />
+      </div>
+      <div className="bilmen-generate-actions">
+        <button type="button" className="btn-primary" onClick={handleGasSave} disabled={saving}>
+          {saving ? '保存中…' : '保存'}
+        </button>
+        <button type="button" className="btn-plain" onClick={() => setEditingId(null)} disabled={saving}>
+          やめる
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <>
       {error && (
@@ -482,7 +616,7 @@ function TemplatesTab({ templates, setTemplates }) {
 
       <section className="bilmen-fieldset">
         <div className="tenant-mail-section-head">
-          <h2 className="ui-page-title">雛型（{templates.length}件）</h2>
+          <h2 className="ui-page-title">雛型（{templates.length + (gasMail ? 1 : 0)}件）</h2>
           {editingId !== 'new' && (
             <button type="button" className="btn-primary" onClick={() => startEdit(null)}>
               ＋ 雛型を追加
@@ -520,6 +654,33 @@ function TemplatesTab({ templates, setTemplates }) {
               )}
             </li>
           ))}
+          {gasMail && (
+            <li className="tenant-mail-template-item">
+              {editingId === GAS_TEMPLATE_ID ? (
+                gasEditor
+              ) : (
+                <>
+                  <div className="tenant-mail-template-summary">
+                    <p className="tenant-mail-template-name">
+                      <span className="tenant-mail-badge">検針</span>
+                      {GAS_TEMPLATE_NAME}
+                    </p>
+                    <p className="tenant-mail-template-subject">宛先: {gasMail.to || '（未登録）'}</p>
+                    {gasMail.cc && <p className="tenant-mail-template-subject">CC: {gasMail.cc}</p>}
+                    <p className="tenant-mail-template-subject">件名: {gasMail.subject}</p>
+                    <p className="tenant-mail-template-meta">
+                      作成は検針の「ガス・水道」画面から（スキャンしたガス検針票を添付）
+                    </p>
+                  </div>
+                  <div className="bilmen-generate-actions">
+                    <button type="button" className="btn-plain" onClick={startGasEdit} disabled={editingId !== null}>
+                      修正
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          )}
         </ul>
       </section>
     </>

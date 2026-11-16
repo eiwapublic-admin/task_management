@@ -164,7 +164,7 @@ FileMaker の画面を元に、一つの画面で一つの作業が終わるよ�
 
 - `/meter/:月度/gas`（検針一覧のヘッダ「ガス・水道」）。月の半ばのガス・水道の検針は翌月度に入る（10/16 の検針 → 11月度）。写真の取込と値の入力はその月度の検針一覧で行う（電気と同じ）
 - お渡し票（メータ検針報告書）: 検針内容が「ガス」「水道」の検針対象メータを持つテナントごとに A4 縦1枚。上半分が「テナント様用」、下半分が「（控）」（FileMaker の「ガス・水道お渡し票」と同じ並び）。宛名は略称＋「様」、検針日付はそのテナントのガス・水道の検針日の新しい方。表は ガス→水道 の行（3行にそろえる）×「今月の検針値・今月の使用量・前月の使用量」（小数第1位＋㎥）。値は検針一覧と同じ `buildMonthRows`（`src/lib/meterGasPdf.js`）。書式は `public/print/meter-gas.css`。作った PDF はアプリ内のプレビューに出し、そこから印刷・ダウンロード（`getReportPdfPreviewUrl` の kind `meter-gas`）。当月値の無いメータがあれば警告
-- ガス検針票の送付メール（FileMaker の「ガス検針表の送付」）: スキャンした検針票（PDF・JPEG・PNG。5つまで・1つ10MB・合計25MB）を選ぶかドラッグして、添付した下書きを共有 Gmail に作る（`POST /api/meter/gas/draft`。送信はしない）。宛先・件名・本文は `settings` の `meter_mail_gas_to`・`_cc`・`_subject`・`_body`・`_reply_to`（`GET/PUT /api/meter/mail-settings?kind=gas`。FileMaker のコンスタントマスタ「検針票」B\_TO・B\_CC・B\_CONT を貼る）。既定の件名は「BKBさくら殿ガス検針票」。提出メール（5-2）とカード（`src/components/MeterMailCard.jsx`）・サーバーの処理（`createMeterDraft`）を共通にした
+- ガス検針票の送付メール（FileMaker の「ガス検針表の送付」）: スキャンした検針票（PDF・JPEG・PNG。5つまで・1つ10MB・合計25MB）を選ぶかドラッグして、添付した下書きを共有 Gmail に作る（`POST /api/meter/gas/draft`。送信はしない）。宛先・件名・本文は `settings` の `meter_mail_gas_to`・`_cc`・`_subject`・`_body`・`_reply_to`（`GET/PUT /api/meter/mail-settings?kind=gas`。FileMaker のコンスタントマスタ「検針票」B\_TO・B\_CC・B\_CONT を貼る）。既定の件名は「BKBさくら殿ガス検針票」。提出メール（5-2）とカード（`src/components/MeterMailCard.jsx`）・サーバーの処理（`createMeterDraft`）を共通にした。**2026-11-16〜（360番）宛先・件名・本文はメール送付管理（`/tenant-mail`）の「雛型」タブで登録・修正する**（カードの「宛先・件名・本文を変える」はそこへのリンク。保存先は同じ settings）
 
 ## 6. 出力
 

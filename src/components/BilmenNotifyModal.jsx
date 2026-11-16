@@ -102,7 +102,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
           <p className="bilmen-notify-settings-note">
             ※ テナントの宛先は<Link to="/equipment/tenants">テナントマスタ</Link>の「案内メールの宛先」、
             <br />
-            件名・本文・その他の宛先・返信先は<Link to="/tenant-mail?tab=templates">テナントへのメール</Link>の画面で指定します。
+            件名・本文・その他の宛先・返信先は<Link to="/tenant-mail?tab=templates">メール送付管理</Link>の画面で指定します。
           </p>
           <button type="button" className="icon-btn-close" onClick={onClose} disabled={drafting} aria-label="閉じる">
             ×
@@ -123,7 +123,7 @@ export default function BilmenNotifyModal({ month, schedules, onDownloadNotice, 
               )}
               {activeRecipients.length === 0 && (
                 <p className="bilmen-undecided">
-                  宛先がありません。テナントマスタの「案内メールの宛先」か、テナントへのメールの「その他の宛先」に登録してください。
+                  宛先がありません。テナントマスタの「案内メールの宛先」か、メール送付管理の「その他の宛先」に登録してください。
                 </p>
               )}
 

@@ -1097,8 +1097,8 @@ export async function handleBilmenMailDraftCreate(req) {
     const pdf = form.get('pdf')
 
     if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: '対象年月が不正です' }, 400)
-    if (!subject) return json({ error: '件名が空です。テナントへのメールの雛型で件名を登録してください' }, 400)
-    if (!body.trim()) return json({ error: '本文が空です。テナントへのメールの雛型で本文を登録してください' }, 400)
+    if (!subject) return json({ error: '件名が空です。メール送付管理の雛型で件名を登録してください' }, 400)
+    if (!body.trim()) return json({ error: '本文が空です。メール送付管理の雛型で本文を登録してください' }, 400)
     if (!pdf || typeof pdf === 'string') return json({ error: '連絡票PDFが添付されていません' }, 400)
     if (pdf.size > DRAFT_PDF_MAX_BYTES) return json({ error: '連絡票PDFが大きすぎます（20MBまで）' }, 400)
 
@@ -1131,7 +1131,7 @@ export async function handleBilmenMailDraftCreate(req) {
       return true
     })
     if (bcc.length === 0) {
-      return json({ error: '宛先がありません。テナントマスタの「案内メールの宛先」か、テナントへのメールの「その他の宛先」に登録してください' }, 400)
+      return json({ error: '宛先がありません。テナントマスタの「案内メールの宛先」か、メール送付管理の「その他の宛先」に登録してください' }, 400)
     }
 
     const filename = String(pdf.name || '').trim() || `作業予定連絡票_${month}.pdf`

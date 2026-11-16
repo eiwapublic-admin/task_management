@@ -214,7 +214,7 @@ export async function handleTenantMailDraftCreate(req) {
     const base = `https://mail.google.com/mail/${account ? `?authuser=${encodeURIComponent(account)}` : 'u/0/'}`
     const messageId = draft?.message?.id || ''
 
-    await logBilmen(supabase, actorOf(auth), `テナントへのメール: 「${template.name}」の下書きを作成しました（宛先 ${bcc.length} 件）`, {
+    await logBilmen(supabase, actorOf(auth), `メール送付管理: 「${template.name}」の下書きを作成しました（宛先 ${bcc.length} 件）`, {
       template_id: template.id,
       draft_id: draft?.id || null,
       message_id: messageId || null,
