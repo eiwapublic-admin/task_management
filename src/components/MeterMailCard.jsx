@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { IconMail } from './Icons'
 import { createMeterDraft, fetchMeterMailSettings, saveMeterMailSettings } from '../lib/meter'
 import { meterFileMonth } from '../lib/meterXlsx'
@@ -15,7 +16,12 @@ function fillMonth(text, month) {
  * @param {{ kind: 'report'|'gas', month: string, title: string, note: React.ReactNode, attachmentNames: string[],
  *   makeFiles: () => Promise<{ blob: Blob, name: string }[]>, disabledReason?: string, children?: React.ReactNode }} props
  *   children は添付を選ぶ欄など（宛先の表示の上に出す）
+ * ガス検針票の送付メール（kind='gas'）の宛先・件名・本文は 2026-11-16〜 メール送付管理（/tenant-mail）の雛型として
+ * 登録・修正する（ここの「宛先・件名・本文を変える」はその雛型の修正画面へのリンク）。提出メールは従来どおりここで直す
  */
+// メール送付管理の雛型で直すメールの種類 → 修正画面
+const TEMPLATE_EDIT_URL = { gas: '/tenant-mail?tab=templates&edit=meter-gas' }
+
 export default function MeterMailCard({ kind, month, title, note, attachmentNames, makeFiles, disabledReason = '', children }) {
   const [mail, setMail] = useState(null)
   const [editing, setEditing] = useState(null)
@@ -151,12 +157,22 @@ export default function MeterMailCard({ kind, month, title, note, attachmentName
               <IconMail size={18} />
               {busy === 'draft' ? '下書きを作成中…' : 'Gmail に下書きを作る'}
             </button>
-            <button type="button" className="btn-plain" onClick={() => setEditing({ ...mail })} disabled={!!busy}>
-              宛先・件名・本文を変える
-            </button>
+            {TEMPLATE_EDIT_URL[kind] ? (
+              <Link className="btn-plain" to={TEMPLATE_EDIT_URL[kind]}>
+                宛先・件名・本文を変える（メール送付管理の雛型）
+              </Link>
+            ) : (
+              <button type="button" className="btn-plain" onClick={() => setEditing({ ...mail })} disabled={!!busy}>
+                宛先・件名・本文を変える
+              </button>
+            )}
           </div>
           {!mail.to ? (
-            <p className="ui-note">先に「宛先・件名・本文を変える」で宛先を登録してください。</p>
+            <p className="ui-note">
+              {TEMPLATE_EDIT_URL[kind]
+                ? '先にメール送付管理の「雛型」タブで、この雛型の宛先を登録してください。'
+                : '先に「宛先・件名・本文を変える」で宛先を登録してください。'}
+            </p>
           ) : (
             disabledReason && <p className="ui-note">{disabledReason}</p>
           )}

@@ -374,7 +374,7 @@ export default function Portal() {
         { label: '連絡帳', icon: <IconAddressBook size={20} />, path: '/contacts', staffOnly: true },
         { label: '業務マニュアル', icon: <IconBook size={20} />, path: '/manuals', staffOnly: true },
         // テナントへのメール（雛型からの一斉メール。2026-10-29〜）
-        { label: 'テナントへのメール', icon: <IconMail size={20} />, path: '/tenant-mail', staffOnly: true },
+        { label: 'メール送付管理', icon: <IconMail size={20} />, path: '/tenant-mail', staffOnly: true },
       ]),
     },
     {

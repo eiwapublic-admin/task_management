@@ -93,3 +93,16 @@
 @media (max-width: 640px) {
   .tenant-mail-template-item { flex-direction: column; }
 }
+
+/* メール作成タブでガス検針票の送付メール（2026-11-16〜）を選んだときの宛先・件名の表示 */
+.tenant-mail-gas-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  margin: var(--space-2) 0 0;
+  color: var(--text-base);
+  font-size: var(--fs-sm);
+}
+.tenant-mail-gas-facts dt { font-weight: 700; }
+.tenant-mail-gas-facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+div.bilmen-undecided > p { margin: 0; }
