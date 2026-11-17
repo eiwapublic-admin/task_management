@@ -83,7 +83,7 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
             <label className="ui-field">
               <span>備品ID（空欄なら自動採番）</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
                 value={itemNo}
@@ -134,7 +134,7 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
             <label className="ui-field">
               <span>表示順</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
                 value={sortOrder}
@@ -144,7 +144,7 @@ export default function EquipmentItemForm({ existing, categories, onClose, onSav
             <label className="ui-field">
               <span>警告数量</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
                 placeholder="未設定なら警告なし"
