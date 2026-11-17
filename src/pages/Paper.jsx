@@ -456,10 +456,8 @@ function PaperWeightInput({ value, disabled, label, onCommit }) {
 
   return (
     <input
-      type="number"
+      type="text"
       inputMode="decimal"
-      step="1"
-      min="0"
       className="paper-weight-input"
       value={draft}
       disabled={disabled}

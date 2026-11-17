@@ -70,11 +70,8 @@ function DailyLimitSection() {
           上限（ドル／日）
           <input
             className="ui-input usage-limit-input"
-            type="number"
+            type="text"
             inputMode="decimal"
-            min={0.05}
-            max={50}
-            step={0.05}
             value={limit ?? ''}
             onChange={(e) => setLimit(e.target.value)}
           />

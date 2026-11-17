@@ -187,11 +187,9 @@ export default function SecureShareModal({ onClose, preset = null }) {
                 <label className="ui-field">
                   <span>有効期限（日）</span>
                   <input
-                    type="number"
+                    type="text"
                     className="ui-input"
                     inputMode="numeric"
-                    min={1}
-                    max={SHARE_MAX_DAYS}
                     value={days}
                     onChange={(e) => setDays(e.target.value)}
                     disabled={busy}
@@ -200,11 +198,9 @@ export default function SecureShareModal({ onClose, preset = null }) {
                 <label className="ui-field">
                   <span>開ける回数</span>
                   <input
-                    type="number"
+                    type="text"
                     className="ui-input"
                     inputMode="numeric"
-                    min={1}
-                    max={SHARE_MAX_OPENS}
                     value={maxOpens}
                     onChange={(e) => setMaxOpens(e.target.value)}
                     disabled={busy}

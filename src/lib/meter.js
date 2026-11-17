@@ -60,7 +60,7 @@ export const TENANT_PROFILE_FIELDS = [
   { key: 'usage', label: '用途' },
   { key: 'capacity', label: '収容人数', type: 'number' },
   { key: 'representative', label: '代表者名' },
-  { key: 'phone', label: '代表電話番号' },
+  { key: 'phone', label: '代表電話番号', type: 'tel' },
   // 連絡先メールアドレスは案内メールの宛先にまとめた（2026-10-21）。データは残し、画面には出さない
   { key: 'email', label: '連絡先メールアドレス', hidden: true },
   { key: 'fire_manager', label: '火元責任者' },
@@ -73,7 +73,7 @@ export const TENANT_PROFILE_FIELDS = [
   // 部屋番号は空なら旧テナントコード → メータの部屋番号の順で補う。会社電話番号は空なら代表電話番号
   { key: 'room_label', label: '部屋番号（一覧表）' },
   { key: 'plate_name', label: 'プレート表示名' },
-  { key: 'company_phone', label: '会社電話番号' },
+  { key: 'company_phone', label: '会社電話番号', type: 'tel' },
   { key: 'entry_date', label: '記入日', type: 'date' },
   { key: 'update_info', label: '更新情報（一覧表）', wide: true },
   { key: 'list_exclude', label: 'テナント一覧表・緊急連絡先一覧表に載せない', type: 'checkbox' },

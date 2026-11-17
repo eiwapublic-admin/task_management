@@ -185,8 +185,8 @@ export default function MeterTenantForm({ tenant: original, onClose, onSaved, on
                 <label key={f.key} className="ui-field">
                   <span>{f.label}</span>
                   <input
-                    type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
-                    inputMode={f.type === 'number' ? 'numeric' : undefined}
+                    type={f.type === 'date' ? 'date' : 'text'}
+                    inputMode={f.type === 'number' ? 'numeric' : f.type === 'tel' ? 'tel' : undefined}
                     className="ui-input"
                     value={profile[f.key] ?? ''}
                     onChange={setP(f.key)}
