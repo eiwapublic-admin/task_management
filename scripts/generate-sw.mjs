@@ -11,7 +11,11 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const outPath = resolve(__dirname, '../public/sw.js')
+// 引数: [出力先] [通知の既定タイトル] [通知アイコン]（勤怠アプリ eWorks 用に 2026-11-18 追加。
+// 省略時はタスク管理の public/sw.js）
+const outPath = process.argv[2] ? resolve(process.cwd(), process.argv[2]) : resolve(__dirname, '../public/sw.js')
+const appTitle = process.argv[3] || '栄和 タスク管理システム'
+const appIcon = process.argv[4] || '/logo.svg'
 
 // デプロイごとに一意になるバージョン。git SHA を優先し、無ければビルド時刻。
 let version
@@ -69,11 +73,11 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     data = {}
   }
-  const title = data.title || '栄和 タスク管理システム'
+  const title = data.title || ${JSON.stringify(appTitle)}
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || '',
-      icon: '/logo.svg',
+      icon: ${JSON.stringify(appIcon)},
       data: { url: data.url || '/' },
     })
   )
@@ -100,4 +104,4 @@ self.addEventListener('notificationclick', (event) => {
 
 mkdirSync(dirname(outPath), { recursive: true })
 writeFileSync(outPath, sw)
-console.log(`[generate-sw] public/sw.js written (version=${version})`)
+console.log(`[generate-sw] ${outPath} written (version=${version})`)

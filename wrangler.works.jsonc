@@ -1,0 +1,24 @@
+{
+  // 勤怠管理（eWorks）の Worker。タスク管理（wrangler.jsonc）とは別の URL で公開する
+  // （docs/eworks-plan.md 5-1）。デプロイ: npm run deploy:works
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eworks",
+  "main": "worker/works.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist-works",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  // ログイン試行回数の記録はタスク管理と同じ KV を共用する
+  "kv_namespaces": [
+    { "binding": "LOGIN_ATTEMPTS", "id": "34182593196e4bc08791fc1091a59f87" }
+  ],
+  "observability": {
+    "enabled": true
+  }
+  // シークレット（SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET）は
+  // タスク管理と同じ値を CI（deploy.yml）で同期する
+}

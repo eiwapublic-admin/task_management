@@ -44,3 +44,7 @@ dist-ssr
 # Python: scripts/ 配下の移行スクリプト実行時に生成される
 __pycache__/
 *.pyc
+
+# eWorks（勤怠アプリ）のビルド出力と生成物
+/dist-works
+/works/public/sw.js

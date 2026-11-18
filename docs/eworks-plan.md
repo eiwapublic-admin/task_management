@@ -1,7 +1,7 @@
 # 勤怠管理（eWorks）開発計画 — FileMaker「eWork2」からの移行と QR 打刻の追加
 
 - 作成日: 2026-11-14（初版）
-- 状態: **計画段階（未着手）**。2026-11-14 に休暇管理、2026-11-16 に切替時期・色・打刻の丸め・代理入力の方針を受領（下の「決定事項」）。残りの判断が要る項目は 17章。移行データ（18章 手順2）は 2026-11-17 に受領し検証済み（[`eworks-data-check.md`](./eworks-data-check.md)）。2026-11-17 に `勤務表日別` と `担当者マスタ` も受領。有休の計算仕様は [`eworks-spec-leave.md`](./eworks-spec-leave.md)
+- 状態: **Phase 1（入口・マスタ・招待）実装済み・本番未反映（2026-11-18）**。14-1 を参照。それまでの経緯: 2026-11-14 に休暇管理、2026-11-16 に切替時期・色・打刻の丸め・代理入力の方針を受領（下の「決定事項」）。残りの判断が要る項目は 17章。移行データ（18章 手順2）は 2026-11-17 に受領し検証済み（[`eworks-data-check.md`](./eworks-data-check.md)）。2026-11-17 に `勤務表日別` と `担当者マスタ` も受領。有休の計算仕様は [`eworks-spec-leave.md`](./eworks-spec-leave.md)
 - 関連文書: 画面イメージ案 [`eworks-ui-proposal.html`](./eworks-ui-proposal.html)／同時に進めている販売管理の計画 `docs/esales-plan.md`（ブランチ `claude/esales2-migration-plan-gpgno3`）／UI 標準 [`ui-standard.md`](./ui-standard.md)／引き継ぎ書 [`HANDOFF.md`](./HANDOFF.md)
 - 調査に使った資料（依頼元から受領。**個人名・勤務実績を含むためリポジトリには入れていない**）
   - FileMaker データベースデザインレポート（`eWork2.fmp12`。参照先として `eSales_data.fmp12`）
@@ -636,12 +636,42 @@ Phase 1 の最初に「現場スタッフのホーム〜打刻完了」「カレ
 
 **合計 17〜21 セッション。**
 
+### 14-1. Phase 1 の実装状況（2026-11-18）
+
+| 区分 | 内容 | ファイル |
+|---|---|---|
+| DB | `users` に役割 `field_staff` と列 `works_admin` を追加。テーブル `works_shift_patterns` / `works_sites` / `works_staff` / `works_staff_schedules` / `works_settings` / `works_invites`（service_role だけが読み書き、RLS 有効） | `supabase/eworks.sql`（何度実行しても同じ結果） |
+| Worker | 2 つ目の Worker `eworks`（eSales の Worker はまだ無いため）。ログイン・自分の情報・マスタ・勤務体系・設定・招待の API | `worker/works.js`、`worker/lib/works/`、`wrangler.works.jsonc` |
+| 既存アプリ | `field_staff` はタスク管理にログインできない（ログイン時に 403、既存トークンも認証で拒否） | `worker/index.js`、`worker/lib/http.js` |
+| 画面 | ログイン／招待（初回登録・パスワード再設定）／ホーム（Phase 2 で打刻が入る）／スタッフ（基本情報・勤務体系・アプリの利用）／出退勤パターン／現場／設定。PC・iPad は左メニュー、iPhone は下部タブ | `works/`、`src/works/`、`vite.works.config.js` |
+| アイコン | 藤紫の地に時計（決定事項 6）。SVG と PNG（180・192・512） | `works/public/` |
+| 取り込み | FileMaker のマスタから投入用 SQL を手元で作るスクリプト（データはリポジトリに入れない） | `scripts/import-works-masters.py` |
+| デプロイ | `deploy.yml` に eWorks の手順を追加。リポジトリ変数 `EWORKS_DEPLOY=true` を登録するまで動かない | `.github/workflows/deploy.yml` |
+
+権限の考え方: **eWorks 管理者（`users.works_admin=true`）** は全スタッフ・マスタ・招待を扱える。それ以外は自分（`works_staff.user_id` が自分）の情報だけ。
+判定はすべて Worker 側。タスク管理の利用者が eWorks 管理者を兼ねる場合は、同じ ID・パスワードで eWorks にもログインする（トークンはアプリごとに別保存）。
+
+招待の流れ: 管理者がスタッフ詳細の「アプリの利用」で招待リンクを発行 → LINE 等で本人へ → 本人がログイン ID とパスワードを決める → `field_staff` の利用者が作られスタッフに紐づく。
+リンクの合言葉は 32 バイトの乱数で、DB には SHA-256 だけを保存。有効期限は設定の日数（既定 7 日）、1 回使うと無効、再発行で前のリンクは無効。
+パスワードを忘れたときは「再設定のリンク」を発行（既存のトークンはすべて失効）。
+
+マスタ取り込みの検証（2026-11-18、ローカルの PostgreSQL 16 で `eworks.sql` → 取り込み SQL を各 2 回実行）:
+出退勤パターン 58（使用中 37）・現場 20・スタッフ 56 名（在籍 18、他は退職）・勤務体系 56 件。在籍 18 名は全員、入社日と勤務体系あり。
+注意点: 担当者 2018 は担当者作業マスタに 2 行あり（入力の多い方を採用）。eSales 担当者マスタに無いコード 9 件（01006 ほか、全員退職扱い）は氏名をコードで仮置き。
+
+本番反映に必要なこと（依頼元の確認後に行う）:
+1. `supabase/eworks.sql` を本番 DB に適用（既存の `users` の制約を差し替えるが、既存の行・役割には影響しない）
+2. eWorks 管理者にする利用者を決めて `works_admin=true` にする（17章⑥）
+3. マスタ取り込み SQL を作って実行
+4. リポジトリ変数 `EWORKS_DEPLOY=true` を登録 → main へ反映でデプロイ（`eworks.<アカウント>.workers.dev`。Workers 無料枠内）
+
+
 **日程の目安（2026-11-16 決定の「遅くとも 2027年4月切替」に合わせて前倒し）**
 
 | 時期 | 内容 |
 |---|---|
 | 2026年11月 | Phase 0（回答受領済み・CSV 受領 11/17 予定・計算仕様の文書化） |
-| 2026年12月 | Phase 1（入口・UI 試作・マスタ・招待） |
+| 2026年11〜12月 | Phase 1（入口・UI 試作・マスタ・招待）。**11/18 に実装、本番反映は確認後** |
 | 2027年1月 | Phase 2・3（予定・カレンダー・QR 打刻）。**事務所と 1〜2 現場で試行開始** |
 | 2027年2月 | Phase 4・5（相違の検知・勤務表・休暇）。過去月の突合を開始 |
 | 2027年3月 | Phase 6・7（帳票・移行）。**3 月分を両システムで作成して突合**。全現場へ QR を掲示 |

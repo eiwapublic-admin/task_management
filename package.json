@@ -9,7 +9,11 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "dev:worker": "wrangler dev"
+    "dev:worker": "wrangler dev",
+    "dev:works": "vite --config vite.works.config.js",
+    "build:works": "node scripts/generate-sw.mjs works/public/sw.js \"eWorks 勤怠管理\" /icon.svg && vite build --config vite.works.config.js",
+    "deploy:works": "npm run build:works && wrangler deploy --config wrangler.works.jsonc",
+    "dev:works-worker": "wrangler dev --config wrangler.works.jsonc --port 8788"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

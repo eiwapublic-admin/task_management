@@ -244,6 +244,12 @@ async function handleLogin(req, env) {
 
     if (attemptsKv) await attemptsKv.delete(attemptKey)
 
+    // 現場スタッフ（勤怠アプリ eWorks 専用の利用者）はタスク管理に入れない（docs/eworks-plan.md 5-1）。
+    // パスワードが正しい場合だけ案内を出す（ユーザー名の存在を推測させないため）
+    if (user.role === 'field_staff') {
+      return json({ error: 'このIDは勤怠アプリ（eWorks）専用です。eWorks からログインしてください' }, 403)
+    }
+
     // tv（発行時点の token_version）を埋め込む。後日 token_version をインクリメント
     // することで、このトークンを含む当該ユーザーの全トークンを即時失効できる。
     const token = await signJwt(
