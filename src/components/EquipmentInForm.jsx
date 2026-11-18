@@ -155,7 +155,7 @@ export default function EquipmentInForm({ items, existing, defaultItemId, onClos
 
           <div className="equipment-qty-staff-row">
             <input
-              type="number"
+              type="text"
               className="ui-input equipment-qty-input"
               inputMode="numeric"
               value={quantity}

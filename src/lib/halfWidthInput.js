@@ -3,6 +3,9 @@
 // 対象: <input> のうち inputmode が numeric / decimal / tel のもの、type が tel のもの、
 //       data-halfwidth 属性を付けたもの（数字を打つ欄。検針の当月値・TimeInput の時刻など）。
 //       type="number" / "date" / "time" / "month" はブラウザの部品が全角を受け付けないので対象外。
+//       type="number" は日本語入力オンで打つと全角の数字が捨てられて空欄になる（Chromium で確認）ため、
+//       アプリでは使わない（2026-11-17 に全部 type="text"＋inputMode="numeric"/"decimal" に置き換えた）。
+//       数字の欄を新しく作るときは type="text" inputMode="numeric"（小数は "decimal"、電話番号は "tel"）にする。
 //
 // 二重入力を起こさないための決まり:
 //   - 日本語入力（IME）で変換中（compositionstart〜compositionend の間）は値に一切触らない。

@@ -517,7 +517,7 @@ function TemplatesTab({ templates, setTemplates, gasMail, setGasMail, initialEdi
           表示順
           <input
             className="ui-input is-compact"
-            type="number"
+            type="text"
             inputMode="numeric"
             value={draft.sort_order}
             onChange={(e) => setDraft((d) => ({ ...d, sort_order: e.target.value }))}

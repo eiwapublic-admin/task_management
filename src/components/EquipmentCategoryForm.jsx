@@ -22,7 +22,10 @@ export default function EquipmentCategoryForm({ categories, onClose, onSaved }) 
 
   async function handleSave() {
     setError('')
-    const valid = rows.filter((r) => r.code.trim() && r.name.trim())
+    // 表示順は入力中の文字のまま持ち、保存のときに数値にする（全角→半角の変換中に 99 へ化けないように。2026-11-17）
+    const valid = rows
+      .filter((r) => r.code.trim() && r.name.trim())
+      .map((r) => ({ ...r, sort_order: Number(r.sort_order) || 99 }))
     if (valid.length === 0) return setError('コードと名称は必須です')
     setSaving(true)
     try {
@@ -82,11 +85,11 @@ export default function EquipmentCategoryForm({ categories, onClose, onSaved }) 
                     </td>
                     <td className="is-numeric">
                       <input
-                        type="number"
+                        type="text"
                         className="ui-input is-compact"
                         inputMode="numeric"
                         value={r.sort_order}
-                        onChange={(e) => updateRow(i, { sort_order: Number(e.target.value) || 99 })}
+                        onChange={(e) => updateRow(i, { sort_order: e.target.value })}
                       />
                     </td>
                     <td>

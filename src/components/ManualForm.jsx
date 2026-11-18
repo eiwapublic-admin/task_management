@@ -151,10 +151,9 @@ export default function ManualForm({ existing, defaultKind = 'response', manuals
             <label className="ui-field manuals-form-no">
               <span>No</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
-                min="0"
                 placeholder="自動"
                 value={no}
                 onChange={(e) => setNo(e.target.value)}

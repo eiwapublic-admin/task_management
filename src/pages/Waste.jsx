@@ -341,10 +341,8 @@ function WasteCell({ record, recordDate, floor, readOnly, onSave, onClear }) {
 
   return (
     <input
-      type="number"
+      type="text"
       inputMode="decimal"
-      step="0.1"
-      min="0"
       className={`waste-cell-input${level !== 'normal' ? ` is-${level}` : ''}${unconfirmed ? ' is-unconfirmed' : ''}`}
       value={draft}
       disabled={readOnly}

@@ -216,7 +216,7 @@ export default function BilmenMasterForm({
             <label className="ui-field">
               <span>作業マスタID</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
                 value={masterNo}
@@ -226,7 +226,7 @@ export default function BilmenMasterForm({
             <label className="ui-field">
               <span>表示順</span>
               <input
-                type="number"
+                type="text"
                 className="ui-input"
                 inputMode="numeric"
                 value={sortOrder}
@@ -283,11 +283,9 @@ export default function BilmenMasterForm({
               <label className="ui-field">
                 <span>何年に1回</span>
                 <input
-                  type="number"
+                  type="text"
                   className="ui-input"
                   inputMode="numeric"
-                  min="2"
-                  max="50"
                   placeholder="2"
                   value={cycleYears}
                   onChange={(e) => setCycleYears(e.target.value)}
@@ -296,11 +294,9 @@ export default function BilmenMasterForm({
               <label className="ui-field">
                 <span>起点の年（実施した年）</span>
                 <input
-                  type="number"
+                  type="text"
                   className="ui-input"
                   inputMode="numeric"
-                  min="1900"
-                  max="2200"
                   placeholder="2025"
                   value={cycleAnchorYear}
                   onChange={(e) => setCycleAnchorYear(e.target.value)}

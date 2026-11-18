@@ -414,10 +414,9 @@ export default function EquipmentOutForm({
 
               <div className="equipment-qty-staff-row">
                 <input
-                  type="number"
+                  type="text"
                   className="ui-input equipment-qty-input"
                   inputMode="numeric"
-                  min="1"
                   value={quantity}
                   disabled={locked}
                   onChange={(e) => setQuantity(e.target.value)}

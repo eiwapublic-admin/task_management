@@ -43,10 +43,8 @@ export default function SettingsPanel({ settings, onSave }) {
             <label>
               開始（時）
               <input
-                type="number"
-                min={0}
-                max={23}
-                step={1}
+                type="text"
+                inputMode="numeric"
                 value={activeStart}
                 onChange={(e) => setActiveStart(e.target.value)}
                 onBlur={(e) => {
@@ -58,10 +56,8 @@ export default function SettingsPanel({ settings, onSave }) {
             <label>
               終了（時）
               <input
-                type="number"
-                min={1}
-                max={24}
-                step={1}
+                type="text"
+                inputMode="numeric"
                 value={activeEnd}
                 onChange={(e) => setActiveEnd(e.target.value)}
                 onBlur={(e) => {
@@ -73,10 +69,8 @@ export default function SettingsPanel({ settings, onSave }) {
             <label>
               頻度（分）
               <input
-                type="number"
-                min={5}
-                max={120}
-                step={1}
+                type="text"
+                inputMode="numeric"
                 value={fetchInterval}
                 onChange={(e) => setFetchInterval(e.target.value)}
                 onBlur={(e) => {
@@ -94,10 +88,8 @@ export default function SettingsPanel({ settings, onSave }) {
           <label>
             アーカイブまでの日数（0 で無効）
             <input
-              type="number"
-              min={0}
-              max={3650}
-              step={1}
+              type="text"
+                inputMode="numeric"
               value={archiveAfterDays}
               onChange={(e) => setArchiveAfterDays(e.target.value)}
               onBlur={(e) => {
