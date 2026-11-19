@@ -18,6 +18,10 @@
   ],
   "observability": {
     "enabled": true
+  },
+  // 毎日 0:00（日本時間 = UTC 15:00）。翌月の予定の自動作成（worker/works.js の scheduled）
+  "triggers": {
+    "crons": ["0 15 * * *"]
   }
   // シークレット（SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET）は
   // タスク管理と同じ値を CI（deploy.yml）で同期する

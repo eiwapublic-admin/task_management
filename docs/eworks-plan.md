@@ -1,7 +1,7 @@
 # 勤怠管理（eWorks）開発計画 — FileMaker「eWork2」からの移行と QR 打刻の追加
 
 - 作成日: 2026-11-14（初版）
-- 状態: **Phase 1（入口・マスタ・招待）実装済み・本番未反映（2026-11-18）**。14-1 を参照。それまでの経緯: 2026-11-14 に休暇管理、2026-11-16 に切替時期・色・打刻の丸め・代理入力の方針を受領（下の「決定事項」）。残りの判断が要る項目は 17章。移行データ（18章 手順2）は 2026-11-17 に受領し検証済み（[`eworks-data-check.md`](./eworks-data-check.md)）。2026-11-17 に `勤務表日別` と `担当者マスタ` も受領。有休の計算仕様は [`eworks-spec-leave.md`](./eworks-spec-leave.md)
+- 状態: **Phase 1 は 2026-11-19 に本番公開（https://eworks.eiwa-public.workers.dev）。Phase 2（予定とカレンダー）実装済み・本番未反映**。14-1・14-2 を参照。それまでの経緯: 2026-11-14 に休暇管理、2026-11-16 に切替時期・色・打刻の丸め・代理入力の方針を受領（下の「決定事項」）。残りの判断が要る項目は 17章。移行データ（18章 手順2）は 2026-11-17 に受領し検証済み（[`eworks-data-check.md`](./eworks-data-check.md)）。2026-11-17 に `勤務表日別` と `担当者マスタ` も受領。有休の計算仕様は [`eworks-spec-leave.md`](./eworks-spec-leave.md)
 - 関連文書: 画面イメージ案 [`eworks-ui-proposal.html`](./eworks-ui-proposal.html)／同時に進めている販売管理の計画 `docs/esales-plan.md`（ブランチ `claude/esales2-migration-plan-gpgno3`）／UI 標準 [`ui-standard.md`](./ui-standard.md)／引き継ぎ書 [`HANDOFF.md`](./HANDOFF.md)
 - 調査に使った資料（依頼元から受領。**個人名・勤務実績を含むためリポジトリには入れていない**）
   - FileMaker データベースデザインレポート（`eWork2.fmp12`。参照先として `eSales_data.fmp12`）
@@ -682,6 +682,18 @@ Phase 1 の最初に「現場スタッフのホーム〜打刻完了」「カレ
 - 出勤簿は月次の業務のため、**突合に必ず 1 か月かかる**
 
 ---
+
+### 14-2. Phase 2 の実装状況（2026-11-19）
+
+| 区分 | 内容 | ファイル |
+|---|---|---|
+| DB | `works_shifts`（勤務区間。Phase 2 は予定だけ。1 人 1 日に複数行可、`source` = auto／manual）、関数 `works_replace_auto_shifts`（1 人 1 か月分の自動分を 1 トランザクションで入れ替え。manual の日は入れない）、`works_settings.last_auto_month` | `supabase/eworks.sql` の Phase 2 節 |
+| 自動作成 | 7-2 のきまり（その日に有効な勤務体系の曜日別パターン／曜日別が空なら標準パターンを月〜金／祝日は入れない（「祝日も予定を入れる」なら入れる）／会社休日は入れない／入社日より前は入れない／在籍だけ／手で直した日は上書きしない）。祝日は holidays-jp（タスク管理の日報と同じ） | `worker/lib/works/plans.js` |
+| 毎月の自動実行 | eworks Worker の Cron（毎日 0:00 JST）。設定の「予定を作る日」以降で翌月分が未作成なら作る | `worker/works.js`、`wrangler.works.jsonc` |
+| 時間の計算 | eworks-spec-time.md 1-2 の休憩規則。Worker と画面で同じモジュール。6 時間超で休憩 45 分未満は警告 | `worker/lib/works/time.js` |
+| 画面 | ホーム（今日・明日の予定）／カレンダー（月表示。管理者はスタッフ切替・前後移動・「全員を表で表示」・予定の作成・日ごとの追加・変更・削除） | `src/works/pages/Calendar.jsx`、`Home.jsx` |
+
+検証: 現行の勤務体系で 2026年11月分を作り、FileMaker の 11 月の予定（作業明細、在籍 18 名）と突き合わせて **344 件すべて一致**（時刻・予定作業時間とも）。
 
 ## 15. データ移行
 

@@ -127,3 +127,70 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- ===========================================================================
+-- Phase 2（2026-11-19）: 予定（勤務区間）と自動作成
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 勤務区間（現行: 勤務表作業明細）。Phase 2 では予定だけを持ち、実績の列は Phase 3 以降で足す
+--   1 人 1 日に複数行を持てる（2 つの現場を回る日）
+--   source: auto = 勤務体系から自動作成 / manual = 管理者が手で追加・変更（再作成で上書きしない）
+-- ---------------------------------------------------------------------------
+create table if not exists works_shifts (
+  id          uuid primary key default gen_random_uuid(),
+  staff_id    uuid not null references works_staff(id) on delete cascade,
+  work_date   date not null,
+  site_id     uuid references works_sites(id) on delete set null,
+  pattern_id  uuid references works_shift_patterns(id) on delete set null,
+  plan_start  time not null,
+  plan_end    time not null,
+  source      text not null default 'auto' check (source in ('auto', 'manual')),
+  note        text,
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  check (plan_start < plan_end)
+);
+create index if not exists works_shifts_staff_date_idx on works_shifts (staff_id, work_date);
+create index if not exists works_shifts_date_idx on works_shifts (work_date);
+
+-- 自動作成を同じ月に 2 回走らせないための印（'2026-12' のように持つ）
+alter table works_settings add column if not exists last_auto_month text;
+
+-- 1 人 1 か月分の自動作成分を入れ替える（1 トランザクション）。
+--   手で直した日（source='manual' がある日）は自動分を入れない
+--   p_rows: [{ "work_date": "2026-12-01", "site_id": "…", "pattern_id": "…", "plan_start": "06:30", "plan_end": "14:30" }, …]
+create or replace function works_replace_auto_shifts(p_staff uuid, p_from date, p_to date, p_rows jsonb)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare n integer;
+begin
+  delete from works_shifts
+   where staff_id = p_staff and work_date between p_from and p_to and source = 'auto';
+  insert into works_shifts (staff_id, work_date, site_id, pattern_id, plan_start, plan_end, source)
+  select p_staff, r.work_date, r.site_id, r.pattern_id, r.plan_start, r.plan_end, 'auto'
+    from jsonb_to_recordset(p_rows) as r(work_date date, site_id uuid, pattern_id uuid, plan_start time, plan_end time)
+   where r.work_date between p_from and p_to
+     and not exists (
+       select 1 from works_shifts m
+        where m.staff_id = p_staff and m.work_date = r.work_date and m.source = 'manual'
+     );
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function works_replace_auto_shifts(uuid, date, date, jsonb) from public, anon, authenticated;
+grant execute on function works_replace_auto_shifts(uuid, date, date, jsonb) to service_role;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['works_shifts'] loop
+    execute format('grant select, insert, update, delete on %I to service_role', t);
+    execute format('alter table %I enable row level security', t);
+    execute format('revoke all on %I from anon, authenticated', t);
+  end loop;
+end $$;

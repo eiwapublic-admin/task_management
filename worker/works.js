@@ -7,6 +7,7 @@ import { json, withSecurityHeaders } from './lib/http.js'
 import { handleWorksLogin, handleWorksMe } from './lib/works/auth.js'
 import { handleMaster, handleSchedules, handleSettings } from './lib/works/masters.js'
 import { handleInviteAccept, handleInviteCheck, handleInvites } from './lib/works/invites.js'
+import { autoCreateNextMonth, handleGenerate, handleShifts } from './lib/works/plans.js'
 
 const MASTER_TABLES = {
   '/api/works/staff': 'works_staff',
@@ -27,6 +28,10 @@ async function route(req, env) {
       if (pathname === '/api/works/schedules') return await handleSchedules(req)
       if (pathname === '/api/works/settings') return await handleSettings(req)
       if (pathname === '/api/works/invites') return await handleInvites(req)
+      if (pathname === '/api/works/shifts') return await handleShifts(req)
+      if (pathname === '/api/works/shifts/generate') {
+        return req.method === 'POST' ? await handleGenerate(req) : json({ error: 'Method Not Allowed' }, 405)
+      }
       if (pathname === '/api/works/invite/check') {
         return req.method === 'POST' ? await handleInviteCheck(req, env) : json({ error: 'Method Not Allowed' }, 405)
       }
@@ -53,5 +58,13 @@ async function route(req, env) {
 export default {
   async fetch(req, env) {
     return withSecurityHeaders(await route(req, env))
+  },
+  // 毎日 0:00（日本時間）。設定の「予定を作る日」になったら翌月の予定を作る（docs/eworks-plan.md 7-2）
+  async scheduled(_event, _env, ctx) {
+    ctx.waitUntil(
+      autoCreateNextMonth()
+        .then((r) => r && console.log('works 予定の自動作成:', JSON.stringify({ month: r.month, created: r.created.length, skipped: r.skipped.length })))
+        .catch((err) => console.error('works 予定の自動作成に失敗:', err))
+    )
   },
 }
