@@ -322,3 +322,65 @@
   color: #b42318;
   font-weight: 700;
 }
+
+/* ===== 2026-11-19 依頼元の修正依頼: 見た目のメリハリ ===== */
+
+/* 画面上部（タイトル・月の移動・ボタン）はスクロールしても固定。
+   .works-main がスクロールする箱なので、その上端に貼り付く */
+.works-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-app);
+  margin: 0 -16px 8px;
+  padding: 4px 16px 4px;
+}
+@media (max-width: 640px) {
+  .works-sticky { margin: 0 -12px 8px; padding: 4px 12px; }
+}
+
+/* 一覧の表: 見出し行を固定するため、表の箱そのものを縦にもスクロールする箱にする
+   （overflow-x: auto の箱の中では sticky がページ基準にならないため。.claude/skills/sticky-header-overflow-trap 参照） */
+.works-scroll {
+  max-height: calc(100dvh - 200px);
+  overflow: auto;
+}
+@media (max-width: 640px) {
+  .works-scroll { max-height: calc(100dvh - 250px); }
+}
+.works-content .ui-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--works-accent-deep);
+  color: #fff;
+  font-size: var(--fs-sm);
+}
+.works-content .ui-table thead th.is-holiday { color: #ffd0d0; }
+.works-content .ui-table thead th.is-sat { color: #cfe3ff; }
+.works-content .ui-table thead th.is-company { color: #ffe7a8; }
+.works-all thead th.works-all-name { z-index: 3; }
+
+/* 明細行は 1 行おきに色を変える */
+.works-content .ui-table tbody tr:nth-child(even) > td { background: #f4f1fa; }
+.works-content .ui-table tbody tr:nth-child(even) > td.is-holiday,
+.works-content .ui-table tbody tr:nth-child(even) > td.is-company { background: #ebe7f2; }
+.works-content .works-clickable tbody tr:hover > td { background: var(--works-accent-soft); }
+.works-content .ui-table tfoot th { background: var(--bg-subtle); color: var(--text-strong); position: sticky; bottom: 0; }
+
+/* 月の移動 ‹ › : 枠・背景なしで大きく太く */
+.works-arrow {
+  border: 0;
+  background: transparent;
+  color: var(--works-accent);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0 10px 4px;
+  min-height: 40px;
+  cursor: pointer;
+  -webkit-text-stroke: 1.5px currentColor;
+  touch-action: manipulation;
+}
+.works-arrow:hover { color: var(--works-accent-deep); }
+.works-month { font-size: 22px; font-weight: 800; color: var(--text-strong); }

@@ -9,14 +9,16 @@ export default function Sites() {
   const [edit, setEdit] = useState(null)
   return (
     <>
-      <h1 className="works-title">現場</h1>
-      <div className="works-row-actions">
-        <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ code: '', name: '', detail: '', address: '', lat: '', lng: '', radius_m: 300, active: true })}>
-          ＋ 新しい現場
-        </button>
+      <div className="works-sticky">
+        <h1 className="works-title">現場</h1>
+        <div className="works-row-actions">
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ code: '', name: '', detail: '', address: '', lat: '', lng: '', radius_m: 300, active: true })}>
+            ＋ 新しい現場
+          </button>
+        </div>
       </div>
       {error && <p className="works-error">{error}</p>}
-      <div className="ui-table-wrap">
+      <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
             <tr><th>作業コード</th><th>作業名称</th><th>作業詳細</th><th>位置</th><th>状態</th></tr>

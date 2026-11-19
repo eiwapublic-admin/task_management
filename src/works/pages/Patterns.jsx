@@ -12,17 +12,19 @@ export default function Patterns() {
 
   return (
     <>
-      <h1 className="works-title">出退勤パターン</h1>
-      <div className="works-row-actions">
-        <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ name: '', start_time: '09:00', end_time: '17:00', active: true })}>
-          ＋ 新しいパターン
-        </button>
-        <label className="works-muted">
-          <input type="checkbox" checked={showStopped} onChange={(e) => setShowStopped(e.target.checked)} /> 停止中も表示
-        </label>
+      <div className="works-sticky">
+        <h1 className="works-title">出退勤パターン</h1>
+        <div className="works-row-actions">
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ name: '', start_time: '09:00', end_time: '17:00', active: true })}>
+            ＋ 新しいパターン
+          </button>
+          <label className="works-muted">
+            <input type="checkbox" checked={showStopped} onChange={(e) => setShowStopped(e.target.checked)} /> 停止中も表示
+          </label>
+        </div>
       </div>
       {error && <p className="works-error">{error}</p>}
-      <div className="ui-table-wrap">
+      <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
             <tr><th>タイプ名</th><th>出勤予定</th><th>退勤予定</th><th>状態</th></tr>
