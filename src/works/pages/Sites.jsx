@@ -1,0 +1,77 @@
+// 現場（現行: 作業マスタ）。位置（緯度・経度）は QR 打刻の持ち出し対策に使う（Phase 3）
+import { useState } from 'react'
+import Modal from '../components/Modal.jsx'
+import { useList } from '../components/useList.js'
+import { api } from '../lib/api.js'
+
+export default function Sites() {
+  const { items, error, reload } = useList('/api/works/sites')
+  const [edit, setEdit] = useState(null)
+  return (
+    <>
+      <h1 className="works-title">現場</h1>
+      <div className="works-row-actions">
+        <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ code: '', name: '', detail: '', address: '', lat: '', lng: '', radius_m: 300, active: true })}>
+          ＋ 新しい現場
+        </button>
+      </div>
+      {error && <p className="works-error">{error}</p>}
+      <div className="ui-table-wrap">
+        <table className="ui-table works-clickable">
+          <thead>
+            <tr><th>作業コード</th><th>作業名称</th><th>作業詳細</th><th>位置</th><th>状態</th></tr>
+          </thead>
+          <tbody>
+            {(items || []).map((s) => (
+              <tr key={s.id} onClick={() => setEdit({ ...s, lat: s.lat ?? '', lng: s.lng ?? '' })}>
+                <td>{s.code}</td>
+                <td>{s.name}</td>
+                <td>{s.detail}</td>
+                <td>{s.lat != null && s.lng != null ? `登録済み（${s.radius_m}m）` : <span className="works-muted">未登録</span>}</td>
+                <td>{s.active ? '使用中' : <span className="ui-badge">停止</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {items && items.length === 0 && <div className="ui-empty">現場がありません</div>}
+      </div>
+      {edit && <SiteForm value={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload() }} />}
+    </>
+  )
+}
+
+function SiteForm({ value, onClose, onSaved }) {
+  const [v, setV] = useState(value)
+  const [error, setError] = useState('')
+  const set = (k) => (e) => setV({ ...v, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
+  const save = async () => {
+    try {
+      await api('/api/works/sites', { method: v.id ? 'PATCH' : 'POST', body: v })
+      onSaved()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+  return (
+    <Modal
+      title={v.id ? '現場を変更' : '現場を登録'}
+      onClose={onClose}
+      foot={<div className="ui-modal-foot-end"><button type="button" className="btn-plain" onClick={onClose}>やめる</button><button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button></div>}
+    >
+      <div className="ui-field-row">
+        <label className="ui-field"><span>作業コード</span><input className="ui-input" value={v.code} onChange={set('code')} /></label>
+        <label className="ui-field"><span>作業名称</span><input className="ui-input" value={v.name} onChange={set('name')} /></label>
+      </div>
+      <label className="ui-field"><span>作業詳細</span><input className="ui-input" value={v.detail || ''} onChange={set('detail')} /></label>
+      <label className="ui-field"><span>住所</span><input className="ui-input" value={v.address || ''} onChange={set('address')} /></label>
+      <div className="ui-field-row">
+        <label className="ui-field"><span>緯度</span><input className="ui-input" inputMode="decimal" value={v.lat} onChange={set('lat')} /></label>
+        <label className="ui-field"><span>経度</span><input className="ui-input" inputMode="decimal" value={v.lng} onChange={set('lng')} /></label>
+        <label className="ui-field"><span>許容距離（m）</span><input className="ui-input" inputMode="numeric" value={v.radius_m} onChange={set('radius_m')} /></label>
+      </div>
+      <p className="ui-note">緯度・経度は、地図アプリで現場を長押しすると表示される数字を貼り付けます。QR 打刻（Phase 3）で、打刻した場所がこの距離の内側かを確かめます。</p>
+      <label><input type="checkbox" checked={v.active} onChange={set('active')} /> 使用中</label>
+      {error && <div className="works-error">{error}</div>}
+    </Modal>
+  )
+}

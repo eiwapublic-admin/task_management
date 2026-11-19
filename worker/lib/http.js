@@ -60,7 +60,10 @@ export function withSecurityHeaders(response) {
 // トークンは無効とみなす。パスワード変更・退職・トークン漏洩時に
 // token_version をインクリメントするだけで、その利用者の既存トークンを
 // 期限（30日）を待たずに即時失効できる。
-export async function verifyRequestAuth(req) {
+// 既定では現場スタッフ（role='field_staff'。勤怠アプリ eWorks 専用の利用者）を拒否する。
+// タスク管理の API は現場スタッフに見せないため（docs/eworks-plan.md 5-1）。
+// eWorks の Worker（worker/works.js）だけが { allowFieldStaff: true } で呼ぶ。
+export async function verifyRequestAuth(req, { allowFieldStaff = false } = {}) {
   const { SESSION_SECRET } = process.env
   if (!SESSION_SECRET) return null
   const header = req.headers.get('authorization') || ''
@@ -85,6 +88,7 @@ export async function verifyRequestAuth(req) {
     // 権限を下げた時に有効期限（30日）を待たずに即反映させるため。
     // role 列が無い場合や未設定は staff 扱い（後方互換）。
     payload.role = user.role || 'staff'
+    if (payload.role === 'field_staff' && !allowFieldStaff) return null
   } catch (err) {
     console.error('verifyRequestAuth: token_version 突合に失敗', err)
     return null // フェイルクローズ（DB参照できない場合は無効扱い）

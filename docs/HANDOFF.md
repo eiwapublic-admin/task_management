@@ -571,6 +571,9 @@ html2canvasでの再キャプチャの両方で、修正前と比べて退行が
   2026-10-05に停止済み。**本番からのカレンダーへの書き込みは2026-10-06に実機で確認済み**（299番。再反映・削除・月まとめの確認は6章の286番に残る））。**案内メール方式A（Phase 4'。Gmail下書き＋PDF自動添付）も
   2026-09-29に実装済み**で、メールソフト方式と併用して運用で評価中。**実施報告書ファイル・現行データのCSV移行（Phase 5）は未着手**。
   計画・フェーズ・実装内容は `docs/bilmen-plan.md` を参照（2026-10-02 更新）
+- **勤怠管理 eWorks（2026-11-14〜）**: FileMaker「eWork2」の移行＋QR 打刻。入口は別 Worker `eworks`（`wrangler.works.jsonc`、画面は `works/`・`src/works/`）。
+  **Phase 1（入口・マスタ・招待）を 2026-11-18 に実装、本番未反映**（DB 適用・管理者の指定・`EWORKS_DEPLOY` 変数の登録が残る）。
+  役割 `field_staff`（現場スタッフ）はタスク管理にはログインできない。計画と進捗は `docs/eworks-plan.md`（14-1）
 - **廃棄物（廃棄物実測値管理。2026-09-03〜）**: BKBビル・一般廃棄物の日次重量計測。手入力・
   月別/年度別集計を実装済み（Phase 1〜3を一括実装。スキーマは本番へ適用済みで稼働中）。
   **紙シートの取込は当初Claude Visionでのスキャン読み取りだったが、実際の筆跡で読み取り失敗が
@@ -1424,6 +1427,12 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 | バインディング名 | 用途 |
 |---|---|
 | LOGIN_ATTEMPTS | ログインのレート制限用。IP+ユーザー名ごとの失敗回数を記録（15分TTL） |
+
+### 勤怠管理 eWorks（2 つ目の Worker。2026-11-18〜）
+- デプロイは `deploy.yml` の後半。**リポジトリ変数 `EWORKS_DEPLOY=true`（Settings → Secrets and variables → Actions → Variables）を登録するまで動かない**
+- シークレットはタスク管理と共通の `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `SESSION_SECRET` だけ。KV は `LOGIN_ATTEMPTS` を共用（キーの接頭辞で区別）
+- ローカル: `npm run build:works && npm run dev:works-worker`（API 込み）／画面だけなら `npm run dev:works`（http://localhost:5174）
+- スキーマは `supabase/eworks.sql`。マスタ投入 SQL は `scripts/import-works-masters.py` で手元生成（個人名を含むのでコミットしない）
 
 ### ローカル開発
 ```bash
