@@ -1,12 +1,31 @@
 // 現場（現行: 作業マスタ）。位置（緯度・経度）は QR 打刻の持ち出し対策に使う（Phase 3）
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api } from '../lib/api.js'
 
+// QR の作成（ZXing）は発行のときだけ読み込む
+const QrSheet = lazy(() => import('../components/QrSheet.jsx'))
+
 export default function Sites() {
   const { items, error, reload } = useList('/api/works/sites')
   const [edit, setEdit] = useState(null)
+  const [qr, setQr] = useState(null)
+  const [qrError, setQrError] = useState('')
+  const issue = async (s) => {
+    const msg = s.has_qr
+      ? `${s.code} ${s.name} の QR を再発行します。\nいま掲示している QR は使えなくなります。よろしいですか？`
+      : `${s.code} ${s.name} の QR を発行します。よろしいですか？`
+    if (!window.confirm(msg)) return
+    setQrError('')
+    try {
+      const r = await api('/api/works/sites/qr', { method: 'POST', body: { id: s.id } })
+      setQr(r)
+      reload()
+    } catch (e) {
+      setQrError(e.message)
+    }
+  }
   return (
     <>
       <div className="works-sticky">
@@ -18,10 +37,11 @@ export default function Sites() {
         </div>
       </div>
       {error && <p className="works-error">{error}</p>}
+      {qrError && <p className="works-error">{qrError}</p>}
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>作業コード</th><th>作業名称</th><th>作業詳細</th><th>位置</th><th>状態</th></tr>
+            <tr><th>作業コード</th><th>作業名称</th><th>作業詳細</th><th>位置</th><th>QR</th><th>状態</th><th /></tr>
           </thead>
           <tbody>
             {(items || []).map((s) => (
@@ -30,13 +50,20 @@ export default function Sites() {
                 <td>{s.name}</td>
                 <td>{s.detail}</td>
                 <td>{s.lat != null && s.lng != null ? `登録済み（${s.radius_m}m）` : <span className="works-muted">未登録</span>}</td>
+                <td>{s.has_qr ? `発行済み（${new Date(s.qr_issued_at).toLocaleDateString('ja-JP')}）` : <span className="works-muted">未発行</span>}</td>
                 <td>{s.active ? '使用中' : <span className="ui-badge">停止</span>}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  {s.active && (
+                    <button type="button" className="btn-plain" onClick={() => issue(s)}>{s.has_qr ? 'QR を再発行' : 'QR を発行'}</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         {items && items.length === 0 && <div className="ui-empty">現場がありません</div>}
       </div>
+      {qr && <Suspense fallback={null}><QrSheet site={qr.site} token={qr.token} onClose={() => setQr(null)} /></Suspense>}
       {edit && <SiteForm value={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload() }} />}
     </>
   )

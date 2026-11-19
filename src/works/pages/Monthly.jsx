@@ -41,16 +41,23 @@ export default function Monthly() {
 
   const rows = useMemo(() => {
     if (!data) return []
+    const today = todayJst()
     const by = {}
     for (const s of data.items) {
-      const r = (by[s.staff_id] ||= { days: new Set(), minutes: 0, manual: 0 })
+      const r = (by[s.staff_id] ||= { days: new Set(), minutes: 0, manual: 0, due: new Set(), open: new Set() })
       r.days.add(s.work_date)
       r.minutes += s.minutes
       if (s.source === 'manual') r.manual += 1
+      // 実績入力: 今日までの予定日のうち、出勤・退勤とも記録がそろった日
+      if (s.work_date <= today) {
+        r.due.add(s.work_date)
+        if (!(s.actual_start && s.actual_end)) r.open.add(s.work_date)
+      }
     }
     return (data.staff || []).map((st) => {
-      const r = by[st.id] || { days: new Set(), minutes: 0, manual: 0 }
-      return { ...st, days: r.days.size, minutes: r.minutes, manual: r.manual, info: staffInfo[st.id] || {} }
+      const r = by[st.id] || { days: new Set(), minutes: 0, manual: 0, due: new Set(), open: new Set() }
+      const due = r.due.size
+      return { ...st, days: r.days.size, minutes: r.minutes, manual: r.manual, due, entered: due - r.open.size, info: staffInfo[st.id] || {} }
     })
   }, [data, staffInfo])
   const total = rows.reduce((a, r) => ({ days: a.days + r.days, minutes: a.minutes + r.minutes }), { days: 0, minutes: 0 })
@@ -120,7 +127,9 @@ export default function Monthly() {
                   <td className="num">{r.days ? `${r.days}日` : ''}</td>
                   <td className="num">{r.minutes ? (r.minutes / 60).toFixed(2) : ''}</td>
                   <td className="num">{r.manual ? `${r.manual}件` : ''}</td>
-                  <td className="center works-muted" title="出勤・退勤の記録は Phase 3 から入ります">—</td>
+                  <td className="center">
+                    {r.due ? <span className={r.entered < r.due ? 'works-none' : ''}>{r.entered}/{r.due}日</span> : <span className="works-muted">—</span>}
+                  </td>
                   <td className="center">{r.info.closed_day_work ? '勤務する' : ''}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <button type="button" className="btn-plain" disabled={!!busy} onClick={() => generate(r)}>
@@ -142,7 +151,7 @@ export default function Monthly() {
           </table>
         </div>
       )}
-      <p className="ui-note">行をタップすると、そのスタッフのカレンダーを開きます。実績入力の列は、出勤・退勤の記録（Phase 3）が入ると「入力済みの日数／予定の日数」を表示します。</p>
+      <p className="ui-note">行をタップすると、そのスタッフのカレンダーを開きます。実績入力は、今日までの予定の日のうち出勤・退勤の記録がそろった日数です（足りないときは赤）。</p>
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
     </>
   )

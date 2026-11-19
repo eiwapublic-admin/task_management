@@ -196,7 +196,7 @@ export async function handleShifts(req) {
     const { from, to } = monthRange(month)
     let q = supabase
       .from('works_shifts')
-      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, source, note')
+      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, source, note')
       .gte('work_date', from)
       .lte('work_date', to)
       .order('work_date')
@@ -224,6 +224,8 @@ export async function handleShifts(req) {
         ...s,
         plan_start: s.plan_start.slice(0, 5),
         plan_end: s.plan_end.slice(0, 5),
+        actual_start: s.actual_start ? s.actual_start.slice(0, 5) : null,
+        actual_end: s.actual_end ? s.actual_end.slice(0, 5) : null,
         site: site ? { code: site.code, name: site.name } : null,
         minutes: calc.minutes,
         break_minutes: calc.breakMinutes,

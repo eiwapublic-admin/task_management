@@ -66,3 +66,45 @@ export function addMonths(ym, n) {
 export function todayJst(now = new Date()) {
   return new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10)
 }
+
+// ---------------------------------------------------------------------------
+// 打刻の採用時刻（docs/eworks-plan.md 6-5。決定 2026-11-16）
+//   出勤 = 打刻を 30 分刻みへ切り上げ、予定の開始より早ければ予定の開始
+//   退勤 = 打刻を 30 分刻みへ切り捨て、予定の終了より遅ければ予定の終了
+//   予定がない日は丸めた時刻のまま
+// ---------------------------------------------------------------------------
+export function roundUp(min, unit = 30) {
+  return Math.ceil(min / unit) * unit
+}
+export function roundDown(min, unit = 30) {
+  return Math.floor(min / unit) * unit
+}
+
+// kind: 'in' | 'out'、punch: 'HH:MM'、plan: { plan_start, plan_end } | null → 'HH:MM'
+export function adoptedTime(kind, punch, plan, unit = 30) {
+  const p = toMin(punch)
+  if (kind === 'in') {
+    let t = Math.min(roundUp(p, unit), 24 * 60 - unit)
+    if (plan) t = Math.max(t, toMin(plan.plan_start))
+    return fromMin(t)
+  }
+  let t = roundDown(p, unit)
+  if (plan) t = Math.min(t, toMin(plan.plan_end))
+  return fromMin(t)
+}
+
+// Date → 日本時間の { date: 'YYYY-MM-DD', time: 'HH:MM' }
+export function jstParts(d) {
+  const j = new Date(d.getTime() + 9 * 3600e3).toISOString()
+  return { date: j.slice(0, 10), time: j.slice(11, 16) }
+}
+
+// 2 点間の距離（メートル）
+export function distanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000
+  const rad = (x) => (x * Math.PI) / 180
+  const dLat = rad(lat2 - lat1)
+  const dLng = rad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2
+  return Math.round(2 * R * Math.asin(Math.sqrt(a)))
+}

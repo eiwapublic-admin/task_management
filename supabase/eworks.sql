@@ -197,3 +197,80 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- =============================================================================
+-- Phase 3: QR 打刻（docs/eworks-plan.md 6章。2026-11-19）
+-- =============================================================================
+
+-- 現場の QR を発行した日時（合言葉はハッシュだけを qr_secret_hash に持つ。再発行で古い QR は無効）
+alter table works_sites add column if not exists qr_issued_at timestamptz;
+
+-- 勤務区間の採用時刻（打刻を 30 分単位で丸め、予定の範囲にそろえた時刻。6-5）
+alter table works_shifts add column if not exists actual_start time;
+alter table works_shifts add column if not exists actual_end   time;
+
+-- 打刻の生データ。追記のみ（訂正・取消は別の行で残す。6-4）
+create table if not exists works_punches (
+  id          uuid primary key default gen_random_uuid(),
+  staff_id    uuid not null references works_staff(id) on delete cascade,
+  work_date   date not null,                    -- 日本時間の日付
+  kind        text not null check (kind in ('in', 'out')),
+  punched_at  timestamptz not null,             -- 打刻の時刻（通常はサーバー時刻。オフライン打刻は端末の時刻）
+  received_at timestamptz not null default now(), -- サーバーが受け取った時刻
+  device_at   timestamptz,                      -- 端末の時刻（参考値）
+  method      text not null default 'qr' check (method in ('qr', 'proxy')), -- QR 打刻／管理者の代理入力
+  site_id     uuid references works_sites(id) on delete set null,
+  shift_id    uuid references works_shifts(id) on delete set null,
+  adopted     time,                             -- この打刻から決めた採用時刻（丸め・予定へのそろえ後）
+  lat         double precision,
+  lng         double precision,
+  accuracy_m  real,
+  distance_m  integer,                          -- 現場の位置からの距離
+  flags       text[] not null default '{}',     -- site_mismatch / no_plan / far / no_location / offline / duplicate / no_in / proxy
+  note        text,
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists works_punches_staff_date_idx on works_punches (staff_id, work_date);
+create index if not exists works_punches_date_idx on works_punches (work_date);
+
+-- 打刻を 1 件記録し、勤務区間の採用時刻を更新する（1 トランザクション）。
+--   p_punch: works_punches の列の JSON。p_start / p_end: 勤務区間に入れる採用時刻（null なら変えない）
+create or replace function works_record_punch(p_punch jsonb, p_start time, p_end time)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare new_id uuid;
+begin
+  insert into works_punches (staff_id, work_date, kind, punched_at, device_at, method, site_id, shift_id, adopted,
+                             lat, lng, accuracy_m, distance_m, flags, note, created_by)
+  select r.staff_id, r.work_date, r.kind, r.punched_at, r.device_at, coalesce(r.method, 'qr'), r.site_id, r.shift_id, r.adopted,
+         r.lat, r.lng, r.accuracy_m, r.distance_m, coalesce(r.flags, '{}'), r.note, r.created_by
+    from jsonb_to_record(p_punch) as r(staff_id uuid, work_date date, kind text, punched_at timestamptz, device_at timestamptz,
+                                       method text, site_id uuid, shift_id uuid, adopted time, lat double precision,
+                                       lng double precision, accuracy_m real, distance_m integer, flags text[], note text,
+                                       created_by uuid)
+  returning id into new_id;
+  if (p_punch->>'shift_id') is not null and (p_start is not null or p_end is not null) then
+    update works_shifts
+       set actual_start = coalesce(p_start, actual_start),
+           actual_end   = coalesce(p_end, actual_end),
+           updated_at   = now()
+     where id = (p_punch->>'shift_id')::uuid;
+  end if;
+  return new_id;
+end $$;
+revoke all on function works_record_punch(jsonb, time, time) from public, anon, authenticated;
+grant execute on function works_record_punch(jsonb, time, time) to service_role;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['works_punches'] loop
+    execute format('grant select, insert, update, delete on %I to service_role', t);
+    execute format('alter table %I enable row level security', t);
+    execute format('revoke all on %I from anon, authenticated', t);
+  end loop;
+end $$;

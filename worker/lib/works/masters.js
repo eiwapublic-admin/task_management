@@ -61,6 +61,13 @@ function pick(table, body, { partial }) {
 const ORDER = { works_staff: 'code', works_shift_patterns: 'name', works_sites: 'code' }
 
 // GET/POST/PATCH の共通処理（削除は持たない。使わなくなったものは無効・退職にする）
+// 現場の QR の合言葉のハッシュは画面に返さない（発行済みかどうかだけ）
+function hideSecret(row) {
+  if (!row || !('qr_secret_hash' in row)) return row
+  const { qr_secret_hash, ...rest } = row
+  return { ...rest, has_qr: !!qr_secret_hash }
+}
+
 export async function handleMaster(req, table) {
   const { ctx, error } = await requireWorks(req, { admin: true })
   if (error) return error
@@ -69,7 +76,7 @@ export async function handleMaster(req, table) {
     if (req.method === 'GET') {
       const { data, error: e } = await supabase.from(table).select('*').order(ORDER[table])
       if (e) throw e
-      return json({ items: data })
+      return json({ items: data.map(hideSecret) })
     }
     const body = await req.json().catch(() => ({}))
     if (req.method === 'POST') {
@@ -77,7 +84,7 @@ export async function handleMaster(req, table) {
       const { data, error: e } = await supabase.from(table).insert(row).select('*').single()
       if (e) return dbError(e)
       await log(supabase, ctx, `${LABEL[table]}を登録: ${row.code || ''} ${row.name}`.trim())
-      return json({ item: data })
+      return json({ item: hideSecret(data) })
     }
     if (req.method === 'PATCH') {
       if (!UUID_RE.test(String(body.id || ''))) return json({ error: 'id が正しくありません' }, 400)
@@ -85,7 +92,7 @@ export async function handleMaster(req, table) {
       const { data, error: e } = await supabase.from(table).update(row).eq('id', body.id).select('*').single()
       if (e) return dbError(e)
       await log(supabase, ctx, `${LABEL[table]}を変更: ${data.code || ''} ${data.name}`.trim())
-      return json({ item: data })
+      return json({ item: hideSecret(data) })
     }
     return json({ error: 'Method Not Allowed' }, 405)
   } catch (err) {
