@@ -336,3 +336,37 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- =============================================================================
+-- 有給休暇の申請（2026-11-19 依頼元の要望）
+--   本人がアプリで申請 → 労務担当（eWorks 管理者）が承認すると works_leaves に入る。
+--   紙の申請書は労務担当が代理で入力する（proxy=true、承認済みで登録）。連絡先は持たない（印刷した紙に手書き）
+-- =============================================================================
+create table if not exists works_leave_requests (
+  id            uuid primary key default gen_random_uuid(),
+  staff_id      uuid not null references works_staff(id) on delete cascade,
+  kind          text not null default 'paid' check (kind in ('paid', 'special')),
+  dates         date[] not null,
+  reason        text,
+  status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  proxy         boolean not null default false,
+  applied_by    uuid references users(id) on delete set null,
+  applied_at    timestamptz not null default now(),
+  decided_by    uuid references users(id) on delete set null,
+  decided_at    timestamptz,
+  decision_note text,
+  updated_at    timestamptz not null default now()
+);
+create index if not exists works_leave_requests_staff_idx on works_leave_requests (staff_id, applied_at desc);
+create index if not exists works_leave_requests_status_idx on works_leave_requests (status);
+alter table works_leaves add column if not exists request_id uuid references works_leave_requests(id) on delete set null;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['works_leave_requests'] loop
+    execute format('grant select, insert, update, delete on %I to service_role', t);
+    execute format('alter table %I enable row level security', t);
+    execute format('revoke all on %I from anon, authenticated', t);
+  end loop;
+end $$;

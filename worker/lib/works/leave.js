@@ -205,3 +205,210 @@ export async function handleLeave(req) {
     return json({ error: '処理に失敗しました' }, 500)
   }
 }
+
+// ---------------------------------------------------------------------------
+// 有給休暇の申請（本人が申請 → 労務担当＝eWorks 管理者が承認。紙の申請書は管理者が代理入力して承認済みにする）
+// ---------------------------------------------------------------------------
+const REQ_COLS = 'id, staff_id, kind, dates, reason, status, proxy, applied_at, decided_at, decision_note, applied_by, decided_by'
+export const REQUEST_STATUS = { pending: '承認待ち', approved: '承認済み', rejected: '却下', cancelled: '取り下げ' }
+
+// 申請の日付を検査して、重複なしの昇順にする
+export function normalizeDates(dates, today) {
+  if (!Array.isArray(dates)) throw new Error('日付を選んでください')
+  const out = [...new Set(dates.map(String))].sort()
+  if (out.length === 0) throw new Error('日付を選んでください')
+  if (out.length > 31) throw new Error('一度に申請できるのは 31 日までです')
+  const min = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`
+  const max = `${Number(today.slice(0, 4)) + 1}${today.slice(4)}`
+  for (const d of out) {
+    const t = DATE_RE.test(d) ? Date.parse(`${d}T00:00:00Z`) : NaN
+    if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== d) throw new Error('日付が正しくありません')
+    if (d < min || d > max) throw new Error('前後 1 年より先の日は申請できません')
+  }
+  return out
+}
+
+async function namesOf(supabase, ids) {
+  const uniq = [...new Set(ids.filter(Boolean))]
+  if (!uniq.length) return {}
+  const { data } = await supabase.from('users').select('id, display_name, username').in('id', uniq)
+  return Object.fromEntries((data || []).map((u) => [u.id, u.display_name || u.username]))
+}
+
+async function withNames(supabase, rows) {
+  const users = await namesOf(supabase, rows.flatMap((r) => [r.applied_by, r.decided_by]))
+  const staffIds = [...new Set(rows.map((r) => r.staff_id))]
+  const { data: staff } = staffIds.length ? await supabase.from('works_staff').select('id, code, name').in('id', staffIds) : { data: [] }
+  const st = Object.fromEntries((staff || []).map((s) => [s.id, s]))
+  return rows.map(({ applied_by, decided_by, ...r }) => ({
+    ...r,
+    staff: st[r.staff_id] ? { code: st[r.staff_id].code, name: st[r.staff_id].name } : null,
+    applied_by_name: users[applied_by] || null,
+    decided_by_name: users[decided_by] || null,
+  }))
+}
+
+// 承認した申請の日を取得日に入れる（特別休暇は同じ日の有休も）
+async function registerLeaves(supabase, req, userId) {
+  const rows = []
+  for (const d of req.dates) {
+    rows.push({ staff_id: req.staff_id, leave_date: d, kind: req.kind, source: 'manual', request_id: req.id, created_by: userId })
+    if (req.kind === 'special') rows.push({ staff_id: req.staff_id, leave_date: d, kind: 'paid', source: 'manual', request_id: req.id, created_by: userId })
+  }
+  const { error } = await supabase.from('works_leaves').upsert(rows, { onConflict: 'staff_id,leave_date,kind', ignoreDuplicates: true })
+  if (error) throw error
+}
+
+async function checkSpecial(kind, dates) {
+  if (kind !== 'special') return null
+  const holidays = await fetchHolidays().catch(() => null)
+  const bad = holidays ? dates.filter((d) => !holidays[d]) : []
+  return bad.length ? `特別休暇は祝日・振替休日だけ申請できます（${bad.join('、')}）` : null
+}
+
+// GET /api/works/leave/mine … 自分の残日数と申請（現場スタッフも使う）
+export async function handleLeaveMine(req) {
+  const { ctx, error } = await requireWorks(req)
+  if (error) return error
+  if (!ctx.staff) return json({ error: 'スタッフ情報が紐づいていません。管理者にお問い合わせください' }, 403)
+  const supabase = getAdminClient()
+  try {
+    const at = todayJst()
+    const [{ data: staff }, rows, { data: reqs, error: e }] = await Promise.all([
+      supabase.from('works_staff').select('id, code, name, status, hired_on').eq('id', ctx.staff.id).maybeSingle(),
+      loadLeaves(supabase, ctx.staff.id),
+      supabase.from('works_leave_requests').select(REQ_COLS).eq('staff_id', ctx.staff.id).order('applied_at', { ascending: false }).limit(50),
+    ])
+    if (e) throw e
+    const { paid = [], special = [] } = split(rows)[ctx.staff.id] || {}
+    const periods = leavePeriods(staff.hired_on, paid, special, at)
+    const cur = periods[periods.length - 1] || null
+    return json({
+      at,
+      staff: { code: staff.code, name: staff.name },
+      summary: leaveSummary(staff, paid, special, at),
+      taken: cur ? { paid: cur.paid_days, special: cur.special_days } : { paid: [], special: [] },
+      requests: await withNames(supabase, reqs || []),
+    })
+  } catch (err) {
+    console.error('works leave mine 失敗:', err)
+    return json({ error: '処理に失敗しました' }, 500)
+  }
+}
+
+// GET  /api/works/leave/requests?status=pending|all&staff_id= … 申請の一覧（管理者）
+// POST /api/works/leave/requests {kind, dates, reason[, staff_id]} … 申請する。管理者が staff_id を付けると紙の申請書の代理入力（承認済み）
+export async function handleLeaveRequests(req) {
+  const { ctx, error } = await requireWorks(req)
+  if (error) return error
+  const supabase = getAdminClient()
+  const url = new URL(req.url)
+  try {
+    if (req.method === 'GET') {
+      if (!ctx.isAdmin) return json({ error: 'この操作は eWorks 管理者だけができます' }, 403)
+      let q = supabase.from('works_leave_requests').select(REQ_COLS).order('applied_at', { ascending: false }).limit(200)
+      const status = url.searchParams.get('status') || 'pending'
+      if (status !== 'all') q = q.eq('status', status)
+      const sid = url.searchParams.get('staff_id')
+      if (sid && UUID_RE.test(sid)) q = q.eq('staff_id', sid)
+      const { data, error: e } = await q
+      if (e) throw e
+      const { count } = await supabase.from('works_leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      return json({ items: await withNames(supabase, data || []), pending: count || 0 })
+    }
+    if (req.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405)
+    const body = await req.json().catch(() => ({}))
+    const proxy = !!body.staff_id
+    if (proxy && !ctx.isAdmin) return json({ error: 'この操作は eWorks 管理者だけができます' }, 403)
+    if (proxy && !UUID_RE.test(String(body.staff_id))) return json({ error: 'スタッフが正しくありません' }, 400)
+    if (!proxy && !ctx.staff) return json({ error: 'スタッフ情報が紐づいていません。管理者にお問い合わせください' }, 403)
+    const staffId = proxy ? body.staff_id : ctx.staff.id
+    const kind = body.kind === 'special' ? 'special' : 'paid'
+    let dates
+    try {
+      dates = normalizeDates(body.dates, todayJst())
+    } catch (e) {
+      return json({ error: e.message }, 400)
+    }
+    const bad = await checkSpecial(kind, dates)
+    if (bad) return json({ error: bad }, 400)
+    const reason = String(body.reason || '').trim().slice(0, 500) || null
+    const now = new Date().toISOString()
+    const row = {
+      staff_id: staffId,
+      kind,
+      dates,
+      reason,
+      proxy,
+      applied_by: ctx.user.id,
+      status: proxy ? 'approved' : 'pending',
+      decided_by: proxy ? ctx.user.id : null,
+      decided_at: proxy ? now : null,
+      decision_note: proxy ? '紙の申請書から入力' : null,
+    }
+    const { data, error: e } = await supabase.from('works_leave_requests').insert(row).select(REQ_COLS).single()
+    if (e) throw e
+    if (proxy) await registerLeaves(supabase, data, ctx.user.id)
+    const { data: s } = await supabase.from('works_staff').select('code').eq('id', staffId).maybeSingle()
+    const label = kind === 'special' ? '特別休暇' : '有給休暇'
+    await log(supabase, ctx, `${label}の${proxy ? '申請を代理入力（承認済み）' : '申請'}: ${s?.code || ''} ${dates.join('、')}`)
+    return json({ item: (await withNames(supabase, [data]))[0] })
+  } catch (err) {
+    console.error('works leave requests 失敗:', err)
+    return json({ error: '処理に失敗しました' }, 500)
+  }
+}
+
+// POST /api/works/leave/requests/decide {id, action: approve|reject|cancel, note}
+//   approve / reject … 管理者が承認待ちを決める。cancel … 本人は承認待ちを取り下げ、管理者は承認済みも取り消せる（取得日も消す）
+export async function handleLeaveDecide(req) {
+  const { ctx, error } = await requireWorks(req)
+  if (error) return error
+  const supabase = getAdminClient()
+  try {
+    const body = await req.json().catch(() => ({}))
+    if (!UUID_RE.test(String(body.id || ''))) return json({ error: 'id が正しくありません' }, 400)
+    const { data: r } = await supabase.from('works_leave_requests').select(REQ_COLS).eq('id', body.id).maybeSingle()
+    if (!r) return json({ error: '申請が見つかりません' }, 404)
+    const mine = ctx.staff && ctx.staff.id === r.staff_id
+    const action = body.action
+    const note = String(body.note || '').trim().slice(0, 300) || null
+    let status
+    if (action === 'approve' || action === 'reject') {
+      if (!ctx.isAdmin) return json({ error: '承認は労務担当（eWorks 管理者）だけができます' }, 403)
+      if (r.status !== 'pending') return json({ error: 'この申請はすでに処理されています' }, 409)
+      if (action === 'approve') {
+        const bad = await checkSpecial(r.kind, r.dates)
+        if (bad) return json({ error: bad }, 400)
+      }
+      status = action === 'approve' ? 'approved' : 'rejected'
+    } else if (action === 'cancel') {
+      if (r.status === 'pending' && !(mine || ctx.isAdmin)) return json({ error: 'この申請は取り下げられません' }, 403)
+      if (r.status === 'approved' && !ctx.isAdmin) return json({ error: '承認済みの申請の取り消しは労務担当にご連絡ください' }, 403)
+      if (r.status !== 'pending' && r.status !== 'approved') return json({ error: 'この申請はすでに処理されています' }, 409)
+      status = 'cancelled'
+    } else {
+      return json({ error: '操作が正しくありません' }, 400)
+    }
+    // 承認待ちのまま処理する（同時に二人が押したときは片方だけ通す）
+    const { data: upd, error: e } = await supabase
+      .from('works_leave_requests')
+      .update({ status, decided_by: ctx.user.id, decided_at: new Date().toISOString(), decision_note: note ?? r.decision_note, updated_at: new Date().toISOString() })
+      .eq('id', r.id)
+      .eq('status', r.status)
+      .select(REQ_COLS)
+    if (e) throw e
+    if (!upd?.length) return json({ error: 'この申請はすでに処理されています' }, 409)
+    if (status === 'approved') await registerLeaves(supabase, r, ctx.user.id)
+    if (status === 'cancelled' && r.status === 'approved') {
+      const { error: e2 } = await supabase.from('works_leaves').delete().eq('request_id', r.id)
+      if (e2) throw e2
+    }
+    const { data: s } = await supabase.from('works_staff').select('code').eq('id', r.staff_id).maybeSingle()
+    await log(supabase, ctx, `${r.kind === 'special' ? '特別休暇' : '有給休暇'}の申請を${REQUEST_STATUS[status]}: ${s?.code || ''} ${r.dates.join('、')}`)
+    return json({ item: (await withNames(supabase, upd))[0] })
+  } catch (err) {
+    console.error('works leave decide 失敗:', err)
+    return json({ error: '処理に失敗しました' }, 500)
+  }
+}

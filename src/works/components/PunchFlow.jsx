@@ -87,7 +87,12 @@ export default function PunchFlow({ expected, preset = null, telework = false, o
         </>
       )}
 
-      {step === 'sending' && <p className="works-punch-lead">記録しています…</p>}
+      {step === 'sending' && (
+        <p className="works-punch-lead">
+          {qr && !telework && !preset ? 'QR を読み取りました。' : ''}記録しています…
+          {!telework && <><br /><small className="works-muted">位置情報の確認に数秒かかることがあります</small></>}
+        </p>
+      )}
 
       {step === 'kind' && (
         <div className="works-punch-box">

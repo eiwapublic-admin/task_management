@@ -588,3 +588,199 @@
   line-height: 1;
   padding: 0 4px;
 }
+
+/* 休暇の申請 */
+.works-subtitle {
+  font-size: 17px;
+  margin: 20px 0 8px;
+}
+.works-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #d4351c;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.works-leave-mine .works-leave-big {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin-bottom: 6px;
+}
+.works-leave-big span {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.works-leave-big strong {
+  font-size: 34px;
+  color: #3f2d78;
+  margin-right: 2px;
+}
+.works-leave-reqs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.works-leave-req {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.works-leave-req.is-cancelled,
+.works-leave-req.is-rejected {
+  opacity: 0.7;
+}
+.works-leave-req-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.works-leave-req .ui-badge.is-ok {
+  background: #e3f4ea;
+  color: #1f7a45;
+}
+.works-leave-req-dates {
+  font-weight: 700;
+}
+.works-leave-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.works-leave-pickday {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--bg-surface, #fff);
+}
+.works-leave-pickday.is-on {
+  border-color: #6b4fb3;
+  background: #ede9f8;
+  font-weight: 700;
+}
+.works-leave-pickday.is-sun {
+  color: #c62828;
+}
+.works-leave-pickday.is-sat {
+  color: #1d5fbf;
+}
+.works-leave-pickday small {
+  font-size: 10px;
+  color: #1f7a45;
+}
+
+/* 有給休暇申請書（A4 縦に 2 枚分。依頼元の様式どおり） */
+.works-lf-offscreen { position: fixed; left: -10000px; top: 0; }
+.works-lf-sheet {
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  padding: 10mm 18mm 0;
+  background: #fff;
+  color: #222;
+  font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+}
+.works-lf-sheet .works-lf {
+  height: 130mm;
+}
+.works-lf-cut {
+  border-top: 1px dashed #555;
+  margin: 0 -14mm 14mm;
+}
+.works-lf {
+  color: #222;
+  background: #fff;
+  font-size: 12px;
+}
+.works-lf-title {
+  text-align: center;
+  font-size: 20px;
+  letter-spacing: 0.1em;
+  margin: 4mm 0 12mm;
+}
+.works-lf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 9mm;
+}
+.works-lf-name {
+  width: 48%;
+  border-bottom: 1px solid #999;
+  padding: 0 0 2px 4mm;
+}
+.works-lf-name span {
+  margin-left: 4mm;
+  font-size: 14px;
+}
+.works-lf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.works-lf-table th,
+.works-lf-table td {
+  border: 1px solid #999;
+  height: 9mm;
+  padding: 0 3mm;
+  font-weight: 400;
+}
+.works-lf-table th {
+  width: 22mm;
+  vertical-align: top;
+  padding-top: 2mm;
+}
+.works-lf-tall td,
+.works-lf-tall th {
+  height: 20mm;
+  vertical-align: top;
+  padding-top: 2mm;
+}
+.works-lf-range {
+  text-align: center;
+}
+.works-lf-range > span {
+  display: inline-block;
+  width: 44%;
+}
+.works-lf-range > span:first-child {
+  text-align: right;
+  padding-right: 3mm;
+}
+.works-lf-range > span:nth-child(2) {
+  text-align: left;
+  padding-left: 3mm;
+}
+.works-lf-range .works-lf-rest {
+  width: auto;
+  text-align: left;
+  font-size: 11px;
+}
+.works-lf-preview {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px 20px;
+  background: #fff;
+  overflow-x: auto;
+}
+.works-lf-preview .works-lf {
+  min-width: 520px;
+}
+
+.works-scan-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-weight: 700;
+  color: #3f2d78;
+}

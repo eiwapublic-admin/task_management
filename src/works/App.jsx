@@ -13,12 +13,13 @@ import Settings from './pages/Settings.jsx'
 import Calendar from './pages/Calendar.jsx'
 import Monthly from './pages/Monthly.jsx'
 import Leave from './pages/Leave.jsx'
+import Vacation from './pages/Vacation.jsx'
 import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
 const PunchLink = lazy(() => import('./pages/PunchLink.jsx'))
 
 const ADMIN_MENU = [
-  { to: '/leave', label: '有給休暇' },
+  { to: '/leave', label: '有給休暇の管理' },
   { to: '/staff', label: 'スタッフ' },
   { to: '/patterns', label: '出退勤パターン' },
   { to: '/sites', label: '現場' },
@@ -41,6 +42,7 @@ function Shell({ children }) {
     { to: '/', label: 'ホーム', end: true },
     ...(user?.works_admin ? [{ to: '/monthly', label: '勤務表一覧' }] : []),
     { to: '/calendar', label: 'カレンダー' },
+    { to: '/vacation', label: '休暇' },
     ...(user?.works_admin ? ADMIN_MENU : []),
   ]
   const signOut = () => {
@@ -112,6 +114,7 @@ export default function App() {
         <Route path="/" element={<StartPage />} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
+        <Route path="/vacation" element={<Private><Vacation /></Private>} />
         <Route path="/leave" element={<Private admin><Leave /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />
         <Route path="/patterns" element={<Private admin><Patterns /></Private>} />

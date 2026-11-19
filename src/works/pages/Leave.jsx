@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { api, WEEKDAYS } from '../lib/api.js'
 import { todayJst } from '../../../worker/lib/works/time.js'
+import LeaveRequestForm from '../components/LeaveRequestForm.jsx'
+import LeaveRequestList from '../components/LeaveRequestList.jsx'
+import LeaveSheet from '../components/LeaveSheet.jsx'
 
 const ymdLabel = (d) => (d ? d.replaceAll('-', '/') : '')
 const withDow = (d) => `${ymdLabel(d)}（${WEEKDAYS[new Date(`${d}T00:00:00Z`).getUTCDay()]}）`
@@ -13,6 +16,27 @@ export default function Leave() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(null)
+  const [tab, setTab] = useState('list')
+  const [reqStatus, setReqStatus] = useState('pending')
+  const [reqs, setReqs] = useState(null)
+  const [pending, setPending] = useState(0)
+  const [form, setForm] = useState(false)
+  const [print, setPrint] = useState(null)
+  const loadReqs = useCallback(() => {
+    api(`/api/works/leave/requests?${new URLSearchParams({ status: reqStatus })}`)
+      .then((d) => {
+        setReqs(d.items)
+        setPending(d.pending)
+      })
+      .catch((e) => setError(e.message))
+  }, [reqStatus])
+  useEffect(() => {
+    loadReqs()
+  }, [loadReqs])
+  const changed = () => {
+    load()
+    loadReqs()
+  }
 
   const load = useCallback(() => {
     api(`/api/works/leave?${new URLSearchParams({ at })}`)
@@ -32,15 +56,44 @@ export default function Leave() {
   return (
     <>
       <div className="works-sticky">
-        <h1 className="works-title">有給休暇</h1>
+        <h1 className="works-title">有給休暇の管理</h1>
         <div className="works-row-actions">
+          <div className="ui-segmented">
+            <button type="button" className={`ui-segmented-btn ${tab === 'list' ? 'is-active' : ''}`} onClick={() => setTab('list')}>残日数の一覧</button>
+            <button type="button" className={`ui-segmented-btn ${tab === 'requests' ? 'is-active' : ''}`} onClick={() => setTab('requests')}>
+              申請{pending > 0 && <span className="works-count">{pending}</span>}
+            </button>
+          </div>
+          {tab === 'list' ? (
+            <>
           <label className="works-inline-field">
             基準日
             <input className="ui-input" type="date" value={at} onChange={(e) => e.target.value && setAt(e.target.value)} />
           </label>
           <button type="button" className="btn-plain" onClick={() => setAt(todayJst())}>今日</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn-primary works-btn-accent" onClick={() => setForm(true)} disabled={!data}>＋ 紙の申請書を入力</button>
+              <button type="button" className="btn-plain" onClick={() => setPrint({ request: null })}>空欄の申請書を印刷</button>
+            </>
+          )}
         </div>
       </div>
+      {tab === 'requests' && (
+        <>
+          <div className="works-row-actions" style={{ marginBottom: 8 }}>
+            <div className="ui-segmented">
+              <button type="button" className={`ui-segmented-btn ${reqStatus === 'pending' ? 'is-active' : ''}`} onClick={() => setReqStatus('pending')}>承認待ち</button>
+              <button type="button" className={`ui-segmented-btn ${reqStatus === 'all' ? 'is-active' : ''}`} onClick={() => setReqStatus('all')}>すべて</button>
+            </div>
+          </div>
+          {reqs ? <LeaveRequestList items={reqs} admin onChanged={changed} onPrint={(r) => setPrint({ request: r, name: r.staff?.name })} /> : <p className="works-muted">読み込み中…</p>}
+          <p className="ui-note">承認すると取得日に入ります。紙の申請書で受け付けた分は「紙の申請書を入力」から登録してください（承認済みで入ります）。</p>
+        </>
+      )}
+      {tab === 'list' && (
+      <>
       {data && short > 0 && (
         <p className="ui-note" style={{ marginTop: 0 }}>
           <span className="works-none">年 5 日の取得がまだ足りない人が {short} 名います</span>（付与 10 日以上の人は、期間内に 5 日取る義務があります）。
@@ -106,6 +159,20 @@ export default function Leave() {
       <p className="ui-note">
         数え方は現行（FileMaker）と同じです。繰越分から先に使い、使い切れなかった繰越分は期間末に消えます。特別休暇は有休の付与がある期間に 5 日で、取った日は有休も 1 日として数えます。行をタップすると期間ごとの履歴と取得日を見られます。
       </p>
+      </>
+      )}
+      {form && (
+        <LeaveRequestForm
+          staffList={items}
+          onClose={() => setForm(false)}
+          onSaved={() => {
+            setForm(false)
+            setReqStatus('all')
+            changed()
+          }}
+        />
+      )}
+      {print && <LeaveSheet request={print.request} name={print.name} onClose={() => setPrint(null)} />}
       {open && <LeaveDetail row={open} at={at} onClose={() => setOpen(null)} onChanged={load} />}
     </>
   )
