@@ -29,7 +29,7 @@ export default function Staff() {
       <div className="ui-table-wrap">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>コード</th><th>氏名</th><th>所属</th><th>入社日</th><th>状態</th><th>アプリ</th></tr>
+            <tr><th>コード</th><th>氏名</th><th>所属</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
           </thead>
           <tbody>
             {list.map((s) => (
@@ -37,7 +37,7 @@ export default function Staff() {
                 <td>{s.code}</td>
                 <td>{s.name}</td>
                 <td>{s.dept}</td>
-                <td>{s.hired_on}</td>
+                <td>{s.closed_day_work ? '勤務する' : <span className="works-muted">—</span>}</td>
                 <td>{s.status === 'active' ? STATUS_LABEL.active : <span className={`ui-badge ${s.status === 'leave' ? 'is-warn' : ''}`}>{STATUS_LABEL[s.status]}</span>}</td>
                 <td>{s.user_id ? '登録済み' : <span className="works-muted">未登録</span>}</td>
               </tr>

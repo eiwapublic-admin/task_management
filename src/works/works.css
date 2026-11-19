@@ -296,3 +296,29 @@
   .works-cal-site, .works-cal-end { display: none; }
   .works-cal-shift { font-size: 10px; padding: 1px 2px; }
 }
+
+/* ホーム下の版表示と「最新に更新」（タスク管理のメニュー下の ver. 表示と同じ役割） */
+.works-version {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted, #888);
+}
+
+/* 勤務表一覧 */
+.works-monthly td.num,
+.works-monthly th.num {
+  text-align: right;
+  white-space: nowrap;
+}
+.works-monthly td.center,
+.works-monthly th.center {
+  text-align: center;
+  white-space: nowrap;
+}
+.works-monthly .works-none {
+  color: #b42318;
+  font-weight: 700;
+}

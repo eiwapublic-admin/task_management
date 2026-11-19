@@ -2,6 +2,7 @@
 //   本人: 自分の月の予定
 //   管理者: スタッフを切り替えて同じ月表示／「全員」でスタッフ × 日の表。予定の作成・手での追加と変更
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
 import { api, getUser, WEEKDAYS } from '../lib/api.js'
 import { addMonths, dow, hoursLabel, monthRange, todayJst } from '../../../worker/lib/works/time.js'
@@ -14,8 +15,10 @@ function monthLabel(ym) {
 export default function Calendar() {
   const me = getUser()
   const isAdmin = !!me?.works_admin
-  const [month, setMonth] = useState(todayJst().slice(0, 7))
-  const [staffId, setStaffId] = useState(me?.staff?.id || (isAdmin ? 'all' : ''))
+  // 勤務表一覧から開いたときは ?month=YYYY-MM&staff=<id> で月とスタッフを受け取る
+  const [params] = useSearchParams()
+  const [month, setMonth] = useState(/^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month') : todayJst().slice(0, 7))
+  const [staffId, setStaffId] = useState((isAdmin && params.get('staff')) || me?.staff?.id || (isAdmin ? 'all' : ''))
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [day, setDay] = useState(null)
@@ -311,7 +314,7 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
   )
 }
 
-function ResultModal({ result, onClose }) {
+export function ResultModal({ result, onClose }) {
   return (
     <Modal title={`${monthLabel(result.month)}の予定を作成しました`} onClose={onClose}>
       <p style={{ margin: 0 }}>作成: <strong>{result.created.length}</strong> 名（{result.created.reduce((a, c) => a + (c.days || 0), 0)} 件）</p>

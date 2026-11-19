@@ -11,8 +11,11 @@ import Patterns from './pages/Patterns.jsx'
 import Sites from './pages/Sites.jsx'
 import Settings from './pages/Settings.jsx'
 import Calendar from './pages/Calendar.jsx'
+import Monthly from './pages/Monthly.jsx'
+import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
 const ADMIN_MENU = [
+  { to: '/monthly', label: '勤務表一覧' },
   { to: '/staff', label: 'スタッフ' },
   { to: '/patterns', label: '出退勤パターン' },
   { to: '/sites', label: '現場' },
@@ -81,11 +84,14 @@ function Private({ children, admin = false }) {
 export default function App() {
   return (
     <BrowserRouter>
+      {/* 新しい版を公開したら画面上部に「更新」バナーを出す（タスク管理と同じ仕組み。sw.js はビルドごとに版が変わる） */}
+      {import.meta.env.PROD && <ReloadPrompt accentColor="#6b4fb3" position="top" />}
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/invite" element={<Invite />} />
         <Route path="/" element={<Private>{(user) => <Home user={user} />}</Private>} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
+        <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />
         <Route path="/patterns" element={<Private admin><Patterns /></Private>} />
         <Route path="/sites" element={<Private admin><Sites /></Private>} />

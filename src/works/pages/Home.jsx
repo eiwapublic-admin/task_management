@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS } from '../lib/api.js'
 import { dow, todayJst } from '../../../worker/lib/works/time.js'
+import { formatBuildTime } from '../../lib/version.js'
+import { reloadApp } from '../../pwa/reloadApp.js'
 
 function addDays(date, n) {
   const [y, m, d] = date.split('-').map(Number)
@@ -53,6 +55,10 @@ export default function Home({ user }) {
         <p className="works-muted">スタッフ情報が紐づいていないため、予定は表示されません。</p>
       )}
       {error && <p className="works-error">{error}</p>}
+      <div className="works-version">
+        ver.{formatBuildTime()}
+        <button type="button" className="btn-plain" onClick={() => reloadApp({ to: '/' })}>最新に更新</button>
+      </div>
     </>
   )
 }
