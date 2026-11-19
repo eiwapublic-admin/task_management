@@ -165,7 +165,7 @@ function MonthGrid({ data, month, onDay }) {
             {(byDate[d] || []).map((s) => (
               <span key={s.id} className={`works-cal-shift ${s.source === 'manual' ? 'is-manual' : ''}`}>
                 {s.plan_start.replace(/^0/, '')}<span className="works-cal-end">–{s.plan_end.replace(/^0/, '')}</span>
-                {s.site && <span className="works-cal-site">{s.site.name}</span>}
+                {s.telework ? <span className="works-cal-site works-tw-text">テレワーク</span> : s.site && <span className="works-cal-site">{s.site.name}</span>}
                 {s.actual_start && (
                   <span className="works-cal-actual">
                     記録 <Diff value={s.actual_start} plan={s.plan_start} short />
@@ -277,7 +277,10 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
             {s.plan_start}〜{s.plan_end}
             <span className="works-muted" style={{ fontWeight: 400 }}>　{hoursLabel(s.minutes)} 時間{s.break_minutes ? `（休憩 ${s.break_minutes} 分）` : ''}</span>
           </div>
-          <div>{s.site ? `${s.site.code} ${s.site.name}` : <span className="works-muted">現場の指定なし</span>}</div>
+          <div>
+            {s.telework && <span className="works-tw-badge" style={{ marginRight: 6 }}>テレワーク</span>}
+            {s.site ? `${s.site.code} ${s.site.name}` : !s.telework && <span className="works-muted">現場の指定なし</span>}
+          </div>
           {s.note && <div className="works-muted">{s.note}</div>}
           <div>
             {s.actual_start ? (
@@ -292,7 +295,7 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
           <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>{s.source === 'manual' ? '手で追加・変更した予定' : '勤務体系から自動作成'}</div>
           {editable && (
             <div className="works-row-actions" style={{ marginTop: 8, marginBottom: 0 }}>
-              <button type="button" className="btn-plain" onClick={() => setEdit({ id: s.id, plan_start: s.plan_start, plan_end: s.plan_end, site_id: s.site_id || '', note: s.note || '' })}>変更</button>
+              <button type="button" className="btn-plain" onClick={() => setEdit({ id: s.id, plan_start: s.plan_start, plan_end: s.plan_end, site_id: s.site_id || '', telework: !!s.telework, note: s.note || '' })}>変更</button>
               <button type="button" className="btn-plain" onClick={() => remove(s)}>削除</button>
             </div>
           )}
@@ -300,7 +303,7 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
       ))}
       {editable && !edit && (
         <div>
-          <button type="button" className="btn-plain" onClick={() => setEdit({ plan_start: shifts[0]?.plan_start || '09:00', plan_end: shifts[0]?.plan_end || '17:00', site_id: shifts[0]?.site_id || '', note: '' })}>
+          <button type="button" className="btn-plain" onClick={() => setEdit({ plan_start: shifts[0]?.plan_start || '09:00', plan_end: shifts[0]?.plan_end || '17:00', site_id: shifts[0]?.site_id || '', telework: !!shifts[0]?.telework, note: '' })}>
             ＋ この日に予定を追加
           </button>
         </div>
@@ -318,6 +321,7 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
               {sites.map((s) => <option key={s.id} value={s.id}>{s.code} {s.name}</option>)}
             </select>
           </label>
+          <label><input type="checkbox" checked={!!edit.telework} onChange={(e) => setEdit({ ...edit, telework: e.target.checked })} /> テレワーク（記録は自己申告）</label>
           <label className="ui-field"><span>メモ（代勤・時間変更の理由など）</span><input className="ui-input" value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} /></label>
           <div className="works-row-actions">
             <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>

@@ -15,7 +15,7 @@ export default function Patterns() {
       <div className="works-sticky">
         <h1 className="works-title">出退勤パターン</h1>
         <div className="works-row-actions">
-          <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ name: '', start_time: '09:00', end_time: '17:00', active: true })}>
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ name: '', start_time: '09:00', end_time: '17:00', telework: false, active: true })}>
             ＋ 新しいパターン
           </button>
           <label className="works-muted">
@@ -27,7 +27,7 @@ export default function Patterns() {
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>タイプ名</th><th>出勤予定</th><th>退勤予定</th><th>状態</th></tr>
+            <tr><th>タイプ名</th><th>出勤予定</th><th>退勤予定</th><th>テレワーク</th><th>状態</th></tr>
           </thead>
           <tbody>
             {list.map((p) => (
@@ -35,6 +35,7 @@ export default function Patterns() {
                 <td>{p.name}</td>
                 <td>{hhmm(p.start_time)}</td>
                 <td>{hhmm(p.end_time)}</td>
+                <td>{p.telework ? <span className="works-tw-badge">テレワーク</span> : ''}</td>
                 <td>{p.active ? '使用中' : <span className="ui-badge">停止</span>}</td>
               </tr>
             ))}
@@ -70,6 +71,7 @@ function PatternForm({ value, onClose, onSaved }) {
         <label className="ui-field"><span>出勤予定時刻</span><input className="ui-input" type="time" value={v.start_time} onChange={set('start_time')} /></label>
         <label className="ui-field"><span>退勤予定時刻</span><input className="ui-input" type="time" value={v.end_time} onChange={set('end_time')} /></label>
       </div>
+      <label><input type="checkbox" checked={!!v.telework} onChange={set('telework')} /> テレワーク（記録は QR を使わない自己申告。出勤簿の備考に「テレワーク」と出ます）</label>
       <label><input type="checkbox" checked={v.active} onChange={set('active')} /> 使用中（外すと新しい予定には使いません）</label>
       {error && <div className="works-error">{error}</div>}
     </Modal>

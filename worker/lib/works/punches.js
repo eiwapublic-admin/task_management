@@ -3,6 +3,7 @@
 //   POST /api/works/sites/qr        { id }                         … 現場の QR を発行・再発行（管理者。古い QR は無効になる）
 //   GET  /api/works/punch/today                                    … 本人の今日の予定・打刻・状態
 //   POST /api/works/punch           { c, k, t, lat, lng, accuracy, device_at, offline, confirm } … 本人の QR 打刻
+//   POST /api/works/punch/self      { kind, confirm }               … テレワークの日の自己申告（QR・位置情報なし。ボタンを押した時刻）
 //   POST /api/works/punch/proxy     { staff_id, work_date, kind, time, note } … 管理者の代理入力
 //   GET  /api/works/punches?staff_id&date                          … その日の打刻の記録（本人は自分の分だけ）
 //
@@ -30,6 +31,7 @@ export const FLAG_LABEL = {
   duplicate: '二重の読み取り',
   no_in: '出勤の記録なし',
   proxy: '代理入力',
+  telework: 'テレワーク（自己申告）',
 }
 
 async function sha256Hex(text) {
@@ -93,7 +95,7 @@ async function loadSettings(supabase) {
 async function dayShifts(supabase, staffId, date) {
   const { data, error } = await supabase
     .from('works_shifts')
-    .select('id, site_id, plan_start, plan_end, actual_start, actual_end, source')
+    .select('id, site_id, plan_start, plan_end, actual_start, actual_end, telework, source')
     .eq('staff_id', staffId)
     .eq('work_date', date)
     .order('plan_start')
@@ -122,10 +124,13 @@ export async function recordPunch(supabase, { staff, kind, at, method, site, lat
   const { date, time } = jstParts(at)
   const settings = await loadSettings(supabase)
   const unit = Number(settings.rounding_minutes) || 30
-  const shifts = await dayShifts(supabase, staff.id, date)
+  let shifts = await dayShifts(supabase, staff.id, date)
+  // テレワークの自己申告はテレワークの予定にだけ結びつける
+  if (method === 'self') shifts = shifts.filter((x) => x.telework)
   const shift = chooseShift(shifts, kind, site?.id || null)
   const flags = []
   if (method === 'proxy') flags.push('proxy')
+  if (method === 'self') flags.push('telework')
   if (offline) flags.push('offline')
   if (!shift) flags.push('no_plan')
   else if (site && shift.site_id && shift.site_id !== site.id) flags.push('site_mismatch')
@@ -143,15 +148,15 @@ export async function recordPunch(supabase, { staff, kind, at, method, site, lat
   const adopted = adoptedTime(kind, time, shift, unit)
   if (kind === 'in') {
     // 代理入力は訂正も兼ねるので上書きする。QR の二重読み取りは採用時刻を変えない
-    if (shift?.actual_start && method === 'qr') flags.push('duplicate')
+    if (shift?.actual_start && method !== 'proxy') flags.push('duplicate')
     else if (shift) setStart = adopted
   } else {
     const hasIn = shift?.actual_start
-    if (!hasIn && !confirm && method === 'qr') {
+    if (!hasIn && !confirm && method !== 'proxy') {
       return { needsConfirm: true, message: '今日の出勤の記録がありません。退勤だけ記録しますか？' }
     }
     if (!hasIn) flags.push('no_in')
-    if (shift?.actual_end && method === 'qr') flags.push('duplicate')
+    if (shift?.actual_end && method !== 'proxy') flags.push('duplicate')
     else if (shift) setEnd = toMin(adopted) < toMin(shift.actual_start || shift.plan_start) ? hm(shift.actual_start || shift.plan_start) : adopted
   }
 
@@ -222,6 +227,7 @@ export async function handlePunchToday(req) {
       plan_end: hm(s.plan_end),
       actual_start: hm(s.actual_start),
       actual_end: hm(s.actual_end),
+      telework: !!s.telework,
       site: siteMap.get(s.site_id) ? { code: siteMap.get(s.site_id).code, name: siteMap.get(s.site_id).name } : null,
     })),
     punches: (punches || []).map((p) => ({ ...p, time: jstParts(new Date(p.punched_at)).time, adopted: hm(p.adopted), site: siteMap.get(p.site_id)?.name || null })),
@@ -278,6 +284,25 @@ export async function handlePunch(req) {
   })
   if (r.needsConfirm) return json({ needs_confirm: true, message: r.message }, 409)
   return json({ ...r, site: { code: site.code, name: site.name } })
+}
+
+// POST /api/works/punch/self（テレワークの日の自己申告）
+export async function handlePunchSelf(req) {
+  const { ctx, error } = await requireWorks(req)
+  if (error) return error
+  if (!ctx.staff) return json({ error: 'スタッフ情報が紐づいていません。管理者にお問い合わせください' }, 403)
+  if (ctx.staff.status === 'retired') return json({ error: '退職済みのため記録できません' }, 403)
+  const b = await req.json().catch(() => ({}))
+  if (b.kind !== 'in' && b.kind !== 'out') return json({ error: '出勤・退勤の区別が正しくありません' }, 400)
+  const supabase = getAdminClient()
+  const now = new Date()
+  const shifts = await dayShifts(supabase, ctx.staff.id, jstParts(now).date)
+  if (!shifts.some((x) => x.telework)) {
+    return json({ error: '今日はテレワークの予定がありません。現場の QR を読んで記録してください' }, 400)
+  }
+  const r = await recordPunch(supabase, { staff: ctx.staff, kind: b.kind, at: now, method: 'self', site: null, confirm: !!b.confirm, actor: ctx.user })
+  if (r.needsConfirm) return json({ needs_confirm: true, message: r.message }, 409)
+  return json({ ...r, site: { name: 'テレワーク' } })
 }
 
 // POST /api/works/punch/proxy（管理者の代理入力。スマートフォンを持たない方・打刻忘れの訂正）

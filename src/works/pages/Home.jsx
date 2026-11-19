@@ -65,7 +65,7 @@ export default function Home({ user }) {
           const a = actual.find((x) => x.id === s.id)
           return (
             <p key={s.id} style={{ margin: '4px 0' }}>
-              <strong>{s.plan_start}〜{s.plan_end}</strong>　{s.site ? s.site.name : ''}
+              <strong>{s.plan_start}〜{s.plan_end}</strong>　{s.telework ? <span className="works-tw-badge">テレワーク</span> : s.site ? s.site.name : ''}
               {a?.actual_start && (
                 <span className="works-actual">
                   　記録 <span className={a.actual_start !== s.plan_start ? 'works-diff' : ''}>{a.actual_start}</span>〜
@@ -80,6 +80,8 @@ export default function Home({ user }) {
   }
 
   const next = now?.state === 'working' ? 'out' : 'in'
+  // 今日の予定がテレワークだけなら、QR を使わず自己申告で記録する
+  const telework = !!now?.shifts?.length && now.shifts.every((s) => s.telework)
 
   return (
     <>
@@ -96,6 +98,7 @@ export default function Home({ user }) {
                 </span>
               )}
             </div>
+            {telework && <div className="works-telework">テレワーク：ボタンを押した時刻を自己申告として記録します（QR は不要です）</div>}
             <button type="button" className={`works-punch-btn is-${next}`} onClick={() => setPunch(next)}>
               {next === 'in' ? '出勤を記録' : '退勤を記録'}
             </button>
@@ -103,7 +106,7 @@ export default function Home({ user }) {
               <button type="button" className="btn-plain" onClick={() => setPunch('out')}>退勤を記録し直す</button>
             )}
             {pending > 0 && <p className="works-punch-flags">電波が戻るのを待っている記録が {pending} 件あります（自動で送ります）</p>}
-            <p className="ui-note" style={{ margin: 0 }}>記録のときに位置情報を記録します（QR の持ち出しを防ぐため）。</p>
+            {!telework && <p className="ui-note" style={{ margin: 0 }}>記録のときに位置情報を記録します（QR の持ち出しを防ぐため）。</p>}
           </div>
           {day(today, '今日')}
           {day(tomorrow, '明日')}
@@ -117,6 +120,7 @@ export default function Home({ user }) {
         <Suspense fallback={<div className="works-punch"><p className="works-punch-lead">準備しています…</p></div>}>
         <PunchFlow
           expected={punch}
+          telework={telework}
           onClose={() => setPunch(null)}
           onDone={() => {
             setPending(pendingCount())

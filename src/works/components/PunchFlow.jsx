@@ -1,33 +1,35 @@
 // 打刻の流れ（docs/eworks-plan.md 6-2）: QR を読む → 送る → 記録完了（大きなチェック・時刻・振動）
 //   preset … /p から開いたとき（標準カメラで QR を読んだ）は QR の中身を渡し、読み取りを飛ばす
+//   telework … テレワークの日の自己申告。QR も位置情報も使わず、押した時刻で記録する
 import { useEffect, useRef, useState } from 'react'
 import QrScanner from './QrScanner.jsx'
 import { parsePunchQr } from '../lib/qr.js'
-import { getLocation, sendPunch, vibrate } from '../lib/punch.js'
+import { getLocation, sendPunch, sendSelfPunch, vibrate } from '../lib/punch.js'
 import { hoursLabel } from '../../../worker/lib/works/time.js'
 
 const KIND = { in: '出勤', out: '退勤' }
 
-export default function PunchFlow({ expected, preset = null, onClose, onDone }) {
-  const [step, setStep] = useState(preset ? 'sending' : 'scan')
-  const [qr, setQr] = useState(preset)
+export default function PunchFlow({ expected, preset = null, telework = false, onClose, onDone }) {
+  const [step, setStep] = useState(preset || telework ? 'sending' : 'scan')
+  const [qr, setQr] = useState(telework ? { k: expected } : preset)
   const [message, setMessage] = useState('')
   const [result, setResult] = useState(null)
+  // 本人に見せる「確認のため知らせる」印（二重の読み取り・テレワークは知らせない）
+  const notice = (result?.flag_labels || []).filter((f) => f !== '二重の読み取り' && !f.startsWith('テレワーク'))
   const locRef = useRef(null)
   const busy = useRef(false)
 
   // 位置情報は読み取りと並行して取りにいく（待ち時間を短くするため）
   useEffect(() => {
-    locRef.current = getLocation()
-  }, [])
+    if (!telework) locRef.current = getLocation()
+  }, [telework])
 
   const submit = async (q, confirm = false) => {
     if (busy.current) return
     busy.current = true
     setStep('sending')
     try {
-      const loc = await locRef.current
-      const r = await sendPunch(q, loc, { confirm })
+      const r = telework ? await sendSelfPunch(q.k, { confirm }) : await sendPunch(q, await locRef.current, { confirm })
       if (r.needsConfirm) {
         setMessage(r.message)
         setStep('confirm')
@@ -51,6 +53,7 @@ export default function PunchFlow({ expected, preset = null, onClose, onDone }) 
 
   useEffect(() => {
     if (preset) submit(preset)
+    else if (telework) submit({ k: expected })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -121,8 +124,8 @@ export default function PunchFlow({ expected, preset = null, onClose, onDone }) 
             )
           )}
           {result.kind === 'out' && result.minutes != null && <p>今日の勤務 <strong>{hoursLabel(result.minutes)}</strong> 時間</p>}
-          {result.flag_labels?.filter((f) => f !== '二重の読み取り').length > 0 && (
-            <p className="works-punch-flags">確認のため管理者に知らせます: {result.flag_labels.filter((f) => f !== '二重の読み取り').join('・')}</p>
+          {notice.length > 0 && (
+            <p className="works-punch-flags">確認のため管理者に知らせます: {notice.join('・')}</p>
           )}
           <button type="button" className="btn-primary works-btn-accent works-punch-close" onClick={onClose}>閉じる</button>
         </div>
@@ -141,7 +144,7 @@ export default function PunchFlow({ expected, preset = null, onClose, onDone }) 
         <div className="works-punch-box">
           <p className="works-error">{message}</p>
           <div className="works-row-actions">
-            {!preset && <button type="button" className="btn-primary works-btn-accent" onClick={() => { setQr(null); setMessage(''); setStep('scan') }}>読み直す</button>}
+            {!preset && !telework && <button type="button" className="btn-primary works-btn-accent" onClick={() => { setQr(null); setMessage(''); setStep('scan') }}>読み直す</button>}
             <button type="button" className="btn-plain" onClick={onClose}>閉じる</button>
           </div>
         </div>

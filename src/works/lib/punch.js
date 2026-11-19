@@ -65,6 +65,17 @@ export async function sendPunch(qr, loc, { confirm = false } = {}) {
   }
 }
 
+// テレワークの日の自己申告（QR・位置情報なし）。戻り値は sendPunch と同じ形（端末への一時保存はしない）
+export async function sendSelfPunch(kind, { confirm = false } = {}) {
+  try {
+    return { ok: true, result: await api('/api/works/punch/self', { method: 'POST', body: { kind, confirm } }) }
+  } catch (e) {
+    if (e.status === 409 && e.data?.needs_confirm) return { needsConfirm: true, message: e.data.message }
+    if (isNetworkError(e) || !navigator.onLine) throw new Error('電波が届かないため記録できませんでした。電波のある場所でもう一度押してください')
+    throw e
+  }
+}
+
 // 一時保存した打刻を送る。送れた件数を返す
 let flushing = false
 export async function flushQueue() {
