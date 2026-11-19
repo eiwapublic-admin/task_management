@@ -106,8 +106,8 @@ export default function Monthly() {
           <table className="ui-table works-monthly works-clickable">
             <thead>
               <tr>
-                <th>スタッフ</th>
-                <th className="center">予定</th>
+                <th>コード</th>
+                <th>氏名</th>
                 <th className="num">予定日数</th>
                 <th className="num">予定時間</th>
                 <th className="num">手で変更</th>
@@ -119,12 +119,12 @@ export default function Monthly() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} onClick={() => open(r)}>
+                  <td>{r.code}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {r.code} <strong>{r.name}</strong>
+                    <strong>{r.name}</strong>
                     {r.status === 'leave' && <span className="ui-badge is-warn" style={{ marginLeft: 6 }}>休職</span>}
                   </td>
-                  <td className="center">{r.days ? '作成済み' : <span className={r.status === 'active' ? 'works-none' : 'works-muted'}>未作成</span>}</td>
-                  <td className="num">{r.days ? `${r.days}日` : ''}</td>
+                  <td className="num">{r.days ? `${r.days}日` : <span className={r.status === 'active' ? 'works-none' : 'works-muted'}>未作成</span>}</td>
                   <td className="num">{r.minutes ? (r.minutes / 60).toFixed(2) : ''}</td>
                   <td className="num">{r.manual ? `${r.manual}件` : ''}</td>
                   <td className="center">
@@ -141,8 +141,7 @@ export default function Monthly() {
             </tbody>
             <tfoot>
               <tr>
-                <th>合計（{rows.length}名）</th>
-                <th />
+                <th colSpan={2}>合計（{rows.length}名）</th>
                 <th className="num">{total.days}日</th>
                 <th className="num">{(total.minutes / 60).toFixed(2)}</th>
                 <th colSpan={4} />

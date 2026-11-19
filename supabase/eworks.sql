@@ -308,3 +308,31 @@ begin
 end $$;
 revoke all on function works_replace_auto_shifts(uuid, date, date, jsonb) from public, anon, authenticated;
 grant execute on function works_replace_auto_shifts(uuid, date, date, jsonb) to service_role;
+
+-- =============================================================================
+-- 有給休暇・特別休暇の取得日（2026-11-19。docs/eworks-spec-leave.md）
+--   取得の記録が正。残日数などは毎回ここから計算する（保存しない）。同じ日は 1 日（kind ごとに 1 行）
+--   特別休暇を登録すると同じ日の有休も登録する（決定 10）。FileMaker からの取込は source='import'
+-- =============================================================================
+create table if not exists works_leaves (
+  id          uuid primary key default gen_random_uuid(),
+  staff_id    uuid not null references works_staff(id) on delete cascade,
+  leave_date  date not null,
+  kind        text not null check (kind in ('paid', 'special')),
+  source      text not null default 'manual' check (source in ('manual', 'import')),
+  note        text,
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  unique (staff_id, leave_date, kind)
+);
+create index if not exists works_leaves_date_idx on works_leaves (leave_date);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['works_leaves'] loop
+    execute format('grant select, insert, update, delete on %I to service_role', t);
+    execute format('alter table %I enable row level security', t);
+    execute format('revoke all on %I from anon, authenticated', t);
+  end loop;
+end $$;

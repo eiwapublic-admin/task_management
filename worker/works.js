@@ -8,6 +8,7 @@ import { handleWorksLogin, handleWorksMe } from './lib/works/auth.js'
 import { handleMaster, handleSchedules, handleSettings } from './lib/works/masters.js'
 import { handleInviteAccept, handleInviteCheck, handleInvites } from './lib/works/invites.js'
 import { autoCreateNextMonth, handleGenerate, handleShifts } from './lib/works/plans.js'
+import { handleLeave } from './lib/works/leave.js'
 import { handlePunch, handlePunches, handlePunchProxy, handlePunchSelf, handlePunchToday, handleSiteQr } from './lib/works/punches.js'
 
 const MASTER_TABLES = {
@@ -33,6 +34,7 @@ async function route(req, env) {
       if (pathname === '/api/works/shifts/generate') {
         return req.method === 'POST' ? await handleGenerate(req) : json({ error: 'Method Not Allowed' }, 405)
       }
+      if (pathname === '/api/works/leave') return await handleLeave(req)
       if (pathname === '/api/works/punch/today') return await handlePunchToday(req)
       if (pathname === '/api/works/punches') return await handlePunches(req)
       const POST_ONLY = { '/api/works/punch': handlePunch, '/api/works/punch/proxy': handlePunchProxy, '/api/works/punch/self': handlePunchSelf, '/api/works/sites/qr': handleSiteQr }
