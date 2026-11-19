@@ -17,7 +17,7 @@ export default function Staff() {
     <>
       <h1 className="works-title">スタッフ</h1>
       <div className="works-row-actions">
-        <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', default_pattern_id: '', note: '' })}>
+        <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', default_pattern_id: '', closed_day_work: false, note: '' })}>
           ＋ 新しいスタッフ
         </button>
         <div className="ui-segmented">
@@ -120,6 +120,10 @@ function BasicForm({ value, patterns, onSaved }) {
         </label>
         <label className="ui-field"><span>メモ</span><input className="ui-input" value={v.note || ''} onChange={set('note')} /></label>
       </div>
+      <label>
+        <input type="checkbox" checked={!!v.closed_day_work} onChange={(e) => setV({ ...v, closed_day_work: e.target.checked })} /> 休館日も勤務する
+        <span className="works-muted">（オンにすると、日報カレンダーの休館日にも予定を作ります）</span>
+      </label>
       <p className="ui-note">電話番号・住所などの個人情報はこのシステムには登録しません。</p>
       {error && <div className="works-error">{error}</div>}
       <div className="works-row-actions">

@@ -69,7 +69,7 @@ export default function Settings() {
       </div>
       <div className="ui-card" style={{ marginTop: 12 }}>
         <div className="ui-card-title">会社の休日（年末年始など）</div>
-        <p className="ui-note" style={{ marginTop: 0 }}>1 行に 1 日、2026-12-30 の形で入力します。国民の祝日はここには入れません（予定作成の段階で別に扱います）。</p>
+        <p className="ui-note" style={{ marginTop: 0 }}>タスク管理の日報カレンダーで「休館日」にした日は、自動で会社の休日になります（ここに入れる必要はありません）。それ以外に休みにしたい日だけ、1 行に 1 日、2026-12-30 の形で入力します。国民の祝日も入力は不要です。</p>
         <textarea className="ui-textarea" rows={6} value={holidayText} onChange={(e) => setHolidayText(e.target.value)} />
       </div>
       {error && <p className="works-error">{error}</p>}

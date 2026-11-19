@@ -10,6 +10,7 @@ import Staff from './pages/Staff.jsx'
 import Patterns from './pages/Patterns.jsx'
 import Sites from './pages/Sites.jsx'
 import Settings from './pages/Settings.jsx'
+import Calendar from './pages/Calendar.jsx'
 
 const ADMIN_MENU = [
   { to: '/staff', label: 'スタッフ' },
@@ -30,7 +31,7 @@ function Shell({ children }) {
       })
       .catch(() => {})
   }, [])
-  const menu = [{ to: '/', label: 'ホーム', end: true }, ...(user?.works_admin ? ADMIN_MENU : [])]
+  const menu = [{ to: '/', label: 'ホーム', end: true }, { to: '/calendar', label: 'カレンダー' }, ...(user?.works_admin ? ADMIN_MENU : [])]
   const signOut = () => {
     logout()
     navigate('/login')
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/invite" element={<Invite />} />
         <Route path="/" element={<Private>{(user) => <Home user={user} />}</Private>} />
+        <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />
         <Route path="/patterns" element={<Private admin><Patterns /></Private>} />
         <Route path="/sites" element={<Private admin><Sites /></Private>} />
