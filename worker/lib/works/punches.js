@@ -37,29 +37,52 @@ async function sha256Hex(text) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function randomToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(24))
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+// QR の合言葉。サーバーの秘密鍵（SESSION_SECRET）と「現場・発行日時」から HMAC で作る。
+// DB には合言葉そのものは置かず（ハッシュだけ）、それでも同じ QR を印刷し直せるようにするため（2026-11-19 依頼元の要望）。
+// 再発行すると発行日時が変わり、合言葉も変わる（古い QR は使えなくなる）
+async function qrToken(siteId, issuedAt) {
+  const secret = process.env.SESSION_SECRET
+  if (!secret) throw new Error('SESSION_SECRET が設定されていません')
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const msg = `works-qr:${siteId}:${new Date(issuedAt).getTime()}`
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg))).slice(0, 24)
+  return btoa(String.fromCharCode(...sig)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 const hm = (t) => (t ? String(t).slice(0, 5) : null)
 
-// POST /api/works/sites/qr
+// POST /api/works/sites/qr { id, mode: 'issue' | 'print' }
+//   issue … 発行・再発行（古い QR は使えなくなる）／print … いまの QR を印刷し直す（QR は変わらない）
 export async function handleSiteQr(req) {
   const { error } = await requireWorks(req, { admin: true })
   if (error) return error
   const b = await req.json().catch(() => ({}))
   if (!UUID_RE.test(String(b.id || ''))) return json({ error: '現場が正しくありません' }, 400)
-  const token = randomToken()
   const supabase = getAdminClient()
+  if (b.mode === 'print') {
+    const { data: site } = await supabase
+      .from('works_sites')
+      .select('id, code, name, detail, qr_issued_at, qr_secret_hash')
+      .eq('id', b.id)
+      .maybeSingle()
+    if (!site?.qr_secret_hash || !site.qr_issued_at) return json({ error: 'この現場はまだ QR を発行していません' }, 400)
+    const token = await qrToken(site.id, site.qr_issued_at)
+    if ((await sha256Hex(token)) !== site.qr_secret_hash) {
+      return json({ error: '以前の方式で発行した QR のため印刷し直せません。お手数ですが一度だけ「再発行」してください' }, 400)
+    }
+    const { qr_secret_hash: _h, ...rest } = site
+    return json({ site: rest, token, reprint: true })
+  }
+  const issuedAt = new Date().toISOString()
+  const token = await qrToken(b.id, issuedAt)
   const { data, error: e } = await supabase
     .from('works_sites')
-    .update({ qr_secret_hash: await sha256Hex(token), qr_issued_at: new Date().toISOString() })
+    .update({ qr_secret_hash: await sha256Hex(token), qr_issued_at: issuedAt })
     .eq('id', b.id)
     .select('id, code, name, detail, qr_issued_at')
     .single()
   if (e) throw e
-  return json({ site: data, token })
+  return json({ site: data, token, reprint: false })
 }
 
 async function loadSettings(supabase) {

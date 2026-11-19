@@ -167,7 +167,10 @@ function MonthGrid({ data, month, onDay }) {
                 {s.plan_start.replace(/^0/, '')}<span className="works-cal-end">–{s.plan_end.replace(/^0/, '')}</span>
                 {s.site && <span className="works-cal-site">{s.site.name}</span>}
                 {s.actual_start && (
-                  <span className="works-cal-actual">記録 {s.actual_start.replace(/^0/, '')}<span className="works-cal-end">–{(s.actual_end || '').replace(/^0/, '')}</span></span>
+                  <span className="works-cal-actual">
+                    記録 <Diff value={s.actual_start} plan={s.plan_start} short />
+                    <span className="works-cal-end">–{s.actual_end && <Diff value={s.actual_end} plan={s.plan_end} short />}</span>
+                  </span>
                 )}
               </span>
             ))}
@@ -177,6 +180,12 @@ function MonthGrid({ data, month, onDay }) {
       <p className="ui-note">紫の線のある予定は、管理者が手で追加・変更したものです（作り直しても残ります）。</p>
     </>
   )
+}
+
+// 実績（記録）の時刻。予定と違うときは赤の太字（2026-11-19 依頼元の要望）
+function Diff({ value, plan, short = false }) {
+  const text = short ? value.replace(/^0/, '') : value
+  return value !== plan ? <span className="works-diff">{text}</span> : text
 }
 
 function AllTable({ data, month, onPick }) {
@@ -272,7 +281,9 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
           {s.note && <div className="works-muted">{s.note}</div>}
           <div>
             {s.actual_start ? (
-              <span className="works-actual">記録 {s.actual_start}〜{s.actual_end || '（退勤なし）'}</span>
+              <span className="works-actual">
+                記録 <Diff value={s.actual_start} plan={s.plan_start} />〜{s.actual_end ? <Diff value={s.actual_end} plan={s.plan_end} /> : '（退勤なし）'}
+              </span>
             ) : date <= todayJst() ? (
               <span className="works-muted">出勤・退勤の記録はまだありません</span>
             ) : null}
@@ -310,7 +321,6 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
           <label className="ui-field"><span>メモ（代勤・時間変更の理由など）</span><input className="ui-input" value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} /></label>
           <div className="works-row-actions">
             <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
-            <button type="button" className="btn-plain" onClick={() => setEdit(null)}>やめる</button>
           </div>
         </>
       )}
@@ -390,7 +400,6 @@ function PunchLog({ date, staffId, editable, onSaved }) {
           <p className="ui-note" style={{ margin: 0 }}>打刻と同じく 30 分単位に丸め、予定の時刻にそろえて勤務表に記録します。すでに記録があれば置き換えます。</p>
           <div className="works-row-actions">
             <button type="button" className="btn-primary works-btn-accent" disabled={!form.time} onClick={save}>記録する</button>
-            <button type="button" className="btn-plain" onClick={() => setForm(null)}>やめる</button>
           </div>
         </>
       )}

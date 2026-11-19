@@ -12,14 +12,14 @@ export default function Sites() {
   const [edit, setEdit] = useState(null)
   const [qr, setQr] = useState(null)
   const [qrError, setQrError] = useState('')
-  const issue = async (s) => {
-    const msg = s.has_qr
+  const issue = async (s, mode = 'issue') => {
+    const msg = mode === 'print' ? null : s.has_qr
       ? `${s.code} ${s.name} の QR を再発行します。\nいま掲示している QR は使えなくなります。よろしいですか？`
       : `${s.code} ${s.name} の QR を発行します。よろしいですか？`
-    if (!window.confirm(msg)) return
+    if (msg && !window.confirm(msg)) return
     setQrError('')
     try {
-      const r = await api('/api/works/sites/qr', { method: 'POST', body: { id: s.id } })
+      const r = await api('/api/works/sites/qr', { method: 'POST', body: { id: s.id, mode } })
       setQr(r)
       reload()
     } catch (e) {
@@ -54,7 +54,10 @@ export default function Sites() {
                 <td>{s.active ? '使用中' : <span className="ui-badge">停止</span>}</td>
                 <td onClick={(e) => e.stopPropagation()}>
                   {s.active && (
-                    <button type="button" className="btn-plain" onClick={() => issue(s)}>{s.has_qr ? 'QR を再発行' : 'QR を発行'}</button>
+                    <div className="works-row-actions" style={{ margin: 0, flexWrap: 'nowrap' }}>
+                      {s.has_qr && <button type="button" className="btn-plain" onClick={() => issue(s, 'print')}>QR を印刷</button>}
+                      <button type="button" className="btn-plain" onClick={() => issue(s)}>{s.has_qr ? '再発行' : 'QR を発行'}</button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -63,7 +66,7 @@ export default function Sites() {
         </table>
         {items && items.length === 0 && <div className="ui-empty">現場がありません</div>}
       </div>
-      {qr && <Suspense fallback={null}><QrSheet site={qr.site} token={qr.token} onClose={() => setQr(null)} /></Suspense>}
+      {qr && <Suspense fallback={null}><QrSheet site={qr.site} token={qr.token} reprint={qr.reprint} onClose={() => setQr(null)} /></Suspense>}
       {edit && <SiteForm value={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload() }} />}
     </>
   )
@@ -85,7 +88,7 @@ function SiteForm({ value, onClose, onSaved }) {
     <Modal
       title={v.id ? '現場を変更' : '現場を登録'}
       onClose={onClose}
-      foot={<div className="ui-modal-foot-end"><button type="button" className="btn-plain" onClick={onClose}>やめる</button><button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button></div>}
+      foot={<div className="ui-modal-foot-end"><button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button></div>}
     >
       <div className="ui-field-row">
         <label className="ui-field"><span>作業コード</span><input className="ui-input" value={v.code} onChange={set('code')} /></label>

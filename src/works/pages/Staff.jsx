@@ -222,7 +222,6 @@ function Schedules({ staff, patterns, sites }) {
         {error && <div className="works-error">{error}</div>}
         <div className="works-row-actions">
           <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
-          <button type="button" className="btn-plain" onClick={() => setEdit(null)}>やめる</button>
           <span className="ui-note">同じ適用開始日がすでにあれば上書きします</span>
         </div>
       </>

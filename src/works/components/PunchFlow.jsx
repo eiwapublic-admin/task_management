@@ -101,7 +101,6 @@ export default function PunchFlow({ expected, preset = null, onClose, onDone }) 
           <p>{message}</p>
           <div className="works-row-actions">
             <button type="button" className="btn-primary works-btn-accent" onClick={() => submit(qr, true)}>退勤だけ記録する</button>
-            <button type="button" className="btn-plain" onClick={onClose}>やめる</button>
           </div>
         </div>
       )}

@@ -67,7 +67,10 @@ export default function Home({ user }) {
             <p key={s.id} style={{ margin: '4px 0' }}>
               <strong>{s.plan_start}〜{s.plan_end}</strong>　{s.site ? s.site.name : ''}
               {a?.actual_start && (
-                <span className="works-actual">　記録 {a.actual_start}〜{a.actual_end || ''}</span>
+                <span className="works-actual">
+                  　記録 <span className={a.actual_start !== s.plan_start ? 'works-diff' : ''}>{a.actual_start}</span>〜
+                  {a.actual_end && <span className={a.actual_end !== s.plan_end ? 'works-diff' : ''}>{a.actual_end}</span>}
+                </span>
               )}
             </p>
           )
