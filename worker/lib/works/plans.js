@@ -10,7 +10,7 @@
 //   ・その日に有効な勤務体系（適用開始日が最も新しいもの）の曜日別パターンで 1 日 1 件
 //   ・曜日別が全部空なら、標準の出退勤パターンを月〜金に入れる
 //   ・祝日は入れない（勤務体系の「祝日も予定を入れる」がオンなら入れる）。
-//     会社の休日（日報カレンダーの休館日＋設定の会社休日）は入れない
+//     日報カレンダーの休館日は入れない（スタッフの「休館日も勤務する」がオンなら入れる）。設定の会社休日は入れない
 //   ・入社日より前は入れない。在籍（active）のスタッフだけ
 //   ・手で追加・変更した日（source='manual'）は上書きしない
 import { json } from '../http.js'
@@ -33,7 +33,7 @@ function scheduleAt(schedules, date) {
 }
 
 // 1 人 1 か月分の自動作成の行を組み立てる（DB に触らない。テストしやすいよう分けている）
-export function buildStaffMonth({ staff, schedules, patterns, holidays, companyHolidays, month }) {
+export function buildStaffMonth({ staff, schedules, patterns, holidays, companyHolidays, closedDays = new Set(), month }) {
   const { from, days } = monthRange(month)
   const rows = []
   let anyScheduleInMonth = false
@@ -42,6 +42,7 @@ export function buildStaffMonth({ staff, schedules, patterns, holidays, companyH
     const date = `${ym}-${String(d).padStart(2, '0')}`
     if (staff.hired_on && date < staff.hired_on) continue
     if (companyHolidays.has(date)) continue
+    if (closedDays.has(date) && !staff.closed_day_work) continue
     const sch = scheduleAt(schedules, date)
     if (sch) anyScheduleInMonth = true
     if (holidays[date] && !sch?.holiday_work) continue
@@ -80,8 +81,8 @@ async function companyHolidaysOf(supabase, month, settings) {
   const { data, error } = await supabase.from('closed_days').select('closed_on').gte('closed_on', from).lte('closed_on', to)
   if (error) throw error
   const out = {}
-  for (const d of settings.company_holidays || []) if (d.startsWith(month)) out[d] = '会社休日'
   for (const r of data || []) out[r.closed_on] = '休館日'
+  for (const d of settings.company_holidays || []) if (d.startsWith(month)) out[d] = '会社休日'
   return out
 }
 
@@ -98,7 +99,7 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
   const settings = await loadSettings(supabase)
   // 祝日が取れないときは作らない（祝日に予定が入ってしまうのを防ぐ）
   const holidays = await holidaysOf(month)
-  let q = supabase.from('works_staff').select('id, code, name, status, hired_on, default_pattern_id').eq('status', 'active').order('code')
+  let q = supabase.from('works_staff').select('id, code, name, status, hired_on, default_pattern_id, closed_day_work').eq('status', 'active').order('code')
   if (staffIds) q = q.in('id', staffIds)
   const { data: staffList, error: e1 } = await q
   if (e1) throw e1
@@ -110,13 +111,15 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
   const { data: pats, error: e3 } = await supabase.from('works_shift_patterns').select('id, name, start_time, end_time')
   if (e3) throw e3
   const patterns = new Map(pats.map((p) => [p.id, p]))
-  const companyHolidays = new Set(Object.keys(await companyHolidaysOf(supabase, month, settings)))
+  const offDays = await companyHolidaysOf(supabase, month, settings)
+  const companyHolidays = new Set(Object.keys(offDays).filter((d) => offDays[d] === '会社休日'))
+  const closedDays = new Set(Object.keys(offDays).filter((d) => offDays[d] === '休館日'))
 
   const created = []
   const skipped = []
   for (const s of staffList) {
     const mine = schedules.filter((x) => x.staff_id === s.id)
-    const { rows, reason } = buildStaffMonth({ staff: s, schedules: mine, patterns, holidays, companyHolidays, month })
+    const { rows, reason } = buildStaffMonth({ staff: s, schedules: mine, patterns, holidays, companyHolidays, closedDays, month })
     const { data: n, error } = await supabase.rpc('works_replace_auto_shifts', { p_staff: s.id, p_from: from, p_to: to, p_rows: rows })
     if (error) throw error
     if (reason) skipped.push({ code: s.code, name: s.name, reason })

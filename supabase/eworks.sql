@@ -155,6 +155,9 @@ create table if not exists works_shifts (
 create index if not exists works_shifts_staff_date_idx on works_shifts (staff_id, work_date);
 create index if not exists works_shifts_date_idx on works_shifts (work_date);
 
+-- スタッフごとの「休館日も勤務する」（オンなら日報カレンダーの休館日にも予定を作る。2026-11-19）
+alter table works_staff add column if not exists closed_day_work boolean not null default false;
+
 -- 自動作成を同じ月に 2 回走らせないための印（'2026-12' のように持つ）
 alter table works_settings add column if not exists last_auto_month text;
 

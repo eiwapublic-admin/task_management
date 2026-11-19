@@ -21,6 +21,7 @@ const SCHEMAS = {
     hired_on: (v) => { const s = str(v); if (s && !DATE_RE.test(s)) throw new Error('入社日の形式が正しくありません'); return s },
     status: (v) => { if (!['active', 'leave', 'retired'].includes(v)) throw new Error('在籍状態が正しくありません'); return v },
     default_pattern_id: (v) => { const s = str(v); if (s && !UUID_RE.test(s)) throw new Error('出退勤パターンが正しくありません'); return s },
+    closed_day_work: (v) => !!v,
     note: str,
   },
   works_shift_patterns: {
