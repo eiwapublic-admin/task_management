@@ -166,6 +166,9 @@ function MonthGrid({ data, month, onDay }) {
               <span key={s.id} className={`works-cal-shift ${s.source === 'manual' ? 'is-manual' : ''}`}>
                 {s.plan_start.replace(/^0/, '')}<span className="works-cal-end">–{s.plan_end.replace(/^0/, '')}</span>
                 {s.site && <span className="works-cal-site">{s.site.name}</span>}
+                {s.actual_start && (
+                  <span className="works-cal-actual">記録 {s.actual_start.replace(/^0/, '')}<span className="works-cal-end">–{(s.actual_end || '').replace(/^0/, '')}</span></span>
+                )}
               </span>
             ))}
           </button>
@@ -211,7 +214,7 @@ function AllTable({ data, month, onPick }) {
                 {days.map((d) => (
                   <td key={d} className={dayClass(d, data)}>
                     {(row[d] || []).map((s) => (
-                      <div key={s.id} className={s.source === 'manual' ? 'works-all-manual' : ''}>{s.plan_start.replace(/^0/, '')}</div>
+                      <div key={s.id} className={`${s.source === 'manual' ? 'works-all-manual' : ''} ${s.actual_start && s.actual_end ? 'works-all-done' : s.actual_start ? 'works-all-working' : ''}`} title={s.actual_start ? `記録 ${s.actual_start}〜${s.actual_end || ''}` : undefined}>{s.plan_start.replace(/^0/, '')}</div>
                     ))}
                   </td>
                 ))}
@@ -267,6 +270,13 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
           </div>
           <div>{s.site ? `${s.site.code} ${s.site.name}` : <span className="works-muted">現場の指定なし</span>}</div>
           {s.note && <div className="works-muted">{s.note}</div>}
+          <div>
+            {s.actual_start ? (
+              <span className="works-actual">記録 {s.actual_start}〜{s.actual_end || '（退勤なし）'}</span>
+            ) : date <= todayJst() ? (
+              <span className="works-muted">出勤・退勤の記録はまだありません</span>
+            ) : null}
+          </div>
           {s.warn_no_break && <div className="ui-note is-danger">6 時間を超える勤務で、休憩が 45 分未満です</div>}
           <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>{s.source === 'manual' ? '手で追加・変更した予定' : '勤務体系から自動作成'}</div>
           {editable && (
@@ -304,8 +314,88 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
           </div>
         </>
       )}
+      {staffId && staffId !== 'all' && !edit && <PunchLog date={date} staffId={staffId} editable={editable} onSaved={onSaved} />}
       {error && <div className="works-error">{error}</div>}
     </Modal>
+  )
+}
+
+// その日の打刻の記録と、管理者の代理入力（スマートフォンを持たない方・打刻忘れの訂正。6-3）
+function PunchLog({ date, staffId, editable, onSaved }) {
+  const [items, setItems] = useState(null)
+  const [form, setForm] = useState(null)
+  const [error, setError] = useState('')
+  const load = useCallback(() => {
+    if (date > todayJst()) return setItems([])
+    api(`/api/works/punches?${new URLSearchParams({ staff_id: staffId, date })}`)
+      .then((d) => setItems(d.items))
+      .catch((e) => setError(e.message))
+  }, [date, staffId])
+  useEffect(() => {
+    load()
+  }, [load])
+  if (date > todayJst()) return null
+  const save = async () => {
+    setError('')
+    try {
+      await api('/api/works/punch/proxy', { method: 'POST', body: { staff_id: staffId, work_date: date, ...form } })
+      setForm(null)
+      load()
+      onSaved()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+  return (
+    <div className="works-punchlog">
+      <strong>打刻の記録</strong>
+      {items && items.length === 0 && <p className="works-muted" style={{ margin: 0 }}>打刻はありません。</p>}
+      {items && items.length > 0 && (
+        <table className="ui-table works-punchlog-table">
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id}>
+                <td>{p.kind === 'in' ? '出勤' : '退勤'}</td>
+                <td>{p.time}</td>
+                <td>→ {p.adopted}</td>
+                <td>
+                  {p.site || ''}
+                  {p.flag_labels.length > 0 && <span className="works-punch-flags">　{p.flag_labels.join('・')}</span>}
+                  {p.distance_m != null && <span className="works-muted">　現場から {p.distance_m}m</span>}
+                  {p.note && <span className="works-muted">　{p.note}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {editable && !form && (
+        <button type="button" className="btn-plain" style={{ marginTop: 6 }} onClick={() => setForm({ kind: 'in', time: '', note: '' })}>
+          ＋ 出勤・退勤を代理で入力
+        </button>
+      )}
+      {editable && form && (
+        <>
+          <div className="ui-field-row">
+            <label className="ui-field">
+              <span>種類</span>
+              <select className="ui-select" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
+                <option value="in">出勤</option>
+                <option value="out">退勤</option>
+              </select>
+            </label>
+            <label className="ui-field"><span>時刻</span><input className="ui-input" type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></label>
+          </div>
+          <label className="ui-field"><span>理由（スマートフォンなし・打刻忘れなど）</span><input className="ui-input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+          <p className="ui-note" style={{ margin: 0 }}>打刻と同じく 30 分単位に丸め、予定の時刻にそろえて勤務表に記録します。すでに記録があれば置き換えます。</p>
+          <div className="works-row-actions">
+            <button type="button" className="btn-primary works-btn-accent" disabled={!form.time} onClick={save}>記録する</button>
+            <button type="button" className="btn-plain" onClick={() => setForm(null)}>やめる</button>
+          </div>
+        </>
+      )}
+      {error && <div className="works-error">{error}</div>}
+    </div>
   )
 }
 

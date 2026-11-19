@@ -384,3 +384,102 @@
 }
 .works-arrow:hover { color: var(--works-accent-deep); }
 .works-month { font-size: 22px; font-weight: 800; color: var(--text-strong); }
+
+/* ===== Phase 3: 打刻 ===== */
+.works-punch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 12px);
+  box-shadow: var(--shadow-card);
+}
+.works-punch-state { font-size: var(--fs-md); }
+.works-punch-state .is-working { color: #1f8a4c; }
+.works-punch-state .is-done { color: var(--text-muted); }
+.works-punch-btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 22px 16px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.works-punch-btn.is-in { background: #1f8a4c; }
+.works-punch-btn.is-out { background: #d4691a; }
+.works-punch-btn:active { transform: scale(0.98); }
+.works-punch-flags { margin: 0; color: #9a5b00; font-weight: 700; font-size: var(--fs-sm); }
+.works-actual { color: #1f8a4c; font-weight: 700; }
+
+.works-punch {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg-app);
+  overflow-y: auto;
+}
+.works-punch-head { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-lg); }
+.works-punch-lead { margin: 0; font-size: var(--fs-md); text-align: center; }
+.works-punch-box { padding: 16px; background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border); }
+.works-punch-done { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding-top: 24px; }
+.works-punch-check {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #1f8a4c;
+  color: #fff;
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 120px;
+}
+.works-punch-check.is-queued { background: #9a6a00; }
+.works-punch-kind { font-size: 22px; font-weight: 800; color: var(--text-strong); }
+.works-punch-time { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-strong); line-height: 1.1; }
+.works-punch-close { margin-top: 16px; min-width: 200px; padding: 14px; font-size: var(--fs-md); }
+
+.works-scan { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.works-scan-view { position: relative; width: min(100%, 420px); aspect-ratio: 1; background: #000; border-radius: 12px; overflow: hidden; }
+.works-scan-view video { width: 100%; height: 100%; object-fit: cover; }
+.works-scan-frame { position: absolute; inset: 12%; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 16px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.25); }
+.works-scan-photo { cursor: pointer; }
+
+/* 現場の QR（プレビューと A4 の掲示物） */
+.works-qr-preview { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.works-qr-preview figure { margin: 0; padding: 8px; border: 4px solid; border-radius: 12px; text-align: center; }
+.works-qr-preview img { width: 180px; height: 180px; display: block; }
+.works-qr-preview figcaption { font-size: 22px; font-weight: 800; }
+.works-qr-sheets { position: fixed; left: -10000px; top: 0; }
+.works-qr-sheet {
+  width: 210mm;
+  box-sizing: border-box;
+  padding: 14mm 14mm 10mm;
+  border: 6mm solid;
+  background: #fff;
+  color: #222;
+  font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  text-align: center;
+}
+.works-qr-sheet-kind { display: inline-block; padding: 2mm 22mm; border-radius: 6mm; color: #fff; font-size: 30mm; font-weight: 900; line-height: 1.25; }
+.works-qr-sheet-site { margin-top: 8mm; font-size: 11mm; font-weight: 800; }
+.works-qr-sheet-detail { font-size: 6mm; color: #555; }
+.works-qr-sheet-code { display: block; width: 120mm; height: 120mm; margin: 6mm auto 4mm; }
+.works-qr-sheet-note { font-size: 8mm; font-weight: 800; }
+.works-qr-sheet-how { margin-top: 4mm; font-size: 5mm; line-height: 1.6; }
+.works-qr-sheet-foot { margin-top: 8mm; font-size: 3.6mm; color: #777; }
+.works-cal-actual { display: block; color: #1f8a4c; font-weight: 700; font-size: 0.92em; }
+.works-all-done { color: #1f8a4c; font-weight: 700; }
+.works-all-working { color: #d4691a; font-weight: 700; }
+.works-punchlog { border-top: 1px solid var(--border); padding-top: 8px; }
+.works-punchlog-table td { padding: 4px 6px; font-size: var(--fs-sm); }

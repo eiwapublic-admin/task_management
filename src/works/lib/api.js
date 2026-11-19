@@ -61,7 +61,12 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
     throw new Error('ログインの有効期限が切れました。もう一度ログインしてください')
   }
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `処理に失敗しました（${res.status}）`)
+  if (!res.ok) {
+    const err = new Error(data.error || data.message || `処理に失敗しました（${res.status}）`)
+    err.status = res.status
+    err.data = data
+    throw err
+  }
   return data
 }
 

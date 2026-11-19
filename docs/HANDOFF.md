@@ -1433,6 +1433,8 @@ main ブランチに push（または PR をマージ）するだけ。GitHub Ac
 - シークレットはタスク管理と共通の `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `SESSION_SECRET` だけ。KV は `LOGIN_ATTEMPTS` を共用（キーの接頭辞で区別）
 - ローカル: `npm run build:works && npm run dev:works-worker`（API 込み）／画面だけなら `npm run dev:works`（http://localhost:5174）
 - スキーマは `supabase/eworks.sql`。マスタ投入 SQL は `scripts/import-works-masters.py` で手元生成（個人名を含むのでコミットしない）
+- **マージ＝本番デプロイまで Claude が行う**（依頼元の依頼 2026-11-19）。ただし本番 DB への SQL 適用は依頼元の了承を得てから。DB を変える PR は、SQL を本番に適用してからマージする（画面が新しい列を読むため）
+- 打刻（Phase 3）: 打刻のきまりは `worker/lib/works/punches.js` の `recordPunch`、採用時刻は `time.js` の `adoptedTime`。QR の合言葉はハッシュだけなので、掲示物の印刷し直しは再発行になる（docs/eworks-plan.md 14-3）
 
 ### ローカル開発
 ```bash

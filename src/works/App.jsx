@@ -1,6 +1,6 @@
 // eWorks（勤怠管理）の画面の入口。権限の正はサーバー側（worker/lib/works/auth.js）で、
 // ここでは管理者向けのメニューを出すかどうかだけを決める。
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { api, getUser, isLoggedIn, logout, setUser } from './lib/api.js'
 import Login from './pages/Login.jsx'
@@ -13,6 +13,8 @@ import Settings from './pages/Settings.jsx'
 import Calendar from './pages/Calendar.jsx'
 import Monthly from './pages/Monthly.jsx'
 import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
+
+const PunchLink = lazy(() => import('./pages/PunchLink.jsx'))
 
 const ADMIN_MENU = [
   { to: '/staff', label: 'スタッフ' },
@@ -104,6 +106,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/invite" element={<Invite />} />
+        <Route path="/p" element={<Suspense fallback={null}><PunchLink /></Suspense>} />
         <Route path="/" element={<StartPage />} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
