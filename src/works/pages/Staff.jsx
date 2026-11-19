@@ -1,5 +1,5 @@
 // スタッフ（現行: eSales 担当者マスタ＋勤怠システムの従業員。決定事項 13）
-// 詳細では 基本情報・勤務体系（適用開始日つき）・招待（初回登録・パスワード再設定）を扱う
+// 詳細では 基本情報（招待＝初回登録・パスワード再設定を含む）・勤務体系（適用開始日つき）を扱う
 import { useEffect, useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
@@ -18,7 +18,7 @@ export default function Staff() {
       <div className="works-sticky">
         <h1 className="works-title">スタッフ</h1>
         <div className="works-row-actions">
-          <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', default_pattern_id: '', closed_day_work: false, note: '' })}>
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', closed_day_work: false, note: '' })}>
             ＋ 新しいスタッフ
           </button>
           <div className="ui-segmented">
@@ -68,20 +68,29 @@ function StaffDetail({ value, patterns, sites, onClose, onSaved }) {
     <Modal title={isNew ? 'スタッフを登録' : `${value.code} ${value.name}`} onClose={onClose} size="lg">
       {!isNew && (
         <div className="ui-segmented">
-          {[['basic', '基本情報'], ['schedule', '勤務体系'], ['invite', 'アプリの利用']].map(([k, label]) => (
+          {[['basic', '基本情報'], ['schedule', '勤務体系']].map(([k, label]) => (
             <button key={k} type="button" className={`ui-segmented-btn ${tab === k ? 'is-active' : ''}`} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
       )}
-      {tab === 'basic' && <BasicForm value={value} patterns={patterns} onSaved={onSaved} />}
-      {tab === 'schedule' && <Schedules staff={value} patterns={patterns} sites={sites} />}
-      {tab === 'invite' && <Invites staff={value} />}
+      {tab === 'basic' && (
+        <>
+          <BasicForm value={value} onSaved={onSaved} />
+          {!isNew && (
+            <section className="works-section">
+              <h3 className="works-section-title">アプリの利用</h3>
+              <Invites staff={value} />
+            </section>
+          )}
+        </>
+      )}
+      {tab === 'schedule' && <Schedules staff={value} patterns={patterns} sites={sites} onSaved={onSaved} />}
     </Modal>
   )
 }
 
-function BasicForm({ value, patterns, onSaved }) {
-  const [v, setV] = useState({ ...value, hired_on: value.hired_on || '', default_pattern_id: value.default_pattern_id || '' })
+function BasicForm({ value, onSaved }) {
+  const [v, setV] = useState({ ...value, hired_on: value.hired_on || '' })
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value })
@@ -89,8 +98,10 @@ function BasicForm({ value, patterns, onSaved }) {
     setError('')
     setMsg('')
     try {
-      const { item } = await api('/api/works/staff', { method: v.id ? 'PATCH' : 'POST', body: v })
-      setV({ ...item, hired_on: item.hired_on || '', default_pattern_id: item.default_pattern_id || '' })
+      const { code, name, kana, dept, hired_on, status, note } = v
+      const body = v.id ? { id: v.id, code, name, kana, dept, hired_on, status, note } : { code, name, kana, dept, hired_on, status, note }
+      const { item } = await api('/api/works/staff', { method: v.id ? 'PATCH' : 'POST', body })
+      setV({ ...item, hired_on: item.hired_on || '' })
       setMsg('保存しました')
       onSaved(item)
     } catch (e) {
@@ -99,11 +110,13 @@ function BasicForm({ value, patterns, onSaved }) {
   }
   return (
     <>
-      <div className="works-grid-2">
+      <div className="works-staff-row1">
         <label className="ui-field"><span>担当者コード</span><input className="ui-input" value={v.code} onChange={set('code')} /></label>
         <label className="ui-field"><span>氏名</span><input className="ui-input" value={v.name} onChange={set('name')} /></label>
         <label className="ui-field"><span>ふりがな</span><input className="ui-input" value={v.kana || ''} onChange={set('kana')} /></label>
         <label className="ui-field"><span>所属コード</span><input className="ui-input" value={v.dept || ''} onChange={set('dept')} /></label>
+      </div>
+      <div className="works-staff-row2">
         <label className="ui-field"><span>入社日（有休の付与に使います）</span><input className="ui-input" type="date" value={v.hired_on} onChange={set('hired_on')} /></label>
         <label className="ui-field">
           <span>在籍状態</span>
@@ -111,21 +124,8 @@ function BasicForm({ value, patterns, onSaved }) {
             {Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
-        <label className="ui-field">
-          <span>標準の出退勤パターン</span>
-          <select className="ui-select" value={v.default_pattern_id} onChange={set('default_pattern_id')}>
-            <option value="">（なし）</option>
-            {patterns.filter((p) => p.active || p.id === v.default_pattern_id).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}（{hhmm(p.start_time)}〜{hhmm(p.end_time)}）</option>
-            ))}
-          </select>
-        </label>
         <label className="ui-field"><span>メモ</span><input className="ui-input" value={v.note || ''} onChange={set('note')} /></label>
       </div>
-      <label>
-        <input type="checkbox" checked={!!v.closed_day_work} onChange={(e) => setV({ ...v, closed_day_work: e.target.checked })} /> 休館日も勤務する
-        <span className="works-muted">（オンにすると、日報カレンダーの休館日にも予定を作ります）</span>
-      </label>
       <p className="ui-note">電話番号・住所などの個人情報はこのシステムには登録しません。</p>
       {error && <div className="works-error">{error}</div>}
       <div className="works-row-actions">
@@ -136,6 +136,9 @@ function BasicForm({ value, patterns, onSaved }) {
   )
 }
 
+// パターンの表示名（勤務時間つき）
+const patternLabel = (p) => `${p.name}（${hhmm(p.start_time)}〜${hhmm(p.end_time)}）`
+
 const emptySchedule = () => ({
   valid_from: new Date().toISOString().slice(0, 10),
   main_site_id: '',
@@ -145,7 +148,8 @@ const emptySchedule = () => ({
   commute_allowance: false,
 })
 
-function Schedules({ staff, patterns, sites }) {
+function Schedules({ staff, patterns, sites, onSaved }) {
+  const [closedDayWork, setClosedDayWork] = useState(!!staff.closed_day_work)
   const path = `/api/works/schedules?staff_id=${staff.id}`
   const [items, setItems] = useState(null)
   const [edit, setEdit] = useState(null)
@@ -154,13 +158,18 @@ function Schedules({ staff, patterns, sites }) {
   useEffect(() => {
     api(path).then((d) => setItems(d.items)).catch((e) => setError(e.message))
   }, [path])
-  const patternName = (id) => patterns.find((p) => p.id === id)?.name || ''
+  const patternName = (id) => { const p = patterns.find((x) => x.id === id); return p ? patternLabel(p) : '' }
   const siteName = (id) => sites.find((s) => s.id === id)?.name || ''
 
   const save = async () => {
     setError('')
     try {
       await api('/api/works/schedules', { method: 'POST', body: { ...edit, staff_id: staff.id } })
+      // 「休館日も勤務する」はスタッフごとの設定（勤務体系の適用開始日には左右されない）
+      if (closedDayWork !== !!staff.closed_day_work) {
+        const { item } = await api('/api/works/staff', { method: 'PATCH', body: { id: staff.id, closed_day_work: closedDayWork } })
+        onSaved(item)
+      }
       setEdit(null)
       reload()
     } catch (e) {
@@ -197,7 +206,7 @@ function Schedules({ staff, patterns, sites }) {
               <span>{w}</span>
               <select className="ui-select" value={edit.weekday_pattern_ids[i] || ''} onChange={(e) => setDay(i, e.target.value)}>
                 <option value="">休み</option>
-                {patterns.filter((p) => p.active || p.id === edit.weekday_pattern_ids[i]).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {patterns.filter((p) => p.active || p.id === edit.weekday_pattern_ids[i]).map((p) => <option key={p.id} value={p.id}>{patternLabel(p)}</option>)}
               </select>
             </label>
           ))}
@@ -217,7 +226,11 @@ function Schedules({ staff, patterns, sites }) {
         <div>
           <button type="button" className="btn-plain" onClick={() => setEdit({ ...edit, break_overrides: [...edit.break_overrides, { dow: 1, start: '12:00', end: '12:30' }] })}>＋ 例外の休憩を追加</button>
         </div>
-        <label><input type="checkbox" checked={edit.holiday_work} onChange={(e) => setEdit({ ...edit, holiday_work: e.target.checked })} /> 祝日も予定を入れる</label>
+        <div className="works-check-row">
+          <label><input type="checkbox" checked={edit.holiday_work} onChange={(e) => setEdit({ ...edit, holiday_work: e.target.checked })} /> 祝日も勤務する</label>
+          <label><input type="checkbox" checked={closedDayWork} onChange={(e) => setClosedDayWork(e.target.checked)} /> 休館日も勤務する</label>
+        </div>
+        <p className="ui-note" style={{ margin: 0 }}>休館日も勤務するをオンにすると、日報カレンダーの休館日にも予定を作ります（スタッフごとの設定で、どの適用開始日でも共通です）。</p>
         <label><input type="checkbox" checked={edit.commute_allowance} onChange={(e) => setEdit({ ...edit, commute_allowance: e.target.checked })} /> 通勤手当の対象</label>
         {error && <div className="works-error">{error}</div>}
         <div className="works-row-actions">
@@ -255,6 +268,7 @@ function Schedules({ staff, patterns, sites }) {
           <div className="works-muted" style={{ marginTop: 8 }}>
             {s.break_overrides?.length ? `例外休憩: ${s.break_overrides.map((o) => `${WEEKDAYS[o.dow]} ${o.start}〜${o.end}`).join('、')}　` : ''}
             {s.holiday_work ? '祝日も勤務　' : ''}
+            {staff.closed_day_work ? '休館日も勤務　' : ''}
             {s.commute_allowance ? '通勤手当あり' : ''}
           </div>
         </div>

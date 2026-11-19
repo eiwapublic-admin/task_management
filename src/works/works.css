@@ -164,9 +164,46 @@
   gap: 6px;
 }
 
+/* スタッフの基本情報: 1 行目 コード・氏名・ふりがな・所属、2 行目 入社日・在籍・メモ */
+.works-staff-row1,
+.works-staff-row2 {
+  display: grid;
+  gap: 12px;
+}
+.works-staff-row1 {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 0.8fr);
+}
+.works-staff-row2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 2fr);
+}
+.works-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.works-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.works-section-title {
+  margin: 0;
+  font-size: 15px;
+}
+
 @media (max-width: 640px) {
   .works-grid-2 {
     grid-template-columns: 1fr;
+  }
+  .works-staff-row1,
+  .works-staff-row2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .works-staff-row2 > :last-child {
+    grid-column: 1 / -1;
   }
   .works-week {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -508,3 +545,46 @@
 .works-tw-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #e3f0fb; color: #1f5f99; font-size: var(--fs-xs); font-weight: 700; }
 .works-tw-text { color: #1f5f99; font-weight: 700; }
 .works-telework { padding: 8px 10px; border-radius: 8px; background: #e3f0fb; color: #1f5f99; font-weight: 700; font-size: var(--fs-sm); }
+
+/* 有給休暇 */
+.works-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.works-inline-field .ui-input {
+  width: auto;
+}
+.works-warn-text {
+  color: #b45309;
+  font-weight: 700;
+}
+.works-leave-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.works-leave-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: #ede9f8;
+  color: #3f2d78;
+  font-size: 13px;
+}
+.works-leave-day.is-special {
+  background: #fde7d3;
+  color: #8a3d06;
+}
+.works-leave-day button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+}

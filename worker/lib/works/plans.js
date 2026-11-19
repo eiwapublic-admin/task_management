@@ -48,8 +48,6 @@ export function buildStaffMonth({ staff, schedules, patterns, holidays, companyH
     if (holidays[date] && !sch?.holiday_work) continue
     const w = dow(date)
     let pid = sch?.weekday_pattern_ids?.[w] || null
-    const noWeekday = !sch || !(sch.weekday_pattern_ids || []).some(Boolean)
-    if (!pid && noWeekday && staff.default_pattern_id && w >= 1 && w <= 5) pid = staff.default_pattern_id
     if (!pid) continue
     const p = patterns.get(pid)
     if (!p) continue
@@ -64,8 +62,8 @@ export function buildStaffMonth({ staff, schedules, patterns, holidays, companyH
   }
   let reason = null
   if (rows.length === 0) {
-    if (!schedules.length && !staff.default_pattern_id) reason = '勤務体系も標準パターンも未登録'
-    else if (schedules.length && !anyScheduleInMonth && !staff.default_pattern_id) reason = `勤務体系の適用開始日（${schedules[0].valid_from}）より前の月`
+    if (!schedules.length) reason = '勤務体系が未登録'
+    else if (!anyScheduleInMonth) reason = `勤務体系の適用開始日（${schedules[0].valid_from}）より前の月`
     else reason = 'この月に予定の日がない（曜日・祝日・入社日による）'
   }
   return { rows, reason }
@@ -100,7 +98,7 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
   const settings = await loadSettings(supabase)
   // 祝日が取れないときは作らない（祝日に予定が入ってしまうのを防ぐ）
   const holidays = await holidaysOf(month)
-  let q = supabase.from('works_staff').select('id, code, name, status, hired_on, default_pattern_id, closed_day_work').eq('status', 'active').order('code')
+  let q = supabase.from('works_staff').select('id, code, name, status, hired_on, closed_day_work').eq('status', 'active').order('code')
   if (staffIds) q = q.in('id', staffIds)
   const { data: staffList, error: e1 } = await q
   if (e1) throw e1
