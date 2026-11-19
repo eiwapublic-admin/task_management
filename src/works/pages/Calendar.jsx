@@ -132,7 +132,7 @@ function useDays(month) {
 function dayClass(date, data) {
   const w = dow(date)
   if (data.holidays[date] || w === 0) return 'is-holiday'
-  if (data.company_holidays.includes(date)) return 'is-company'
+  if (data.company_holidays[date]) return 'is-company'
   if (w === 6) return 'is-sat'
   return ''
 }
@@ -161,8 +161,8 @@ function MonthGrid({ data, month, onDay }) {
         {days.map((d) => (
           <button type="button" key={d} className={`works-cal-day ${dayClass(d, data)} ${d === today ? 'is-today' : ''}`} onClick={() => onDay(d)}>
             <span className="works-cal-date">{Number(d.slice(8))}</span>
-            {(data.holidays[d] || data.company_holidays.includes(d)) && (
-              <span className="works-cal-hname">{data.holidays[d] || '会社休日'}</span>
+            {(data.holidays[d] || data.company_holidays[d]) && (
+              <span className="works-cal-hname">{data.holidays[d] || data.company_holidays[d]}</span>
             )}
             {(byDate[d] || []).map((s) => (
               <span key={s.id} className={`works-cal-shift ${s.source === 'manual' ? 'is-manual' : ''}`}>
@@ -257,8 +257,8 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
 
   return (
     <Modal title={title} onClose={onClose}>
-      {(data.holidays[date] || data.company_holidays.includes(date)) && (
-        <p className="works-error" style={{ margin: 0 }}>{data.holidays[date] || '会社休日'}</p>
+      {(data.holidays[date] || data.company_holidays[date]) && (
+        <p className="works-error" style={{ margin: 0 }}>{data.holidays[date] || data.company_holidays[date]}</p>
       )}
       {shifts.length === 0 && !edit && <p className="works-muted" style={{ margin: 0 }}>予定はありません。</p>}
       {!edit && shifts.map((s) => (

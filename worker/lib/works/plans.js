@@ -9,7 +9,8 @@
 // 自動作成のきまり（現行「予定一括作成」と同じ＋保護）:
 //   ・その日に有効な勤務体系（適用開始日が最も新しいもの）の曜日別パターンで 1 日 1 件
 //   ・曜日別が全部空なら、標準の出退勤パターンを月〜金に入れる
-//   ・祝日は入れない（勤務体系の「祝日も予定を入れる」がオンなら入れる）。会社の休日は入れない
+//   ・祝日は入れない（勤務体系の「祝日も予定を入れる」がオンなら入れる）。
+//     会社の休日（日報カレンダーの休館日＋設定の会社休日）は入れない
 //   ・入社日より前は入れない。在籍（active）のスタッフだけ
 //   ・手で追加・変更した日（source='manual'）は上書きしない
 import { json } from '../http.js'
@@ -73,6 +74,17 @@ async function loadSettings(supabase) {
   return data || { break_windows: [{ start: '12:00', end: '13:00' }], company_holidays: [] }
 }
 
+// 会社の休日 = 日報カレンダーの休館日（closed_days。タスク管理と共有）＋ 設定の会社休日。{ 日付: 表示名 }
+async function companyHolidaysOf(supabase, month, settings) {
+  const { from, to } = monthRange(month)
+  const { data, error } = await supabase.from('closed_days').select('closed_on').gte('closed_on', from).lte('closed_on', to)
+  if (error) throw error
+  const out = {}
+  for (const d of settings.company_holidays || []) if (d.startsWith(month)) out[d] = '会社休日'
+  for (const r of data || []) out[r.closed_on] = '休館日'
+  return out
+}
+
 async function holidaysOf(month) {
   const all = await fetchHolidays()
   const out = {}
@@ -98,7 +110,7 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
   const { data: pats, error: e3 } = await supabase.from('works_shift_patterns').select('id, name, start_time, end_time')
   if (e3) throw e3
   const patterns = new Map(pats.map((p) => [p.id, p]))
-  const companyHolidays = new Set(settings.company_holidays || [])
+  const companyHolidays = new Set(Object.keys(await companyHolidaysOf(supabase, month, settings)))
 
   const created = []
   const skipped = []
@@ -187,10 +199,11 @@ export async function handleShifts(req) {
       .order('work_date')
       .order('plan_start')
     if (staffId !== 'all') q = q.eq('staff_id', staffId)
-    const [{ data: shifts, error: e1 }, settings, holidays, { data: sites }] = await Promise.all([
+    const settings = await loadSettings(supabase)
+    const [{ data: shifts, error: e1 }, holidays, companyHolidays, { data: sites }] = await Promise.all([
       q,
-      loadSettings(supabase),
       holidaysOf(month).catch(() => ({})),
+      companyHolidaysOf(supabase, month, settings),
       supabase.from('works_sites').select('id, code, name'),
     ])
     if (e1) throw e1
@@ -224,7 +237,7 @@ export async function handleShifts(req) {
       staff_id: staffId,
       items,
       holidays,
-      company_holidays: (settings.company_holidays || []).filter((d) => d.startsWith(month)),
+      company_holidays: companyHolidays,
       staff,
       last_auto_month: ctx.isAdmin ? settings.last_auto_month || null : undefined,
     })
