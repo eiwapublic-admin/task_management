@@ -28,6 +28,7 @@ const SCHEMAS = {
     name: (v) => { const s = str(v); if (!s) throw new Error('タイプ名は必須です'); return s },
     start_time: (v) => { if (!TIME_RE.test(String(v || ''))) throw new Error('出勤予定時刻が正しくありません'); return v },
     end_time: (v) => { if (!TIME_RE.test(String(v || ''))) throw new Error('退勤予定時刻が正しくありません'); return v },
+    telework: (v) => !!v,
     active: (v) => !!v,
   },
   works_sites: {

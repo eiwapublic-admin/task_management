@@ -504,3 +504,7 @@
 .works-punchlog-table td { padding: 4px 6px; font-size: var(--fs-sm); }
 /* 実績が予定と違う時刻は赤の太字 */
 .works-diff { color: #c62828 !important; font-weight: 800 !important; }
+/* テレワーク */
+.works-tw-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #e3f0fb; color: #1f5f99; font-size: var(--fs-xs); font-weight: 700; }
+.works-tw-text { color: #1f5f99; font-weight: 700; }
+.works-telework { padding: 8px 10px; border-radius: 8px; background: #e3f0fb; color: #1f5f99; font-weight: 700; font-size: var(--fs-sm); }

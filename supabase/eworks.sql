@@ -274,3 +274,37 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- =============================================================================
+-- テレワーク（2026-11-19 依頼元の要望）
+--   出退勤パターンに「テレワーク」。そのパターンで作った予定（勤務区間）にも印を写す（手で追加・変更するときも指定できる）。
+--   テレワークの日の記録は自己申告（QR・位置情報なしでボタンを押した時刻。method='self'）。出勤簿の備考に「テレワーク」と出す（Phase 6）
+-- =============================================================================
+alter table works_shift_patterns add column if not exists telework boolean not null default false;
+alter table works_shifts add column if not exists telework boolean not null default false;
+alter table works_punches drop constraint if exists works_punches_method_check;
+alter table works_punches add constraint works_punches_method_check check (method in ('qr', 'proxy', 'self'));
+
+create or replace function works_replace_auto_shifts(p_staff uuid, p_from date, p_to date, p_rows jsonb)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare n integer;
+begin
+  delete from works_shifts
+   where staff_id = p_staff and work_date between p_from and p_to and source = 'auto';
+  insert into works_shifts (staff_id, work_date, site_id, pattern_id, plan_start, plan_end, telework, source)
+  select p_staff, r.work_date, r.site_id, r.pattern_id, r.plan_start, r.plan_end, coalesce(r.telework, false), 'auto'
+    from jsonb_to_recordset(p_rows) as r(work_date date, site_id uuid, pattern_id uuid, plan_start time, plan_end time, telework boolean)
+   where r.work_date between p_from and p_to
+     and not exists (
+       select 1 from works_shifts m
+        where m.staff_id = p_staff and m.work_date = r.work_date and m.source = 'manual'
+     );
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function works_replace_auto_shifts(uuid, date, date, jsonb) from public, anon, authenticated;
+grant execute on function works_replace_auto_shifts(uuid, date, date, jsonb) to service_role;

@@ -8,7 +8,7 @@ import { handleWorksLogin, handleWorksMe } from './lib/works/auth.js'
 import { handleMaster, handleSchedules, handleSettings } from './lib/works/masters.js'
 import { handleInviteAccept, handleInviteCheck, handleInvites } from './lib/works/invites.js'
 import { autoCreateNextMonth, handleGenerate, handleShifts } from './lib/works/plans.js'
-import { handlePunch, handlePunches, handlePunchProxy, handlePunchToday, handleSiteQr } from './lib/works/punches.js'
+import { handlePunch, handlePunches, handlePunchProxy, handlePunchSelf, handlePunchToday, handleSiteQr } from './lib/works/punches.js'
 
 const MASTER_TABLES = {
   '/api/works/staff': 'works_staff',
@@ -35,7 +35,7 @@ async function route(req, env) {
       }
       if (pathname === '/api/works/punch/today') return await handlePunchToday(req)
       if (pathname === '/api/works/punches') return await handlePunches(req)
-      const POST_ONLY = { '/api/works/punch': handlePunch, '/api/works/punch/proxy': handlePunchProxy, '/api/works/sites/qr': handleSiteQr }
+      const POST_ONLY = { '/api/works/punch': handlePunch, '/api/works/punch/proxy': handlePunchProxy, '/api/works/punch/self': handlePunchSelf, '/api/works/sites/qr': handleSiteQr }
       if (POST_ONLY[pathname]) return req.method === 'POST' ? await POST_ONLY[pathname](req) : json({ error: 'Method Not Allowed' }, 405)
       if (pathname === '/api/works/invite/check') {
         return req.method === 'POST' ? await handleInviteCheck(req, env) : json({ error: 'Method Not Allowed' }, 405)

@@ -59,6 +59,7 @@ export function buildStaffMonth({ staff, schedules, patterns, holidays, companyH
       pattern_id: pid,
       plan_start: p.start_time.slice(0, 5),
       plan_end: p.end_time.slice(0, 5),
+      telework: !!p.telework,
     })
   }
   let reason = null
@@ -108,7 +109,7 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
     ? await supabase.from('works_staff_schedules').select('*').in('staff_id', ids).lte('valid_from', to).order('valid_from')
     : { data: [] }
   if (e2) throw e2
-  const { data: pats, error: e3 } = await supabase.from('works_shift_patterns').select('id, name, start_time, end_time')
+  const { data: pats, error: e3 } = await supabase.from('works_shift_patterns').select('id, name, start_time, end_time, telework')
   if (e3) throw e3
   const patterns = new Map(pats.map((p) => [p.id, p]))
   const offDays = await companyHolidaysOf(supabase, month, settings)
@@ -173,6 +174,7 @@ function pickShift(b) {
     if (b.site_id && !UUID_RE.test(b.site_id)) throw new Error('現場が正しくありません')
     row.site_id = b.site_id || null
   }
+  if (b.telework !== undefined) row.telework = !!b.telework
   if (b.note !== undefined) row.note = b.note ? String(b.note).trim().slice(0, 200) || null : null
   return row
 }
@@ -196,7 +198,7 @@ export async function handleShifts(req) {
     const { from, to } = monthRange(month)
     let q = supabase
       .from('works_shifts')
-      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, source, note')
+      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, telework, source, note')
       .gte('work_date', from)
       .lte('work_date', to)
       .order('work_date')
