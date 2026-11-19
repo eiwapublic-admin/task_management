@@ -706,7 +706,7 @@ Phase 1 の最初に「現場スタッフのホーム〜打刻完了」「カレ
 | 項目 | 内容 | ファイル |
 |---|---|---|
 | DB | `works_punches`（打刻の生データ。追記のみ。種別・打刻時刻（サーバー時刻、オフラインは端末時刻）・受信時刻・端末時刻・方法（qr／proxy）・現場・勤務区間・採用時刻・位置・現場からの距離・印）、`works_shifts.actual_start／actual_end`（採用時刻）、`works_sites.qr_issued_at`、関数 `works_record_punch`（打刻の記録と採用時刻の更新を 1 トランザクション） | `supabase/eworks.sql` の Phase 3 節 |
-| QR | 現場マスタの「QR を発行／再発行」。合言葉は乱数 24 バイトで、DB には SHA-256 だけ。発行直後に出勤用（緑）・退勤用（橙）の A4 掲示物を PDF で出す（2 ページ）。再発行で古い QR は無効。QR の作成・読み取りは ZXing（既存の依存。端末内で処理） | `worker/lib/works/punches.js`、`src/works/components/QrSheet.jsx`、`src/works/lib/qr.js` |
+| QR | 現場マスタの「QR を発行／再発行」と「QR を印刷」（同じ QR の印刷し直し。2026-11-19 依頼元の要望）。合言葉はサーバーの秘密鍵（SESSION_SECRET）と現場・発行日時からの HMAC で作り、DB には SHA-256 だけを置く（秘密鍵を替えると印刷し直しはできなくなるが、掲示中の QR はハッシュで照合するので使える）。掲示物は A4 横 1 枚に出勤用（緑）・退勤用（橙）を左右に並べ、真ん中に切り取り線。再発行で古い QR は無効。QR の作成・読み取りは ZXing（既存の依存。端末内で処理） | `worker/lib/works/punches.js`、`src/works/components/QrSheet.jsx`、`src/works/lib/qr.js` |
 | 打刻 | ホームに状態（未出勤／勤務中／退勤済み）と大きなボタン（出勤＝緑、退勤＝橙）。アプリ内のカメラで読む（読めない端末は「写真を撮って読む」）。位置情報は読み取りと並行して取得。記録完了は大きなチェック・時刻・振動。標準カメラで読んだ場合は `/p` が開き、ログイン済みならそのまま記録 | `src/works/pages/Home.jsx`、`components/PunchFlow.jsx`・`QrScanner.jsx`、`pages/PunchLink.jsx` |
 | 採用時刻 | 6-5 のとおり（出勤は 30 分切り上げと予定開始の遅いほう、退勤は 30 分切り捨てと予定終了の早いほう。丸め単位は設定の `rounding_minutes`） | `worker/lib/works/time.js`（`adoptedTime`） |
 | 印（要確認の元） | 現場違い／予定外の出勤／位置不一致（現場の位置＋許容距離＋測位の誤差を超える）／位置情報なし／オフライン打刻／二重の読み取り（採用時刻は変えない）／出勤の記録なし（確認のうえ退勤だけ記録）／代理入力。一覧で見せるのは Phase 4（要確認） | `punches.js` |

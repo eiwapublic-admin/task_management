@@ -63,7 +63,7 @@ function PatternForm({ value, onClose, onSaved }) {
     <Modal
       title={v.id ? 'パターンを変更' : 'パターンを登録'}
       onClose={onClose}
-      foot={<div className="ui-modal-foot-end"><button type="button" className="btn-plain" onClick={onClose}>やめる</button><button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button></div>}
+      foot={<div className="ui-modal-foot-end"><button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button></div>}
     >
       <label className="ui-field"><span>タイプ名</span><input className="ui-input" value={v.name} onChange={set('name')} /></label>
       <div className="ui-field-row">

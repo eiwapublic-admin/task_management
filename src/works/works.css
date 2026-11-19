@@ -461,25 +461,46 @@
 .works-qr-preview img { width: 180px; height: 180px; display: block; }
 .works-qr-preview figcaption { font-size: 22px; font-weight: 800; }
 .works-qr-sheets { position: fixed; left: -10000px; top: 0; }
+/* A4 横（297×210mm）。左右 2 つの枠の間に切り取り用の点線。高さは中身なり（1 ページに収まる大きさにする） */
 .works-qr-sheet {
-  width: 210mm;
+  width: 297mm;
   box-sizing: border-box;
-  padding: 14mm 14mm 10mm;
-  border: 6mm solid;
+  padding: 7mm;
+  display: flex;
+  gap: 0;
   background: #fff;
   color: #222;
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
   text-align: center;
 }
-.works-qr-sheet-kind { display: inline-block; padding: 2mm 22mm; border-radius: 6mm; color: #fff; font-size: 30mm; font-weight: 900; line-height: 1.25; }
-.works-qr-sheet-site { margin-top: 8mm; font-size: 11mm; font-weight: 800; }
-.works-qr-sheet-detail { font-size: 6mm; color: #555; }
-.works-qr-sheet-code { display: block; width: 120mm; height: 120mm; margin: 6mm auto 4mm; }
-.works-qr-sheet-note { font-size: 8mm; font-weight: 800; }
-.works-qr-sheet-how { margin-top: 4mm; font-size: 5mm; line-height: 1.6; }
-.works-qr-sheet-foot { margin-top: 8mm; font-size: 3.6mm; color: #777; }
+.works-qr-half {
+  flex: 1;
+  box-sizing: border-box;
+  margin: 0 7mm;
+  padding: 7mm 6mm 5mm;
+  border: 4mm solid;
+  border-radius: 4mm;
+  position: relative;
+}
+.works-qr-half + .works-qr-half::before {
+  content: '';
+  position: absolute;
+  left: -11.5mm;
+  top: -7mm;
+  bottom: -7mm;
+  border-left: 0.6mm dashed #999;
+}
+.works-qr-sheet-kind { display: inline-block; padding: 1mm 14mm; border-radius: 4mm; color: #fff; font-size: 17mm; font-weight: 900; line-height: 1.25; }
+.works-qr-sheet-site { margin-top: 4mm; font-size: 7mm; font-weight: 800; }
+.works-qr-sheet-detail { font-size: 4.5mm; color: #555; }
+.works-qr-sheet-code { display: block; width: 88mm; height: 88mm; margin: 3mm auto 2mm; }
+.works-qr-sheet-note { font-size: 5.5mm; font-weight: 800; }
+.works-qr-sheet-how { margin-top: 2mm; font-size: 3.8mm; line-height: 1.5; }
+.works-qr-sheet-foot { margin-top: 3mm; font-size: 3mm; color: #777; }
 .works-cal-actual { display: block; color: #1f8a4c; font-weight: 700; font-size: 0.92em; }
 .works-all-done { color: #1f8a4c; font-weight: 700; }
 .works-all-working { color: #d4691a; font-weight: 700; }
 .works-punchlog { border-top: 1px solid var(--border); padding-top: 8px; }
 .works-punchlog-table td { padding: 4px 6px; font-size: var(--fs-sm); }
+/* 実績が予定と違う時刻は赤の太字 */
+.works-diff { color: #c62828 !important; font-weight: 800 !important; }
