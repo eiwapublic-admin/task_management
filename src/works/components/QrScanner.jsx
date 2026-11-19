@@ -1,4 +1,6 @@
-// カメラで QR を読む（打刻用）。背面カメラの映像を 0.2 秒ごとに読み、読めたら onResult(text) を呼ぶ。
+// カメラで QR を読む（打刻用）。背面カメラの映像を絶えず読み、写った時点で onResult(text) を呼ぶ（撮影ボタンは不要）。
+//   読み取り: 端末の QR 読み取り機能（BarcodeDetector。Android の Chrome など）があればそれを使い、無ければ ZXing。
+//   ZXing は 1 コマごとに「中央の正方形」と「画面全体」を交互に読む（近づけても離しても読めるように）。
 // カメラが使えない端末・許可されなかったときは「写真を撮って読む」に切り替えられる。
 import { useEffect, useRef, useState } from 'react'
 import { readQr, readQrFromVideo } from '../lib/qr.js'
@@ -8,6 +10,7 @@ export default function QrScanner({ onResult, paused = false }) {
   const canvasRef = useRef(null)
   const pausedRef = useRef(paused)
   const [error, setError] = useState('')
+  const [live, setLive] = useState(false)
   pausedRef.current = paused
 
   useEffect(() => {
@@ -20,16 +23,44 @@ export default function QrScanner({ onResult, paused = false }) {
         return
       }
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        })
         if (stopped) return
+        // ピントを合わせ続ける（対応している端末だけ。失敗しても読み取りは続ける）
+        const track = stream.getVideoTracks()[0]
+        if (track?.getCapabilities?.().focusMode?.includes('continuous')) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
         const v = videoRef.current
         v.srcObject = stream
         await v.play().catch(() => {})
-        timer = setInterval(() => {
-          if (pausedRef.current || !videoRef.current) return
-          const text = readQrFromVideo(videoRef.current, canvasRef.current)
-          if (text) onResultRef.current(text)
-        }, 200)
+        setLive(true)
+        let detector = null
+        try {
+          if ('BarcodeDetector' in window && (await window.BarcodeDetector.getSupportedFormats()).includes('qr_code')) {
+            detector = new window.BarcodeDetector({ formats: ['qr_code'] })
+          }
+        } catch {
+          detector = null
+        }
+        let busy = false
+        let frame = 0
+        const tick = async () => {
+          if (stopped || busy || pausedRef.current || !videoRef.current || videoRef.current.readyState < 2) return
+          busy = true
+          try {
+            let text = null
+            if (detector) {
+              const codes = await detector.detect(videoRef.current).catch(() => [])
+              text = codes[0]?.rawValue || null
+            }
+            if (!text) text = readQrFromVideo(videoRef.current, canvasRef.current, frame++ % 2 === 0 ? 'center' : 'full')
+            if (text && !stopped) onResultRef.current(text)
+          } finally {
+            busy = false
+          }
+        }
+        timer = setInterval(tick, 120)
       } catch {
         setError('カメラを使えませんでした。カメラの利用を許可するか、下の「写真を撮って読む」をお使いください。')
       }
@@ -77,9 +108,10 @@ export default function QrScanner({ onResult, paused = false }) {
         <div className="works-scan-frame" aria-hidden="true" />
       </div>
       <canvas ref={canvasRef} hidden />
+      {live && <p className="works-scan-hint">QR を枠に入れると自動で読み取ります（ボタンを押す必要はありません）</p>}
       {error && <p className="works-error">{error}</p>}
       <label className="btn-plain works-scan-photo">
-        写真を撮って読む
+        うまく読めないときは：写真を撮って読む
         <input type="file" accept="image/*" capture="environment" onChange={fromPhoto} hidden />
       </label>
     </div>

@@ -54,20 +54,27 @@ export function readQr(luma, width, height) {
   }
 }
 
-// カメラの映像（video 要素）の 1 コマから QR を読む。中央の正方形だけを切り出して軽くする
-export function readQrFromVideo(video, canvas) {
+// カメラの映像（video 要素）の 1 コマから QR を読む
+export function readQrFromVideo(video, canvas, mode = 'center') {
   const vw = video.videoWidth
   const vh = video.videoHeight
   if (!vw || !vh) return null
-  const side = Math.min(vw, vh)
-  const size = Math.min(side, 720)
-  canvas.width = canvas.height = size
+  // center … 中央の正方形（近づけたとき）。full … 画面全体を縮小（離れていて小さく写るとき）
+  const sx = mode === 'full' ? 0 : (vw - Math.min(vw, vh)) / 2
+  const sy = mode === 'full' ? 0 : (vh - Math.min(vw, vh)) / 2
+  const sw = mode === 'full' ? vw : Math.min(vw, vh)
+  const sh = mode === 'full' ? vh : Math.min(vw, vh)
+  const scale = Math.min(1, 800 / Math.max(sw, sh))
+  const w = Math.round(sw * scale)
+  const h = Math.round(sh * scale)
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  ctx.drawImage(video, (vw - side) / 2, (vh - side) / 2, side, side, 0, 0, size, size)
-  const { data } = ctx.getImageData(0, 0, size, size)
-  const luma = new Uint8ClampedArray(size * size)
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h)
+  const { data } = ctx.getImageData(0, 0, w, h)
+  const luma = new Uint8ClampedArray(w * h)
   for (let i = 0, j = 0; j < luma.length; i += 4, j++) luma[j] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000
-  return readQr(luma, size, size)
+  return readQr(luma, w, h)
 }
 
 // 打刻用 QR の中身（https://…/p?c=<現場コード>&k=<in|out>&t=<合言葉>）を取り出す。eWorks の QR でなければ null

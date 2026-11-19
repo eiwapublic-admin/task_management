@@ -734,6 +734,17 @@ Phase 1 の最初に「現場スタッフのホーム〜打刻完了」「カレ
 | 有給休暇 | 管理者メニュー「有給休暇」。基準日（既定は今日）を含む期間の 繰越・付与・取得・残日数・期間末に消える日数・年 5 日の取得状況・特別休暇（取得／5）・当月の取得。行から期間ごとの履歴と今の期間の取得日、取得日の登録・取り消し（特別休暇は祝日のみ、同じ日の有休も登録）。計算は計算仕様 3・4 章（同じ日の重複は 1 日） | `pages/Leave.jsx`、`worker/lib/works/leave.js` |
 | DB・取込 | `works_leaves`（取得日。種類 paid／special、取込分は source='import'）。FileMaker の取得実績は `scripts/import-works-leaves.py` で SQL を作って取り込む（取込分だけ入れ直すので、並行運用中に何度でもやり直せる） | `supabase/eworks.sql`、`scripts/import-works-leaves.py` |
 
+### 14-3-4. 有給休暇の申請・申請書の印刷・QR の自動読み取り（2026-11-19 依頼元の要望）
+
+| 項目 | 内容 | ファイル |
+|---|---|---|
+| 申請 | 全員のメニュー「休暇」: 自分の残り（有休・特休・期間末に消える日数・年 5 日）と取得日、申請（期間を選ぶと 1 日ずつ並び、勤務の予定がある日に印。特別休暇は祝日のみ）、承認待ちの取り下げ | `pages/Vacation.jsx`、`components/LeaveRequestForm.jsx` |
+| 承認 | 「有給休暇の管理」の「申請」タブ: 承認待ちの一覧と 承認／却下（理由つき）、承認済みの取り消し（取得日も消す）。承認すると `works_leaves` に入る。承認できるのは eWorks 管理者（労務担当 may も管理者にする） | `pages/Leave.jsx`、`components/LeaveRequestList.jsx`、`worker/lib/works/leave.js` |
+| 紙の申請書 | 現状の紙の運用はそのまま。労務担当が「紙の申請書を入力」で代理入力すると承認済みで登録 | 同上 |
+| 申請書の印刷 | 依頼元の様式「有給休暇申請書」と同じ形（A4 縦に上下 2 枚分）。申請から開くと申請日・氏名・日時・事由が入る。空欄の用紙も出せる。連絡先は持たないので手書き | `components/LeaveSheet.jsx` |
+| DB | `works_leave_requests`（申請。日付の配列・状態・代理入力の印・承認者）、`works_leaves.request_id` | `supabase/eworks.sql` |
+| QR | 読み取りを強化。端末の QR 読み取り機能（BarcodeDetector）があれば使い、無ければ ZXing で中央と画面全体を交互に約 0.1 秒ごとに読む。連続オートフォーカス。読めた時点で記録（撮影ボタンは不要。「写真を撮って読む」は読めないときの予備） | `components/QrScanner.jsx`、`lib/qr.js` |
+
 ## 15. データ移行
 
 ### 15-1. 方式
