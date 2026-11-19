@@ -15,18 +15,20 @@ export default function Staff() {
 
   return (
     <>
-      <h1 className="works-title">スタッフ</h1>
-      <div className="works-row-actions">
-        <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', default_pattern_id: '', closed_day_work: false, note: '' })}>
-          ＋ 新しいスタッフ
-        </button>
-        <div className="ui-segmented">
-          <button type="button" className={`ui-segmented-btn ${filter === 'current' ? 'is-active' : ''}`} onClick={() => setFilter('current')}>在籍・休職</button>
-          <button type="button" className={`ui-segmented-btn ${filter === 'all' ? 'is-active' : ''}`} onClick={() => setFilter('all')}>退職者も表示</button>
+      <div className="works-sticky">
+        <h1 className="works-title">スタッフ</h1>
+        <div className="works-row-actions">
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', default_pattern_id: '', closed_day_work: false, note: '' })}>
+            ＋ 新しいスタッフ
+          </button>
+          <div className="ui-segmented">
+            <button type="button" className={`ui-segmented-btn ${filter === 'current' ? 'is-active' : ''}`} onClick={() => setFilter('current')}>在籍・休職</button>
+            <button type="button" className={`ui-segmented-btn ${filter === 'all' ? 'is-active' : ''}`} onClick={() => setFilter('all')}>退職者も表示</button>
+          </div>
         </div>
       </div>
       {error && <p className="works-error">{error}</p>}
-      <div className="ui-table-wrap">
+      <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
             <tr><th>コード</th><th>氏名</th><th>所属</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
@@ -35,7 +37,7 @@ export default function Staff() {
             {list.map((s) => (
               <tr key={s.id} onClick={() => setOpen(s)}>
                 <td>{s.code}</td>
-                <td>{s.name}</td>
+                <td><strong>{s.name}</strong></td>
                 <td>{s.dept}</td>
                 <td>{s.closed_day_work ? '勤務する' : <span className="works-muted">—</span>}</td>
                 <td>{s.status === 'active' ? STATUS_LABEL.active : <span className={`ui-badge ${s.status === 'leave' ? 'is-warn' : ''}`}>{STATUS_LABEL[s.status]}</span>}</td>

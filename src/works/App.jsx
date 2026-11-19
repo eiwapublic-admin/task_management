@@ -15,7 +15,6 @@ import Monthly from './pages/Monthly.jsx'
 import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
 const ADMIN_MENU = [
-  { to: '/monthly', label: '勤務表一覧' },
   { to: '/staff', label: 'スタッフ' },
   { to: '/patterns', label: '出退勤パターン' },
   { to: '/sites', label: '現場' },
@@ -34,7 +33,12 @@ function Shell({ children }) {
       })
       .catch(() => {})
   }, [])
-  const menu = [{ to: '/', label: 'ホーム', end: true }, { to: '/calendar', label: 'カレンダー' }, ...(user?.works_admin ? ADMIN_MENU : [])]
+  const menu = [
+    { to: '/', label: 'ホーム', end: true },
+    ...(user?.works_admin ? [{ to: '/monthly', label: '勤務表一覧' }] : []),
+    { to: '/calendar', label: 'カレンダー' },
+    ...(user?.works_admin ? ADMIN_MENU : []),
+  ]
   const signOut = () => {
     logout()
     navigate('/login')
@@ -75,6 +79,17 @@ function Shell({ children }) {
   )
 }
 
+// アプリを開いたとき（ログイン直後・起動直後）の最初の画面。管理者は勤務表一覧から始める。
+// ホームへは 2 回目以降（メニューから選んだとき）は普通に入れるよう、起動時の 1 回だけ振り分ける
+let startHandled = false
+function StartPage() {
+  if (!startHandled) {
+    startHandled = true
+    if (isLoggedIn() && getUser()?.works_admin) return <Navigate to="/monthly" replace />
+  }
+  return <Private>{(user) => <Home user={user} />}</Private>
+}
+
 function Private({ children, admin = false }) {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
   if (admin && !getUser()?.works_admin) return <Navigate to="/" replace />
@@ -89,7 +104,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/invite" element={<Invite />} />
-        <Route path="/" element={<Private>{(user) => <Home user={user} />}</Private>} />
+        <Route path="/" element={<StartPage />} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />

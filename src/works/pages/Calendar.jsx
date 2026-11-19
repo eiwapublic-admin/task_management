@@ -46,11 +46,6 @@ export default function Calendar() {
   const staffList = data?.staff || []
   const idx = staffList.findIndex((s) => s.id === staffId)
   const current = staffList[idx]
-  const moveStaff = (n) => {
-    if (!staffList.length) return
-    const i = idx < 0 ? 0 : (idx + n + staffList.length) % staffList.length
-    setStaffId(staffList[i].id)
-  }
 
   const generate = async (onlyThis) => {
     const who = onlyThis ? `${current.code} ${current.name} さん` : '在籍の全員'
@@ -69,39 +64,39 @@ export default function Calendar() {
 
   return (
     <>
-      <h1 className="works-title">カレンダー</h1>
-      <div className="works-row-actions">
-        <button type="button" className="btn-plain" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
-        <strong className="works-month">{monthLabel(month)}</strong>
-        <button type="button" className="btn-plain" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">›</button>
-        <button type="button" className="btn-plain" onClick={() => setMonth(todayJst().slice(0, 7))}>今月</button>
+      <div className="works-sticky">
+        <h1 className="works-title">カレンダー</h1>
+        <div className="works-row-actions">
+          <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
+          <strong className="works-month">{monthLabel(month)}</strong>
+          <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">›</button>
+          <button type="button" className="btn-plain" onClick={() => setMonth(todayJst().slice(0, 7))}>今月</button>
+          {isAdmin && (
+            <>
+              <span className="works-sep" />
+              <select className="ui-select works-staff-select" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+                <option value="all">全員を表で表示</option>
+                {staffList.map((s) => (
+                  <option key={s.id} value={s.id}>{s.code} {s.name}{s.status === 'leave' ? '（休職）' : ''}</option>
+                ))}
+              </select>
+            </>
+          )}
+        </div>
         {isAdmin && (
-          <>
-            <span className="works-sep" />
-            <button type="button" className="btn-plain" onClick={() => moveStaff(-1)} disabled={staffId === 'all'} aria-label="前のスタッフ">‹</button>
-            <select className="ui-select works-staff-select" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-              <option value="all">全員を表で表示</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>{s.code} {s.name}{s.status === 'leave' ? '（休職）' : ''}</option>
-              ))}
-            </select>
-            <button type="button" className="btn-plain" onClick={() => moveStaff(1)} disabled={staffId === 'all'} aria-label="次のスタッフ">›</button>
-          </>
+          <div className="works-row-actions">
+            <button type="button" className="btn-primary works-btn-accent" disabled={busy} onClick={() => generate(false)}>
+              {busy ? '作成中…' : `${monthLabel(month)}の予定を作成（全員）`}
+            </button>
+            {current && (
+              <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>このスタッフだけ作り直す</button>
+            )}
+            <span className="ui-note" style={{ margin: 0 }}>
+              翌月分は毎月 設定の日に自動で作ります{data?.last_auto_month ? `（最後に自動作成: ${monthLabel(data.last_auto_month)}分）` : ''}
+            </span>
+          </div>
         )}
       </div>
-      {isAdmin && (
-        <div className="works-row-actions">
-          <button type="button" className="btn-primary works-btn-accent" disabled={busy} onClick={() => generate(false)}>
-            {busy ? '作成中…' : `${monthLabel(month)}の予定を作成（全員）`}
-          </button>
-          {current && (
-            <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>このスタッフだけ作り直す</button>
-          )}
-          <span className="ui-note" style={{ margin: 0 }}>
-            翌月分は毎月 設定の日に自動で作ります{data?.last_auto_month ? `（最後に自動作成: ${monthLabel(data.last_auto_month)}分）` : ''}
-          </span>
-        </div>
-      )}
       {error && <p className="works-error">{error}</p>}
       {!isAdmin && !me?.staff && <p className="works-muted">スタッフ情報が紐づいていません。管理者にお問い合わせください。</p>}
       {data && staffId === 'all' && <AllTable data={data} month={month} onPick={(id) => setStaffId(id)} />}
@@ -189,7 +184,7 @@ function AllTable({ data, month, onPick }) {
     return m
   }, [data])
   return (
-    <div className="ui-table-wrap works-all">
+    <div className="ui-table-wrap works-all works-scroll">
       <table className="ui-table">
         <thead>
           <tr>
@@ -211,7 +206,7 @@ function AllTable({ data, month, onPick }) {
             return (
               <tr key={st.id}>
                 <td className="works-all-name">
-                  <button type="button" className="works-linklike" onClick={() => onPick(st.id)}>{st.code} {st.name}</button>
+                  <button type="button" className="works-linklike" onClick={() => onPick(st.id)}>{st.code} <strong>{st.name}</strong></button>
                 </td>
                 {days.map((d) => (
                   <td key={d} className={dayClass(d, data)}>

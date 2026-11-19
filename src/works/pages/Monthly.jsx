@@ -73,16 +73,18 @@ export default function Monthly() {
 
   return (
     <>
-      <h1 className="works-title">勤務表一覧</h1>
-      <div className="works-row-actions">
-        <button type="button" className="btn-plain" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
-        <strong className="works-month">{monthLabel(month)}</strong>
-        <button type="button" className="btn-plain" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">›</button>
-        <button type="button" className="btn-plain" onClick={() => setMonth(todayJst().slice(0, 7))}>今月</button>
-        <span className="works-sep" />
-        <button type="button" className="btn-primary works-btn-accent" disabled={!!busy} onClick={() => generate(null)}>
-          {busy === 'all' ? '作成中…' : '予定を一括作成'}
-        </button>
+      <div className="works-sticky">
+        <h1 className="works-title">勤務表一覧</h1>
+        <div className="works-row-actions">
+          <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
+          <strong className="works-month">{monthLabel(month)}</strong>
+          <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">›</button>
+          <button type="button" className="btn-plain" onClick={() => setMonth(todayJst().slice(0, 7))}>今月</button>
+          <span className="works-sep" />
+          <button type="button" className="btn-primary works-btn-accent" disabled={!!busy} onClick={() => generate(null)}>
+            {busy === 'all' ? '作成中…' : '予定を一括作成'}
+          </button>
+        </div>
       </div>
       {data && (
         <p className="ui-note" style={{ marginTop: 0 }}>
@@ -93,7 +95,7 @@ export default function Monthly() {
       {error && <p className="works-error">{error}</p>}
       {!data && !error && <p className="works-muted">読み込み中…</p>}
       {data && (
-        <div className="ui-table-wrap">
+        <div className="ui-table-wrap works-scroll">
           <table className="ui-table works-monthly works-clickable">
             <thead>
               <tr>
@@ -111,7 +113,7 @@ export default function Monthly() {
               {rows.map((r) => (
                 <tr key={r.id} onClick={() => open(r)}>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {r.code} {r.name}
+                    {r.code} <strong>{r.name}</strong>
                     {r.status === 'leave' && <span className="ui-badge is-warn" style={{ marginLeft: 6 }}>休職</span>}
                   </td>
                   <td className="center">{r.days ? '作成済み' : <span className={r.status === 'active' ? 'works-none' : 'works-muted'}>未作成</span>}</td>
