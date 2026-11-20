@@ -7,6 +7,7 @@ import { todayJst } from '../../../worker/lib/works/time.js'
 import LeaveRequestForm from '../components/LeaveRequestForm.jsx'
 import LeaveRequestList from '../components/LeaveRequestList.jsx'
 import LeaveSheet from '../components/LeaveSheet.jsx'
+import KeyCell from '../components/KeyCell.jsx'
 
 const ymdLabel = (d) => (d ? d.replaceAll('-', '/') : '')
 const withDow = (d) => `${ymdLabel(d)}（${WEEKDAYS[new Date(`${d}T00:00:00Z`).getUTCDay()]}）`
@@ -106,8 +107,7 @@ export default function Leave() {
           <table className="ui-table works-monthly works-clickable">
             <thead>
               <tr>
-                <th>コード</th>
-                <th>氏名</th>
+                <th className="works-key">氏名</th>
                 <th>今の期間</th>
                 <th className="num">繰越</th>
                 <th className="num">付与</th>
@@ -124,11 +124,9 @@ export default function Leave() {
                 const p = r.period
                 return (
                   <tr key={r.staff_id} onClick={() => setOpen(r)}>
-                    <td>{r.code}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <strong>{r.name}</strong>
+                    <KeyCell name={r.name} code={r.code}>
                       {r.status === 'leave' && <span className="ui-badge is-warn" style={{ marginLeft: 6 }}>休職</span>}
-                    </td>
+                    </KeyCell>
                     {p ? (
                       <>
                         <td style={{ whiteSpace: 'nowrap' }}>{ymdLabel(p.start)}〜{ymdLabel(p.end)}</td>
@@ -276,7 +274,7 @@ function LeaveDetail({ row, at, onClose, onChanged }) {
                 <table className="ui-table works-monthly">
                   <thead>
                     <tr>
-                      <th>期間</th>
+                      <th className="works-key">期間</th>
                       <th className="num">繰越</th>
                       <th className="num">付与</th>
                       <th className="num">取得</th>
@@ -290,7 +288,7 @@ function LeaveDetail({ row, at, onClose, onChanged }) {
                   <tbody>
                     {data.periods.map((p) => (
                       <tr key={p.start}>
-                        <td style={{ whiteSpace: 'nowrap' }}>{ymdLabel(p.start)}〜{ymdLabel(p.end)}</td>
+                        <td className="works-key">{ymdLabel(p.start)}〜{ymdLabel(p.end)}</td>
                         <td className="num">{p.carry}</td>
                         <td className="num">{p.grant}</td>
                         <td className="num">{p.taken}</td>

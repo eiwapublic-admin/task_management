@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api, hhmm } from '../lib/api.js'
+import KeyCell from '../components/KeyCell.jsx'
 
 export default function Patterns() {
   const { items, error, reload } = useList('/api/works/patterns')
@@ -27,12 +28,12 @@ export default function Patterns() {
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>タイプ名</th><th>出勤予定</th><th>退勤予定</th><th>テレワーク</th><th>状態</th></tr>
+            <tr><th className="works-key">タイプ名</th><th>出勤予定</th><th>退勤予定</th><th>テレワーク</th><th>状態</th></tr>
           </thead>
           <tbody>
             {list.map((p) => (
               <tr key={p.id} onClick={() => setEdit({ ...p, start_time: hhmm(p.start_time), end_time: hhmm(p.end_time) })}>
-                <td>{p.name}</td>
+                <KeyCell name={p.name} />
                 <td>{hhmm(p.start_time)}</td>
                 <td>{hhmm(p.end_time)}</td>
                 <td>{p.telework ? <span className="works-tw-badge">テレワーク</span> : ''}</td>

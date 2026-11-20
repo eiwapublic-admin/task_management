@@ -3,6 +3,7 @@ import { lazy, Suspense, useState } from 'react'
 import Modal from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api } from '../lib/api.js'
+import KeyCell from '../components/KeyCell.jsx'
 
 // QR の作成（ZXing）は発行のときだけ読み込む
 const QrSheet = lazy(() => import('../components/QrSheet.jsx'))
@@ -41,13 +42,12 @@ export default function Sites() {
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>作業コード</th><th>作業名称</th><th>作業詳細</th><th>位置</th><th>QR</th><th>状態</th><th /></tr>
+            <tr><th className="works-key">作業名称</th><th>作業詳細</th><th>位置</th><th>QR</th><th>状態</th><th /></tr>
           </thead>
           <tbody>
             {(items || []).map((s) => (
               <tr key={s.id} onClick={() => setEdit({ ...s, lat: s.lat ?? '', lng: s.lng ?? '' })}>
-                <td>{s.code}</td>
-                <td>{s.name}</td>
+                <KeyCell name={s.name} code={s.code} />
                 <td>{s.detail}</td>
                 <td>{s.lat != null && s.lng != null ? `登録済み（${s.radius_m}m）` : <span className="works-muted">未登録</span>}</td>
                 <td>{s.has_qr ? `発行済み（${new Date(s.qr_issued_at).toLocaleDateString('ja-JP')}）` : <span className="works-muted">未発行</span>}</td>

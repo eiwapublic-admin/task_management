@@ -1,11 +1,14 @@
 // スタッフ（現行: eSales 担当者マスタ＋勤怠システムの従業員。決定事項 13）
 // 詳細では 基本情報（招待＝初回登録・パスワード再設定を含む）・勤務体系（適用開始日つき）を扱う
 import { useEffect, useState } from 'react'
-import Modal from '../components/Modal.jsx'
+import KeyCell from '../components/KeyCell.jsx'
+import Modal, { ModalFoot } from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api, hhmm, STATUS_LABEL, WEEKDAYS } from '../lib/api.js'
 
 const METHOD_LABEL = { qr: 'QR（現場の QR をかざす）', self: '本人が入力', proxy: '管理者が代理入力' }
+// 一覧での短い表記
+const METHOD_SHORT = { qr: 'QR', self: '本人', proxy: '管理者' }
 const METHOD_NOTE = {
   qr: '本人が現場に掲示した QR をかざして記録します。',
   self: '本人がアプリで出勤・退勤の時刻を入力します（「予定通り」や 1 か月分の一括入力もできます）。日報の担当名を入れると、日報の作業時間がその日の出退勤に入ります（テレワークの日は本人が入力）。',
@@ -38,15 +41,14 @@ export default function Staff() {
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>コード</th><th>氏名</th><th>所属</th><th>出退勤の入力</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
+            <tr><th className="works-key">氏名</th><th>所属</th><th>出退勤の入力</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
           </thead>
           <tbody>
             {list.map((s) => (
               <tr key={s.id} onClick={() => setOpen(s)}>
-                <td>{s.code}</td>
-                <td><strong>{s.name}</strong></td>
+                <KeyCell name={s.name} code={s.code} />
                 <td>{s.dept}</td>
-                <td>{METHOD_LABEL[s.punch_method || 'qr']}{s.report_name ? <span className="works-muted">（日報: {s.report_name}）</span> : ''}</td>
+                <td className="works-nowrap">{METHOD_SHORT[s.punch_method || 'qr']}{s.report_name ? <span className="works-muted">（日報: {s.report_name}）</span> : ''}</td>
                 <td>{s.closed_day_work ? '勤務する' : <span className="works-muted">—</span>}</td>
                 <td>{s.status === 'active' ? STATUS_LABEL.active : <span className={`ui-badge ${s.status === 'leave' ? 'is-warn' : ''}`}>{STATUS_LABEL[s.status]}</span>}</td>
                 <td>{s.user_id ? '登録済み' : <span className="works-muted">未登録</span>}</td>
@@ -126,7 +128,7 @@ function BasicForm({ value, onSaved }) {
         <label className="ui-field"><span>所属コード</span><input className="ui-input" value={v.dept || ''} onChange={set('dept')} /></label>
       </div>
       <div className="works-staff-row2">
-        <label className="ui-field"><span>入社日（有休の付与に使います）</span><input className="ui-input" type="date" value={v.hired_on} onChange={set('hired_on')} /></label>
+        <label className="ui-field"><span>入社日</span><input className="ui-input" type="date" value={v.hired_on} onChange={set('hired_on')} /></label>
         <label className="ui-field">
           <span>在籍状態</span>
           <select className="ui-select" value={v.status} onChange={set('status')}>
@@ -148,12 +150,14 @@ function BasicForm({ value, onSaved }) {
         </label>
       </div>
       <p className="ui-note" style={{ margin: 0 }}>{METHOD_NOTE[v.punch_method || 'qr']}</p>
-      <p className="ui-note">電話番号・住所などの個人情報はこのシステムには登録しません。</p>
+      <p className="ui-note" style={{ margin: 0 }}>入社日は有給休暇の付与に使います。電話番号・住所などの個人情報はこのシステムには登録しません。</p>
       {error && <div className="works-error">{error}</div>}
-      <div className="works-row-actions">
-        <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
-        {msg && <span className="works-muted">{msg}</span>}
-      </div>
+      <ModalFoot>
+        <div className="ui-modal-foot-end">
+          {msg && <span className="works-muted">{msg}</span>}
+          <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
+        </div>
+      </ModalFoot>
     </>
   )
 }
@@ -255,10 +259,13 @@ function Schedules({ staff, patterns, sites, onSaved }) {
         <p className="ui-note" style={{ margin: 0 }}>休館日も勤務するをオンにすると、日報カレンダーの休館日にも予定を作ります（スタッフごとの設定で、どの適用開始日でも共通です）。</p>
         <label><input type="checkbox" checked={edit.commute_allowance} onChange={(e) => setEdit({ ...edit, commute_allowance: e.target.checked })} /> 通勤手当の対象</label>
         {error && <div className="works-error">{error}</div>}
-        <div className="works-row-actions">
-          <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
-          <span className="ui-note">同じ適用開始日がすでにあれば上書きします</span>
-        </div>
+        <p className="ui-note" style={{ margin: 0 }}>同じ適用開始日がすでにあれば上書きします。</p>
+        <ModalFoot>
+          <div className="ui-modal-foot-end">
+            <button type="button" className="btn-plain" onClick={() => setEdit(null)}>キャンセル</button>
+            <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
+          </div>
+        </ModalFoot>
       </>
     )
   }
