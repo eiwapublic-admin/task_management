@@ -889,3 +889,21 @@
   padding-top: 8px;
   border-top: 1px dashed var(--border);
 }
+
+/* 勤務表一覧: 氏名の列は横スクロールしても固定。コードは氏名の下に小さく薄く（2026-11-20 依頼元の要望） */
+.works-monthly .works-monthly-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+  background: var(--bg-surface);
+  box-shadow: 1px 0 0 var(--border, #e5e7eb);
+}
+.works-content .works-monthly thead th.works-monthly-name { z-index: 3; }
+.works-content .works-monthly tfoot th.works-monthly-name { z-index: 3; }
+.works-monthly-code {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
