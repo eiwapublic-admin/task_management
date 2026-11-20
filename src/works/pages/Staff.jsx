@@ -64,14 +64,14 @@ export default function Staff() {
           patterns={patterns || []}
           sites={sites || []}
           onClose={() => setOpen(null)}
-          onSaved={(item) => { reload(); if (item) setOpen(item) }}
+          onDone={() => { reload(); setOpen(null) }}
         />
       )}
     </>
   )
 }
 
-function StaffDetail({ value, patterns, sites, onClose, onSaved }) {
+function StaffDetail({ value, patterns, sites, onClose, onDone }) {
   const [tab, setTab] = useState('basic')
   const isNew = !value.id
   return (
@@ -85,7 +85,7 @@ function StaffDetail({ value, patterns, sites, onClose, onSaved }) {
       )}
       {tab === 'basic' && (
         <>
-          <BasicForm value={value} onSaved={onSaved} />
+          <BasicForm value={value} onDone={onDone} />
           {!isNew && (
             <section className="works-section">
               <h3 className="works-section-title">アプリの利用</h3>
@@ -94,29 +94,28 @@ function StaffDetail({ value, patterns, sites, onClose, onSaved }) {
           )}
         </>
       )}
-      {tab === 'schedule' && <Schedules staff={value} patterns={patterns} sites={sites} onSaved={onSaved} />}
+      {tab === 'schedule' && <Schedules staff={value} patterns={patterns} sites={sites} onDone={onDone} />}
     </Modal>
   )
 }
 
-function BasicForm({ value, onSaved }) {
+function BasicForm({ value, onDone }) {
   const [v, setV] = useState({ ...value, hired_on: value.hired_on || '' })
-  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value })
   const save = async () => {
     setError('')
-    setMsg('')
+    setBusy(true)
     try {
       const { code, name, kana, dept, hired_on, status, note, punch_method, report_name } = v
       const fields = { code, name, kana, dept, hired_on, status, note, punch_method: punch_method || 'qr', report_name: report_name || '' }
       const body = v.id ? { id: v.id, ...fields } : fields
-      const { item } = await api('/api/works/staff', { method: v.id ? 'PATCH' : 'POST', body })
-      setV({ ...item, hired_on: item.hired_on || '' })
-      setMsg('保存しました')
-      onSaved(item)
+      await api('/api/works/staff', { method: v.id ? 'PATCH' : 'POST', body })
+      onDone()
     } catch (e) {
       setError(e.message)
+      setBusy(false)
     }
   }
   return (
@@ -154,8 +153,7 @@ function BasicForm({ value, onSaved }) {
       {error && <div className="works-error">{error}</div>}
       <ModalFoot>
         <div className="ui-modal-foot-end">
-          {msg && <span className="works-muted">{msg}</span>}
-          <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
+          <button type="button" className="btn-primary works-btn-accent" disabled={busy} onClick={save}>{busy ? '保存中…' : '保存'}</button>
         </div>
       </ModalFoot>
     </>
@@ -174,7 +172,7 @@ const emptySchedule = () => ({
   commute_allowance: false,
 })
 
-function Schedules({ staff, patterns, sites, onSaved }) {
+function Schedules({ staff, patterns, sites, onDone }) {
   const [closedDayWork, setClosedDayWork] = useState(!!staff.closed_day_work)
   const path = `/api/works/schedules?staff_id=${staff.id}`
   const [items, setItems] = useState(null)
@@ -193,11 +191,9 @@ function Schedules({ staff, patterns, sites, onSaved }) {
       await api('/api/works/schedules', { method: 'POST', body: { ...edit, staff_id: staff.id } })
       // 「休館日も勤務する」はスタッフごとの設定（勤務体系の適用開始日には左右されない）
       if (closedDayWork !== !!staff.closed_day_work) {
-        const { item } = await api('/api/works/staff', { method: 'PATCH', body: { id: staff.id, closed_day_work: closedDayWork } })
-        onSaved(item)
+        await api('/api/works/staff', { method: 'PATCH', body: { id: staff.id, closed_day_work: closedDayWork } })
       }
-      setEdit(null)
-      reload()
+      onDone()
     } catch (e) {
       setError(e.message)
     }
