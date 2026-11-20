@@ -1,7 +1,7 @@
 // eWorks（勤怠管理）の画面の入口。権限の正はサーバー側（worker/lib/works/auth.js）で、
 // ここでは管理者向けのメニューを出すかどうかだけを決める。
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, getUser, isLoggedIn, logout, setUser } from './lib/api.js'
 import Login from './pages/Login.jsx'
 import Invite from './pages/Invite.jsx'
@@ -14,6 +14,8 @@ import Calendar from './pages/Calendar.jsx'
 import Monthly from './pages/Monthly.jsx'
 import Leave from './pages/Leave.jsx'
 import Vacation from './pages/Vacation.jsx'
+import MySettings from './pages/MySettings.jsx'
+import TabIcon from './components/TabIcons.jsx'
 import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
 const PunchLink = lazy(() => import('./pages/PunchLink.jsx'))
@@ -45,10 +47,34 @@ function Shell({ children }) {
     { to: '/vacation', label: '休暇' },
     ...(user?.works_admin ? ADMIN_MENU : []),
   ]
+  if (!user?.works_admin) menu.push({ to: '/me', label: '設定' })
   const signOut = () => {
     logout()
     navigate('/login')
   }
+  // スマホの下部メニュー（アイコン型。2026-11-20 依頼元の要望）
+  //   管理者: ホーム｜一覧｜有給｜スタッフ｜その他（カレンダー・休暇・出退勤パターン・現場・設定・ログアウト）
+  //   スタッフ: ホーム｜カレンダー｜休暇｜設定
+  const tabs = user?.works_admin
+    ? [
+        { to: '/', label: 'ホーム', icon: 'home', end: true },
+        { to: '/monthly', label: '一覧', icon: 'list' },
+        { to: '/leave', label: '有給', icon: 'leave' },
+        { to: '/staff', label: 'スタッフ', icon: 'staff' },
+      ]
+    : [
+        { to: '/', label: 'ホーム', icon: 'home', end: true },
+        { to: '/calendar', label: 'カレンダー', icon: 'calendar' },
+        { to: '/vacation', label: '休暇', icon: 'vacation' },
+        { to: '/me', label: '設定', icon: 'settings' },
+      ]
+  const more = [
+    { to: '/calendar', label: 'カレンダー', icon: 'calendar' },
+    { to: '/vacation', label: '休暇（自分の申請）', icon: 'vacation' },
+    { to: '/patterns', label: '出退勤パターン', icon: 'pattern' },
+    { to: '/sites', label: '現場', icon: 'site' },
+    { to: '/settings', label: '設定', icon: 'settings' },
+  ]
   return (
     <div className="works-shell">
       <aside className="works-side">
@@ -73,15 +99,49 @@ function Shell({ children }) {
       <main className="works-main">
         <div className="works-content">{typeof children === 'function' ? children(user) : children}</div>
       </main>
+      <TabBar tabs={tabs} more={user?.works_admin ? more : null} onSignOut={signOut} />
+    </div>
+  )
+}
+
+function TabBar({ tabs, more, onSignOut }) {
+  const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => setOpen(false), [pathname])
+  const moreActive = more?.some((m) => pathname.startsWith(m.to))
+  return (
+    <>
+      {open && (
+        <div className="works-more" onClick={() => setOpen(false)}>
+          <div className="works-more-sheet" role="menu" onClick={(e) => e.stopPropagation()}>
+            {more.map((m) => (
+              <NavLink key={m.to} to={m.to} role="menuitem">
+                <TabIcon name={m.icon} size={22} />
+                {m.label}
+              </NavLink>
+            ))}
+            <button type="button" role="menuitem" onClick={onSignOut}>
+              <TabIcon name="logout" size={22} />
+              ログアウト
+            </button>
+          </div>
+        </div>
+      )}
       <nav className="works-tabbar">
-        {menu.map((m) => (
+        {tabs.map((m) => (
           <NavLink key={m.to} to={m.to} end={m.end}>
-            {m.label}
+            <TabIcon name={m.icon} />
+            <span>{m.label}</span>
           </NavLink>
         ))}
-        <a href="/login" onClick={(e) => { e.preventDefault(); signOut() }}>ログアウト</a>
+        {more && (
+          <button type="button" className={moreActive || open ? 'active' : ''} aria-expanded={open} onClick={() => setOpen(!open)}>
+            <TabIcon name="more" />
+            <span>その他</span>
+          </button>
+        )}
       </nav>
-    </div>
+    </>
   )
 }
 
@@ -114,6 +174,7 @@ export default function App() {
         <Route path="/" element={<StartPage />} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
+        <Route path="/me" element={<Private><MySettings /></Private>} />
         <Route path="/vacation" element={<Private><Vacation /></Private>} />
         <Route path="/leave" element={<Private admin><Leave /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />
