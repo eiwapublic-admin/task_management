@@ -63,11 +63,12 @@
   padding: 0 4px;
 }
 
+/* -webkit-overflow-scrolling: touch は付けない。iOS ではこれで重なりの層が分かれ、
+   詳細画面（モーダル）が下部メニューの下に隠れて「保存」が押せなくなる（2026-11-20） */
 .works-main {
   min-width: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 
 .works-content {
@@ -915,9 +916,6 @@
 .works-content input[type='date'].ui-input {
   min-width: 0;
   max-width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  display: block;
 }
 .ui-modal input[type='date'].ui-input::-webkit-date-and-time-value,
 .works-content input[type='date'].ui-input::-webkit-date-and-time-value { text-align: left; }

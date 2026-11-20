@@ -270,8 +270,8 @@ function DayModal({ date, data, staff, staffId, sites, editable, actualEditable,
     try {
       if (edit.id) await api('/api/works/shifts', { method: 'PATCH', body: edit })
       else await api('/api/works/shifts', { method: 'POST', body: { ...edit, staff_id: staffId, work_date: date } })
-      setEdit(null)
       onSaved()
+      onClose()
     } catch (e) {
       setError(e.message)
     }
