@@ -4,8 +4,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal.jsx'
+import ActualEditor from '../components/ActualEditor.jsx'
 import { api, getUser, WEEKDAYS } from '../lib/api.js'
 import { addMonths, dow, hoursLabel, monthRange, todayJst } from '../../../worker/lib/works/time.js'
+
+const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-')
@@ -47,6 +50,24 @@ export default function Calendar() {
   const idx = staffList.findIndex((s) => s.id === staffId)
   const current = staffList[idx]
 
+  // 実績を入力できるか（管理者、または入力方法が「本人」の本人）
+  const selfInput = !isAdmin && me?.staff?.punch_method === 'self'
+  const canActual = isAdmin || selfInput
+  const fillMonth = async () => {
+    const who = isAdmin ? `${current.code} ${current.name} さんの` : ''
+    if (!window.confirm(`${monthLabel(month)}の${who}今日までの勤務で、出勤・退勤が入っていない日に予定通りの時刻を入れます。よろしいですか？`)) return
+    setBusy(true)
+    try {
+      const r = await api('/api/works/actuals/plan', { method: 'POST', body: { staff_id: staffId, month } })
+      window.alert(`${r.count} 日分を予定通りに入力しました`)
+      load()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const generate = async (onlyThis) => {
     const who = onlyThis ? `${current.code} ${current.name} さん` : '在籍の全員'
     if (!window.confirm(`${monthLabel(month)}の予定を、勤務体系から作り直します（${who}）。\n手で追加・変更した日はそのまま残ります。よろしいですか？`)) return
@@ -80,20 +101,16 @@ export default function Calendar() {
                   <option key={s.id} value={s.id}>{s.code} {s.name}{s.status === 'leave' ? '（休職）' : ''}</option>
                 ))}
               </select>
+              {current && (
+                <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>{busy ? '作成中…' : '予定を再作成'}</button>
+              )}
             </>
           )}
         </div>
-        {isAdmin && (
+        {((isAdmin && current) || selfInput) && (
           <div className="works-row-actions">
-            <button type="button" className="btn-primary works-btn-accent" disabled={busy} onClick={() => generate(false)}>
-              {busy ? '作成中…' : `${monthLabel(month)}の予定を作成（全員）`}
-            </button>
-            {current && (
-              <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>このスタッフだけ作り直す</button>
-            )}
-            <span className="ui-note" style={{ margin: 0 }}>
-              翌月分は毎月 設定の日に自動で作ります{data?.last_auto_month ? `（最後に自動作成: ${monthLabel(data.last_auto_month)}分）` : ''}
-            </span>
+            {isAdmin && current && <span className="works-muted">入力方法: {METHOD_LABEL[current.punch_method || 'qr']}</span>}
+            <button type="button" className="btn-plain" disabled={busy} onClick={fillMonth}>この月の実績を予定通りに入力</button>
           </div>
         )}
       </div>
@@ -111,6 +128,7 @@ export default function Calendar() {
           staffId={staffId}
           sites={sites}
           editable={isAdmin}
+          actualEditable={canActual}
           onClose={() => setDay(null)}
           onSaved={() => load()}
         />
@@ -237,7 +255,7 @@ function AllTable({ data, month, onPick }) {
   )
 }
 
-function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSaved }) {
+function DayModal({ date, data, staff, staffId, sites, editable, actualEditable, onClose, onSaved }) {
   const shifts = data.items.filter((s) => s.work_date === date)
   const [edit, setEdit] = useState(null)
   const [error, setError] = useState('')
@@ -291,6 +309,12 @@ function DayModal({ date, data, staff, staffId, sites, editable, onClose, onSave
               <span className="works-muted">出勤・退勤の記録はまだありません</span>
             ) : null}
           </div>
+          {actualEditable && (editable || date <= todayJst()) && (
+            <div className="works-actual-box">
+              <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>出勤・退勤の時刻{editable && staff ? '（代理入力）' : ''}</div>
+              <ActualEditor shift={s} onSaved={onSaved} compact />
+            </div>
+          )}
           {s.warn_no_break && <div className="ui-note is-danger">6 時間を超える勤務で、休憩が 45 分未満です</div>}
           <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>{s.source === 'manual' ? '手で追加・変更した予定' : '勤務体系から自動作成'}</div>
           {editable && (

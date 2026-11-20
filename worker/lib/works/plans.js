@@ -234,7 +234,7 @@ export async function handleShifts(req) {
     })
     let staff = null
     if (ctx.isAdmin) {
-      const { data } = await supabase.from('works_staff').select('id, code, name, status').neq('status', 'retired').order('code')
+      const { data } = await supabase.from('works_staff').select('id, code, name, status, punch_method').neq('status', 'retired').order('code')
       staff = data
     }
     return json({

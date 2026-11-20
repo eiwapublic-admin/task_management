@@ -5,6 +5,13 @@ import Modal from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api, hhmm, STATUS_LABEL, WEEKDAYS } from '../lib/api.js'
 
+const METHOD_LABEL = { qr: 'QR（現場の QR をかざす）', self: '本人が入力', proxy: '管理者が代理入力' }
+const METHOD_NOTE = {
+  qr: '本人が現場に掲示した QR をかざして記録します。',
+  self: '本人がアプリで出勤・退勤の時刻を入力します（「予定通り」や 1 か月分の一括入力もできます）。日報の担当名を入れると、日報の作業時間がその日の出退勤に入ります（テレワークの日は本人が入力）。',
+  proxy: '手書きの出勤簿を見て、管理者がカレンダーから入力します。日報の担当名を入れると、日報の作業時間も入ります。',
+}
+
 export default function Staff() {
   const { items, error, reload } = useList('/api/works/staff')
   const { items: patterns } = useList('/api/works/patterns')
@@ -18,7 +25,7 @@ export default function Staff() {
       <div className="works-sticky">
         <h1 className="works-title">スタッフ</h1>
         <div className="works-row-actions">
-          <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', closed_day_work: false, note: '' })}>
+          <button type="button" className="btn-primary works-btn-accent" onClick={() => setOpen({ code: '', name: '', kana: '', dept: '', hired_on: '', status: 'active', closed_day_work: false, punch_method: 'qr', report_name: '', note: '' })}>
             ＋ 新しいスタッフ
           </button>
           <div className="ui-segmented">
@@ -31,7 +38,7 @@ export default function Staff() {
       <div className="ui-table-wrap works-scroll">
         <table className="ui-table works-clickable">
           <thead>
-            <tr><th>コード</th><th>氏名</th><th>所属</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
+            <tr><th>コード</th><th>氏名</th><th>所属</th><th>出退勤の入力</th><th>休館日勤務</th><th>状態</th><th>アプリ</th></tr>
           </thead>
           <tbody>
             {list.map((s) => (
@@ -39,6 +46,7 @@ export default function Staff() {
                 <td>{s.code}</td>
                 <td><strong>{s.name}</strong></td>
                 <td>{s.dept}</td>
+                <td>{METHOD_LABEL[s.punch_method || 'qr']}{s.report_name ? <span className="works-muted">（日報: {s.report_name}）</span> : ''}</td>
                 <td>{s.closed_day_work ? '勤務する' : <span className="works-muted">—</span>}</td>
                 <td>{s.status === 'active' ? STATUS_LABEL.active : <span className={`ui-badge ${s.status === 'leave' ? 'is-warn' : ''}`}>{STATUS_LABEL[s.status]}</span>}</td>
                 <td>{s.user_id ? '登録済み' : <span className="works-muted">未登録</span>}</td>
@@ -98,8 +106,9 @@ function BasicForm({ value, onSaved }) {
     setError('')
     setMsg('')
     try {
-      const { code, name, kana, dept, hired_on, status, note } = v
-      const body = v.id ? { id: v.id, code, name, kana, dept, hired_on, status, note } : { code, name, kana, dept, hired_on, status, note }
+      const { code, name, kana, dept, hired_on, status, note, punch_method, report_name } = v
+      const fields = { code, name, kana, dept, hired_on, status, note, punch_method: punch_method || 'qr', report_name: report_name || '' }
+      const body = v.id ? { id: v.id, ...fields } : fields
       const { item } = await api('/api/works/staff', { method: v.id ? 'PATCH' : 'POST', body })
       setV({ ...item, hired_on: item.hired_on || '' })
       setMsg('保存しました')
@@ -126,6 +135,19 @@ function BasicForm({ value, onSaved }) {
         </label>
         <label className="ui-field"><span>メモ</span><input className="ui-input" value={v.note || ''} onChange={set('note')} /></label>
       </div>
+      <div className="works-staff-row3">
+        <label className="ui-field">
+          <span>出勤・退勤の入力方法</span>
+          <select className="ui-select" value={v.punch_method || 'qr'} onChange={set('punch_method')}>
+            {Object.entries(METHOD_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+        <label className="ui-field">
+          <span>日報の担当名（日報の時刻を出退勤に写す）</span>
+          <input className="ui-input" value={v.report_name || ''} onChange={set('report_name')} placeholder="例: 西川" />
+        </label>
+      </div>
+      <p className="ui-note" style={{ margin: 0 }}>{METHOD_NOTE[v.punch_method || 'qr']}</p>
       <p className="ui-note">電話番号・住所などの個人情報はこのシステムには登録しません。</p>
       {error && <div className="works-error">{error}</div>}
       <div className="works-row-actions">

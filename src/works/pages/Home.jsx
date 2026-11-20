@@ -1,4 +1,5 @@
 // ホーム。今日の状態と「出勤を記録」「退勤を記録」の大きなボタン、今日・明日の予定（docs/eworks-plan.md 6-2・10-3）
+// 入力方法（2026-11-20）で切り替える: qr＝QR の大きなボタン／self＝時刻の入力欄と「予定通り」／proxy＝管理者が入力する旨の表示
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, WEEKDAYS } from '../lib/api.js'
@@ -6,6 +7,7 @@ import { dow, todayJst } from '../../../worker/lib/works/time.js'
 import { formatBuildTime } from '../../lib/version.js'
 import { reloadApp } from '../../pwa/reloadApp.js'
 import { flushQueue, pendingCount } from '../lib/punch.js'
+import ActualEditor from '../components/ActualEditor.jsx'
 
 function addDays(date, n) {
   const [y, m, d] = date.split('-').map(Number)
@@ -82,6 +84,7 @@ export default function Home({ user }) {
   const next = now?.state === 'working' ? 'out' : 'in'
   // 今日の予定がテレワークだけなら、QR を使わず自己申告で記録する
   const telework = !!now?.shifts?.length && now.shifts.every((s) => s.telework)
+  const method = user?.staff?.punch_method || 'qr'
 
   return (
     <>
@@ -89,6 +92,27 @@ export default function Home({ user }) {
       <p style={{ marginTop: 0 }}>{user?.staff ? `${user.staff.name} さん` : user?.display_name ? `${user.display_name} さん` : ''}</p>
       {user?.staff ? (
         <>
+          {method === 'self' && (
+            <div className="works-punch-card">
+              <div className="works-punch-state">今日の出勤・退勤の時刻を入力してください</div>
+              {now && now.shifts.length === 0 && <p className="works-muted" style={{ margin: 0 }}>今日の予定はありません。</p>}
+              {now?.shifts.map((s) => (
+                <div key={s.id}>
+                  <div className="works-muted" style={{ marginBottom: 4 }}>
+                    予定 {s.plan_start}〜{s.plan_end}{s.telework ? '（テレワーク）' : s.site ? `　${s.site.name}` : ''}
+                  </div>
+                  <ActualEditor shift={s} onSaved={loadToday} />
+                </div>
+              ))}
+              <p className="ui-note" style={{ margin: 0 }}>ほかの日の入力や 1 か月分をまとめて「予定通り」にするのは <Link to="/calendar">カレンダー</Link> からできます。</p>
+            </div>
+          )}
+          {method === 'proxy' && (
+            <div className="works-punch-card">
+              <div className="works-punch-state">出勤・退勤の時刻は、出勤簿をもとに管理者が入力します。</div>
+            </div>
+          )}
+          {method === 'qr' && (
           <div className="works-punch-card">
             <div className="works-punch-state">
               今日の状態: <strong className={`is-${now?.state || 'before'}`}>{now ? STATE[now.state] : '…'}</strong>
@@ -108,6 +132,7 @@ export default function Home({ user }) {
             {pending > 0 && <p className="works-punch-flags">電波が戻るのを待っている記録が {pending} 件あります（自動で送ります）</p>}
             {!telework && <p className="ui-note" style={{ margin: 0 }}>記録のときに位置情報を記録します（QR の持ち出しを防ぐため）。</p>}
           </div>
+          )}
           {day(today, '今日')}
           {day(tomorrow, '明日')}
           <p className="ui-note">月の予定は <Link to="/calendar">カレンダー</Link> で見られます。</p>

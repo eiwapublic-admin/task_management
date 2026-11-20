@@ -29,7 +29,7 @@ export async function getWorksContext(req) {
   if (error || !user) return null
   const { data: staff } = await supabase
     .from('works_staff')
-    .select('id, code, name, status')
+    .select('id, code, name, status, punch_method')
     .eq('user_id', user.id)
     .maybeSingle()
   return { auth, user, staff: staff || null, isAdmin: !!user.works_admin }
@@ -50,7 +50,7 @@ function publicUser(user, staff) {
     display_name: user.display_name,
     role: user.role || 'staff',
     works_admin: !!user.works_admin,
-    staff: staff ? { id: staff.id, code: staff.code, name: staff.name } : null,
+    staff: staff ? { id: staff.id, code: staff.code, name: staff.name, punch_method: staff.punch_method || 'qr' } : null,
   }
 }
 
@@ -89,7 +89,7 @@ export async function handleWorksLogin(req, env) {
       return json({ error: 'ログインIDまたはパスワードが違います' }, 401)
     }
     if (kv) await kv.delete(key)
-    const { data: staff } = await supabase.from('works_staff').select('id, code, name, status').eq('user_id', user.id).maybeSingle()
+    const { data: staff } = await supabase.from('works_staff').select('id, code, name, status, punch_method').eq('user_id', user.id).maybeSingle()
     if (!user.works_admin && !staff) {
       return json({ error: 'このIDは eWorks の利用者として登録されていません。管理者にお問い合わせください' }, 403)
     }
