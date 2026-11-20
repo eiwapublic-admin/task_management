@@ -99,21 +99,87 @@
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
-    overflow-x: auto;
+    position: relative;
+    z-index: 30;
   }
-  .works-tabbar a {
-    flex: 1 0 auto;
-    min-width: 64px;
-    padding: 10px 6px;
-    text-align: center;
-    font-size: var(--fs-xs);
+  .works-tabbar a,
+  .works-tabbar button {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 2px 6px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 11px;
+    line-height: 1.2;
     color: var(--text-muted);
     text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
-  .works-tabbar a.active {
+  .works-tabbar svg {
+    width: 26px;
+    height: 26px;
+  }
+  .works-tabbar a.active,
+  .works-tabbar button.active {
     color: var(--works-accent);
     font-weight: 700;
   }
+  .works-tabbar a.active svg,
+  .works-tabbar button.active svg {
+    stroke-width: 2.3;
+  }
+}
+
+/* 「その他」のメニュー（下部メニューの上に出す） */
+.works-more {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(20, 16, 40, 0.35);
+}
+.works-more-sheet {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(62px + env(safe-area-inset-bottom));
+  background: var(--bg-surface, #fff);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.works-more-sheet a,
+.works-more-sheet button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text-strong);
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+.works-more-sheet a.active {
+  background: #ede9f8;
+  color: var(--works-accent);
+  font-weight: 700;
+}
+.works-more-sheet button {
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 10px 10px;
+  color: var(--text-muted);
 }
 
 .works-title {
