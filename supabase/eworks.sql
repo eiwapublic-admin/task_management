@@ -370,3 +370,18 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- =============================================================================
+-- 出退勤の入力方法（2026-11-20 依頼元の要望）
+--   qr … 本人が現場の QR をかざす（これまでどおり）
+--   self … 本人が時刻を直接入力（「予定通り」・1 か月一括も可）。日報の担当なら日報の時刻を自動で入れる
+--   proxy … 手書きの出勤簿を見て管理者が代理入力
+--   report_name … タスク管理の日報の担当名（例: 西川）。日報を保存するとその日の勤務に時刻を写す（テレワークの日は除く）
+-- =============================================================================
+alter table works_staff add column if not exists punch_method text not null default 'qr';
+alter table works_staff drop constraint if exists works_staff_punch_method_check;
+alter table works_staff add constraint works_staff_punch_method_check check (punch_method in ('qr', 'self', 'proxy'));
+alter table works_staff add column if not exists report_name text;
+-- 打刻の記録に「直接入力（manual）」「日報から（report）」を加える
+alter table works_punches drop constraint if exists works_punches_method_check;
+alter table works_punches add constraint works_punches_method_check check (method in ('qr', 'proxy', 'self', 'manual', 'report'));

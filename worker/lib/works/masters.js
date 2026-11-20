@@ -22,6 +22,8 @@ const SCHEMAS = {
     status: (v) => { if (!['active', 'leave', 'retired'].includes(v)) throw new Error('在籍状態が正しくありません'); return v },
     default_pattern_id: (v) => { const s = str(v); if (s && !UUID_RE.test(s)) throw new Error('出退勤パターンが正しくありません'); return s },
     closed_day_work: (v) => !!v,
+    punch_method: (v) => { if (!['qr', 'self', 'proxy'].includes(v)) throw new Error('出退勤の入力方法が正しくありません'); return v },
+    report_name: str,
     note: str,
   },
   works_shift_patterns: {

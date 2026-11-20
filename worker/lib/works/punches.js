@@ -32,6 +32,8 @@ export const FLAG_LABEL = {
   no_in: '出勤の記録なし',
   proxy: '代理入力',
   telework: 'テレワーク（自己申告）',
+  manual: '直接入力',
+  report: '日報から',
 }
 
 async function sha256Hex(text) {

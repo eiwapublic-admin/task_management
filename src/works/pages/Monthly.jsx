@@ -106,8 +106,7 @@ export default function Monthly() {
           <table className="ui-table works-monthly works-clickable">
             <thead>
               <tr>
-                <th>コード</th>
-                <th>氏名</th>
+                <th className="works-monthly-name">氏名</th>
                 <th className="num">予定日数</th>
                 <th className="num">予定時間</th>
                 <th className="num">手で変更</th>
@@ -119,10 +118,10 @@ export default function Monthly() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} onClick={() => open(r)}>
-                  <td>{r.code}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
+                  <td className="works-monthly-name">
                     <strong>{r.name}</strong>
                     {r.status === 'leave' && <span className="ui-badge is-warn" style={{ marginLeft: 6 }}>休職</span>}
+                    <span className="works-monthly-code">{r.code}</span>
                   </td>
                   <td className="num">{r.days ? `${r.days}日` : <span className={r.status === 'active' ? 'works-none' : 'works-muted'}>未作成</span>}</td>
                   <td className="num">{r.minutes ? (r.minutes / 60).toFixed(2) : ''}</td>
@@ -141,7 +140,7 @@ export default function Monthly() {
             </tbody>
             <tfoot>
               <tr>
-                <th colSpan={2}>合計（{rows.length}名）</th>
+                <th className="works-monthly-name">合計（{rows.length}名）</th>
                 <th className="num">{total.days}日</th>
                 <th className="num">{(total.minutes / 60).toFixed(2)}</th>
                 <th colSpan={4} />

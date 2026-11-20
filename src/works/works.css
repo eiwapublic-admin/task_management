@@ -242,6 +242,11 @@
 .works-staff-row2 {
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 2fr);
 }
+.works-staff-row3 {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
 .works-check-row {
   display: flex;
   flex-wrap: wrap;
@@ -267,6 +272,9 @@
   .works-staff-row1,
   .works-staff-row2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .works-staff-row3 {
+    grid-template-columns: 1fr;
   }
   .works-staff-row2 > :last-child {
     grid-column: 1 / -1;
@@ -849,4 +857,53 @@
   text-align: center;
   font-weight: 700;
   color: #3f2d78;
+}
+
+/* 出退勤の時刻の直接入力 */
+.works-actual-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.works-actual-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.works-actual-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.works-actual-row .ui-input {
+  width: 8.5em;
+  font-size: 18px;
+}
+.works-actual-sep {
+  padding-bottom: 10px;
+}
+.works-actual-box {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+/* 勤務表一覧: 氏名の列は横スクロールしても固定。コードは氏名の下に小さく薄く（2026-11-20 依頼元の要望） */
+.works-monthly .works-monthly-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+  background: var(--bg-surface);
+  box-shadow: 1px 0 0 var(--border, #e5e7eb);
+}
+.works-content .works-monthly thead th.works-monthly-name { z-index: 3; }
+.works-content .works-monthly tfoot th.works-monthly-name { z-index: 3; }
+.works-monthly-code {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.2;
 }

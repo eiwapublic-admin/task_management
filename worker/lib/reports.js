@@ -10,6 +10,7 @@ import { fetchHolidays } from './holidays.js'
 import { recognizeVehicle, resolveProvider, estimateCostUSD } from './ai/index.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 import { signJwt, verifyJwt } from './jwt.js'
+import { syncFromReport } from './works/actuals.js'
 
 // 日報1件を返すときに読む列。明細は別クエリで取り、画面側で組み立てる
 const REPORT_COLUMNS = 'id, report_date, worker_am, worker_pm, work_start, work_end, created_at, updated_at'
@@ -201,6 +202,7 @@ export async function handleReportCreate(req) {
       console.error('report-create:', err.message)
       return json({ error: '日報の作成に失敗しました' }, 500)
     }
+    await syncFromReport(data)
     return json({ report: { ...data, entries: [] } })
   } catch (err) {
     console.error('report-create 失敗:', err)
@@ -236,6 +238,8 @@ export async function handleReportUpdate(req) {
       return json({ error: '日報の更新に失敗しました' }, 500)
     }
     if (!data) return json({ error: '日報が見つかりません' }, 404)
+    // 作業者・作業時間が変わったら eWorks の出退勤に写す（日報の担当として登録したスタッフだけ。2026-11-20）
+    await syncFromReport(data)
     return json({ report: data })
   } catch (err) {
     console.error('report-update 失敗:', err)
