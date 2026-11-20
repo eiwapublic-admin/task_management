@@ -3,10 +3,11 @@
 //   管理者: スタッフを切り替えて同じ月表示／「全員」でスタッフ × 日の表。予定の作成・手での追加と変更
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import Modal from '../components/Modal.jsx'
+import Modal, { ModalFoot } from '../components/Modal.jsx'
 import ActualEditor from '../components/ActualEditor.jsx'
 import { api, getUser, WEEKDAYS } from '../lib/api.js'
 import { addMonths, dow, hoursLabel, monthRange, todayJst } from '../../../worker/lib/works/time.js'
+import KeyCell from '../components/KeyCell.jsx'
 
 const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
@@ -218,7 +219,7 @@ function AllTable({ data, month, onPick }) {
       <table className="ui-table">
         <thead>
           <tr>
-            <th className="works-all-name">スタッフ</th>
+            <th className="works-key">スタッフ</th>
             {days.map((d) => (
               <th key={d} className={dayClass(d, data)}>
                 {Number(d.slice(8))}
@@ -235,8 +236,11 @@ function AllTable({ data, month, onPick }) {
             const total = Object.values(row).flat().reduce((a, s) => a + s.minutes, 0)
             return (
               <tr key={st.id}>
-                <td className="works-all-name">
-                  <button type="button" className="works-linklike" onClick={() => onPick(st.id)}>{st.code} <strong>{st.name}</strong></button>
+                <td className="works-key">
+                  <button type="button" className="works-linklike works-key-btn" onClick={() => onPick(st.id)}>
+                    <strong className="works-key-name">{st.name}</strong>
+                    <span className="works-key-code">{st.code}</span>
+                  </button>
                 </td>
                 {days.map((d) => (
                   <td key={d} className={dayClass(d, data)}>
@@ -347,9 +351,12 @@ function DayModal({ date, data, staff, staffId, sites, editable, actualEditable,
           </label>
           <label><input type="checkbox" checked={!!edit.telework} onChange={(e) => setEdit({ ...edit, telework: e.target.checked })} /> テレワーク（記録は自己申告）</label>
           <label className="ui-field"><span>メモ（代勤・時間変更の理由など）</span><input className="ui-input" value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} /></label>
-          <div className="works-row-actions">
-            <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
-          </div>
+          <ModalFoot>
+            <div className="ui-modal-foot-end">
+              <button type="button" className="btn-plain" onClick={() => setEdit(null)}>キャンセル</button>
+              <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
+            </div>
+          </ModalFoot>
         </>
       )}
       {staffId && staffId !== 'all' && !edit && <PunchLog date={date} staffId={staffId} editable={editable} onSaved={onSaved} />}
@@ -447,7 +454,7 @@ export function ResultModal({ result, onClose }) {
             <table className="ui-table">
               <tbody>
                 {result.skipped.map((s) => (
-                  <tr key={s.code}><td>{s.code} {s.name}</td><td>{s.reason}</td></tr>
+                  <tr key={s.code}><KeyCell name={s.name} code={s.code} /><td>{s.reason}</td></tr>
                 ))}
               </tbody>
             </table>

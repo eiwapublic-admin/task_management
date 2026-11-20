@@ -240,7 +240,7 @@
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 0.8fr);
 }
 .works-staff-row2 {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 2fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 2fr);
 }
 .works-staff-row3 {
   display: grid;
@@ -391,13 +391,6 @@
 .works-cal-site { display: block; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
 .works-all table { font-size: var(--fs-xs); }
 .works-all th, .works-all td { padding: 4px; text-align: center; white-space: nowrap; }
-.works-all .works-all-name {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--bg-surface);
-  text-align: left;
-}
 .works-all-manual { color: var(--works-accent-deep); font-weight: 700; }
 .works-linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--works-accent-deep); cursor: pointer; text-align: left; }
 
@@ -470,7 +463,6 @@
 .works-content .ui-table thead th.is-holiday { color: #ffd0d0; }
 .works-content .ui-table thead th.is-sat { color: #cfe3ff; }
 .works-content .ui-table thead th.is-company { color: #ffe7a8; }
-.works-all thead th.works-all-name { z-index: 3; }
 
 /* 明細行は 1 行おきに色を変える */
 .works-content .ui-table tbody tr:nth-child(even) > td { background: #f4f1fa; }
@@ -890,20 +882,46 @@
   border-top: 1px dashed var(--border);
 }
 
-/* 勤務表一覧: 氏名の列は横スクロールしても固定。コードは氏名の下に小さく薄く（2026-11-20 依頼元の要望） */
-.works-monthly .works-monthly-name {
+/* 一覧表のキー項目（2026-11-20 依頼元の共通ルール。components/KeyCell.jsx）
+   名称は太字、コードは名称の下に小さく薄い字。改行させず、横スクロールしても左に固定する */
+.ui-table .works-key {
   position: sticky;
   left: 0;
   z-index: 1;
   white-space: nowrap;
+  text-align: left;
   background: var(--bg-surface);
-  box-shadow: 1px 0 0 var(--border, #e5e7eb);
+  box-shadow: inset -1px 0 0 var(--border);
 }
-.works-content .works-monthly thead th.works-monthly-name { z-index: 3; }
-.works-content .works-monthly tfoot th.works-monthly-name { z-index: 3; }
-.works-monthly-code {
+.ui-table thead th.works-key,
+.ui-table tfoot th.works-key { z-index: 3; }
+.works-key-name { white-space: nowrap; }
+.works-key-code {
   display: block;
   font-size: var(--fs-xs);
+  font-weight: 400;
   color: var(--text-muted);
-  line-height: 1.2;
+  line-height: 1.25;
+  white-space: nowrap;
 }
+.works-key-btn { text-align: left; }
+.works-nowrap { white-space: nowrap; }
+
+/* 詳細画面のフッタ（保存などのボタン）。何も置かない画面では出さない */
+.works-modal-foot:empty { display: none; }
+
+/* 日付の欄が隣の欄に重ならないようにする（Safari は日付の欄に固有の最小幅を持つ） */
+.ui-modal input[type='date'].ui-input,
+.works-content input[type='date'].ui-input {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+}
+.ui-modal input[type='date'].ui-input::-webkit-date-and-time-value,
+.works-content input[type='date'].ui-input::-webkit-date-and-time-value { text-align: left; }
+
+/* 画面の一覧表（.works-scroll の中）は折り返さず、はみ出す分は横にスクロールする */
+.works-scroll .ui-table th,
+.works-scroll .ui-table td { white-space: nowrap; }
