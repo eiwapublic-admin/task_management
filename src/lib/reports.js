@@ -535,6 +535,28 @@ export async function deleteChlorineTest(id) {
   await authFetch(`/api/report/chlorine?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
+// BKB塩素注入レベル（2026-11-24）。[{ date: 'YYYY-MM-DD', level }] を日付の古い順で返す
+export async function fetchChlorineInjectionLevels() {
+  return authFetch('/api/report/chlorine/injection-levels')
+}
+
+export async function saveChlorineInjectionLevels(levels) {
+  return authFetch('/api/report/chlorine/injection-levels', {
+    method: 'PUT',
+    body: JSON.stringify({ levels }),
+  })
+}
+
+// 指定日（'YYYY-MM-DD'）時点で効いている注入レベル。その日より前に設定が無ければ null
+export function injectionLevelOn(levels, date) {
+  let cur = null
+  for (const l of levels) {
+    if (l.date <= date) cur = l.level
+    else break
+  }
+  return cur
+}
+
 // 'YYYY'（JST基準の今年）
 export function currentYearJST() {
   return Number(todayJST().slice(0, 4))

@@ -1648,3 +1648,106 @@ export async function handleChlorineDelete(req) {
     return json({ error: '残留塩素等検査の削除に失敗しました' }, 500)
   }
 }
+
+// ------------------------------------------------------------
+// BKB塩素注入レベル（2026-11-24）。BKBの水道水に塩素を注入する機器の設定値で、
+// 残留塩素濃度の変化を見て現場で調整している。「いつから・いくつに変えたか」の履歴だけを
+// 持てばよい小さなデータのため、新しいテーブルは作らず settings の1キーに JSON 配列で持つ
+// （SQL Editor での作業を不要にするため）。キーがまだ無いうちは依頼時に受け取った
+// 初期値（CHLORINE_INJECTION_INITIAL）を返し、最初の保存で settings に書き込まれる。
+// ------------------------------------------------------------
+const CHLORINE_INJECTION_KEY = 'chlorine_bkb_injection_levels'
+const CHLORINE_INJECTION_INITIAL = [
+  ['2025-07-08', 10],
+  ['2025-07-22', 12],
+  ['2025-09-02', 15],
+  ['2025-09-30', 10],
+  ['2026-02-16', 7],
+  ['2026-02-24', 2],
+  ['2026-08-12', 6],
+  ['2026-09-08', 10],
+  ['2026-09-15', 15],
+  ['2026-10-27', 8],
+  ['2026-11-10', 12],
+].map(([date, level]) => ({ date, level }))
+const CHLORINE_INJECTION_MAX_ROWS = 500
+
+function sanitizeInjectionLevels(list) {
+  if (!Array.isArray(list)) return null
+  if (list.length > CHLORINE_INJECTION_MAX_ROWS) return null
+  const byDate = new Map()
+  for (const row of list) {
+    const date = String(row?.date || '')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) return null
+    const level = Number(row?.level)
+    if (!Number.isFinite(level) || level < 0 || level > 999) return null
+    // 同じ日付が2回あれば後のほうを採る
+    byDate.set(date, { date, level: Math.round(level * 100) / 100 })
+  }
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+}
+
+// GET /api/report/chlorine/injection-levels — { levels: [{date, level}], updated_at, updated_by_name }
+export async function handleChlorineInjectionGet(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const { data, error: err } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', CHLORINE_INJECTION_KEY)
+      .maybeSingle()
+    if (err) {
+      console.error('chlorine-injection-get:', err.message)
+      return json({ error: 'BKB塩素注入レベルの取得に失敗しました' }, 500)
+    }
+    if (!data?.value) return json({ levels: CHLORINE_INJECTION_INITIAL, updated_at: null, updated_by_name: null })
+    let parsed = null
+    try {
+      parsed = JSON.parse(data.value)
+    } catch {
+      parsed = null
+    }
+    const levels = sanitizeInjectionLevels(parsed?.levels) || []
+    return json({
+      levels,
+      updated_at: parsed?.updated_at || null,
+      updated_by_name: parsed?.updated_by_name || null,
+    })
+  } catch (err) {
+    console.error('chlorine-injection-get 失敗:', err)
+    return json({ error: 'BKB塩素注入レベルの取得に失敗しました' }, 500)
+  }
+}
+
+// PUT /api/report/chlorine/injection-levels — 一覧を丸ごと置き換える（{ levels: [{date, level}] }）
+export async function handleChlorineInjectionSave(req) {
+  const { auth, error } = await requireAuth(req, { write: true })
+  if (error) return error
+  try {
+    const payload = await req.json().catch(() => null)
+    const levels = sanitizeInjectionLevels(payload?.levels)
+    if (!levels) return json({ error: '日付（YYYY-MM-DD）と注入レベル（0〜999の数値）を正しく入れてください' }, 400)
+
+    const supabase = getAdminClient()
+    const { data: user } = await supabase.from('users').select('display_name').eq('id', auth.sub).maybeSingle()
+    const value = {
+      levels,
+      updated_at: new Date().toISOString(),
+      updated_by: auth.sub,
+      updated_by_name: user?.display_name || null,
+    }
+    const { error: err } = await supabase
+      .from('settings')
+      .upsert({ key: CHLORINE_INJECTION_KEY, value: JSON.stringify(value) }, { onConflict: 'key' })
+    if (err) {
+      console.error('chlorine-injection-save:', err.message)
+      return json({ error: 'BKB塩素注入レベルの保存に失敗しました' }, 500)
+    }
+    return json({ levels, updated_at: value.updated_at, updated_by_name: value.updated_by_name })
+  } catch (err) {
+    console.error('chlorine-injection-save 失敗:', err)
+    return json({ error: 'BKB塩素注入レベルの保存に失敗しました' }, 500)
+  }
+}

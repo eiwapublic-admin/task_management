@@ -40,6 +40,8 @@ import {
   handleChlorineCreate,
   handleChlorineUpdate,
   handleChlorineDelete,
+  handleChlorineInjectionGet,
+  handleChlorineInjectionSave,
 } from './lib/reports.js'
 import {
   handleEquipmentCategoryList,
@@ -1130,6 +1132,11 @@ async function route(req, env) {
     if (req.method === 'POST') return handleChlorineCreate(req)
     if (req.method === 'PATCH') return handleChlorineUpdate(req)
     if (req.method === 'DELETE') return handleChlorineDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/report/chlorine/injection-levels') {
+    if (req.method === 'GET') return handleChlorineInjectionGet(req)
+    if (req.method === 'PUT') return handleChlorineInjectionSave(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
 
