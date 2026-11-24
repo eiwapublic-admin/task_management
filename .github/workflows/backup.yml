@@ -202,12 +202,15 @@ jobs:
           # なりFAILED変数の更新がループの外に反映されないため。
           FAILED=0
           while IFS= read -r row; do
-            bucket=$(echo "$row" | jq -r '.bucket_id')
-            name=$(echo "$row" | jq -r '.name')
+            bucket=$(jq -r '.bucket_id' <<< "$row")
+            name=$(jq -r '.name' <<< "$row")
             # パスの区切り(/)はそのまま、各セグメントだけをURLエンコードする
             # （worker/lib/storage.js が encodeURI() を使うのと同じ考え方。jqの@uriは
             # encodeURIComponent相当で/も%2Fにしてしまうため、セグメントごとに分けて使う）
-            encoded_name=$(echo "$row" | jq -rn --argjson row "$row" '$row.name | split("/") | map(@uri) | join("/")')
+            # jq -n は標準入力を読まないので、echo からパイプで渡すと jq が先に終わったときに
+            # echo が Broken pipe で失敗し、pipefail でステップ全体が落ちる（2026-11-22 の失敗の原因）。
+            # 標準入力は使わず --argjson だけで渡す
+            encoded_name=$(jq -rn --argjson row "$row" '$row.name | split("/") | map(@uri) | join("/")')
             dest="storage/${bucket}/${name}"
             mkdir -p "$(dirname "$dest")"
             if ! curl -fsS "${KEY_HEADERS[@]}" \
