@@ -21,12 +21,28 @@ import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
 const PunchLink = lazy(() => import('./pages/PunchLink.jsx'))
 
-const ADMIN_MENU = [
-  { to: '/leave', label: '有給休暇の管理' },
-  { to: '/staff', label: 'スタッフ' },
-  { to: '/patterns', label: '出退勤パターン' },
-  { to: '/sites', label: '現場' },
-  { to: '/settings', label: '設定' },
+// 管理者の PC のメニュー（2026-11-24 依頼元の要望）。「ホーム」「休暇」は廃止し、グループに分ける。
+//   勤務管理: 勤務一覧・スタッフ別・要確認・有給休暇の管理 ／ マスター: スタッフ・出勤パターン・現場 ／ 設定
+// 管理者自身の勤務は「スタッフ別」で自分を選んで入力し、休暇の申請も「スタッフ別」の日の詳細から行う
+const adminGroups = (alertTotal) => [
+  {
+    label: '勤務管理',
+    items: [
+      { to: '/monthly', label: '勤務一覧', icon: 'list', short: '一覧' },
+      { to: '/calendar', label: 'スタッフ別', icon: 'calendar' },
+      { to: '/alerts', label: '要確認', icon: 'alert', badge: alertTotal },
+      { to: '/leave', label: '有給休暇の管理', icon: 'leave', short: '有給' },
+    ],
+  },
+  {
+    label: 'マスター',
+    items: [
+      { to: '/staff', label: 'スタッフ', icon: 'staff' },
+      { to: '/patterns', label: '出勤パターン', icon: 'pattern' },
+      { to: '/sites', label: '現場', icon: 'site' },
+    ],
+  },
+  { items: [{ to: '/settings', label: '設定', icon: 'settings' }] },
 ]
 
 // 管理者の「要確認」の件数（未確認＋承認待ちの修正申請）。画面を移るたび（1 分に 1 回まで）と、確認したときに取り直す
@@ -68,42 +84,35 @@ function Shell({ children }) {
       })
       .catch(() => {})
   }, [])
-  const menu = [
-    { to: '/', label: 'ホーム', end: true },
-    ...(user?.works_admin ? [{ to: '/monthly', label: '勤務表一覧' }, { to: '/alerts', label: '要確認', badge: alertTotal }] : []),
-    { to: '/calendar', label: 'カレンダー' },
-    { to: '/vacation', label: '休暇' },
-    ...(user?.works_admin ? ADMIN_MENU : []),
-  ]
-  if (!user?.works_admin) menu.push({ to: '/me', label: '設定' })
+  const isAdmin = !!user?.works_admin
+  const groups = isAdmin
+    ? adminGroups(alertTotal)
+    : [
+        {
+          items: [
+            { to: '/', label: 'ホーム', end: true },
+            { to: '/calendar', label: 'カレンダー' },
+            { to: '/vacation', label: '休暇' },
+            { to: '/me', label: '設定' },
+          ],
+        },
+      ]
   const signOut = () => {
     logout()
     navigate('/login')
   }
   // スマホの下部メニュー（アイコン型。2026-11-20 依頼元の要望）
-  //   管理者: ホーム｜一覧｜有給｜スタッフ｜その他（要確認・カレンダー・休暇・出退勤パターン・現場・設定・ログアウト）
+  //   管理者: PC の「勤務管理」の 4 つ（一覧｜スタッフ別｜要確認｜有給）＋その他（マスター・設定・ログアウト）（2026-11-24）
   //   スタッフ: ホーム｜カレンダー｜休暇｜設定
-  const tabs = user?.works_admin
-    ? [
-        { to: '/', label: 'ホーム', icon: 'home', end: true },
-        { to: '/monthly', label: '一覧', icon: 'list' },
-        { to: '/leave', label: '有給', icon: 'leave' },
-        { to: '/staff', label: 'スタッフ', icon: 'staff' },
-      ]
+  const tabs = isAdmin
+    ? groups[0].items.map((m) => ({ ...m, label: m.short || m.label }))
     : [
         { to: '/', label: 'ホーム', icon: 'home', end: true },
         { to: '/calendar', label: 'カレンダー', icon: 'calendar' },
         { to: '/vacation', label: '休暇', icon: 'vacation' },
         { to: '/me', label: '設定', icon: 'settings' },
       ]
-  const more = [
-    { to: '/alerts', label: '要確認', icon: 'alert', badge: alertTotal },
-    { to: '/calendar', label: 'カレンダー', icon: 'calendar' },
-    { to: '/vacation', label: '休暇（自分の申請）', icon: 'vacation' },
-    { to: '/patterns', label: '出退勤パターン', icon: 'pattern' },
-    { to: '/sites', label: '現場', icon: 'site' },
-    { to: '/settings', label: '設定', icon: 'settings' },
-  ]
+  const more = isAdmin ? groups.slice(1) : null
   return (
     <div className="works-shell">
       <aside className="works-side">
@@ -112,11 +121,16 @@ function Shell({ children }) {
           eWorks
         </div>
         <nav className="works-nav">
-          {menu.map((m) => (
-            <NavLink key={m.to} to={m.to} end={m.end}>
-              {m.label}
-              {m.badge > 0 && <span className="works-count">{m.badge}</span>}
-            </NavLink>
+          {groups.map((g, i) => (
+            <div key={i} className="works-nav-group">
+              {g.label && <div className="works-nav-label">{g.label}</div>}
+              {g.items.map((m) => (
+                <NavLink key={m.to} to={m.to} end={m.end} className={g.label ? 'is-sub' : ''}>
+                  {m.label}
+                  {m.badge > 0 && <span className="works-count">{m.badge}</span>}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="works-side-foot">
@@ -129,7 +143,7 @@ function Shell({ children }) {
       <main className="works-main">
         <div className="works-content">{typeof children === 'function' ? children(user) : children}</div>
       </main>
-      <TabBar tabs={tabs} more={user?.works_admin ? more : null} onSignOut={signOut} />
+      <TabBar tabs={tabs} more={more} onSignOut={signOut} />
     </div>
   )
 }
@@ -138,19 +152,23 @@ function TabBar({ tabs, more, onSignOut }) {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
   useEffect(() => setOpen(false), [pathname])
-  const moreActive = more?.some((m) => pathname.startsWith(m.to))
-  const moreBadge = (more || []).reduce((a, m) => a + (m.badge || 0), 0)
+  const moreItems = (more || []).flatMap((g) => g.items)
+  const moreActive = moreItems.some((m) => pathname.startsWith(m.to))
   return (
     <>
       {open && (
         <div className="works-more" onClick={() => setOpen(false)}>
           <div className="works-more-sheet" role="menu" onClick={(e) => e.stopPropagation()}>
-            {more.map((m) => (
-              <NavLink key={m.to} to={m.to} role="menuitem">
-                <TabIcon name={m.icon} size={22} />
-                {m.label}
-                {m.badge > 0 && <span className="works-count">{m.badge}</span>}
-              </NavLink>
+            {more.map((g, i) => (
+              <div key={i} role="group" aria-label={g.label}>
+                {g.label && <div className="works-more-label">{g.label}</div>}
+                {g.items.map((m) => (
+                  <NavLink key={m.to} to={m.to} role="menuitem">
+                    <TabIcon name={m.icon} size={22} />
+                    {m.label}
+                  </NavLink>
+                ))}
+              </div>
             ))}
             <button type="button" role="menuitem" onClick={onSignOut}>
               <TabIcon name="logout" size={22} />
@@ -164,13 +182,13 @@ function TabBar({ tabs, more, onSignOut }) {
           <NavLink key={m.to} to={m.to} end={m.end}>
             <TabIcon name={m.icon} />
             <span>{m.label}</span>
+            {m.badge > 0 && <span className="works-count works-tab-count">{m.badge}</span>}
           </NavLink>
         ))}
         {more && (
           <button type="button" className={moreActive || open ? 'active' : ''} aria-expanded={open} onClick={() => setOpen(!open)}>
             <TabIcon name="more" />
             <span>その他</span>
-            {moreBadge > 0 && <span className="works-count works-tab-count">{moreBadge}</span>}
           </button>
         )}
       </nav>
@@ -178,20 +196,17 @@ function TabBar({ tabs, more, onSignOut }) {
   )
 }
 
-// アプリを開いたとき（ログイン直後・起動直後）の最初の画面。管理者は勤務表一覧から始める。
-// ホームへは 2 回目以降（メニューから選んだとき）は普通に入れるよう、起動時の 1 回だけ振り分ける
-let startHandled = false
+// 「/」はスタッフのホーム。管理者はホームを廃止したので（2026-11-24）、いつも勤務一覧へ
 function StartPage() {
-  if (!startHandled) {
-    startHandled = true
-    if (isLoggedIn() && getUser()?.works_admin) return <Navigate to="/monthly" replace />
-  }
+  if (isLoggedIn() && getUser()?.works_admin) return <Navigate to="/monthly" replace />
   return <Private>{(user) => <Home user={user} />}</Private>
 }
 
-function Private({ children, admin = false }) {
+function Private({ children, admin = false, staffOnly = '' }) {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
   if (admin && !getUser()?.works_admin) return <Navigate to="/" replace />
+  // 管理者の「休暇」画面は廃止（休暇の申請・残日数は「スタッフ別」へ。2026-11-24）
+  if (staffOnly && getUser()?.works_admin) return <Navigate to={staffOnly} replace />
   return <Shell>{children}</Shell>
 }
 
@@ -208,8 +223,8 @@ export default function App() {
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
         <Route path="/alerts" element={<Private admin><Alerts /></Private>} />
-        <Route path="/me" element={<Private><MySettings /></Private>} />
-        <Route path="/vacation" element={<Private><Vacation /></Private>} />
+        <Route path="/me" element={<Private staffOnly="/settings"><MySettings /></Private>} />
+        <Route path="/vacation" element={<Private staffOnly="/calendar"><Vacation /></Private>} />
         <Route path="/leave" element={<Private admin><Leave /></Private>} />
         <Route path="/staff" element={<Private admin><Staff /></Private>} />
         <Route path="/patterns" element={<Private admin><Patterns /></Private>} />

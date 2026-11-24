@@ -14,7 +14,7 @@ export default function Patterns() {
   return (
     <>
       <div className="works-sticky">
-        <h1 className="works-title">出退勤パターン</h1>
+        <h1 className="works-title">出勤パターン</h1>
         <div className="works-row-actions">
           <button type="button" className="btn-primary works-btn-accent" onClick={() => setEdit({ name: '', start_time: '09:00', end_time: '17:00', telework: false, active: true })}>
             ＋ 新しいパターン

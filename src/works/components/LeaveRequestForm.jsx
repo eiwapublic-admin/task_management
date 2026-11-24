@@ -1,6 +1,7 @@
 // 有給休暇・特別休暇の申請フォーム。
 //   本人: 申請 → 労務担当の承認待ちになる。
 //   管理者（staffList を渡す）: 紙の申請書の代理入力。スタッフを選び、承認済みで登録する。
+//   管理者（staff を渡す）: 「スタッフ別」の日の詳細から、そのスタッフの分を承認済みで登録する（date はその日。2026-11-24）
 // 期間を選ぶと 1 日ずつ並べ、予定（勤務）のある日に最初から印を付ける（予定がまだ無い月は平日に付ける）
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
@@ -21,12 +22,12 @@ function daysBetween(from, to) {
 }
 const dowOf = (d) => new Date(`${d}T00:00:00Z`).getUTCDay()
 
-export default function LeaveRequestForm({ staffList = null, summary = null, onClose, onSaved }) {
-  const proxy = !!staffList
-  const [staffId, setStaffId] = useState('')
+export default function LeaveRequestForm({ staffList = null, staff = null, date = null, summary = null, onClose, onSaved }) {
+  const proxy = !!staffList || !!staff
+  const [staffId, setStaffId] = useState(staff?.id || '')
   const [kind, setKind] = useState('paid')
-  const [from, setFrom] = useState(todayJst())
-  const [to, setTo] = useState(todayJst())
+  const [from, setFrom] = useState(date || todayJst())
+  const [to, setTo] = useState(date || todayJst())
   const [checked, setChecked] = useState({})
   const [reason, setReason] = useState('')
   const [shiftDays, setShiftDays] = useState(null)
@@ -95,7 +96,7 @@ export default function LeaveRequestForm({ staffList = null, summary = null, onC
 
   return (
     <Modal
-      title={proxy ? '紙の申請書を入力（承認済みで登録）' : '休暇を申請する'}
+      title={staff ? `${staff.name} さんの休暇を登録（承認済み）` : proxy ? '紙の申請書を入力（承認済みで登録）' : '休暇を申請する'}
       onClose={onClose}
       size="lg"
       foot={
@@ -104,7 +105,7 @@ export default function LeaveRequestForm({ staffList = null, summary = null, onC
         </button>
       }
     >
-      {proxy && (
+      {staffList && !staff && (
         <label className="ui-field">
           <span>スタッフ</span>
           <select className="ui-select" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
@@ -154,7 +155,7 @@ export default function LeaveRequestForm({ staffList = null, summary = null, onC
         </p>
       )}
       <p className="ui-note" style={{ margin: 0 }}>
-        {proxy ? '紙の申請書の内容をそのまま入力してください。登録すると取得日にも入ります。' : '申請すると、労務担当が確認して承認します。承認されると取得日に入ります。'}
+        {staff ? '管理者が入力するので、承認済みで取得日に入ります（紙の申請書を受け付けたときもここから入力できます）。' : proxy ? '紙の申請書の内容をそのまま入力してください。登録すると取得日にも入ります。' : '申請すると、労務担当が確認して承認します。承認されると取得日に入ります。'}
       </p>
       {error && <div className="works-error">{error}</div>}
     </Modal>

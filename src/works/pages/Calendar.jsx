@@ -1,6 +1,7 @@
 // カレンダー（Phase 2。docs/eworks-plan.md 10-3）
 //   本人: 自分の月の予定
-//   管理者: スタッフを切り替えて同じ月表示／「全員」でスタッフ × 日の表。予定の作成・手での追加と変更
+//   管理者（メニュー名「スタッフ別」）: スタッフを切り替えて同じ月表示／「全員」でスタッフ × 日の表。予定の作成・手での追加と変更。
+//     2026-11-24: ホーム・休暇を廃止し、管理者自身の勤務入力（自分を選ぶ）・休暇の申請（日の詳細）・有給休暇の残りもここで行う
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal, { ModalFoot } from '../components/Modal.jsx'
@@ -9,6 +10,8 @@ import { api, getUser, WEEKDAYS } from '../lib/api.js'
 import { addMonths, dow, hoursLabel, monthRange, todayJst } from '../../../worker/lib/works/time.js'
 import KeyCell from '../components/KeyCell.jsx'
 import DayAlerts from '../components/DayAlerts.jsx'
+import LeaveRequestForm from '../components/LeaveRequestForm.jsx'
+import StaffLeavePanel from '../components/StaffLeavePanel.jsx'
 
 const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
@@ -30,6 +33,9 @@ export default function Calendar() {
   const [sites, setSites] = useState([])
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [leaveForm, setLeaveForm] = useState(null)
+  const [leaveSummary, setLeaveSummary] = useState(null)
+  const [leaveVersion, setLeaveVersion] = useState(0)
 
   const load = useCallback(() => {
     const q = new URLSearchParams({ month })
@@ -105,7 +111,7 @@ export default function Calendar() {
   return (
     <>
       <div className="works-sticky">
-        <h1 className="works-title">カレンダー</h1>
+        <h1 className="works-title">{isAdmin ? 'スタッフ別' : 'カレンダー'}</h1>
         <div className="works-row-actions">
           <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
           <strong className="works-month">{monthLabel(month)}</strong>
@@ -117,7 +123,7 @@ export default function Calendar() {
               <select className="ui-select works-staff-select" value={staffId} onChange={(e) => setStaffId(e.target.value)}>
                 <option value="all">全員を表で表示</option>
                 {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>{s.code} {s.name}{s.status === 'leave' ? '（休職）' : ''}</option>
+                  <option key={s.id} value={s.id}>{s.code} {s.name}{s.status === 'leave' ? '（休職）' : ''}{s.id === me?.staff?.id ? '（自分）' : ''}</option>
                 ))}
               </select>
               {current && (
@@ -139,6 +145,7 @@ export default function Calendar() {
       {data && staffId !== 'all' && staffId && (
         <MonthGrid data={data} month={month} alerts={alerts} onDay={(d) => setDay(d)} />
       )}
+      {isAdmin && current && <StaffLeavePanel staff={current} version={leaveVersion} onLoaded={setLeaveSummary} />}
       {day && (
         <DayModal
           date={day}
@@ -149,6 +156,10 @@ export default function Calendar() {
           editable={isAdmin}
           actualEditable={canActual}
           canRequest={!isAdmin && (me?.staff?.punch_method || 'qr') === 'qr'}
+          onLeave={isAdmin && current ? (d) => {
+            setDay(null)
+            setLeaveForm({ date: d })
+          } : null}
           onClose={() => setDay(null)}
           onSaved={() => {
             load()
@@ -157,6 +168,19 @@ export default function Calendar() {
         />
       )}
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
+      {leaveForm && current && (
+        <LeaveRequestForm
+          date={leaveForm.date}
+          // 自分の分は今までどおり申請（もう一人の管理者が承認）。ほかのスタッフの分は管理者の入力なので承認済みで登録
+          staff={current.id === me?.staff?.id ? null : current}
+          summary={leaveSummary}
+          onClose={() => setLeaveForm(null)}
+          onSaved={() => {
+            setLeaveForm(null)
+            setLeaveVersion((v) => v + 1)
+          }}
+        />
+      )}
     </>
   )
 }
@@ -293,7 +317,7 @@ function AllTable({ data, month, onPick }) {
   )
 }
 
-export function DayModal({ date, data, staff, staffId, sites, editable, actualEditable, canRequest = false, onClose, onSaved }) {
+export function DayModal({ date, data, staff, staffId, sites, editable, actualEditable, canRequest = false, onLeave = null, onClose, onSaved }) {
   const shifts = data.items.filter((s) => s.work_date === date)
   const [edit, setEdit] = useState(null)
   const [error, setError] = useState('')
@@ -367,7 +391,8 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
         </div>
       ))}
       {editable && !edit && (
-        <div>
+        <div className="works-row-actions" style={{ marginBottom: 0 }}>
+          {onLeave && <button type="button" className="btn-plain" onClick={() => onLeave(date)}>＋ 休暇を申請する</button>}
           <button type="button" className="btn-plain" onClick={() => setEdit({ plan_start: shifts[0]?.plan_start || '09:00', plan_end: shifts[0]?.plan_end || '17:00', site_id: shifts[0]?.site_id || '', telework: !!shifts[0]?.telework, note: '' })}>
             ＋ この日に予定を追加
           </button>
