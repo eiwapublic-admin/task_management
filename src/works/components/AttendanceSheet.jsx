@@ -121,7 +121,7 @@ export default function AttendanceSheet({ month, sheet, holidays = {}, companyHo
               </div>
               <div className="att-c att-c-work">
                 {items.map((s) => (
-                  <div key={s.id} className="att-v att-site">
+                  <div key={s.id} className={s.actual_start && s.actual_end ? 'att-v att-site is-actual' : 'att-v att-site'}>
                     {s.telework ? 'テレワーク' : ''}
                   </div>
                 ))}
