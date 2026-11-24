@@ -69,3 +69,9 @@ export async function upsertPaperRecord(payload) {
 export async function deletePaperRecord(id) {
   await authFetch(`/api/paper/records?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
+
+// 全期間の月別合計（過去推移タブ用。2026-11-24〜）。[{ month: 'YYYY-MM', total }]
+export async function fetchPaperMonthlyTotals() {
+  const data = await authFetch('/api/paper/monthly-totals')
+  return data.months || []
+}

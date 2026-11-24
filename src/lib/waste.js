@@ -138,3 +138,9 @@ export async function fetchWasteDriveFileBuffer(fileId) {
   }
   return res.arrayBuffer()
 }
+
+// 全期間の月別合計（過去推移タブ用。2026-11-24〜）。[{ month: 'YYYY-MM', total }]
+export async function fetchWasteMonthlyTotals() {
+  const data = await authFetch('/api/waste/monthly-totals')
+  return data.months || []
+}

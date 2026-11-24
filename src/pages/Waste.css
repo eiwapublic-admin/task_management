@@ -16,29 +16,8 @@
 .waste-day.is-saturday { color: var(--color-primary-hover); }
 .waste-day.is-holiday { color: var(--color-danger); }
 
-/* 年度集計：月別合計だけの表にし、年度合計は表の上に独立してカードで大きく表示する
-   （2026-09-04。月ごとの1〜7階の内訳は不要との依頼）。数字の大きさはポータルの
-   統計値と同じ --fs-4xl を使う */
-.waste-year-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-}
-.waste-year-total-label { font-size: var(--fs-lg); font-weight: 700; color: var(--text-strong); }
-.waste-year-total-value {
-  font-size: var(--fs-4xl);
-  font-weight: 700;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-}
-.waste-year-total-unit { font-size: var(--fs-md); font-weight: 400; color: var(--text-muted); }
+/* 年度集計・過去推移の中身は共通部品 src/components/YearCompareCharts.jsx（2026-11-24〜）。
+   年度合計のカード（.waste-year-total）はグラフと重複するため削除した（依頼） */
 
 /* 月別一覧（.waste-month-table）：床数(7)+合計+日+曜日で列数が多く、モバイルでは
    横スクロールが前提になる。日・曜日の2列だけ左端に固定し（frozen columns。
@@ -178,21 +157,27 @@
 .waste-chat-paste { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); resize: vertical; }
 .waste-chat-copy-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
 
-/* 年度集計の前年比較グラフ（2026-11-24〜。src/components/YearCompareCharts.jsx）。
-   左に月別（前年同月と横並び）、右に年間合計の前年度比較。狭幅では縦に積む */
-.waste-year-charts {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
-  gap: var(--space-5);
-  align-items: center;
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+/* 入力タブ：見出し行の固定（2026-11-24。依頼）。表のラッパーは横スクロールを持ち、CSSの仕様上
+   縦のスクロールコンテナにもなるため、ページ基準の sticky は効かない
+   （.claude/skills/sticky-header-overflow-trap）。古紙回収の入力表（Paper.css）と同じく、
+   画面を縦の flex にしてラッパーに残りの高さを渡し、その中で縦スクロールさせる */
+.waste-page.is-input {
+  display: flex;
+  flex-direction: column;
 }
-.waste-prev-total { color: var(--text-muted); }
-@media (max-width: 768px) {
-  .waste-year-charts { grid-template-columns: 1fr; gap: var(--space-3); padding: var(--space-3); }
+.waste-page.is-input > * { flex: 0 0 auto; }
+.waste-page.is-input > .waste-month-wrap {
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.waste-month-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+/* 左端の日・曜日の見出しは、横と縦の両方で固定するので重なりを最上位に */
+.waste-month-table thead th:nth-child(1),
+.waste-month-table thead th:nth-child(2) { z-index: 3; }

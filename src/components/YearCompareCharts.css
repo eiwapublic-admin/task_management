@@ -183,3 +183,110 @@
   .ycc-annual { gap: 2px; }
   .ycc-annual-track { height: 12px; }
 }
+
+/* ===== 年度集計・過去推移タブの枠と表（2026-11-24〜） ===== */
+.ycc-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: var(--space-5);
+  align-items: center;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.ycc-panel.is-history {
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+.ycc-table th,
+.ycc-table td { text-align: center; white-space: nowrap; }
+.ycc-table thead th {
+  background: var(--border-strong);
+  color: var(--text-strong);
+}
+.ycc-table tbody tr:nth-child(even) { background: var(--bg-app); }
+.ycc-table-strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.ycc-table-muted { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ycc-table .ycc-table-total td {
+  font-weight: 700;
+  background: var(--bg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 過去推移（年度ごとの縦棒） */
+.ycc-history-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 220px;
+  min-width: 0;
+}
+.ycc-history-col {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 96px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.ycc-history-bar-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.ycc-history-bar {
+  display: block;
+  width: 70%;
+  max-width: 48px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
+  box-sizing: border-box;
+}
+.ycc-history-bar.is-partial { opacity: 0.4; }
+.ycc-history-bar.is-estimate {
+  position: relative;
+  background: transparent;
+  border: 2px dashed var(--color-primary);
+  border-bottom: none;
+}
+.ycc-history-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-primary);
+  opacity: 0.85;
+}
+.ycc-history-value,
+.ycc-history-label,
+.ycc-history-sub {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ycc-history-value { color: var(--text-strong); font-weight: 600; }
+.ycc-history-value.is-estimate { color: var(--color-primary); }
+.ycc-history-sub { min-height: 1.2em; }
+
+@media (max-width: 768px) {
+  .ycc-panel { grid-template-columns: 1fr; gap: var(--space-3); padding: var(--space-3); }
+  /* 年度が多いと狭幅に収まらないため横スクロールにする。金額は下の表で読めるので棒の上は省く */
+  .ycc-history-chart { height: 180px; gap: var(--space-1); overflow-x: auto; justify-content: flex-start; }
+  .ycc-history-col { flex: 0 0 44px; }
+  .ycc-history-value { display: none; }
+}
+.ycc-only-narrow { display: none; }
+@media (max-width: 768px) {
+  .ycc-only-wide { display: none; }
+  .ycc-only-narrow { display: inline; }
+}

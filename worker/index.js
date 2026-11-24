@@ -160,6 +160,7 @@ import {
 } from './lib/tenant-mail.js'
 import {
   handleWasteRecordList,
+  handleWasteMonthlyTotals,
   handleWasteRecordUpsert,
   handleWasteRecordDelete,
   handleWasteRecordConfirmMonth,
@@ -170,6 +171,7 @@ import {
 } from './lib/waste.js'
 import {
   handlePaperRecordList,
+  handlePaperMonthlyTotals,
   handlePaperRecordUpsert,
   handlePaperRecordDelete,
 } from './lib/paper.js'
@@ -1401,6 +1403,10 @@ async function route(req, env) {
     if (req.method === 'DELETE') return handleWasteRecordDelete(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
+  if (pathname === '/api/waste/monthly-totals') {
+    if (req.method === 'GET') return handleWasteMonthlyTotals(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
   if (pathname === '/api/waste/records/confirm-month') {
     if (req.method === 'POST') return handleWasteRecordConfirmMonth(req)
     return json({ error: 'Method Not Allowed' }, 405)
@@ -1429,6 +1435,10 @@ async function route(req, env) {
     if (req.method === 'GET') return handlePaperRecordList(req)
     if (req.method === 'PUT') return handlePaperRecordUpsert(req)
     if (req.method === 'DELETE') return handlePaperRecordDelete(req)
+    return json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/paper/monthly-totals') {
+    if (req.method === 'GET') return handlePaperMonthlyTotals(req)
     return json({ error: 'Method Not Allowed' }, 405)
   }
 

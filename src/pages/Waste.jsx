@@ -10,15 +10,14 @@ import {
   WASTE_FLOORS,
   classifyWasteWeight,
   currentFiscalYear,
-  fiscalYearMonths,
   fetchWasteRecords,
+  fetchWasteMonthlyTotals,
   upsertWasteRecord,
   deleteWasteRecord,
   confirmWasteMonth,
 } from '../lib/waste'
 import { currentMonthJST, shiftMonth, daysInMonth, weekdayInfo, fetchHolidays } from '../lib/reports'
-import { fiscalYearTotals, sameMonthLastYear } from '../lib/yearCompare'
-import { AnnualCompareChart, MonthCompareChart } from '../components/YearCompareCharts'
+import { HistoryPanel, YearSummaryPanel } from '../components/YearCompareCharts'
 import './Dashboard.css'
 import './Waste.css'
 
@@ -31,12 +30,15 @@ export default function Waste() {
   // 書き込みは残留塩素・自主検査と同じ扱い（owner・備品出庫限定ロールは閲覧のみ）
   const readOnly = isLimitedRole(user)
 
-  const [viewMode, setViewMode] = useState('month') // 'month' | 'year'
+  // 'month'＝入力 | 'year'＝年度集計 | 'history'＝過去推移（2026-11-24〜 タブ名を「月別」から「入力」に、過去推移を追加）
+  const [viewMode, setViewMode] = useState('month')
   const [month, setMonth] = useState(currentMonthJST())
   const [fiscalYear, setFiscalYear] = useState(currentFiscalYear())
   const [records, setRecords] = useState([])
   // 年度集計で前年度と比べるための前年度の実測値（2026-11-24〜）
   const [prevRecords, setPrevRecords] = useState([])
+  // 過去推移タブ用の全期間の月別合計（'YYYY-MM' -> kg）
+  const [historyTotals, setHistoryTotals] = useState(new Map())
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -56,6 +58,9 @@ export default function Waste() {
     try {
       if (viewMode === 'month') {
         setRecords(await fetchWasteRecords({ month }))
+      } else if (viewMode === 'history') {
+        const rows = await fetchWasteMonthlyTotals()
+        setHistoryTotals(new Map(rows.map((r) => [r.month, Number(r.total)])))
       } else {
         const [rows, prev] = await Promise.all([
           fetchWasteRecords({ fiscalYear }),
@@ -145,27 +150,26 @@ export default function Waste() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide app-scroll">
+      <div className={`ui-container is-wide app-scroll waste-page${viewMode === 'month' ? ' is-input' : ''}`}>
         <FeatureHeader
           filters={
             <>
               <div className="ui-segmented" role="group" aria-label="表示の切り替え">
-                <button
-                  type="button"
-                  className={`ui-segmented-btn${viewMode === 'month' ? ' is-active' : ''}`}
-                  aria-pressed={viewMode === 'month'}
-                  onClick={() => setViewMode('month')}
-                >
-                  月別
-                </button>
-                <button
-                  type="button"
-                  className={`ui-segmented-btn${viewMode === 'year' ? ' is-active' : ''}`}
-                  aria-pressed={viewMode === 'year'}
-                  onClick={() => setViewMode('year')}
-                >
-                  年度集計
-                </button>
+                {[
+                  ['month', '入力'],
+                  ['year', '年度集計'],
+                  ['history', '過去推移'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`ui-segmented-btn${viewMode === mode ? ' is-active' : ''}`}
+                    aria-pressed={viewMode === mode}
+                    onClick={() => setViewMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
               {viewMode === 'month' ? (
                 <div className="inspection-month">
@@ -189,7 +193,7 @@ export default function Waste() {
                     <IconChevronRight size={28} />
                   </button>
                 </div>
-              ) : (
+              ) : viewMode === 'year' ? (
                 <div className="inspection-month">
                   <button
                     type="button"
@@ -211,7 +215,7 @@ export default function Waste() {
                     <IconChevronRight size={28} />
                   </button>
                 </div>
-              )}
+              ) : null}
             </>
           }
           actions={
@@ -287,16 +291,20 @@ export default function Waste() {
             onSave={handleSaveCell}
             onClear={handleClearCell}
           />
-        ) : (
+        ) : viewMode === 'year' ? (
           <YearTable fiscalYear={fiscalYear} records={records} prevRecords={prevRecords} />
+        ) : (
+          <HistoryPanel monthTotals={historyTotals} totalFormat={formatWasteTotalKg} />
         )}
 
+        {viewMode === 'month' && (
         <p className="settings-hint waste-legend">
           単位: kg／通常0〜20kg、
           <span className="waste-legend-high">20kg超</span>は多め、
           <span className="waste-legend-extreme">50kg以上</span>
           は書き間違いの疑いがあるため確認してください（自動修正はしません）。
         </p>
+        )}
       </div>
 
       {importOpen && (
@@ -374,7 +382,10 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
   const grandTotal = colTotals.reduce((a, b) => a + b, 0)
 
   return (
-    <div className="ui-table-wrap">
+    // 見出し行の固定（2026-11-24。依頼）。表のラッパーは横スクロールを持つため、ページ基準の
+    // sticky は効かない（.claude/skills/sticky-header-overflow-trap）。古紙回収の入力表と同じく
+    // 画面を縦の flex にしてラッパー自身を縦スクロールさせ、見出しをその上端に貼り付ける
+    <div className="ui-table-wrap waste-month-wrap">
       <table className="ui-table waste-table waste-month-table">
         <thead>
           <tr>
@@ -449,68 +460,18 @@ function formatWasteTotalKg(value) {
 }
 
 // 年度集計。2026-11-24〜 月別合計を前年同月と横並びで比べる棒グラフと、年間合計を前年度と
-// 比べる横棒（最新年度は締まった月の月平均から推計し、点線枠で示す）を足した。
-// 表にも前年同月の列を足す
+// 比べる横棒（最新年度は締まった月の月平均から推計し、点線枠で示す）、月別の表
+// （合計・前年同月・前年比）。上にあった年度合計のカードはグラフと重複するため削除（依頼）
 function YearTable({ fiscalYear, records, prevRecords }) {
-  const months = fiscalYearMonths(fiscalYear)
   const monthTotals = useMemo(() => sumByMonth(records), [records])
   const prevMonthTotals = useMemo(() => sumByMonth(prevRecords), [prevRecords])
-
-  const grandTotal = months.reduce((sum, m) => sum + (monthTotals.get(m) || 0), 0)
-  const currentMonth = currentMonthJST()
-  const chartMonths = months.map((m) => ({
-    month: m,
-    current: monthTotals.get(m) || 0,
-    previous: prevMonthTotals.get(sameMonthLastYear(m)) || 0,
-  }))
-  const currentTotals = fiscalYearTotals(fiscalYear, monthTotals, currentMonth)
-  const prevTotals = fiscalYearTotals(fiscalYear - 1, prevMonthTotals, currentMonth)
-
   return (
-    <>
-      <p className="waste-year-total">
-        <span className="waste-year-total-label">{fiscalYear}年度 合計</span>
-        <span className="waste-year-total-value">
-          {grandTotal > 0 ? grandTotal.toFixed(1) : '0.0'}
-          <span className="waste-year-total-unit"> kg</span>
-        </span>
-      </p>
-      <div className="waste-year-charts">
-        <MonthCompareChart months={chartMonths} fiscalYear={fiscalYear} format={formatWasteKg} />
-        <AnnualCompareChart
-          fiscalYear={fiscalYear}
-          current={currentTotals}
-          previous={prevTotals}
-          format={formatWasteTotalKg}
-        />
-      </div>
-      <div className="ui-table-wrap">
-        <table className="ui-table waste-table">
-          <thead>
-            <tr>
-              <th>月</th>
-              <th className="is-numeric">合計</th>
-              <th className="is-numeric">前年同月</th>
-              <th className="is-numeric">前年比</th>
-            </tr>
-          </thead>
-          <tbody>
-            {months.map((m) => {
-              const total = monthTotals.get(m) || 0
-              const prev = prevMonthTotals.get(sameMonthLastYear(m)) || 0
-              const ratio = total > 0 && prev > 0 ? Math.round(((total - prev) / prev) * 100) : null
-              return (
-                <tr key={m}>
-                  <td>{Number(m.slice(5, 7))}月</td>
-                  <td className="is-numeric waste-row-total">{total > 0 ? total.toFixed(1) : ''}</td>
-                  <td className="is-numeric waste-prev-total">{prev > 0 ? prev.toFixed(1) : ''}</td>
-                  <td className="is-numeric waste-prev-total">{ratio == null ? '' : `${ratio > 0 ? '+' : ''}${ratio}%`}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <YearSummaryPanel
+      fiscalYear={fiscalYear}
+      monthTotals={monthTotals}
+      prevMonthTotals={prevMonthTotals}
+      format={formatWasteKg}
+      totalFormat={formatWasteTotalKg}
+    />
   )
 }
