@@ -22,7 +22,7 @@
 /* ===== 年度サマリ（合計・月平均）と月別グラフ ===== */
 .paper-summary {
   display: grid;
-  grid-template-columns: minmax(200px, 260px) 1fr;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 300px);
   gap: var(--space-5);
   align-items: center;
   margin-bottom: var(--space-5);
@@ -61,45 +61,10 @@
   color: var(--text-muted);
 }
 
-/* 月別合計の棒グラフ。専用のグラフ描画ライブラリは入れていないため、
-   違反車両のランキング（RankingBarList）と同じくdiv+CSSで組む */
-.paper-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  height: 140px;
-  min-width: 0;
-}
-
-.paper-chart-col {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
-
-.paper-chart-value {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.paper-chart-bar {
-  width: 100%;
-  max-width: 28px;
-  min-height: 1px;
-  border-radius: 2px 2px 0 0;
-  background: var(--color-primary);
-}
-
-.paper-chart-month {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
+/* 月別グラフ（前年同月と横並び）と年間合計の前年度比較は共通部品
+   src/components/YearCompareCharts.jsx（2026-11-24〜） */
+.paper-annual {
+  align-self: center;
 }
 
 /* ===== 週ごとの入力表 ===== */
@@ -327,6 +292,16 @@
 
 .paper-legend { margin-top: var(--space-4); }
 
+/* 中くらいの幅では、年間合計の比較を合計・月平均の下へ回す（月別グラフに幅を残す） */
+@media (max-width: 1100px) {
+  .paper-summary {
+    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  }
+  .paper-summary-figures { grid-row: 1; grid-column: 1; }
+  .paper-summary .ycc-month { grid-row: 1 / span 2; grid-column: 2; }
+  .paper-annual { grid-row: 2; grid-column: 1; }
+}
+
 /* 狭幅では左のサマリを上に積む（表自体は .paper-table-wrap の横スクロールに任せる） */
 @media (max-width: 768px) {
   .paper-summary {
@@ -334,12 +309,14 @@
     gap: var(--space-3);
     padding: var(--space-3);
   }
+  .paper-summary-figures,
+  .paper-summary .ycc-month,
+  .paper-annual { grid-row: auto; grid-column: auto; }
   /* 合計と月平均は横に並べる（縦に積むと表に残る高さが2行ぶんも減るため） */
   .paper-summary-figures {
     flex-direction: row;
     gap: var(--space-5);
   }
-  .paper-chart { height: 96px; }
 }
 
 /* 画面が低い端末（iPhone SE 等）では、サマリが場所を取りすぎて入力表に高さが残らない。
@@ -349,7 +326,7 @@
     padding: var(--space-3);
     margin-bottom: var(--space-3);
   }
-  .paper-chart { height: 76px; }
+  .paper-summary .ycc-month-chart { height: 76px; }
   .paper-legend {
     margin-top: var(--space-2);
     font-size: var(--fs-2xs);

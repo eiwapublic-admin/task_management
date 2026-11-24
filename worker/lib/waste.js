@@ -52,21 +52,31 @@ export async function handleWasteRecordList(req) {
     if (!month && !fiscalYear) return json({ error: 'month または fiscal_year は必須です' }, 400)
     if (month && !MONTH_PATTERN.test(month)) return json({ error: 'month の形式が不正です' }, 400)
 
+    if (!month && !/^\d{4}$/.test(fiscalYear)) return json({ error: 'fiscal_year の形式が不正です' }, 400)
     const supabase = getAdminClient()
-    let query = supabase.from('waste_records').select(RECORD_COLUMNS)
-    if (month) {
-      query = query.gte('record_date', `${month}-01`).lt('record_date', `${shiftMonth(month, 1)}-01`)
-    } else {
-      if (!/^\d{4}$/.test(fiscalYear)) return json({ error: 'fiscal_year の形式が不正です' }, 400)
-      const { from, to } = fiscalYearRange(fiscalYear)
-      query = query.gte('record_date', from).lte('record_date', to)
+    const build = () => {
+      let query = supabase.from('waste_records').select(RECORD_COLUMNS)
+      if (month) {
+        query = query.gte('record_date', `${month}-01`).lt('record_date', `${shiftMonth(month, 1)}-01`)
+      } else {
+        const { from, to } = fiscalYearRange(fiscalYear)
+        query = query.gte('record_date', from).lte('record_date', to)
+      }
+      return query.order('record_date', { ascending: true }).order('floor', { ascending: true })
     }
-    const { data, error: err } = await query.order('record_date', { ascending: true })
-    if (err) {
-      console.error('waste-record-list:', err.message)
-      return json({ error: '実測値の取得に失敗しました' }, 500)
+    // Supabase は1回に1000行までしか返さない。年度（最大 366日×7階）だと超えるため
+    // 分けて読む（2026-11-24。2025年度は1342行あり、2〜3月分が年度集計から欠けていた）
+    const records = []
+    for (let i = 0; ; i += 1000) {
+      const { data, error: err } = await build().range(i, i + 999)
+      if (err) {
+        console.error('waste-record-list:', err.message)
+        return json({ error: '実測値の取得に失敗しました' }, 500)
+      }
+      records.push(...(data || []))
+      if (!data || data.length < 1000) break
     }
-    return json({ records: data || [] })
+    return json({ records })
   } catch (err) {
     console.error('waste-record-list 失敗:', err)
     return json({ error: '実測値の取得に失敗しました' }, 500)

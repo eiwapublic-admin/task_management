@@ -17,6 +17,8 @@ import {
   confirmWasteMonth,
 } from '../lib/waste'
 import { currentMonthJST, shiftMonth, daysInMonth, weekdayInfo, fetchHolidays } from '../lib/reports'
+import { fiscalYearTotals, sameMonthLastYear } from '../lib/yearCompare'
+import { AnnualCompareChart, MonthCompareChart } from '../components/YearCompareCharts'
 import './Dashboard.css'
 import './Waste.css'
 
@@ -33,6 +35,8 @@ export default function Waste() {
   const [month, setMonth] = useState(currentMonthJST())
   const [fiscalYear, setFiscalYear] = useState(currentFiscalYear())
   const [records, setRecords] = useState([])
+  // 年度集計で前年度と比べるための前年度の実測値（2026-11-24〜）
+  const [prevRecords, setPrevRecords] = useState([])
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -50,9 +54,16 @@ export default function Waste() {
     setLoading(true)
     setError('')
     try {
-      const rows =
-        viewMode === 'month' ? await fetchWasteRecords({ month }) : await fetchWasteRecords({ fiscalYear })
-      setRecords(rows)
+      if (viewMode === 'month') {
+        setRecords(await fetchWasteRecords({ month }))
+      } else {
+        const [rows, prev] = await Promise.all([
+          fetchWasteRecords({ fiscalYear }),
+          fetchWasteRecords({ fiscalYear: fiscalYear - 1 }),
+        ])
+        setRecords(rows)
+        setPrevRecords(prev)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -277,7 +288,7 @@ export default function Waste() {
             onClear={handleClearCell}
           />
         ) : (
-          <YearTable fiscalYear={fiscalYear} records={records} />
+          <YearTable fiscalYear={fiscalYear} records={records} prevRecords={prevRecords} />
         )}
 
         <p className="settings-hint waste-legend">
@@ -419,18 +430,41 @@ function MonthTable({ days, holidays, byKey, readOnly, onSave, onClear }) {
   )
 }
 
-function YearTable({ fiscalYear, records }) {
+function sumByMonth(records) {
+  const map = new Map() // 'YYYY-MM' -> total
+  for (const r of records) {
+    const key = r.record_date.slice(0, 7)
+    map.set(key, (map.get(key) || 0) + Number(r.weight_kg))
+  }
+  return map
+}
+
+function formatWasteKg(value) {
+  const num = Number(value) || 0
+  return num > 0 ? num.toFixed(1) : '0'
+}
+
+function formatWasteTotalKg(value) {
+  return Math.round(Number(value) || 0).toLocaleString('ja-JP')
+}
+
+// 年度集計。2026-11-24〜 月別合計を前年同月と横並びで比べる棒グラフと、年間合計を前年度と
+// 比べる横棒（最新年度は締まった月の月平均から推計し、点線枠で示す）を足した。
+// 表にも前年同月の列を足す
+function YearTable({ fiscalYear, records, prevRecords }) {
   const months = fiscalYearMonths(fiscalYear)
-  const monthTotals = useMemo(() => {
-    const map = new Map() // 'YYYY-MM' -> total
-    for (const r of records) {
-      const key = r.record_date.slice(0, 7)
-      map.set(key, (map.get(key) || 0) + Number(r.weight_kg))
-    }
-    return map
-  }, [records])
+  const monthTotals = useMemo(() => sumByMonth(records), [records])
+  const prevMonthTotals = useMemo(() => sumByMonth(prevRecords), [prevRecords])
 
   const grandTotal = months.reduce((sum, m) => sum + (monthTotals.get(m) || 0), 0)
+  const currentMonth = currentMonthJST()
+  const chartMonths = months.map((m) => ({
+    month: m,
+    current: monthTotals.get(m) || 0,
+    previous: prevMonthTotals.get(sameMonthLastYear(m)) || 0,
+  }))
+  const currentTotals = fiscalYearTotals(fiscalYear, monthTotals, currentMonth)
+  const prevTotals = fiscalYearTotals(fiscalYear - 1, prevMonthTotals, currentMonth)
 
   return (
     <>
@@ -441,21 +475,36 @@ function YearTable({ fiscalYear, records }) {
           <span className="waste-year-total-unit"> kg</span>
         </span>
       </p>
+      <div className="waste-year-charts">
+        <MonthCompareChart months={chartMonths} fiscalYear={fiscalYear} format={formatWasteKg} />
+        <AnnualCompareChart
+          fiscalYear={fiscalYear}
+          current={currentTotals}
+          previous={prevTotals}
+          format={formatWasteTotalKg}
+        />
+      </div>
       <div className="ui-table-wrap">
         <table className="ui-table waste-table">
           <thead>
             <tr>
               <th>月</th>
               <th className="is-numeric">合計</th>
+              <th className="is-numeric">前年同月</th>
+              <th className="is-numeric">前年比</th>
             </tr>
           </thead>
           <tbody>
             {months.map((m) => {
               const total = monthTotals.get(m) || 0
+              const prev = prevMonthTotals.get(sameMonthLastYear(m)) || 0
+              const ratio = total > 0 && prev > 0 ? Math.round(((total - prev) / prev) * 100) : null
               return (
                 <tr key={m}>
                   <td>{Number(m.slice(5, 7))}月</td>
                   <td className="is-numeric waste-row-total">{total > 0 ? total.toFixed(1) : ''}</td>
+                  <td className="is-numeric waste-prev-total">{prev > 0 ? prev.toFixed(1) : ''}</td>
+                  <td className="is-numeric waste-prev-total">{ratio == null ? '' : `${ratio > 0 ? '+' : ''}${ratio}%`}</td>
                 </tr>
               )
             })}
