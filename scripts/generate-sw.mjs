@@ -5,7 +5,7 @@
 //    React Router のクライアント遷移を壊さない（Cloudflare Workers の静的配信でも安全）。
 //  - 役割は「更新の検知」と「SKIP_WAITING による有効化」だけ。オフラインキャッシュは行わない。
 //  - SW_VERSION がデプロイごとに変わることで、ブラウザが新版を検知し ReloadPrompt がバナーを出す。
-import { execSync } from 'node:child_process'
+import { appVersion } from './app-version.mjs'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,16 +17,10 @@ const outPath = process.argv[2] ? resolve(process.cwd(), process.argv[2]) : reso
 const appTitle = process.argv[3] || '栄和 タスク管理システム'
 const appIcon = process.argv[4] || '/logo.svg'
 
-// デプロイごとに一意になるバージョン。git SHA を優先し、無ければビルド時刻。
-let version
-try {
-  version = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-    .toString()
-    .trim()
-} catch {
-  version = String(Date.now())
-}
-if (!version) version = String(Date.now())
+// アプリごとの版（そのアプリの画面に関わるファイルを最後に変えたコミット。scripts/app-version.mjs）。
+// 出力先が works/ なら eWorks、それ以外はタスク管理
+const app = outPath.includes(`${'/'}works${'/'}public`) ? 'works' : 'tasks'
+const { version } = appVersion(app)
 
 const sw = `/*
  * 最小 Service Worker（自動生成 / scripts/generate-sw.mjs）

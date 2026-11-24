@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { appVersion } from './scripts/app-version.mjs'
 import { resolve } from 'node:path'
 
 // 勤怠アプリ eWorks のビルド（docs/eworks-plan.md 5-1）。
@@ -10,7 +11,7 @@ export default defineConfig({
   publicDir: resolve(import.meta.dirname, 'works/public'),
   plugins: [react()],
   define: {
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_TIME__: JSON.stringify(appVersion('works').time),
   },
   server: {
     port: 5174,

@@ -32,6 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # アプリごとの版（scripts/app-version.mjs）を git の履歴から決めるので、履歴をすべて取る
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
