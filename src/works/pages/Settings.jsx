@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api.js'
 import PushCard from '../components/PushCard.jsx'
+import { formatBuildTime } from '../../lib/version.js'
+import { reloadApp } from '../../pwa/reloadApp.js'
 
 const RULES = [
   ['absent_min', '未出勤: 出勤予定から何分過ぎても出勤がないとき（管理者に通知）'],
@@ -105,6 +107,14 @@ export default function Settings() {
         {msg && <span className="works-muted">{msg}</span>}
       </div>
       <PushCard admin />
+      {/* 版の表示と「最新に更新」（ホームを廃止したのでここへ。2026-11-24） */}
+      <div className="ui-card" style={{ marginTop: 12 }}>
+        <div className="ui-card-title">アプリ</div>
+        <div className="works-row-actions" style={{ marginBottom: 0 }}>
+          <span className="works-muted">ver.{formatBuildTime()}</span>
+          <button type="button" className="btn-plain" onClick={() => reloadApp({ to: '/settings' })}>最新に更新</button>
+        </div>
+      </div>
     </>
   )
 }

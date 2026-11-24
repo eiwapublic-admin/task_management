@@ -68,6 +68,8 @@
 .works-main {
   min-width: 0;
   overflow-y: auto;
+  /* 横には動かさない（iPhone で縦にスクロールするとき、画面ごと左右にぶれないように。2026-11-24） */
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
@@ -941,6 +943,7 @@
   text-align: center;
   vertical-align: 1px;
 }
+.works-tabbar a,
 .works-tabbar button { position: relative; }
 .works-tab-count { position: absolute; top: 3px; left: calc(50% + 6px); margin-left: 0; }
 .works-cal-alert {
@@ -990,3 +993,31 @@
   text-decoration: none;
 }
 .works-alert-banner strong { font-size: var(--fs-lg, 18px); }
+
+/* ===== 2026-11-24 管理者メニューのグループ（勤務管理・マスター） ===== */
+.works-nav-group + .works-nav-group { margin-top: 10px; }
+.works-nav-label {
+  padding: 6px 12px 2px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+.works-nav a.is-sub { padding-left: 22px; }
+.works-more-label {
+  padding: 8px 14px 2px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* iPhone: 一覧表を縦にスクロールするとき、表が左右にぶれないように（2026-11-24）
+   左右の端で指が少し斜めに動いたときの横のバウンド（ゴムのような戻り）を止める。
+   画面全体が左右にぶれるのは .works-main の overflow-x: hidden で止める */
+.works-content .ui-table-wrap,
+.works-scroll {
+  overscroll-behavior-x: none;
+}
+
+/* 「スタッフ別」のカレンダーの下の有給休暇（旧「休暇」画面の内容） */
+.works-leave-panel { margin-top: 16px; }

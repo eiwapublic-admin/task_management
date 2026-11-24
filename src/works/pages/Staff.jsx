@@ -221,7 +221,7 @@ function Schedules({ staff, patterns, sites, onDone }) {
             </select>
           </label>
         </div>
-        <div className="ui-label">曜日ごとの出退勤パターン（空欄は休み）</div>
+        <div className="ui-label">曜日ごとの出勤パターン（空欄は休み）</div>
         <div className="works-week">
           {WEEKDAYS.map((w, i) => (
             <label key={w} className="ui-field">

@@ -96,7 +96,7 @@ export default function Monthly() {
   return (
     <>
       <div className="works-sticky">
-        <h1 className="works-title">勤務表一覧</h1>
+        <h1 className="works-title">勤務一覧</h1>
         <div className="works-row-actions">
           <button type="button" className="works-arrow" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">‹</button>
           <strong className="works-month">{monthLabel(month)}</strong>
