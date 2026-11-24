@@ -95,7 +95,7 @@ export default function Calendar() {
 
   const generate = async (onlyThis) => {
     const who = onlyThis ? `${current.code} ${current.name} さん` : '在籍の全員'
-    if (!window.confirm(`${monthLabel(month)}の予定を、勤務体系から作り直します（${who}）。\n手で追加・変更した日はそのまま残ります。よろしいですか？`)) return
+    if (!window.confirm(`${monthLabel(month)}の予定を、勤務体系から作り直します（${who}）。\n手で追加・変更した日と、出勤・退勤の記録がある日はそのまま残ります。よろしいですか？`)) return
     setBusy(true)
     try {
       const r = await api('/api/works/shifts/generate', { method: 'POST', body: { month, staff_id: onlyThis ? staffId : undefined } })

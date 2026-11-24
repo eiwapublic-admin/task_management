@@ -70,6 +70,30 @@ export function buildStaffMonth({ staff, schedules, patterns, holidays, companyH
   return { rows, reason }
 }
 
+// 自動作成の予定を作り直す。出勤・退勤の記録（実績）が入っている日は、予定も実績もそのまま残す
+//   （以前は DB 関数 works_replace_auto_shifts で月の自動作成分をすべて消していたため、実績まで消えていた。2026-11-24）
+//   手で追加・変更した日（source=manual）も今までどおり残す
+async function replaceAutoShifts(supabase, staffId, from, to, rows) {
+  const { error: e1 } = await supabase
+    .from('works_shifts')
+    .delete()
+    .eq('staff_id', staffId)
+    .eq('source', 'auto')
+    .gte('work_date', from)
+    .lte('work_date', to)
+    .is('actual_start', null)
+    .is('actual_end', null)
+  if (e1) throw e1
+  const { data: keep, error: e2 } = await supabase.from('works_shifts').select('work_date').eq('staff_id', staffId).gte('work_date', from).lte('work_date', to)
+  if (e2) throw e2
+  const taken = new Set((keep || []).map((r) => r.work_date))
+  const add = rows.filter((r) => !taken.has(r.work_date)).map((r) => ({ staff_id: staffId, ...r, source: 'auto' }))
+  if (!add.length) return 0
+  const { error: e3 } = await supabase.from('works_shifts').insert(add)
+  if (e3) throw e3
+  return add.length
+}
+
 async function loadSettings(supabase) {
   const { data } = await supabase.from('works_settings').select('*').eq('id', 1).maybeSingle()
   return data || { break_windows: [{ start: '12:00', end: '13:00' }], company_holidays: [] }
@@ -108,6 +132,11 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
     ? await supabase.from('works_staff_schedules').select('*').in('staff_id', ids).lte('valid_from', to).order('valid_from')
     : { data: [] }
   if (e2) throw e2
+  // 適用開始日がこの月より後の勤務体系も読む（「未登録」ではなく「適用開始日より前の月」と正しく出すため）
+  const { data: later, error: e4 } = ids.length
+    ? await supabase.from('works_staff_schedules').select('staff_id, valid_from').in('staff_id', ids).gt('valid_from', to).order('valid_from')
+    : { data: [] }
+  if (e4) throw e4
   const { data: pats, error: e3 } = await supabase.from('works_shift_patterns').select('id, name, start_time, end_time, telework')
   if (e3) throw e3
   const patterns = new Map(pats.map((p) => [p.id, p]))
@@ -120,8 +149,13 @@ export async function generateMonth(supabase, month, { staffIds = null, actor = 
   for (const s of staffList) {
     const mine = schedules.filter((x) => x.staff_id === s.id)
     const { rows, reason } = buildStaffMonth({ staff: s, schedules: mine, patterns, holidays, companyHolidays, closedDays, month })
-    const { data: n, error } = await supabase.rpc('works_replace_auto_shifts', { p_staff: s.id, p_from: from, p_to: to, p_rows: rows })
-    if (error) throw error
+    // この月に使える勤務体系が無いときは、今ある予定に手を付けない（2026-11-24: 予定と実績が消えた不具合の対策）
+    if (!mine.length) {
+      const next = later.find((x) => x.staff_id === s.id)
+      skipped.push({ code: s.code, name: s.name, reason: next ? `勤務体系の適用開始日（${next.valid_from}）より前の月のため、今の予定をそのまま残しました` : '勤務体系が未登録のため、今の予定をそのまま残しました' })
+      continue
+    }
+    const n = await replaceAutoShifts(supabase, s.id, from, to, rows)
     if (reason) skipped.push({ code: s.code, name: s.name, reason })
     else created.push({ code: s.code, name: s.name, days: n })
   }
