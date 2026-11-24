@@ -199,7 +199,17 @@ export async function handleSettings(req) {
     const inviteDays = Number(b.invite_valid_days)
     if (!Number.isInteger(inviteDays) || inviteDays < 1 || inviteDays > 30) return json({ error: '招待の有効日数は 1〜30 日で入力してください' }, 400)
     const holidays = (Array.isArray(b.company_holidays) ? b.company_holidays : []).filter((d) => DATE_RE.test(d))
+    // 要確認のしきい値（分）と、要確認を出し始める日（Phase 4）
+    const rules = {}
+    for (const k of ['absent_min', 'late_min', 'early_min', 'no_out_min', 'overtime_min']) {
+      const v = Number(b.alert_rules?.[k])
+      if (!Number.isInteger(v) || v < 0 || v > 600) return json({ error: '要確認のしきい値は 0〜600 分で入力してください' }, 400)
+      rules[k] = v
+    }
+    if (b.alerts_from && !DATE_RE.test(String(b.alerts_from))) return json({ error: '要確認を出し始める日が正しくありません' }, 400)
     const row = {
+      alert_rules: rules,
+      alerts_from: b.alerts_from || null,
       break_windows: windows.map((w) => ({ start: w.start.slice(0, 5), end: w.end.slice(0, 5) })),
       rounding_minutes: rounding,
       schedule_create_day: day,

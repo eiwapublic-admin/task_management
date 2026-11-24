@@ -44,7 +44,7 @@ export async function writeActual(supabase, shift, { start, end }, { method, act
       shift_id: shift.id,
       site_id: shift.site_id || null,
       adopted: t,
-      flags: [method === 'report' ? 'report' : 'manual'],
+      flags: [method === 'report' ? 'report' : method === 'correction' ? 'correction' : 'manual'],
       note: t ? note : `${kind === 'in' ? '出勤' : '退勤'}の時刻を消去${note ? `（${note}）` : ''}`,
       created_by: actorId,
     })

@@ -15,6 +15,7 @@ import Monthly from './pages/Monthly.jsx'
 import Leave from './pages/Leave.jsx'
 import Vacation from './pages/Vacation.jsx'
 import MySettings from './pages/MySettings.jsx'
+import Alerts from './pages/Alerts.jsx'
 import TabIcon from './components/TabIcons.jsx'
 import { ReloadPrompt } from '../pwa/ReloadPrompt.jsx'
 
@@ -28,9 +29,36 @@ const ADMIN_MENU = [
   { to: '/settings', label: '設定' },
 ]
 
+// 管理者の「要確認」の件数（未確認＋承認待ちの修正申請）。画面を移るたび（1 分に 1 回まで）と、確認したときに取り直す
+let countCache = { at: 0, value: null }
+function useAlertCount(enabled) {
+  const { pathname } = useLocation()
+  const [count, setCount] = useState(countCache.value)
+  useEffect(() => {
+    if (!enabled) return
+    const fetchCount = (force) => {
+      if (!force && Date.now() - countCache.at < 60e3) return setCount(countCache.value)
+      countCache.at = Date.now()
+      api('/api/works/alerts/count')
+        .then((c) => {
+          countCache.value = c
+          setCount(c)
+        })
+        .catch(() => {})
+    }
+    fetchCount(false)
+    const onChange = () => fetchCount(true)
+    window.addEventListener('works-alerts-changed', onChange)
+    return () => window.removeEventListener('works-alerts-changed', onChange)
+  }, [enabled, pathname])
+  return count
+}
+
 function Shell({ children }) {
   const navigate = useNavigate()
   const [user, setU] = useState(getUser())
+  const alertCount = useAlertCount(!!user?.works_admin)
+  const alertTotal = alertCount ? alertCount.open + alertCount.requests : 0
   useEffect(() => {
     // 権限が変わっていることがあるので、開くたびにサーバーから取り直す
     api('/api/works/me')
@@ -42,7 +70,7 @@ function Shell({ children }) {
   }, [])
   const menu = [
     { to: '/', label: 'ホーム', end: true },
-    ...(user?.works_admin ? [{ to: '/monthly', label: '勤務表一覧' }] : []),
+    ...(user?.works_admin ? [{ to: '/monthly', label: '勤務表一覧' }, { to: '/alerts', label: '要確認', badge: alertTotal }] : []),
     { to: '/calendar', label: 'カレンダー' },
     { to: '/vacation', label: '休暇' },
     ...(user?.works_admin ? ADMIN_MENU : []),
@@ -53,7 +81,7 @@ function Shell({ children }) {
     navigate('/login')
   }
   // スマホの下部メニュー（アイコン型。2026-11-20 依頼元の要望）
-  //   管理者: ホーム｜一覧｜有給｜スタッフ｜その他（カレンダー・休暇・出退勤パターン・現場・設定・ログアウト）
+  //   管理者: ホーム｜一覧｜有給｜スタッフ｜その他（要確認・カレンダー・休暇・出退勤パターン・現場・設定・ログアウト）
   //   スタッフ: ホーム｜カレンダー｜休暇｜設定
   const tabs = user?.works_admin
     ? [
@@ -69,6 +97,7 @@ function Shell({ children }) {
         { to: '/me', label: '設定', icon: 'settings' },
       ]
   const more = [
+    { to: '/alerts', label: '要確認', icon: 'alert', badge: alertTotal },
     { to: '/calendar', label: 'カレンダー', icon: 'calendar' },
     { to: '/vacation', label: '休暇（自分の申請）', icon: 'vacation' },
     { to: '/patterns', label: '出退勤パターン', icon: 'pattern' },
@@ -86,6 +115,7 @@ function Shell({ children }) {
           {menu.map((m) => (
             <NavLink key={m.to} to={m.to} end={m.end}>
               {m.label}
+              {m.badge > 0 && <span className="works-count">{m.badge}</span>}
             </NavLink>
           ))}
         </nav>
@@ -109,6 +139,7 @@ function TabBar({ tabs, more, onSignOut }) {
   const { pathname } = useLocation()
   useEffect(() => setOpen(false), [pathname])
   const moreActive = more?.some((m) => pathname.startsWith(m.to))
+  const moreBadge = (more || []).reduce((a, m) => a + (m.badge || 0), 0)
   return (
     <>
       {open && (
@@ -118,6 +149,7 @@ function TabBar({ tabs, more, onSignOut }) {
               <NavLink key={m.to} to={m.to} role="menuitem">
                 <TabIcon name={m.icon} size={22} />
                 {m.label}
+                {m.badge > 0 && <span className="works-count">{m.badge}</span>}
               </NavLink>
             ))}
             <button type="button" role="menuitem" onClick={onSignOut}>
@@ -138,6 +170,7 @@ function TabBar({ tabs, more, onSignOut }) {
           <button type="button" className={moreActive || open ? 'active' : ''} aria-expanded={open} onClick={() => setOpen(!open)}>
             <TabIcon name="more" />
             <span>その他</span>
+            {moreBadge > 0 && <span className="works-count works-tab-count">{moreBadge}</span>}
           </button>
         )}
       </nav>
@@ -174,6 +207,7 @@ export default function App() {
         <Route path="/" element={<StartPage />} />
         <Route path="/calendar" element={<Private><Calendar /></Private>} />
         <Route path="/monthly" element={<Private admin><Monthly /></Private>} />
+        <Route path="/alerts" element={<Private admin><Alerts /></Private>} />
         <Route path="/me" element={<Private><MySettings /></Private>} />
         <Route path="/vacation" element={<Private><Vacation /></Private>} />
         <Route path="/leave" element={<Private admin><Leave /></Private>} />

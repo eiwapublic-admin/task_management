@@ -923,3 +923,70 @@
 /* 画面の一覧表（.works-scroll の中）は折り返さず、はみ出す分は横にスクロールする */
 .works-scroll .ui-table th,
 .works-scroll .ui-table td { white-space: nowrap; }
+
+/* =========================================================================
+   Phase 4: 要確認（2026-11-24）
+   ========================================================================= */
+.works-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  vertical-align: 1px;
+}
+.works-tabbar button { position: relative; }
+.works-tab-count { position: absolute; top: 3px; left: calc(50% + 6px); margin-left: 0; }
+.works-cal-alert {
+  display: block;
+  margin: 1px 0;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: var(--fs-2xs, 10px);
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: color-mix(in srgb, var(--due-soon, #e08a00) 18%, var(--bg-surface));
+  color: var(--color-warn-ink, #8a5200);
+}
+.works-cal-alert.is-high { background: color-mix(in srgb, var(--color-danger) 14%, var(--bg-surface)); color: var(--color-danger); }
+.works-cal-changed {
+  display: block;
+  width: fit-content;
+  margin-top: 1px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--works-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.works-day-alerts { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.works-day-alerts > .ui-card, .works-day-alerts > div { align-self: stretch; }
+.works-alert-card.is-open { border-left: 4px solid var(--color-danger); }
+.works-alert-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 0; }
+.works-alert-line.is-done { opacity: 0.75; }
+.works-btn-xs { padding: 0 6px; margin-left: 6px; font-size: var(--fs-xs); }
+.works-alerts td.nowrap, .works-alerts td .ui-badge { white-space: nowrap; }
+.works-alert-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border-left: 4px solid var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--bg-surface));
+  color: var(--text-strong);
+  text-decoration: none;
+}
+.works-alert-banner strong { font-size: var(--fs-lg, 18px); }

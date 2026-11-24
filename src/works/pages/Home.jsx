@@ -8,6 +8,7 @@ import { formatBuildTime } from '../../lib/version.js'
 import { reloadApp } from '../../pwa/reloadApp.js'
 import { flushQueue, pendingCount } from '../lib/punch.js'
 import ActualEditor from '../components/ActualEditor.jsx'
+import AlertBanner from '../components/AlertBanner.jsx'
 
 function addDays(date, n) {
   const [y, m, d] = date.split('-').map(Number)
@@ -90,6 +91,7 @@ export default function Home({ user }) {
     <>
       <h1 className="works-title">ホーム</h1>
       <p style={{ marginTop: 0 }}>{user?.staff ? `${user.staff.name} さん` : user?.display_name ? `${user.display_name} さん` : ''}</p>
+      {user?.works_admin && <AlertBanner />}
       {user?.staff ? (
         <>
           {method === 'self' && (

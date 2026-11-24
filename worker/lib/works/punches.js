@@ -34,6 +34,7 @@ export const FLAG_LABEL = {
   telework: 'テレワーク（自己申告）',
   manual: '直接入力',
   report: '日報から',
+  correction: '修正申請',
 }
 
 async function sha256Hex(text) {
@@ -137,9 +138,10 @@ export async function recordPunch(supabase, { staff, kind, at, method, site, lat
   if (!shift) flags.push('no_plan')
   else if (site && shift.site_id && shift.site_id !== site.id) flags.push('site_mismatch')
 
-  if (method === 'qr') {
+  // 位置は現場の緯度・経度を登録した現場だけで確かめる（未登録の現場は位置の印を付けない。2026-11-24 決定）
+  if (method === 'qr' && site?.lat != null && site?.lng != null) {
     if (lat == null || lng == null) flags.push('no_location')
-    else if (site?.lat != null && site?.lng != null) {
+    else {
       const d = distanceM(lat, lng, site.lat, site.lng)
       if (d > (site.radius_m || 300) + Math.min(Number(accuracy) || 0, 500)) flags.push('far')
     }
@@ -349,7 +351,7 @@ export async function handlePunches(req) {
   const [{ data, error: e }, { data: sites }] = await Promise.all([
     supabase
       .from('works_punches')
-      .select('id, kind, punched_at, method, site_id, adopted, flags, distance_m, note, created_by')
+      .select('id, kind, punched_at, method, site_id, adopted, flags, lat, lng, accuracy_m, distance_m, note, created_by')
       .eq('staff_id', staffId)
       .eq('work_date', date)
       .order('punched_at'),
@@ -368,6 +370,10 @@ export async function handlePunches(req) {
       flags: p.flags,
       flag_labels: (p.flags || []).map((f) => FLAG_LABEL[f] || f),
       distance_m: ctx.isAdmin ? p.distance_m : undefined,
+      // 打刻した位置（管理者だけに見せる。現場の位置が未登録でも確かめられるように。2026-11-24 依頼元の要望）
+      lat: ctx.isAdmin ? p.lat : undefined,
+      lng: ctx.isAdmin ? p.lng : undefined,
+      accuracy_m: ctx.isAdmin ? p.accuracy_m : undefined,
       note: p.note,
     })),
   })

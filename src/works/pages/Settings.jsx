@@ -1,6 +1,16 @@
 // 設定（現行: Parm）
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api.js'
+import PushCard from '../components/PushCard.jsx'
+
+const RULES = [
+  ['absent_min', '未出勤: 出勤予定から何分過ぎても出勤がないとき（管理者に通知）'],
+  ['late_min', '遅刻: 出勤が予定より何分を超えて遅いとき'],
+  ['early_min', '早退: 退勤が予定より何分を超えて早いとき'],
+  ['no_out_min', '退勤漏れ: 退勤予定から何分過ぎても退勤がないとき（本人に通知）'],
+  ['overtime_min', '超過: 退勤が予定より何分を超えて遅いとき'],
+]
+const DEFAULT_RULES = { absent_min: 10, late_min: 5, early_min: 5, no_out_min: 60, overtime_min: 30 }
 
 export default function Settings() {
   const [v, setV] = useState(null)
@@ -23,7 +33,8 @@ export default function Settings() {
     setMsg('')
     try {
       const company_holidays = holidayText.split(/[\s,、]+/).map((s) => s.trim().replace(/\//g, '-')).filter(Boolean)
-      const { settings } = await api('/api/works/settings', { method: 'PUT', body: { ...v, company_holidays } })
+      const alert_rules = Object.fromEntries(RULES.map(([k]) => [k, Number(v.alert_rules?.[k] ?? DEFAULT_RULES[k])]))
+      const { settings } = await api('/api/works/settings', { method: 'PUT', body: { ...v, company_holidays, alert_rules } })
       setV(settings)
       setHolidayText(settings.company_holidays.join('\n'))
       setMsg('保存しました')
@@ -68,6 +79,22 @@ export default function Settings() {
         </div>
       </div>
       <div className="ui-card" style={{ marginTop: 12 }}>
+        <div className="ui-card-title">要確認</div>
+        <p className="ui-note" style={{ marginTop: 0 }}>未出勤・退勤漏れは、入力方法が「QR」でアプリに登録済みのスタッフだけを見ます。位置の不一致は、現場の緯度・経度を登録した現場だけで判定します（許容距離は現場ごと。既定 300m）。</p>
+        <div className="works-grid-2">
+          {RULES.map(([k, label]) => (
+            <label key={k} className="ui-field">
+              <span>{label}</span>
+              <input className="ui-input" inputMode="numeric" value={v.alert_rules?.[k] ?? DEFAULT_RULES[k]} onChange={(e) => setV({ ...v, alert_rules: { ...DEFAULT_RULES, ...v.alert_rules, [k]: e.target.value } })} />
+            </label>
+          ))}
+          <label className="ui-field">
+            <span>要確認を出し始める日（これより前の日は出しません）</span>
+            <input className="ui-input" type="date" value={v.alerts_from || ''} onChange={(e) => setV({ ...v, alerts_from: e.target.value })} />
+          </label>
+        </div>
+      </div>
+      <div className="ui-card" style={{ marginTop: 12 }}>
         <div className="ui-card-title">会社の休日（年末年始など）</div>
         <p className="ui-note" style={{ marginTop: 0 }}>タスク管理の日報カレンダーで「休館日」にした日は、自動で会社の休日になります（ここに入れる必要はありません）。それ以外に休みにしたい日だけ、1 行に 1 日、2026-12-30 の形で入力します。国民の祝日も入力は不要です。</p>
         <textarea className="ui-textarea" rows={6} value={holidayText} onChange={(e) => setHolidayText(e.target.value)} />
@@ -77,6 +104,7 @@ export default function Settings() {
         <button type="button" className="btn-primary works-btn-accent" onClick={save}>保存</button>
         {msg && <span className="works-muted">{msg}</span>}
       </div>
+      <PushCard admin />
     </>
   )
 }
