@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import AppHeader from '../components/AppHeader'
 import FeatureHeader from '../components/FeatureHeader'
 import ChlorineForm from '../components/ChlorineForm'
+import ChlorineInjectionModal from '../components/ChlorineInjectionModal'
 import { ChlorineTrendChart } from '../components/ChlorineChart'
 import useChlorinePdfExport from '../hooks/useChlorinePdfExport'
 import { IconChevronRight, IconDownload } from '../components/Icons'
@@ -12,6 +13,8 @@ import {
   CHLORINE_STANDARD_MIN,
   fetchChlorineTests,
   deleteChlorineTest,
+  fetchChlorineInjectionLevels,
+  injectionLevelOn,
   formatConcentration,
   formatReportDate,
   currentMonthJST,
@@ -76,6 +79,16 @@ export default function Chlorine() {
   // 年月グループの開閉状態。ユーザーが手で切り替えた分だけ既定値からの例外として持つ
   const [collapseOverrides, setCollapseOverrides] = useState({})
   const pdf = useChlorinePdfExport()
+  // BKB塩素注入レベル（2026-11-24）。[{ date, level }]（日付の古い順）。グラフの棒に使う
+  const [injectionLevels, setInjectionLevels] = useState([])
+  const [injectionOpen, setInjectionOpen] = useState(false)
+
+  useEffect(() => {
+    // 取れなくても濃度のグラフ・一覧は使えるため、失敗は棒を出さないだけにする
+    fetchChlorineInjectionLevels()
+      .then((data) => setInjectionLevels(data.levels || []))
+      .catch((err) => console.error('BKB塩素注入レベルの取得に失敗:', err))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -127,6 +140,32 @@ export default function Chlorine() {
       return { key: building, label: building, color: CHLORINE_TREND_COLORS[i], values }
     })
   }, [tests, chlorineTrendMonths])
+
+  // BKB塩素注入レベルの棒（2026-11-24）。各月末時点（今月は今日時点）に効いている設定値を
+  // 1本の棒にする。月の途中で変えた場合は、その月の変更をツールチップに並べる
+  const injectionBars = useMemo(() => {
+    if (injectionLevels.length === 0) return null
+    const today = todayJST()
+    const values = []
+    const titles = []
+    for (const mo of chlorineTrendMonths) {
+      const [yy, mm] = mo.key.split('-').map(Number)
+      const lastDay = new Date(Date.UTC(yy, mm, 0)).getUTCDate()
+      const monthEnd = `${mo.key}-${String(lastDay).padStart(2, '0')}`
+      const asOf = monthEnd < today ? monthEnd : today
+      const v = injectionLevelOn(injectionLevels, asOf)
+      values.push(v)
+      const changes = injectionLevels
+        .filter((l) => l.date.startsWith(mo.key))
+        .map((l) => `${Number(l.date.slice(5, 7))}/${Number(l.date.slice(8, 10))}→${l.level}`)
+      titles.push(
+        v == null
+          ? ''
+          : `${mo.fullLabel} BKB塩素注入レベル: ${v}${changes.length ? `（変更 ${changes.join('、')}）` : ''}`
+      )
+    }
+    return { label: 'BKB塩素注入レベル', values, titles }
+  }, [injectionLevels, chlorineTrendMonths])
 
   // 年月ごとにまとめる（新しい月が上）。さらに同じ月の中で測定日ごとにまとめ、
   // 1日分の記録（BKB・小泉本社）を1行に横並びのカードで表示する（2026-08-19。
@@ -282,11 +321,21 @@ export default function Chlorine() {
             出しても意味がないため、1件以上あるときだけ表示する */}
         {!loading && tests.length > 0 && (
           <div className="ui-card chlorine-trend-card">
-            <div className="ui-card-title">残留塩素濃度の推移（過去3年）</div>
+            <div className="ui-card-title">
+              残留塩素濃度の推移（過去3年）
+              <button
+                type="button"
+                className="btn-plain chlorine-trend-title-btn"
+                onClick={() => setInjectionOpen(true)}
+              >
+                BKB塩素注入レベル
+              </button>
+            </div>
             <ChlorineTrendChart
               months={chlorineTrendMonths}
               series={chlorineTrendSeries}
               standardValue={CHLORINE_STANDARD_MIN}
+              bars={injectionBars}
             />
           </div>
         )}
@@ -381,6 +430,17 @@ export default function Chlorine() {
       </div>
 
       {pdf.sheetsPortal}
+
+      {injectionOpen && (
+        <ChlorineInjectionModal
+          readOnly={readOnly}
+          onClose={() => setInjectionOpen(false)}
+          onSaved={(levels) => {
+            setInjectionLevels(levels)
+            setInjectionOpen(false)
+          }}
+        />
+      )}
 
       {editing && (
         <ChlorineForm

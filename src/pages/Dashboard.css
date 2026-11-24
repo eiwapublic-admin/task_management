@@ -2621,6 +2621,21 @@ button.report-row-icon:hover { filter: brightness(1.15); }
 .chlorine-trend-line { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .chlorine-trend-dot { stroke: var(--bg-surface); stroke-width: 1.5; }
 
+/* BKB塩素注入レベルの棒（右軸。2026-11-24）。折れ線の背面に置く補助の系列なので、
+   薄い黄色で控えめにする（依頼: 黄色系の薄め・折れ線よりバック） */
+.chlorine-trend-bar { fill: #f7dc6f; fill-opacity: 0.45; }
+.chlorine-trend-legend-swatch.is-bar { height: 10px; width: 12px; border-radius: 2px; background: #f7dc6f; opacity: 0.75; }
+.chlorine-trend-axis-label.is-bar { fill: #a8841a; }
+.chlorine-trend-title-btn { margin-left: auto; font-weight: 400; }
+
+/* BKB塩素注入レベルの編集モーダル（2026-11-24） */
+.chlorine-injection-add { margin-bottom: var(--space-2); }
+.chlorine-injection-table { width: 100%; border-collapse: collapse; }
+.chlorine-injection-table th { text-align: left; font-size: var(--fs-sm); color: var(--text-muted); font-weight: 400; padding: 0 4px 4px; }
+.chlorine-injection-table td { padding: 3px 4px; vertical-align: middle; }
+.chlorine-injection-table td:last-child { width: 1%; }
+.chlorine-injection-level { max-width: 7em; text-align: right; }
+
 /* --- 入力モーダル（自主検査表のモーダル .inspection-* を土台に使う） --- */
 
 /* 測定施設。ドロップダウンではなく択一ボタンにする（2026-08-10。選択肢が2つだけなので

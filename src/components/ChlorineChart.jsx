@@ -9,20 +9,37 @@ const H = 190
 // 左側にラベル専用の余白（PAD_LEFT）を確保し、プロット領域はその外側から描く
 const PAD_LEFT = 42
 const PAD_RIGHT = 14
+// 右軸（BKB塩素注入レベル。2026-11-24）を出すときの右余白
+const PAD_RIGHT_WITH_BARS = 34
 const PLOT_TOP = 18
 const PLOT_BOTTOM = 150
 const MONTH_LABEL_Y = 172
 // Y軸の横線の間隔（2026-08-25。グレーの点線を0.1刻みで引いてほしいとの依頼）
 const Y_GRID_STEP = 0.1
 
-export function ChlorineTrendChart({ months, series, standardValue }) {
+// bars（任意。2026-11-24）: BKB塩素注入レベルの棒。{ label, values: (number|null)[], titles: string[] }。
+// 濃度（左軸 mg/L）とは単位が違うため右軸で目盛りを振り、折れ線より背面に薄い黄色で描く
+export function ChlorineTrendChart({ months, series, standardValue, bars }) {
   const n = months.length
-  const step = n > 1 ? (W - PAD_LEFT - PAD_RIGHT) / (n - 1) : 0
+  const barValues = bars ? bars.values.filter((v) => v != null) : []
+  const showBars = barValues.length > 0
+  const padRight = showBars ? PAD_RIGHT_WITH_BARS : PAD_RIGHT
+  // 棒が端の月で切れないよう、両端に半月分の余白を取る（棒が無いときは従来どおり）
+  const edge = showBars ? 0.5 : 0
+  const step = n > 1 ? (W - PAD_LEFT - padRight) / (n - 1 + edge * 2) : 0
   const allValues = series.flatMap((s) => s.values.filter((v) => v != null))
   const rawMax = Math.max(0.2, standardValue || 0, ...allValues)
   const yMax = Math.ceil(rawMax * 10) / 10
-  const x = (i) => PAD_LEFT + i * step
+  const x = (i) => PAD_LEFT + (i + edge) * step
   const y = (v) => PLOT_BOTTOM - (v / yMax) * (PLOT_BOTTOM - PLOT_TOP)
+
+  // 右軸（注入レベル）。5刻みで切り上げた最大値まで、5刻みで目盛りを出す
+  const BAR_STEP = 5
+  const barMax = showBars ? Math.max(BAR_STEP, Math.ceil(Math.max(...barValues) / BAR_STEP) * BAR_STEP) : 1
+  const yBar = (v) => PLOT_BOTTOM - (v / barMax) * (PLOT_BOTTOM - PLOT_TOP)
+  const barTicks = []
+  if (showBars) for (let v = 0; v <= barMax; v += BAR_STEP) barTicks.push(v)
+  const barWidth = Math.max(2, step * 0.6)
 
   // 欠測（null）で線が途切れるよう、値がある区間だけをsegmentに分ける
   const seriesWithSegments = series.map((s) => {
@@ -72,6 +89,12 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
   return (
     <div className="chlorine-trend-wrap">
       <ul className="chlorine-trend-legend">
+        {showBars && (
+          <li className="chlorine-trend-legend-item">
+            <span className="chlorine-trend-legend-swatch is-bar" />
+            {bars.label}（棒・右軸）
+          </li>
+        )}
         {series.map((s) => (
           <li className="chlorine-trend-legend-item" key={s.key}>
             <span className="chlorine-trend-legend-swatch" style={{ background: s.color }} />
@@ -85,13 +108,41 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
         role="img"
         aria-label="残留塩素濃度の推移（過去3年・3施設）"
       >
+        {/* 注入レベルの棒は折れ線・目安線より背面に置く（2026-11-24） */}
+        {showBars &&
+          bars.values.map((v, i) =>
+            v == null ? null : (
+              <rect
+                key={months[i].key}
+                className="chlorine-trend-bar"
+                x={x(i) - barWidth / 2}
+                y={yBar(v)}
+                width={barWidth}
+                height={PLOT_BOTTOM - yBar(v)}
+              >
+                <title>{bars.titles[i]}</title>
+              </rect>
+            )
+          )}
+        {showBars &&
+          barTicks.map((v) => (
+            <text
+              key={`bar-${v}`}
+              className="chlorine-trend-axis-label is-bar"
+              x={W - padRight + 6}
+              y={v === 0 ? PLOT_BOTTOM + 12 : yBar(v) + 3}
+              textAnchor="start"
+            >
+              {v}
+            </text>
+          ))}
         {yGridSteps.map((v) => (
           <line
             key={v}
             className="chlorine-trend-ygrid"
             x1={PAD_LEFT}
             y1={y(v)}
-            x2={W - PAD_RIGHT}
+            x2={W - padRight}
             y2={y(v)}
           />
         ))}
@@ -105,14 +156,14 @@ export function ChlorineTrendChart({ months, series, standardValue }) {
             y2={PLOT_BOTTOM}
           />
         ))}
-        <line className="chlorine-trend-baseline" x1={PAD_LEFT} y1={PLOT_BOTTOM} x2={W - PAD_RIGHT} y2={PLOT_BOTTOM} />
+        <line className="chlorine-trend-baseline" x1={PAD_LEFT} y1={PLOT_BOTTOM} x2={W - padRight} y2={PLOT_BOTTOM} />
         {showStandard && (
           <>
             <line
               className="chlorine-trend-standard-line"
               x1={PAD_LEFT}
               y1={y(standardValue)}
-              x2={W - PAD_RIGHT}
+              x2={W - padRight}
               y2={y(standardValue)}
             />
             {/* グラフの線・点と重ならないよう、プロット領域の外側（左）に出す（2026-08-25） */}
