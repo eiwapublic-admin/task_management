@@ -13,6 +13,9 @@
   display: grid;
   grid-template-columns: 220px 1fr;
   background: var(--bg-app);
+  /* 上端の藤紫の帯は画面の幅いっぱいに 1 本で引く（以前はサイドバーだけに付いていて、
+     右のボディとの間に 4px の段差ができていた。2026-11-24 依頼元の要望） */
+  border-top: 4px solid var(--works-accent);
 }
 
 .works-side {
@@ -20,10 +23,10 @@
   flex-direction: column;
   gap: var(--space-1, 4px);
   padding: 16px 12px;
-  padding-top: calc(16px + env(safe-area-inset-top));
+  /* ロゴ（eWorks）が右の画面タイトルと同じ高さに並ぶよう、上の余白は .works-content（20px）＋.works-sticky（4px）と同じ 24px */
+  padding-top: calc(24px + env(safe-area-inset-top));
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
-  border-top: 4px solid var(--works-accent);
 }
 
 .works-brand {
@@ -89,6 +92,7 @@
   .works-shell {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
+    border-top: 0;
   }
   .works-side {
     display: none;
