@@ -132,7 +132,7 @@ jobs:
       # 勤怠管理 eWorks（2つ目の Worker「eworks」。docs/eworks-plan.md）。
       # 公開の準備ができるまでは動かさない: リポジトリの Settings → Secrets and variables → Actions →
       # Variables タブで EWORKS_DEPLOY=true を登録すると、以後 main への push でデプロイされる。
-      # 使うシークレットは SUPABASE_URL / SUPABASE_SERVICE_KEY / SESSION_SECRET の3つだけ（タスク管理と共通）。
+      # 使うシークレットは SUPABASE_URL / SUPABASE_SERVICE_KEY / SESSION_SECRET と VAPID_*（タスク管理と共通）。
       - name: Build eWorks frontend
         if: vars.EWORKS_DEPLOY == 'true'
         run: npm run build:works
@@ -146,14 +146,21 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
           SECRETS_FILE="$RUNNER_TEMP/eworks-secrets.json"
           umask 077
+          # VAPID_* はプッシュ通知（要確認・予定変更。タスク管理と同じ鍵）。未設定なら通知だけ無効
           jq -n \
             --arg SUPABASE_URL "$SUPABASE_URL" \
             --arg SUPABASE_SERVICE_KEY "$SUPABASE_SERVICE_KEY" \
             --arg SESSION_SECRET "$SESSION_SECRET" \
-            '{SUPABASE_URL: $SUPABASE_URL, SUPABASE_SERVICE_KEY: $SUPABASE_SERVICE_KEY, SESSION_SECRET: $SESSION_SECRET}' > "$SECRETS_FILE"
+            --arg VAPID_PUBLIC_KEY "$VAPID_PUBLIC_KEY" \
+            --arg VAPID_PRIVATE_KEY "$VAPID_PRIVATE_KEY" \
+            --arg VAPID_SUBJECT "$VAPID_SUBJECT" \
+            '{SUPABASE_URL: $SUPABASE_URL, SUPABASE_SERVICE_KEY: $SUPABASE_SERVICE_KEY, SESSION_SECRET: $SESSION_SECRET, VAPID_PUBLIC_KEY: $VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: $VAPID_PRIVATE_KEY, VAPID_SUBJECT: $VAPID_SUBJECT}' > "$SECRETS_FILE"
           npx wrangler deploy --config wrangler.works.jsonc --message="$DEPLOY_MESSAGE" --secrets-file="$SECRETS_FILE"
           rm -f "$SECRETS_FILE"
 

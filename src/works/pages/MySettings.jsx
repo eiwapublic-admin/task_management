@@ -1,8 +1,9 @@
-// 設定（スタッフ）。いまはアカウントの表示・アプリの更新・ログアウトだけ（項目は今後検討。2026-11-20 依頼元）
+// 設定（スタッフ）。アカウントの表示・通知・アプリの更新・ログアウト（項目は今後検討。2026-11-20 依頼元）
 import { useNavigate } from 'react-router-dom'
 import { getUser, logout } from '../lib/api.js'
 import { formatBuildTime } from '../../lib/version.js'
 import { reloadApp } from '../../pwa/reloadApp.js'
+import PushCard from '../components/PushCard.jsx'
 
 export default function MySettings() {
   const navigate = useNavigate()
@@ -15,6 +16,7 @@ export default function MySettings() {
         <div>{user?.staff ? `${user.staff.code} ${user.staff.name}` : user?.display_name}</div>
         <div className="works-muted">ログイン ID: {user?.username}</div>
       </div>
+      <PushCard />
       <div className="ui-card" style={{ marginTop: 12 }}>
         <div className="ui-card-title">アプリ</div>
         <div className="works-row-actions" style={{ marginBottom: 0 }}>

@@ -8,6 +8,7 @@ import ActualEditor from '../components/ActualEditor.jsx'
 import { api, getUser, WEEKDAYS } from '../lib/api.js'
 import { addMonths, dow, hoursLabel, monthRange, todayJst } from '../../../worker/lib/works/time.js'
 import KeyCell from '../components/KeyCell.jsx'
+import DayAlerts from '../components/DayAlerts.jsx'
 
 const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
@@ -43,6 +44,23 @@ export default function Calendar() {
   useEffect(() => {
     load()
   }, [load])
+  // この月の要確認（カレンダーの日に印を出す。本人にも同じ印。8-2）
+  const [alerts, setAlerts] = useState({})
+  const loadAlerts = useCallback(() => {
+    if (!staffId || staffId === 'all') return setAlerts({})
+    const { from, to } = monthRange(month)
+    if (from > todayJst()) return setAlerts({})
+    api(`/api/works/alerts?${new URLSearchParams({ from, to, staff_id: staffId, status: 'open' })}`)
+      .then((d) => {
+        const m = {}
+        for (const a of d.items) (m[a.work_date] ||= []).push(a)
+        setAlerts(m)
+      })
+      .catch(() => setAlerts({}))
+  }, [month, staffId])
+  useEffect(() => {
+    loadAlerts()
+  }, [loadAlerts])
   useEffect(() => {
     if (isAdmin) api('/api/works/sites').then((d) => setSites(d.items.filter((s) => s.active))).catch(() => {})
   }, [isAdmin])
@@ -119,7 +137,7 @@ export default function Calendar() {
       {!isAdmin && !me?.staff && <p className="works-muted">スタッフ情報が紐づいていません。管理者にお問い合わせください。</p>}
       {data && staffId === 'all' && <AllTable data={data} month={month} onPick={(id) => setStaffId(id)} />}
       {data && staffId !== 'all' && staffId && (
-        <MonthGrid data={data} month={month} onDay={(d) => setDay(d)} />
+        <MonthGrid data={data} month={month} alerts={alerts} onDay={(d) => setDay(d)} />
       )}
       {day && (
         <DayModal
@@ -130,8 +148,12 @@ export default function Calendar() {
           sites={sites}
           editable={isAdmin}
           actualEditable={canActual}
+          canRequest={!isAdmin && (me?.staff?.punch_method || 'qr') === 'qr'}
           onClose={() => setDay(null)}
-          onSaved={() => load()}
+          onSaved={() => {
+            load()
+            loadAlerts()
+          }}
         />
       )}
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
@@ -154,7 +176,7 @@ function dayClass(date, data) {
   return ''
 }
 
-function MonthGrid({ data, month, onDay }) {
+function MonthGrid({ data, month, alerts = {}, onDay }) {
   const days = useDays(month)
   const today = todayJst()
   const byDate = useMemo(() => {
@@ -181,10 +203,16 @@ function MonthGrid({ data, month, onDay }) {
             {(data.holidays[d] || data.company_holidays[d]) && (
               <span className="works-cal-hname">{data.holidays[d] || data.company_holidays[d]}</span>
             )}
+            {alerts[d]?.length > 0 && (
+              <span className={`works-cal-alert ${alerts[d].some((a) => a.level === 'high') ? 'is-high' : ''}`} title={alerts[d].map((a) => a.label).join('・')}>
+                {alerts[d].length === 1 ? alerts[d][0].label : `要確認 ${alerts[d].length}`}
+              </span>
+            )}
             {(byDate[d] || []).map((s) => (
               <span key={s.id} className={`works-cal-shift ${s.source === 'manual' ? 'is-manual' : ''}`}>
                 {s.plan_start.replace(/^0/, '')}<span className="works-cal-end">–{s.plan_end.replace(/^0/, '')}</span>
                 {s.telework ? <span className="works-cal-site works-tw-text">テレワーク</span> : s.site && <span className="works-cal-site">{s.site.name}</span>}
+                {recentlyChanged(s, today) && <span className="works-cal-changed">変更あり</span>}
                 {s.actual_start && (
                   <span className="works-cal-actual">
                     記録 <Diff value={s.actual_start} plan={s.plan_start} short />
@@ -196,9 +224,15 @@ function MonthGrid({ data, month, onDay }) {
           </button>
         ))}
       </div>
-      <p className="ui-note">紫の線のある予定は、管理者が手で追加・変更したものです（作り直しても残ります）。</p>
+      <p className="ui-note">紫の線のある予定は、管理者が手で追加・変更したものです（作り直しても残ります）。「変更あり」は、この 2 週間に管理者が変えた今日以降の予定です。赤・橙の印は要確認（日を押すと内容を見られます）。</p>
     </>
   )
+}
+
+// 管理者がこの 2 週間に変えた、今日以降の予定（13-1 の 10）
+function recentlyChanged(s, today) {
+  if (!s.plan_changed_at || s.work_date < today) return false
+  return Date.now() - new Date(s.plan_changed_at).getTime() < 14 * 24 * 3600e3
 }
 
 // 実績（記録）の時刻。予定と違うときは赤の太字（2026-11-19 依頼元の要望）
@@ -259,7 +293,7 @@ function AllTable({ data, month, onPick }) {
   )
 }
 
-function DayModal({ date, data, staff, staffId, sites, editable, actualEditable, onClose, onSaved }) {
+export function DayModal({ date, data, staff, staffId, sites, editable, actualEditable, canRequest = false, onClose, onSaved }) {
   const shifts = data.items.filter((s) => s.work_date === date)
   const [edit, setEdit] = useState(null)
   const [error, setError] = useState('')
@@ -291,6 +325,9 @@ function DayModal({ date, data, staff, staffId, sites, editable, actualEditable,
     <Modal title={title} onClose={onClose}>
       {(data.holidays[date] || data.company_holidays[date]) && (
         <p className="works-error" style={{ margin: 0 }}>{data.holidays[date] || data.company_holidays[date]}</p>
+      )}
+      {staffId && staffId !== 'all' && !edit && (
+        <DayAlerts date={date} staffId={staffId} shifts={shifts} admin={editable} canRequest={canRequest} onChanged={onSaved} />
       )}
       {shifts.length === 0 && !edit && <p className="works-muted" style={{ margin: 0 }}>予定はありません。</p>}
       {!edit && shifts.map((s) => (
@@ -407,6 +444,13 @@ function PunchLog({ date, staffId, editable, onSaved }) {
                   {p.site || ''}
                   {p.flag_labels.length > 0 && <span className="works-punch-flags">　{p.flag_labels.join('・')}</span>}
                   {p.distance_m != null && <span className="works-muted">　現場から {p.distance_m}m</span>}
+                  {p.lat != null && p.lng != null && (
+                    <span className="works-muted">
+                      　位置 {p.lat.toFixed(5)}, {p.lng.toFixed(5)}{p.accuracy_m ? `（誤差 約${Math.round(p.accuracy_m)}m）` : ''}{' '}
+                      <a href={`https://www.google.com/maps?q=${p.lat},${p.lng}`} target="_blank" rel="noopener noreferrer">地図</a>
+                    </span>
+                  )}
+                  {editable && p.method === 'qr' && p.lat == null && !p.flags?.includes('no_location') && <span className="works-muted">　位置情報なし</span>}
                   {p.note && <span className="works-muted">　{p.note}</span>}
                 </td>
               </tr>

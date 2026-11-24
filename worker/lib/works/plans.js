@@ -18,6 +18,7 @@ import { fetchHolidays } from '../holidays.js'
 import { getAdminClient } from '../supabase-admin.js'
 import { requireWorks } from './auth.js'
 import { log } from './masters.js'
+import { pushToStaff } from './push.js'
 import { addMonths, dow, monthRange, shiftMinutes, todayJst } from './time.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -155,6 +156,32 @@ export async function handleGenerate(req) {
   }
 }
 
+// 時刻・現場・テレワークのどれかが変わったか（メモだけの変更は本人へ知らせない）
+function planChanged(cur, row) {
+  if (!cur) return false
+  if (row.work_date !== undefined && row.work_date !== cur.work_date) return true
+  if (row.plan_start !== undefined && row.plan_start !== cur.plan_start.slice(0, 5)) return true
+  if (row.plan_end !== undefined && row.plan_end !== cur.plan_end.slice(0, 5)) return true
+  if (row.site_id !== undefined && (row.site_id || null) !== (cur.site_id || null)) return true
+  if (row.telework !== undefined && !!row.telework !== !!cur.telework) return true
+  return false
+}
+
+// 予定変更の本人通知（13-1 の 10）。今日以降の予定だけ。失敗しても保存は止めない
+async function notifyPlanChange(supabase, shift, title) {
+  try {
+    if (!shift?.work_date || shift.work_date < todayJst()) return
+    const d = shift.work_date
+    await pushToStaff(supabase, shift.staff_id, {
+      title,
+      body: `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日 ${String(shift.plan_start).slice(0, 5)}〜${String(shift.plan_end).slice(0, 5)}　カレンダーで確かめてください`,
+      url: `/calendar?month=${d.slice(0, 7)}`,
+    })
+  } catch (err) {
+    console.error('works 予定変更の通知に失敗:', err)
+  }
+}
+
 function pickShift(b) {
   const row = {}
   if (b.work_date !== undefined) {
@@ -196,7 +223,7 @@ export async function handleShifts(req) {
     const { from, to } = monthRange(month)
     let q = supabase
       .from('works_shifts')
-      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, telework, source, note')
+      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, telework, source, note, plan_changed_at')
       .gte('work_date', from)
       .lte('work_date', to)
       .order('work_date')
@@ -257,18 +284,19 @@ export async function handleShifts(req) {
       if (!row.work_date || !row.plan_start || !row.plan_end) return json({ error: '日付と時刻を入力してください' }, 400)
       const { data, error: e } = await supabase
         .from('works_shifts')
-        .insert({ ...row, staff_id: b.staff_id, source: 'manual', created_by: ctx.user.id })
+        .insert({ ...row, staff_id: b.staff_id, source: 'manual', created_by: ctx.user.id, plan_changed_at: new Date().toISOString() })
         .select('*')
         .single()
       if (e) throw e
       await log(supabase, ctx, `予定を追加: ${row.work_date} ${row.plan_start}〜${row.plan_end}`)
+      await notifyPlanChange(supabase, data, '予定が追加されました')
       return json({ item: data })
     }
     if (req.method === 'PATCH') {
       const b = await req.json().catch(() => ({}))
       if (!UUID_RE.test(String(b.id || ''))) return json({ error: 'id が正しくありません' }, 400)
       const row = pickShift(b)
-      const { data: cur } = await supabase.from('works_shifts').select('plan_start, plan_end').eq('id', b.id).maybeSingle()
+      const { data: cur } = await supabase.from('works_shifts').select('plan_start, plan_end, site_id, telework, work_date').eq('id', b.id).maybeSingle()
       if (!cur) return json({ error: '予定が見つかりません' }, 404)
       const start = row.plan_start || cur.plan_start.slice(0, 5)
       const end = row.plan_end || cur.plan_end.slice(0, 5)
@@ -276,20 +304,22 @@ export async function handleShifts(req) {
       // 手で直した予定は、再作成で上書きしないよう manual にする
       const { data, error: e } = await supabase
         .from('works_shifts')
-        .update({ ...row, source: 'manual', updated_at: new Date().toISOString() })
+        .update({ ...row, source: 'manual', updated_at: new Date().toISOString(), ...(planChanged(cur, row) ? { plan_changed_at: new Date().toISOString() } : {}) })
         .eq('id', b.id)
         .select('*')
         .single()
       if (e) throw e
       await log(supabase, ctx, `予定を変更: ${data.work_date} ${start}〜${end}`)
+      if (planChanged(cur, row)) await notifyPlanChange(supabase, data, '予定が変更されました')
       return json({ item: data })
     }
     if (req.method === 'DELETE') {
       const id = url.searchParams.get('id')
       if (!UUID_RE.test(String(id || ''))) return json({ error: 'id が正しくありません' }, 400)
-      const { data, error: e } = await supabase.from('works_shifts').delete().eq('id', id).select('work_date').maybeSingle()
+      const { data, error: e } = await supabase.from('works_shifts').delete().eq('id', id).select('staff_id, work_date, plan_start, plan_end').maybeSingle()
       if (e) throw e
       await log(supabase, ctx, `予定を削除: ${data?.work_date || ''}`)
+      if (data) await notifyPlanChange(supabase, data, '予定が取り消されました')
       return json({ ok: true })
     }
   } catch (err) {

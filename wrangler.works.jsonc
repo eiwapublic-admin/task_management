@@ -19,9 +19,10 @@
   "observability": {
     "enabled": true
   },
-  // 毎日 0:00（日本時間 = UTC 15:00）。翌月の予定の自動作成（worker/works.js の scheduled）
+  // 5 分おき。未出勤・退勤漏れの通知と、日本時間 0:00 の回の翌月の予定の自動作成（worker/works.js の scheduled）。
+  // Cron はアカウントで無料 5 本まで。eWorks は 1 本だけ使う（タスク管理と合わせて 2 本）
   "triggers": {
-    "crons": ["0 15 * * *"]
+    "crons": ["*/5 * * * *"]
   }
   // シークレット（SUPABASE_URL, SUPABASE_SERVICE_KEY, SESSION_SECRET）は
   // タスク管理と同じ値を CI（deploy.yml）で同期する

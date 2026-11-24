@@ -385,3 +385,79 @@ alter table works_staff add column if not exists report_name text;
 -- 打刻の記録に「直接入力（manual）」「日報から（report）」を加える
 alter table works_punches drop constraint if exists works_punches_method_check;
 alter table works_punches add constraint works_punches_method_check check (method in ('qr', 'proxy', 'self', 'manual', 'report'));
+
+-- =============================================================================
+-- Phase 4: 要確認・通知・打刻の修正申請（docs/eworks-plan.md 8章・13-1。2026-11-24）
+--   要確認の判定は毎回 予定・打刻・休暇 から計算する（判定結果そのものは保存しない）。
+--   保存するのは「確認済みにした」「通知を送った」の印だけ（works_alert_states）。
+-- =============================================================================
+
+-- 判定のしきい値（分・m）。既定値は 2026-11-24 依頼元の決定どおり
+alter table works_settings add column if not exists alert_rules jsonb not null
+  default '{"absent_min":10,"late_min":5,"early_min":5,"no_out_min":60,"overtime_min":30}'::jsonb;
+-- この日より前は要確認を出さない（運用を始める前の空の日を「未出勤」にしないため）
+alter table works_settings add column if not exists alerts_from date;
+update works_settings set alerts_from = (now() at time zone 'Asia/Tokyo')::date where id = 1 and alerts_from is null;
+
+-- 要確認 1 件ごとの印。alert_key は「スタッフ:日付:勤務:種別」（判定のたびに同じ値になる）
+create table if not exists works_alert_states (
+  alert_key   text primary key,
+  staff_id    uuid not null references works_staff(id) on delete cascade,
+  work_date   date not null,
+  kind        text not null,
+  notified_at timestamptz,                  -- プッシュ通知を送った日時（同じ件で 2 回送らない）
+  resolved_at timestamptz,                  -- 確認済みにした日時（null なら未確認）
+  resolved_by uuid references users(id) on delete set null,
+  note        text,                         -- 確認のメモ
+  updated_at  timestamptz not null default now()
+);
+create index if not exists works_alert_states_date_idx on works_alert_states (work_date);
+
+-- 打刻の修正申請（本人が申請 → 管理者が承認すると勤務の時刻に反映。6-3・13-1 の 3）
+create table if not exists works_punch_requests (
+  id            uuid primary key default gen_random_uuid(),
+  staff_id      uuid not null references works_staff(id) on delete cascade,
+  shift_id      uuid references works_shifts(id) on delete set null,
+  work_date     date not null,
+  start_time    time,                       -- 直したい出勤の時刻（null は変えない）
+  end_time      time,                       -- 直したい退勤の時刻（null は変えない）
+  reason        text not null,
+  status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  applied_by    uuid references users(id) on delete set null,
+  applied_at    timestamptz not null default now(),
+  decided_by    uuid references users(id) on delete set null,
+  decided_at    timestamptz,
+  decision_note text,
+  updated_at    timestamptz not null default now()
+);
+create index if not exists works_punch_requests_staff_idx on works_punch_requests (staff_id, work_date);
+create index if not exists works_punch_requests_status_idx on works_punch_requests (status);
+
+-- eWorks のプッシュ通知の購読（端末ごと）。タスク管理の push_subscriptions とは分ける
+-- （タスク管理の通知は購読中の全端末へ送るため、現場スタッフの端末に届かないようにする）
+create table if not exists works_push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists works_push_subscriptions_user_idx on works_push_subscriptions (user_id);
+
+-- 管理者が予定を変えた日時（本人のカレンダーに「変更あり」を出す。13-1 の 10）
+alter table works_shifts add column if not exists plan_changed_at timestamptz;
+
+-- 打刻の記録に「修正申請の承認（correction）」を加える
+alter table works_punches drop constraint if exists works_punches_method_check;
+alter table works_punches add constraint works_punches_method_check check (method in ('qr', 'proxy', 'self', 'manual', 'report', 'correction'));
+
+do $$
+declare t text;
+begin
+  foreach t in array array['works_alert_states','works_punch_requests','works_push_subscriptions'] loop
+    execute format('grant select, insert, update, delete on %I to service_role', t);
+    execute format('alter table %I enable row level security', t);
+    execute format('revoke all on %I from anon, authenticated', t);
+  end loop;
+end $$;

@@ -4,9 +4,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api.js'
-import { addMonths, todayJst } from '../../../worker/lib/works/time.js'
+import { addMonths, monthRange, todayJst } from '../../../worker/lib/works/time.js'
 import { ResultModal } from './Calendar.jsx'
 import KeyCell from '../components/KeyCell.jsx'
+import AlertBanner from '../components/AlertBanner.jsx'
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-')
@@ -34,6 +35,19 @@ export default function Monthly() {
   useEffect(() => {
     load()
   }, [load])
+  // この月の未確認の要確認（スタッフごとの件数。月締めの前の確認漏れを防ぐ。8-2）
+  const [alertBy, setAlertBy] = useState({})
+  useEffect(() => {
+    const { from, to } = monthRange(month)
+    if (from > todayJst()) return setAlertBy({})
+    api(`/api/works/alerts?${new URLSearchParams({ from, to, status: 'open' })}`)
+      .then((d) => {
+        const m = {}
+        for (const a of d.items) m[a.staff_id] = (m[a.staff_id] || 0) + 1
+        setAlertBy(m)
+      })
+      .catch(() => setAlertBy({}))
+  }, [month])
   useEffect(() => {
     api('/api/works/staff')
       .then((d) => setStaffInfo(Object.fromEntries(d.items.map((s) => [s.id, s]))))
@@ -94,6 +108,7 @@ export default function Monthly() {
           </button>
         </div>
       </div>
+      <AlertBanner />
       {data && (
         <p className="ui-note" style={{ marginTop: 0 }}>
           {missing > 0 ? <span className="works-none">予定が未作成の在籍スタッフが {missing} 名います。</span> : '在籍スタッフ全員の予定が作成済みです。'}
@@ -112,6 +127,7 @@ export default function Monthly() {
                 <th className="num">予定時間</th>
                 <th className="num">手で変更</th>
                 <th className="center">実績入力</th>
+                <th className="center">要確認</th>
                 <th className="center">休館日勤務</th>
                 <th />
               </tr>
@@ -128,6 +144,7 @@ export default function Monthly() {
                   <td className="center">
                     {r.due ? <span className={r.entered < r.due ? 'works-none' : ''}>{r.entered}/{r.due}日</span> : <span className="works-muted">—</span>}
                   </td>
+                  <td className="center">{alertBy[r.id] ? <span className="works-none">{alertBy[r.id]}件</span> : ''}</td>
                   <td className="center">{r.info.closed_day_work ? '勤務する' : ''}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <button type="button" className="btn-plain" disabled={!!busy} onClick={() => generate(r)}>
@@ -142,13 +159,13 @@ export default function Monthly() {
                 <th className="works-key">合計（{rows.length}名）</th>
                 <th className="num">{total.days}日</th>
                 <th className="num">{(total.minutes / 60).toFixed(2)}</th>
-                <th colSpan={4} />
+                <th colSpan={5} />
               </tr>
             </tfoot>
           </table>
         </div>
       )}
-      <p className="ui-note">行をタップすると、そのスタッフのカレンダーを開きます。実績入力は、今日までの予定の日のうち出勤・退勤の記録がそろった日数です（足りないときは赤）。</p>
+      <p className="ui-note">行をタップすると、そのスタッフのカレンダーを開きます。実績入力は、今日までの予定の日のうち出勤・退勤の記録がそろった日数です（足りないときは赤）。要確認は、この月の未確認の件数です。</p>
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
     </>
   )
