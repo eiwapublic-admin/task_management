@@ -282,8 +282,22 @@
   .works-staff-row2 > :last-child {
     grid-column: 1 / -1;
   }
+  /* iPhone: 曜日ごとの勤務は 1 列に並べ、曜日と出勤パターンを同じ行に（2026-11-24 依頼元の要望） */
   .works-week {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+  }
+  .works-week > .ui-field {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .works-week > .ui-field > span {
+    flex: 0 0 1.6em;
+    font-weight: 700;
+  }
+  .works-week > .ui-field > .ui-select {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
@@ -1008,7 +1022,8 @@
   color: var(--works-accent-deep);
   letter-spacing: 0.05em;
 }
-.works-nav a.is-sub { padding-left: 22px; }
+/* グループの中の項目は、選択中の背景ごと右へ寄せる（帯に対してインデントが見えるように） */
+.works-nav a.is-sub { margin-left: 12px; }
 .works-more-label {
   margin: 2px 0 4px;
   padding: 7px 14px;
