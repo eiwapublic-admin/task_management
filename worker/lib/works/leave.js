@@ -112,7 +112,7 @@ export function leaveSummary(staff, paid, special, at) {
   }
 }
 
-async function loadLeaves(supabase, staffId = null) {
+export async function loadLeaves(supabase, staffId = null) {
   const all = []
   for (let from = 0; ; from += 1000) {
     let q = supabase.from('works_leaves').select('id, staff_id, leave_date, kind, source, note').order('leave_date').range(from, from + 999)
@@ -125,7 +125,7 @@ async function loadLeaves(supabase, staffId = null) {
   return all
 }
 
-function split(rows) {
+export function split(rows) {
   const by = {}
   for (const r of rows) {
     const x = (by[r.staff_id] ||= { paid: [], special: [] })

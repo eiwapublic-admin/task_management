@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import './AttachmentPreview.css'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5

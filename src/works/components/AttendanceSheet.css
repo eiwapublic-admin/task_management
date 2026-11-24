@@ -1,0 +1,308 @@
+/* 出勤簿（AttendanceSheet.jsx）の PDF 用シート。A4 縦 1 枚。
+   タスク管理の帳票シート（WasteSheet.css など）と同じ方式: ふだんは隠し、PDF を作る間だけ
+   body.pdf-capture-mode で画面外に A4 の大きさで出して html2canvas で撮る。
+   色は生の hex だけ（html2canvas は oklch などの新しい色関数を解釈できない）。 */
+
+.att-sheet {
+  display: none;
+}
+
+body.pdf-capture-mode .att-sheet {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  background: #fff;
+  color: #222;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'BIZ UDPMincho', 'MS PMincho', serif;
+  line-height: 1.2;
+}
+
+.att-sheet * {
+  box-sizing: border-box;
+}
+
+/* ---------- 見出し（0〜24.4mm） ---------- */
+.att-head {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 24.4mm;
+}
+
+.att-title,
+.att-kind,
+.att-month,
+.att-name {
+  position: absolute;
+  top: 9.2mm;
+  white-space: nowrap;
+}
+
+.att-title {
+  left: 11mm;
+  top: 8.4mm;
+  font-size: 17pt;
+  font-weight: 700;
+  color: #644600;
+  letter-spacing: 0.5mm;
+}
+
+.att-kind {
+  left: 36.5mm;
+  font-size: 12pt;
+  color: #41573b;
+}
+
+.att-month {
+  left: 52.5mm;
+  font-size: 12pt;
+  color: #41573b;
+}
+
+.att-name {
+  left: 80mm;
+  font-size: 12pt;
+  color: #222;
+}
+
+.att-leave {
+  position: absolute;
+  top: 6.6mm;
+  left: 112mm;
+  width: 75mm;
+  font-size: 8.5pt;
+  color: #555;
+}
+
+.att-leave > div {
+  display: flex;
+  align-items: baseline;
+  height: 3.9mm;
+}
+
+.att-leave-label {
+  width: 38mm;
+  text-align: right;
+}
+
+.att-leave-num {
+  width: 7mm;
+  text-align: right;
+  color: #222;
+}
+
+.att-leave-sub {
+  margin-left: 3mm;
+  width: 15mm;
+  white-space: nowrap;
+}
+
+.att-col-title {
+  position: absolute;
+  top: 19.4mm;
+  font-size: 9.5pt;
+  color: #956900;
+  white-space: nowrap;
+}
+
+/* ---------- 日ごとの行（24.4〜240.4mm。行の高さは日数で割る） ---------- */
+.att-rows {
+  position: absolute;
+  top: 24.4mm;
+  left: 6.4mm;
+  width: 196.8mm;
+  border-top: 0.3mm solid #333;
+}
+
+.att-row {
+  display: flex;
+}
+
+.att-row.is-even {
+  background: #e6efe2;
+}
+
+.att-c {
+  flex: none;
+  height: 100%;
+  padding: 0.9mm 0.8mm 0;
+  overflow: hidden;
+  border-left: 0.2mm solid #c9c9c9;
+  font-size: 8pt;
+}
+
+.att-c-day {
+  width: 6.3mm;
+  border-left: none;
+  text-align: right;
+  padding-right: 1mm;
+}
+
+.att-c-dow {
+  width: 6.3mm;
+  border-left: none;
+  text-align: center;
+}
+
+.att-c-dow.is-red {
+  background: #f6c7d9;
+}
+
+.att-c-note {
+  width: 18.6mm;
+  font-size: 6.5pt;
+  line-height: 1.25;
+}
+
+.att-c-start { width: 9.7mm; text-align: right; }
+.att-c-end { width: 9.1mm; text-align: right; }
+.att-c-normal { width: 10.2mm; text-align: right; }
+.att-c-over { width: 9.5mm; }
+.att-c-hol { width: 9.6mm; }
+.att-c-work { width: 34.5mm; }
+.att-c-fare { width: 14mm; border-left-width: 0.4mm; border-left-color: #aaa; border-right: 0.2mm solid #c9c9c9; }
+
+/* 予定は薄い字（本人がこの上に実際の時刻を書き込む）。実績は濃い字 */
+.att-v {
+  color: #b1c1ad;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 3.3mm;
+}
+
+.att-v.is-actual {
+  color: #333;
+}
+
+.att-site {
+  font-size: 6.5pt;
+  padding-top: 0.4mm;
+}
+
+/* ---------- 合計と件名別小計（240.4mm〜） ---------- */
+.att-foot {
+  position: absolute;
+  top: 240.4mm;
+  left: 0;
+  width: 210mm;
+  height: 56.6mm;
+}
+
+.att-total,
+.att-count {
+  position: absolute;
+  left: 11mm;
+  width: 33.8mm;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 9.5pt;
+  color: #956900;
+}
+
+.att-total b {
+  flex: 1;
+  margin-left: 1.5mm;
+  text-align: right;
+  font-weight: 400;
+  font-size: 12pt;
+  color: #222;
+  border-bottom: 0.35mm dotted #555;
+}
+
+.att-count {
+  top: 29mm;
+}
+
+.att-count b {
+  font-weight: 400;
+  font-size: 8.5pt;
+  color: #222;
+}
+
+.att-sub-label {
+  position: absolute;
+  top: 0.8mm;
+  left: 48mm;
+  font-size: 6pt;
+  color: #956900;
+}
+
+.att-sub {
+  position: absolute;
+  top: 3.4mm;
+  left: 47.7mm;
+  width: 130.9mm;
+  border-top: 0.2mm solid #9b8a5f;
+  border-bottom: 0.2mm solid #9b8a5f;
+  border-left: 0.2mm solid #9b8a5f;
+}
+
+.att-sub-row {
+  display: flex;
+  height: 5.25mm;
+}
+
+.att-sub-row + .att-sub-row {
+  border-top: 0.2mm solid #ddd;
+}
+
+.att-sub-pair {
+  display: flex;
+  width: 33.33%;
+  border-right: 0.2mm solid #9b8a5f;
+}
+
+.att-sub-name {
+  flex: 1;
+  padding: 0.8mm 0.6mm 0;
+  font-size: 6.5pt;
+  white-space: nowrap;
+  overflow: hidden;
+  border-right: 0.2mm solid #bbb;
+}
+
+.att-sub-hours {
+  width: 11mm;
+  padding: 0.8mm 0.8mm 0;
+  font-size: 7pt;
+  text-align: right;
+}
+
+.att-right {
+  position: absolute;
+  left: 179.6mm;
+  width: 23.6mm;
+  height: 8.4mm;
+  font-size: 9.5pt;
+  color: #956900;
+  border-bottom: 0.35mm dotted #555;
+}
+
+.att-stamp-month {
+  position: absolute;
+  top: 33.4mm;
+  left: 152mm;
+  font-size: 6pt;
+  color: #41573b;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, sans-serif;
+}
+
+.att-stamp-name {
+  position: absolute;
+  top: 32.2mm;
+  left: 170mm;
+  width: 30.6mm;
+  height: 4.9mm;
+  padding: 0.8mm 1.3mm 0;
+  font-size: 7pt;
+  border: 0.35mm solid #ada590;
+  border-radius: 1.5mm;
+  white-space: nowrap;
+  overflow: hidden;
+}

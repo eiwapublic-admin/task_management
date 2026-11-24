@@ -12,6 +12,7 @@ import KeyCell from '../components/KeyCell.jsx'
 import DayAlerts from '../components/DayAlerts.jsx'
 import LeaveRequestForm from '../components/LeaveRequestForm.jsx'
 import StaffLeavePanel from '../components/StaffLeavePanel.jsx'
+import useAttendanceSheetPdf from '../components/useAttendanceSheetPdf.jsx'
 
 const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
@@ -36,6 +37,7 @@ export default function Calendar() {
   const [leaveForm, setLeaveForm] = useState(null)
   const [leaveSummary, setLeaveSummary] = useState(null)
   const [leaveVersion, setLeaveVersion] = useState(0)
+  const sheetPdf = useAttendanceSheetPdf()
 
   const load = useCallback(() => {
     const q = new URLSearchParams({ month })
@@ -127,7 +129,10 @@ export default function Calendar() {
                 ))}
               </select>
               {current && (
-                <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>{busy ? '作成中…' : '予定を再作成'}</button>
+                <>
+                  <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>{busy ? '作成中…' : '予定を再作成'}</button>
+                  <button type="button" className="btn-plain" disabled={busy || sheetPdf.busy} onClick={() => sheetPdf.open(month, current.id)}>出勤簿を印刷</button>
+                </>
               )}
             </>
           )}
@@ -140,6 +145,7 @@ export default function Calendar() {
         )}
       </div>
       {error && <p className="works-error">{error}</p>}
+      {sheetPdf.error && <p className="works-error">{sheetPdf.error}</p>}
       {!isAdmin && !me?.staff && <p className="works-muted">スタッフ情報が紐づいていません。管理者にお問い合わせください。</p>}
       {data && staffId === 'all' && <AllTable data={data} month={month} onPick={(id) => setStaffId(id)} />}
       {data && staffId !== 'all' && staffId && (
@@ -168,6 +174,7 @@ export default function Calendar() {
         />
       )}
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
+      {sheetPdf.ui}
       {leaveForm && current && (
         <LeaveRequestForm
           date={leaveForm.date}

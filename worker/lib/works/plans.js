@@ -117,6 +117,55 @@ async function holidaysOf(month) {
   return out
 }
 
+// 月の予定（勤務区間）を、現場名・休憩を引いた時間つきで読む。staffIds を省くと全員。
+//   GET /api/works/shifts と出勤簿（sheets.js）の共通部分。実績（actual_*）がそろった区間は actual_minutes も付ける
+export async function loadMonthShifts(supabase, month, { staffIds = null, settings = null } = {}) {
+  settings ||= await loadSettings(supabase)
+  const { from, to } = monthRange(month)
+  let q = supabase
+    .from('works_shifts')
+    .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, telework, source, note, plan_changed_at')
+    .gte('work_date', from)
+    .lte('work_date', to)
+    .order('work_date')
+    .order('plan_start')
+  if (staffIds) q = q.in('staff_id', staffIds)
+  const [{ data: shifts, error: e1 }, holidays, companyHolidays, { data: sites }] = await Promise.all([
+    q,
+    holidaysOf(month).catch(() => ({})),
+    companyHolidaysOf(supabase, month, settings),
+    supabase.from('works_sites').select('id, code, name'),
+  ])
+  if (e1) throw e1
+  const ids = [...new Set(shifts.map((s) => s.staff_id))]
+  const { data: schedules } = ids.length
+    ? await supabase.from('works_staff_schedules').select('staff_id, valid_from, break_overrides').in('staff_id', ids).lte('valid_from', to).order('valid_from')
+    : { data: [] }
+  const siteMap = new Map((sites || []).map((s) => [s.id, s]))
+  const items = shifts.map((s) => {
+    const sch = scheduleAt((schedules || []).filter((x) => x.staff_id === s.staff_id), s.work_date)
+    const override = (sch?.break_overrides || []).find((o) => o.dow === dow(s.work_date)) || null
+    const opts = { windows: settings.break_windows || [], override }
+    const calc = shiftMinutes(s.plan_start, s.plan_end, opts)
+    const site = siteMap.get(s.site_id)
+    const actualStart = s.actual_start ? s.actual_start.slice(0, 5) : null
+    const actualEnd = s.actual_end ? s.actual_end.slice(0, 5) : null
+    return {
+      ...s,
+      plan_start: s.plan_start.slice(0, 5),
+      plan_end: s.plan_end.slice(0, 5),
+      actual_start: actualStart,
+      actual_end: actualEnd,
+      site: site ? { code: site.code, name: site.name } : null,
+      minutes: calc.minutes,
+      break_minutes: calc.breakMinutes,
+      warn_no_break: calc.warnNoBreak,
+      actual_minutes: actualStart && actualEnd && actualStart < actualEnd ? shiftMinutes(actualStart, actualEnd, opts).minutes : null,
+    }
+  })
+  return { items, holidays, companyHolidays, settings }
+}
+
 // 予定を作る。staffIds を省くと在籍の全員
 export async function generateMonth(supabase, month, { staffIds = null, actor = null } = {}) {
   const { from, to } = monthRange(month)
@@ -254,45 +303,8 @@ export async function handleShifts(req) {
     } else if (staffId !== 'all' && !UUID_RE.test(staffId)) {
       return json({ error: 'スタッフが正しくありません' }, 400)
     }
-    const { from, to } = monthRange(month)
-    let q = supabase
-      .from('works_shifts')
-      .select('id, staff_id, work_date, site_id, pattern_id, plan_start, plan_end, actual_start, actual_end, telework, source, note, plan_changed_at')
-      .gte('work_date', from)
-      .lte('work_date', to)
-      .order('work_date')
-      .order('plan_start')
-    if (staffId !== 'all') q = q.eq('staff_id', staffId)
     const settings = await loadSettings(supabase)
-    const [{ data: shifts, error: e1 }, holidays, companyHolidays, { data: sites }] = await Promise.all([
-      q,
-      holidaysOf(month).catch(() => ({})),
-      companyHolidaysOf(supabase, month, settings),
-      supabase.from('works_sites').select('id, code, name'),
-    ])
-    if (e1) throw e1
-    const staffIds = [...new Set(shifts.map((s) => s.staff_id))]
-    const { data: schedules } = staffIds.length
-      ? await supabase.from('works_staff_schedules').select('staff_id, valid_from, break_overrides').in('staff_id', staffIds).lte('valid_from', to).order('valid_from')
-      : { data: [] }
-    const siteMap = new Map((sites || []).map((s) => [s.id, s]))
-    const items = shifts.map((s) => {
-      const sch = scheduleAt((schedules || []).filter((x) => x.staff_id === s.staff_id), s.work_date)
-      const override = (sch?.break_overrides || []).find((o) => o.dow === dow(s.work_date)) || null
-      const calc = shiftMinutes(s.plan_start, s.plan_end, { windows: settings.break_windows || [], override })
-      const site = siteMap.get(s.site_id)
-      return {
-        ...s,
-        plan_start: s.plan_start.slice(0, 5),
-        plan_end: s.plan_end.slice(0, 5),
-        actual_start: s.actual_start ? s.actual_start.slice(0, 5) : null,
-        actual_end: s.actual_end ? s.actual_end.slice(0, 5) : null,
-        site: site ? { code: site.code, name: site.name } : null,
-        minutes: calc.minutes,
-        break_minutes: calc.breakMinutes,
-        warn_no_break: calc.warnNoBreak,
-      }
-    })
+    const { items, holidays, companyHolidays } = await loadMonthShifts(supabase, month, { staffIds: staffId === 'all' ? null : [staffId], settings })
     let staff = null
     if (ctx.isAdmin) {
       const { data } = await supabase.from('works_staff').select('id, code, name, status, punch_method').neq('status', 'retired').order('code')
