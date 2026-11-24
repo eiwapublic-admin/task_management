@@ -1,0 +1,185 @@
+/* 前年比較グラフ（古紙回収・廃棄物。2026-11-24〜）。
+   当年度＝主色、前年度＝薄いグレー。月別は横並びの棒、年間合計は横棒（推計は点線枠） */
+.ycc-month,
+.ycc-annual {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ycc-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.ycc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ycc-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ycc-swatch.is-current,
+.ycc-bar.is-current,
+.ycc-annual-bar.is-current:not(.is-estimate),
+.ycc-annual-bar.is-current .ycc-annual-fill {
+  background: var(--color-primary);
+}
+
+.ycc-swatch.is-previous,
+.ycc-bar.is-previous,
+.ycc-annual-bar.is-previous:not(.is-estimate),
+.ycc-annual-bar.is-previous .ycc-annual-fill {
+  background: #b8c0cc;
+}
+
+/* ===== 月別（前年同月と横並び） ===== */
+.ycc-month-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 140px;
+  min-width: 0;
+}
+
+.ycc-month-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.ycc-month-bars {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 36px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  min-height: 0;
+}
+
+.ycc-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+}
+
+.ycc-month-value,
+.ycc-month-label {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ===== 年間合計（前年度と比較する横棒） ===== */
+.ycc-annual-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ycc-annual-title {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.ycc-annual-ratio {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.ycc-annual-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'label value'
+    'track track';
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  align-items: baseline;
+}
+
+.ycc-annual-label {
+  grid-area: label;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ycc-annual-value {
+  grid-area: value;
+  justify-self: end;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ycc-annual-sub {
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.ycc-annual-track {
+  grid-area: track;
+  height: 16px;
+  min-width: 0;
+}
+
+.ycc-annual-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+/* 推計：外枠を点線にし、中に今までの実績を塗る */
+.ycc-annual-bar.is-estimate {
+  position: relative;
+  background: transparent;
+  border: 2px dashed var(--color-primary);
+}
+
+.ycc-annual-bar.is-estimate.is-previous {
+  border-color: #8a94a3;
+}
+
+.ycc-annual-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  opacity: 0.85;
+}
+
+.ycc-annual-note {
+  margin: 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .ycc-month-chart { height: 96px; gap: 3px; }
+  .ycc-month-value { display: none; }
+  .ycc-annual { gap: 2px; }
+  .ycc-annual-track { height: 12px; }
+}
