@@ -996,19 +996,28 @@
 
 /* ===== 2026-11-24 管理者メニューのグループ（勤務管理・マスター） ===== */
 .works-nav-group + .works-nav-group { margin-top: 10px; }
+/* グループ名は背景色付きの帯にして区切りをわかりやすく（2026-11-24 依頼元の要望） */
 .works-nav-label {
-  padding: 6px 12px 2px;
-  font-size: var(--fs-xs);
+  margin: 0 0 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--works-accent-soft);
+  border-left: 4px solid var(--works-accent);
+  font-size: var(--fs-sm);
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--works-accent-deep);
   letter-spacing: 0.05em;
 }
 .works-nav a.is-sub { padding-left: 22px; }
 .works-more-label {
-  padding: 8px 14px 2px;
-  font-size: var(--fs-xs);
+  margin: 2px 0 4px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--works-accent-soft);
+  border-left: 4px solid var(--works-accent);
+  font-size: 14px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--works-accent-deep);
 }
 
 /* iPhone: 一覧表を縦にスクロールするとき、表が左右にぶれないように（2026-11-24）
@@ -1021,3 +1030,9 @@
 
 /* 「スタッフ別」のカレンダーの下の有給休暇（旧「休暇」画面の内容） */
 .works-leave-panel { margin-top: 16px; }
+/* 「その他」の中で、マスターの後ろの設定は線で区切る（マスターの一部に見えないように） */
+.works-more-sheet [role="group"] + [role="group"] {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
