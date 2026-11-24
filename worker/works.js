@@ -14,6 +14,7 @@ import { handleAlertCount, handleAlertResolve, handleAlerts, runAlertNotificatio
 import { handlePushKey, handlePushSubscribe, handlePushUnsubscribe } from './lib/works/push.js'
 import { handlePunchRequestDecide, handlePunchRequests } from './lib/works/requests.js'
 import { jstParts } from './lib/works/time.js'
+import { handleAttendanceSheet, handleWorksPdfPreview } from './lib/works/sheets.js'
 import { handlePunch, handlePunches, handlePunchProxy, handlePunchSelf, handlePunchToday, handleSiteQr } from './lib/works/punches.js'
 
 const MASTER_TABLES = {
@@ -48,6 +49,8 @@ async function route(req, env) {
       if (pathname === '/api/works/alerts/count') return await handleAlertCount(req)
       if (pathname === '/api/works/punch-requests') return await handlePunchRequests(req)
       if (pathname === '/api/works/push/key') return await handlePushKey(req)
+      if (pathname === '/api/works/attendance-sheet') return await handleAttendanceSheet(req)
+      if (pathname === '/api/works/pdf-preview') return await handleWorksPdfPreview(req)
       const POST_ONLY = { '/api/works/actuals': handleActuals, '/api/works/actuals/plan': handleActualsPlan, '/api/works/leave/requests/decide': handleLeaveDecide, '/api/works/punch': handlePunch, '/api/works/punch/proxy': handlePunchProxy, '/api/works/punch/self': handlePunchSelf, '/api/works/sites/qr': handleSiteQr, '/api/works/alerts/resolve': handleAlertResolve, '/api/works/punch-requests/decide': handlePunchRequestDecide, '/api/works/push/subscribe': handlePushSubscribe, '/api/works/push/unsubscribe': handlePushUnsubscribe }
       if (POST_ONLY[pathname]) return req.method === 'POST' ? await POST_ONLY[pathname](req) : json({ error: 'Method Not Allowed' }, 405)
       if (pathname === '/api/works/invite/check') {

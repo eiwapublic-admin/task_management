@@ -8,6 +8,7 @@ import { addMonths, monthRange, todayJst } from '../../../worker/lib/works/time.
 import { ResultModal } from './Calendar.jsx'
 import KeyCell from '../components/KeyCell.jsx'
 import AlertBanner from '../components/AlertBanner.jsx'
+import useAttendanceSheetPdf from '../components/useAttendanceSheetPdf.jsx'
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-')
@@ -22,6 +23,7 @@ export default function Monthly() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
   const [result, setResult] = useState(null)
+  const sheetPdf = useAttendanceSheetPdf()
 
   const load = useCallback(() => {
     setData(null)
@@ -77,6 +79,8 @@ export default function Monthly() {
   }, [data, staffInfo])
   const total = rows.reduce((a, r) => ({ days: a.days + r.days, minutes: a.minutes + r.minutes }), { days: 0, minutes: 0 })
   const missing = rows.filter((r) => r.days === 0 && r.status === 'active').length
+  // 出勤簿の一括印刷の対象（入力方法が「管理者が代理入力」の人）
+  const proxyCount = rows.filter((r) => r.punch_method === 'proxy').length
 
   const generate = async (st) => {
     const who = st ? `${st.code} ${st.name} さん` : '在籍の全員'
@@ -106,6 +110,15 @@ export default function Monthly() {
           <button type="button" className="btn-primary works-btn-accent" disabled={!!busy} onClick={() => generate(null)}>
             {busy === 'all' ? '作成中…' : '予定を一括作成'}
           </button>
+          <button
+            type="button"
+            className="btn-plain"
+            disabled={!!busy || sheetPdf.busy || !data}
+            onClick={() => sheetPdf.open(month, 'proxy')}
+            title="入力方法が「管理者が代理入力」のスタッフ全員の出勤簿（入力用の用紙）を 1 つの PDF にします"
+          >
+            出勤簿を一括印刷（代理入力{data ? ` ${proxyCount}名` : ''}）
+          </button>
         </div>
       </div>
       <AlertBanner />
@@ -116,6 +129,7 @@ export default function Monthly() {
         </p>
       )}
       {error && <p className="works-error">{error}</p>}
+      {sheetPdf.error && <p className="works-error">{sheetPdf.error}</p>}
       {!data && !error && <p className="works-muted">読み込み中…</p>}
       {data && (
         <div className="ui-table-wrap works-scroll">
@@ -146,9 +160,12 @@ export default function Monthly() {
                   </td>
                   <td className="center">{alertBy[r.id] ? <span className="works-none">{alertBy[r.id]}件</span> : ''}</td>
                   <td className="center">{r.info.closed_day_work ? '勤務する' : ''}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
                     <button type="button" className="btn-plain" disabled={!!busy} onClick={() => generate(r)}>
                       {busy === r.id ? '作成中…' : r.days ? '作り直す' : '作成'}
+                    </button>{' '}
+                    <button type="button" className="btn-plain" disabled={!!busy || sheetPdf.busy} onClick={() => sheetPdf.open(month, r.id)}>
+                      出勤簿
                     </button>
                   </td>
                 </tr>
@@ -165,8 +182,9 @@ export default function Monthly() {
           </table>
         </div>
       )}
-      <p className="ui-note">行をタップすると、そのスタッフのカレンダーを開きます。実績入力は、今日までの予定の日のうち出勤・退勤の記録がそろった日数です（足りないときは赤）。要確認は、この月の未確認の件数です。</p>
+      <p className="ui-note">「出勤簿を一括印刷」は、入力方法が「管理者が代理入力」のスタッフ全員の出勤簿（予定を薄い字で印字した入力用の用紙）を 1 つの PDF にします。1 人分は各行の「出勤簿」から出せます。行をタップすると、そのスタッフのカレンダーを開きます。実績入力は、今日までの予定の日のうち出勤・退勤の記録がそろった日数です（足りないときは赤）。要確認は、この月の未確認の件数です。</p>
       {result && <ResultModal result={result} onClose={() => setResult(null)} />}
+      {sheetPdf.ui}
     </>
   )
 }

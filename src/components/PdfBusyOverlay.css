@@ -1,0 +1,42 @@
+/* ============================================================
+   PDF作成中のブロッキングオーバーレイ（2026-08-10）。
+   自主検査表・残留塩素等検査帳票のどちらのPDF出力からも共通で使う
+   （PdfBusyOverlay.jsx）。2026-11-24 に Dashboard.css から切り出した（eWorks でも使うため）。既存モーダル（.attachment-preview-overlay z-index:60）
+   よりも確実に前面に出す必要があるため、余裕を持って高い値にしている。
+   ============================================================ */
+.pdf-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-blocking);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.pdf-busy-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.pdf-busy-spinner {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: pdf-busy-spin 0.8s linear infinite;
+}
+
+@keyframes pdf-busy-spin {
+  to { transform: rotate(360deg); }
+}

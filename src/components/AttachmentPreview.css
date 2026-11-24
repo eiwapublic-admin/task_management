@@ -1,0 +1,177 @@
+/* 添付ファイル・帳票PDFのアプリ内プレビュー（AttachmentPreview.jsx・PdfPreviewActions.jsx）。
+   2026-11-24 に KanbanBoard.css から切り出した（勤怠管理 eWorks の出勤簿でも同じ画面を使うため）。 */
+.attachment-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-preview); /* タスク詳細モーダル（z-index:50）より上に重ねる */
+  padding: var(--space-4);
+}
+
+.attachment-preview-modal {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  width: 900px;
+  max-width: 100%;
+  height: 85vh;
+  height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+.attachment-preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.attachment-preview-filename {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+  word-break: break-all;
+}
+
+.attachment-preview-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.attachment-preview-zoom-controls button {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.attachment-preview-zoom-controls button[aria-label='ズームをリセット'] {
+  width: auto;
+  padding: 0 var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.attachment-preview-zoom-level {
+  min-width: 3.5em;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/* PDFプレビューの「共有」「ダウンロード」「プリント」（2026-08-07に1つのボタンとして追加、
+   2026-09-09に共有/ダウンロードの2ボタンへ分離、続けて同日中に共有・ダウンロードを
+   アイコンのみの控えめなボタンへ変更しプリントを追加）。並びは「共有（↑）→
+   ダウンロード（↓）→プリント」に揃え、プリントだけを主張の強い色にする */
+.attachment-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.attachment-preview-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.attachment-preview-print {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 雛形ファイルのプレビュー内「ダウンロード」ボタン（src/pages/DocumentTemplates.jsx）が
+   引き続き使う、文字ラベル付きの控えめなボタンスタイル（PDFプレビューの共有ボタンとは無関係） */
+.attachment-preview-share {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.attachment-preview-close {
+  border: none;
+  background: transparent;
+  font-size: var(--fs-2xl);
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  flex-shrink: 0;
+}
+
+.attachment-preview-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--scrim-heavy);
+  touch-action: none;
+}
+
+.attachment-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  touch-action: none;
+  transition: transform 60ms ease-out;
+}
+
+.attachment-preview-pdf {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--bg-surface);
+}
+
+.attachment-preview-unsupported {
+  color: var(--ink-on-fill);
+}
+
+@media (max-width: 768px) {
+  .attachment-preview-modal {
+    width: 100%;
+    height: 90vh;
+    height: 90dvh;
+  }
+}
