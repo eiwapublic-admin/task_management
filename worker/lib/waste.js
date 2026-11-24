@@ -456,3 +456,37 @@ export async function handleWasteDriveFileDownload(req) {
     return driveErrorResponse(err, 'Googleドライブからファイルを取得できませんでした')
   }
 }
+
+// GET /api/waste/monthly-totals — 全期間の月別合計（過去推移タブ用。2026-11-24〜）。
+// 年度合計の推移を出すのに日×階の明細は要らないため、日付と重量の2列だけを1000行ずつ読み、
+// Worker 側で月ごとに足して小さく返す（明細のまま返すと1万行を超え、画面側の処理も重い）
+export async function handleWasteMonthlyTotals(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const totals = new Map()
+    for (let i = 0; ; i += 1000) {
+      const { data, error: err } = await supabase
+        .from('waste_records')
+        .select('record_date, weight_kg')
+        .order('record_date', { ascending: true })
+        .order('floor', { ascending: true })
+        .range(i, i + 999)
+      if (err) {
+        console.error('waste-monthly-totals:', err.message)
+        return json({ error: '月別合計の取得に失敗しました' }, 500)
+      }
+      for (const r of data || []) {
+        const month = r.record_date.slice(0, 7)
+        totals.set(month, (totals.get(month) || 0) + Number(r.weight_kg || 0))
+      }
+      if (!data || data.length < 1000) break
+    }
+    const months = [...totals].map(([month, total]) => ({ month, total: Math.round(total * 100) / 100 }))
+    return json({ months })
+  } catch (err) {
+    console.error('waste-monthly-totals 失敗:', err)
+    return json({ error: '月別合計の取得に失敗しました' }, 500)
+  }
+}

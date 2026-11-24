@@ -138,3 +138,37 @@ export async function handlePaperRecordDelete(req) {
     return json({ error: '古紙回収量の削除に失敗しました' }, 500)
   }
 }
+
+// GET /api/paper/monthly-totals — 全期間の月別合計（過去推移タブ用。2026-11-24〜）。
+// 中止の回は数えない。重量の4列だけを読み、Worker 側で月ごとに足して返す
+export async function handlePaperMonthlyTotals(req) {
+  const { error } = await requireAuth(req)
+  if (error) return error
+  try {
+    const supabase = getAdminClient()
+    const totals = new Map()
+    for (let i = 0; ; i += 1000) {
+      const { data, error: err } = await supabase
+        .from('paper_records')
+        .select(`collect_date, skipped, ${WEIGHT_FIELDS.join(', ')}`)
+        .order('collect_date', { ascending: true })
+        .range(i, i + 999)
+      if (err) {
+        console.error('paper-monthly-totals:', err.message)
+        return json({ error: '月別合計の取得に失敗しました' }, 500)
+      }
+      for (const r of data || []) {
+        if (r.skipped) continue
+        const month = r.collect_date.slice(0, 7)
+        const sum = WEIGHT_FIELDS.reduce((s, f) => s + Number(r[f] || 0), 0)
+        totals.set(month, (totals.get(month) || 0) + sum)
+      }
+      if (!data || data.length < 1000) break
+    }
+    const months = [...totals].map(([month, total]) => ({ month, total: Math.round(total * 10) / 10 }))
+    return json({ months })
+  } catch (err) {
+    console.error('paper-monthly-totals 失敗:', err)
+    return json({ error: '月別合計の取得に失敗しました' }, 500)
+  }
+}

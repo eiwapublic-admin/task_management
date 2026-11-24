@@ -9,14 +9,14 @@ import {
   currentFiscalYear,
   deletePaperRecord,
   fetchPaperRecords,
+  fetchPaperMonthlyTotals,
   fiscalYearOf,
   formatKg,
   paperRowTotal,
   upsertPaperRecord,
 } from '../lib/paper'
-import { currentMonthJST, fetchHolidays, todayJST, weekdayInfo } from '../lib/reports'
-import { fiscalMonthsOf, fiscalYearTotals, sameMonthLastYear } from '../lib/yearCompare'
-import { AnnualCompareChart, MonthCompareChart } from '../components/YearCompareCharts'
+import { fetchHolidays, todayJST, weekdayInfo } from '../lib/reports'
+import { HistoryPanel, YearSummaryPanel } from '../components/YearCompareCharts'
 import './Dashboard.css'
 import './Paper.css'
 
@@ -31,10 +31,14 @@ export default function Paper() {
   // 書き込みは廃棄物・残留塩素と同じ扱い（owner・備品出庫限定ロールは閲覧のみ）
   const readOnly = isLimitedRole(user)
 
+  // 'input'＝入力 | 'year'＝年度集計 | 'history'＝過去推移（2026-11-24〜。廃棄物の画面と同じ構成）
+  const [viewMode, setViewMode] = useState('input')
   const [fiscalYear, setFiscalYear] = useState(currentFiscalYear())
   const [records, setRecords] = useState([])
-  // 前年度の記録（グラフの前年同月・年間合計の比較用。2026-11-24〜）
+  // 前年度の記録（年度集計タブの前年同月・年間合計の比較用。2026-11-24〜）
   const [prevRecords, setPrevRecords] = useState([])
+  // 過去推移タブ用の全期間の月別合計（'YYYY-MM' -> kg）
+  const [historyTotals, setHistoryTotals] = useState(new Map())
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -43,18 +47,25 @@ export default function Paper() {
     setLoading(true)
     setError('')
     try {
-      const [current, previous] = await Promise.all([
-        fetchPaperRecords(fiscalYear),
-        fetchPaperRecords(fiscalYear - 1),
-      ])
-      setRecords(current)
-      setPrevRecords(previous)
+      if (viewMode === 'history') {
+        const rows = await fetchPaperMonthlyTotals()
+        setHistoryTotals(new Map(rows.map((r) => [r.month, Number(r.total)])))
+      } else if (viewMode === 'year') {
+        const [current, previous] = await Promise.all([
+          fetchPaperRecords(fiscalYear),
+          fetchPaperRecords(fiscalYear - 1),
+        ])
+        setRecords(current)
+        setPrevRecords(previous)
+      } else {
+        setRecords(await fetchPaperRecords(fiscalYear))
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [fiscalYear])
+  }, [fiscalYear, viewMode])
 
   useEffect(() => {
     load()
@@ -106,6 +117,12 @@ export default function Paper() {
   }
 
   function handleGoToToday() {
+    if (viewMode !== 'input') {
+      scrollToTodayRef.current = true
+      setViewMode('input')
+      setFiscalYear(currentFiscalYear())
+      return
+    }
     if (fiscalYear === currentFiscalYear()) {
       scrollToToday()
     } else {
@@ -134,27 +151,9 @@ export default function Paper() {
     return [...map.values()]
   }, [rows, byDate])
 
-  // 年度合計と月平均。平均は「実績のある月」だけで割る（Excelが未到来の月を
-  // #N/A にして平均・近似曲線から外しているのと同じ考え方）
-  const summary = useMemo(() => {
-    const withData = months.filter((m) => m.total > 0)
-    const total = withData.reduce((sum, m) => sum + m.total, 0)
-    return {
-      total,
-      average: withData.length > 0 ? total / withData.length : 0,
-      monthCount: withData.length,
-    }
-  }, [months])
-
-  // 前年度の月別合計（'YYYY-MM' -> kg）。中止の回は paperRowTotal が0を返す
-  const prevMonthTotals = useMemo(() => {
-    const map = new Map()
-    for (const r of prevRecords) {
-      const key = r.collect_date.slice(0, 7)
-      map.set(key, (map.get(key) || 0) + paperRowTotal(r))
-    }
-    return map
-  }, [prevRecords])
+  // 年度集計タブ用の月別合計（'YYYY-MM' -> kg）。中止の回は paperRowTotal が0を返す
+  const monthTotals = useMemo(() => sumByMonth(records), [records])
+  const prevMonthTotals = useMemo(() => sumByMonth(prevRecords), [prevRecords])
 
   async function handleSave(collectDate, patch) {
     setError('')
@@ -215,35 +214,58 @@ export default function Paper() {
   return (
     <div className="ui-page">
       <AppHeader />
-      <div className="ui-container is-wide app-scroll paper-page">
+      <div className={`ui-container is-wide app-scroll${viewMode === 'input' ? ' paper-page' : ''}`}>
         <FeatureHeader
           filters={
-            <div className="inspection-month">
-              <button
-                type="button"
-                className="icon-btn-nav"
-                onClick={() => setFiscalYear((y) => y - 1)}
-                aria-label="前年度"
-                title="前年度"
-              >
-                <IconChevronLeft size={28} />
-              </button>
-              <span className="inspection-month-label">{fiscalYear}年度</span>
-              <button
-                type="button"
-                className="icon-btn-nav"
-                onClick={() => setFiscalYear((y) => y + 1)}
-                aria-label="翌年度"
-                title="翌年度"
-              >
-                <IconChevronRight size={28} />
-              </button>
-              {/* 押すと今年度へ切り替え、本日（または本日に一番近い過去）の回収日の行まで
-                  スクロールする。年度は52週あり、目当ての週を探すのに毎回スクロールが要るため */}
-              <button type="button" className="btn-plain reports-today-btn" onClick={handleGoToToday}>
-                本日
-              </button>
-            </div>
+            <>
+              <div className="ui-segmented" role="group" aria-label="表示の切り替え">
+                {[
+                  ['input', '入力'],
+                  ['year', '年度集計'],
+                  ['history', '過去推移'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`ui-segmented-btn${viewMode === mode ? ' is-active' : ''}`}
+                    aria-pressed={viewMode === mode}
+                    onClick={() => setViewMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {viewMode !== 'history' && (
+                <div className="inspection-month">
+                  <button
+                    type="button"
+                    className="icon-btn-nav"
+                    onClick={() => setFiscalYear((y) => y - 1)}
+                    aria-label="前年度"
+                    title="前年度"
+                  >
+                    <IconChevronLeft size={28} />
+                  </button>
+                  <span className="inspection-month-label">{fiscalYear}年度</span>
+                  <button
+                    type="button"
+                    className="icon-btn-nav"
+                    onClick={() => setFiscalYear((y) => y + 1)}
+                    aria-label="翌年度"
+                    title="翌年度"
+                  >
+                    <IconChevronRight size={28} />
+                  </button>
+                  {/* 押すと入力タブ・今年度へ切り替え、本日（または本日に一番近い過去）の回収日の
+                      行までスクロールする。年度は52週あり、目当ての週を探すのに毎回スクロールが要るため */}
+                  {viewMode === 'input' && (
+                    <button type="button" className="btn-plain reports-today-btn" onClick={handleGoToToday}>
+                      本日
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
           }
         />
 
@@ -256,8 +278,18 @@ export default function Paper() {
         {loading ? (
           <p className="dashboard-loading">読み込み中…</p>
         ) : (
-          <>
-            <PaperSummary fiscalYear={fiscalYear} summary={summary} months={months} prevMonthTotals={prevMonthTotals} />
+          viewMode === 'year' ? (
+            <YearSummaryPanel
+              fiscalYear={fiscalYear}
+              monthTotals={monthTotals}
+              prevMonthTotals={prevMonthTotals}
+              format={formatKg}
+              totalFormat={formatTotalKg}
+            />
+          ) : viewMode === 'history' ? (
+            <HistoryPanel monthTotals={historyTotals} totalFormat={formatTotalKg} />
+          ) : (
+            // 入力タブは入力用の表だけを置く（2026-11-24。依頼。グラフは年度集計タブへ）
             <PaperTable
               months={months}
               byDate={byDate}
@@ -267,59 +299,27 @@ export default function Paper() {
               onSave={handleSave}
               onDateChange={handleDateChange}
             />
-          </>
+          )
         )}
 
+        {viewMode === 'input' && (
         <p className="settings-hint paper-legend">
           単位: kg／回収は原則毎週月曜。祝日・休館日で回収が無かった週は「中止」にすると、
           月平均の計算から外れます。日程がずれた週は日付欄を直接書き換えてください。
         </p>
+        )}
       </div>
     </div>
   )
 }
 
-// 年度の合計・月平均と、月別合計の棒グラフ（Excel右側の月別集計＋グラフに相当）。
-// 2026-11-24〜 月別の棒に前年同月を横並びで足し、年間合計を前年度と比べる横棒を加えた
-// （最新年度は締まった月の月平均から推計し、点線枠で示す。src/lib/yearCompare.js）
-function PaperSummary({ fiscalYear, summary, months, prevMonthTotals }) {
-  const currentMonth = currentMonthJST()
-  const monthTotals = new Map(months.map((m) => [m.month, m.total]))
-  const chartMonths = fiscalMonthsOf(fiscalYear).map((month) => ({
-    month,
-    current: monthTotals.get(month) || 0,
-    previous: prevMonthTotals.get(sameMonthLastYear(month)) || 0,
-  }))
-  const current = fiscalYearTotals(fiscalYear, monthTotals, currentMonth)
-  const previous = fiscalYearTotals(fiscalYear - 1, prevMonthTotals, currentMonth)
-  return (
-    <div className="paper-summary">
-      <div className="paper-summary-figures">
-        <div className="paper-figure">
-          <span className="paper-figure-label">{fiscalYear}年度 合計</span>
-          <span className="paper-figure-value">
-            {formatKg(summary.total)}
-            <span className="paper-figure-unit"> kg</span>
-          </span>
-        </div>
-        <div className="paper-figure">
-          <span className="paper-figure-label">月平均（実績{summary.monthCount}か月）</span>
-          <span className="paper-figure-value">
-            {summary.monthCount > 0 ? Math.round(summary.average) : '—'}
-            <span className="paper-figure-unit"> kg</span>
-          </span>
-        </div>
-      </div>
-      <MonthCompareChart months={chartMonths} fiscalYear={fiscalYear} format={formatKg} />
-      <AnnualCompareChart
-        fiscalYear={fiscalYear}
-        current={current}
-        previous={previous}
-        format={formatTotalKg}
-        className="paper-annual"
-      />
-    </div>
-  )
+function sumByMonth(records) {
+  const map = new Map()
+  for (const r of records) {
+    const key = r.collect_date.slice(0, 7)
+    map.set(key, (map.get(key) || 0) + paperRowTotal(r))
+  }
+  return map
 }
 
 // 年間合計の表示用（桁区切り・整数）
