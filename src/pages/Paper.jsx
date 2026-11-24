@@ -14,7 +14,9 @@ import {
   paperRowTotal,
   upsertPaperRecord,
 } from '../lib/paper'
-import { fetchHolidays, todayJST, weekdayInfo } from '../lib/reports'
+import { currentMonthJST, fetchHolidays, todayJST, weekdayInfo } from '../lib/reports'
+import { fiscalMonthsOf, fiscalYearTotals, sameMonthLastYear } from '../lib/yearCompare'
+import { AnnualCompareChart, MonthCompareChart } from '../components/YearCompareCharts'
 import './Dashboard.css'
 import './Paper.css'
 
@@ -31,6 +33,8 @@ export default function Paper() {
 
   const [fiscalYear, setFiscalYear] = useState(currentFiscalYear())
   const [records, setRecords] = useState([])
+  // 前年度の記録（グラフの前年同月・年間合計の比較用。2026-11-24〜）
+  const [prevRecords, setPrevRecords] = useState([])
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,7 +43,12 @@ export default function Paper() {
     setLoading(true)
     setError('')
     try {
-      setRecords(await fetchPaperRecords(fiscalYear))
+      const [current, previous] = await Promise.all([
+        fetchPaperRecords(fiscalYear),
+        fetchPaperRecords(fiscalYear - 1),
+      ])
+      setRecords(current)
+      setPrevRecords(previous)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -136,6 +145,16 @@ export default function Paper() {
       monthCount: withData.length,
     }
   }, [months])
+
+  // 前年度の月別合計（'YYYY-MM' -> kg）。中止の回は paperRowTotal が0を返す
+  const prevMonthTotals = useMemo(() => {
+    const map = new Map()
+    for (const r of prevRecords) {
+      const key = r.collect_date.slice(0, 7)
+      map.set(key, (map.get(key) || 0) + paperRowTotal(r))
+    }
+    return map
+  }, [prevRecords])
 
   async function handleSave(collectDate, patch) {
     setError('')
@@ -238,7 +257,7 @@ export default function Paper() {
           <p className="dashboard-loading">読み込み中…</p>
         ) : (
           <>
-            <PaperSummary fiscalYear={fiscalYear} summary={summary} months={months} />
+            <PaperSummary fiscalYear={fiscalYear} summary={summary} months={months} prevMonthTotals={prevMonthTotals} />
             <PaperTable
               months={months}
               byDate={byDate}
@@ -260,9 +279,19 @@ export default function Paper() {
   )
 }
 
-// 年度の合計・月平均と、月別合計の棒グラフ（Excel右側の月別集計＋グラフに相当）
-function PaperSummary({ fiscalYear, summary, months }) {
-  const max = Math.max(1, ...months.map((m) => m.total))
+// 年度の合計・月平均と、月別合計の棒グラフ（Excel右側の月別集計＋グラフに相当）。
+// 2026-11-24〜 月別の棒に前年同月を横並びで足し、年間合計を前年度と比べる横棒を加えた
+// （最新年度は締まった月の月平均から推計し、点線枠で示す。src/lib/yearCompare.js）
+function PaperSummary({ fiscalYear, summary, months, prevMonthTotals }) {
+  const currentMonth = currentMonthJST()
+  const monthTotals = new Map(months.map((m) => [m.month, m.total]))
+  const chartMonths = fiscalMonthsOf(fiscalYear).map((month) => ({
+    month,
+    current: monthTotals.get(month) || 0,
+    previous: prevMonthTotals.get(sameMonthLastYear(month)) || 0,
+  }))
+  const current = fiscalYearTotals(fiscalYear, monthTotals, currentMonth)
+  const previous = fiscalYearTotals(fiscalYear - 1, prevMonthTotals, currentMonth)
   return (
     <div className="paper-summary">
       <div className="paper-summary-figures">
@@ -281,17 +310,21 @@ function PaperSummary({ fiscalYear, summary, months }) {
           </span>
         </div>
       </div>
-      <div className="paper-chart" role="img" aria-label={`${fiscalYear}年度の月別古紙回収量`}>
-        {months.map((m) => (
-          <div className="paper-chart-col" key={m.month} title={`${Number(m.month.slice(5, 7))}月: ${formatKg(m.total)}kg`}>
-            <span className="paper-chart-value">{m.total > 0 ? formatKg(m.total) : ''}</span>
-            <span className="paper-chart-bar" style={{ height: `${(m.total / max) * 100}%` }} />
-            <span className="paper-chart-month">{Number(m.month.slice(5, 7))}月</span>
-          </div>
-        ))}
-      </div>
+      <MonthCompareChart months={chartMonths} fiscalYear={fiscalYear} format={formatKg} />
+      <AnnualCompareChart
+        fiscalYear={fiscalYear}
+        current={current}
+        previous={previous}
+        format={formatTotalKg}
+        className="paper-annual"
+      />
     </div>
   )
+}
+
+// 年間合計の表示用（桁区切り・整数）
+function formatTotalKg(value) {
+  return Math.round(Number(value) || 0).toLocaleString('ja-JP')
 }
 
 function PaperTable({ months, byDate, todayDate, holidays, readOnly, onSave, onDateChange }) {

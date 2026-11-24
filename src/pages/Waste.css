@@ -177,3 +177,22 @@
 .waste-chat-prompt { font-size: var(--fs-sm); color: var(--text-muted); resize: vertical; }
 .waste-chat-paste { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-sm); resize: vertical; }
 .waste-chat-copy-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+
+/* 年度集計の前年比較グラフ（2026-11-24〜。src/components/YearCompareCharts.jsx）。
+   左に月別（前年同月と横並び）、右に年間合計の前年度比較。狭幅では縦に積む */
+.waste-year-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: var(--space-5);
+  align-items: center;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.waste-prev-total { color: var(--text-muted); }
+@media (max-width: 768px) {
+  .waste-year-charts { grid-template-columns: 1fr; gap: var(--space-3); padding: var(--space-3); }
+}
