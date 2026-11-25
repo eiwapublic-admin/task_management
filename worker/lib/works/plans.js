@@ -15,6 +15,7 @@
 //   ・手で追加・変更した日（source='manual'）は上書きしない
 import { json } from '../http.js'
 import { fetchHolidays } from '../holidays.js'
+import { closedDaysInRange } from '../closedDays.js'
 import { getAdminClient } from '../supabase-admin.js'
 import { requireWorks } from './auth.js'
 import { log } from './masters.js'
@@ -102,10 +103,10 @@ async function loadSettings(supabase) {
 // 会社の休日 = 日報カレンダーの休館日（closed_days。タスク管理と共有）＋ 設定の会社休日。{ 日付: 表示名 }
 async function companyHolidaysOf(supabase, month, settings) {
   const { from, to } = monthRange(month)
-  const { data, error } = await supabase.from('closed_days').select('closed_on').gte('closed_on', from).lte('closed_on', to)
-  if (error) throw error
+  // 日曜・祝日の自動の休館日も含む（2026-11-25。worker/lib/closedDays.js）
+  const closed = await closedDaysInRange(supabase, from, to)
   const out = {}
-  for (const r of data || []) out[r.closed_on] = '休館日'
+  for (const d of closed) out[d] = '休館日'
   for (const d of settings.company_holidays || []) if (d.startsWith(month)) out[d] = '会社休日'
   return out
 }

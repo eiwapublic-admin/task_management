@@ -7,6 +7,7 @@ import { json, verifyRequestAuth, canWrite } from './http.js'
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { fetchHolidays } from './holidays.js'
+import { closedDaysInRange, isAutoClosedCandidate, setOpenDay } from './closedDays.js'
 import { recognizeVehicle, resolveProvider, estimateCostUSD } from './ai/index.js'
 import { checkDailyLimit, addTodayUsage, setLimitAlert } from './usageLimit.js'
 import { signJwt, verifyJwt } from './jwt.js'
@@ -1033,22 +1034,22 @@ export async function handleInspectionPdfPreviewGet(req) {
 // ============================================================
 
 // GET /api/report/closed-days?month=YYYY-MM — 指定月の休館日一覧（日付の配列）。
-// month を省略した場合は全期間を返す（件数が少ない想定のため一覧のページングは行わない）。
+// 手で休館日にした日（closed_days）に、日曜・祝日の自動の休館日を足したもの（2026-11-25。
+// worker/lib/closedDays.js）。month を省略した場合は手で休館日にした日だけを全期間返す。
 export async function handleClosedDaysList(req) {
   const { error } = await requireAuth(req)
   if (error) return error
   try {
     const month = new URL(req.url).searchParams.get('month') || ''
     const supabase = getAdminClient()
-    let query = supabase.from('closed_days').select('closed_on')
     if (month) {
       if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: 'month が不正です' }, 400)
       const [y, m] = month.split('-').map(Number)
-      const from = `${month}-01`
-      const to = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
-      query = query.gte('closed_on', from).lt('closed_on', to)
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+      const days = await closedDaysInRange(supabase, `${month}-01`, `${month}-${String(last).padStart(2, '0')}`)
+      return json({ closed_days: days })
     }
-    const { data, error: err } = await query.order('closed_on', { ascending: true })
+    const { data, error: err } = await supabase.from('closed_days').select('closed_on').order('closed_on', { ascending: true })
     if (err) {
       console.error('closed-days-list:', err.message)
       return json({ error: '休館日の取得に失敗しました' }, 500)
@@ -1095,6 +1096,8 @@ export async function handleClosedDayCreate(req) {
       console.error('closed-day-create:', err.message)
       return json({ error: '休館日の登録に失敗しました' }, 500)
     }
+    // 以前「休館日を解除」した日なら、その記録も消す（自動の休館日に戻す）
+    await setOpenDay(supabase, date, false, auth.sub)
     return json({ ok: true })
   } catch (err) {
     console.error('closed-day-create 失敗:', err)
@@ -1102,9 +1105,11 @@ export async function handleClosedDayCreate(req) {
   }
 }
 
-// DELETE /api/report/closed-days?date=YYYY-MM-DD — 休館日の解除（未入力の状態に戻す）
+// DELETE /api/report/closed-days?date=YYYY-MM-DD — 休館日の解除（未入力の状態に戻す）。
+// 日曜・祝日（自動の休館日）を解除したときは「解除した日」として settings に残し、
+// 自動で休館日に戻らないようにする（例外的に開館する日。2026-11-25）。
 export async function handleClosedDayDelete(req) {
-  const { error } = await requireAuth(req, { write: true })
+  const { auth, error } = await requireAuth(req, { write: true })
   if (error) return error
   try {
     const date = new URL(req.url).searchParams.get('date') || ''
@@ -1115,6 +1120,8 @@ export async function handleClosedDayDelete(req) {
       console.error('closed-day-delete:', err.message)
       return json({ error: '休館日の解除に失敗しました' }, 500)
     }
+    const holidays = await fetchHolidays().catch(() => ({}))
+    if (isAutoClosedCandidate(date, holidays)) await setOpenDay(supabase, date, true, auth.sub)
     return json({ ok: true })
   } catch (err) {
     console.error('closed-day-delete 失敗:', err)

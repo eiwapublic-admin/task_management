@@ -295,7 +295,6 @@ export default function Inspections() {
           building={building}
           existing={byDate.get(editing) || null}
           initialClosed={closedDays.has(editing)}
-          isSundayOrHoliday={weekdayInfo(editing, holidays).isRed}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
