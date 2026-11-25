@@ -129,3 +129,29 @@
   margin: var(--space-3) 0 0;
   min-height: 18px;
 }
+
+/* 管理者通知（警告・エラー）の通知先（2026-11-25） */
+.settings-panel .admin-alert-users {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+}
+.settings-panel label.admin-alert-user {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+.settings-panel label.admin-alert-user input {
+  width: auto;
+}
+.admin-alert-devices {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.admin-alert-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

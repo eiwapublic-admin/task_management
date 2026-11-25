@@ -83,28 +83,9 @@ jobs:
   dump:
     runs-on: ubuntu-latest
     steps:
-      - name: バックアップ先リポジトリを取得
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ env.BACKUP_REPO }}
-          token: ${{ secrets.BACKUP_REPO_TOKEN }}
-          path: backup
-
-      - name: PostgreSQLクライアント(サーバーと同メジャー版)を用意
-        run: |
-          set -euo pipefail
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
-          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
-          sudo apt-get update -qq
-          # ⚠️ Supabase側のPostgresメジャーバージョン(17)に合わせる(ずれると
-          # "aborting because of server version mismatch" で失敗する)
-          sudo apt-get install -y -qq postgresql-client-17
-          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-          /usr/lib/postgresql/17/bin/pg_dump --version
-
-      # 接続文字列はここで組み立てる。手で組み立てるとユーザー名の付け忘れ
+      # 接続文字列はここで組み立てる（最初のステップにしている。2026-11-25: バックアップ先の
+      # 取得〔トークン期限切れ〕で失敗した日に、まだ接続文字列が無いせいで「失敗を操作ログに記録」が
+      # 何もせず終わり、アプリの処理ログに失敗が残らなかったため）。手で組み立てるとユーザー名の付け忘れ
       # (Session pooler は postgres.<project-ref> が必須)やパスワードの記号の
       # エンコード漏れで失敗しやすいため、機械的に作る。
       - name: 接続文字列を組み立て
@@ -125,6 +106,27 @@ jobs:
           echo "::add-mask::$URL"
           echo "DB_URL=$URL" >> "$GITHUB_ENV"
           echo "接続先: ${DB_USER}@${DB_HOST}:${DB_PORT} / パスワード長: ${#DB_PASSWORD}"
+
+      - name: バックアップ先リポジトリを取得
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.BACKUP_REPO }}
+          token: ${{ secrets.BACKUP_REPO_TOKEN }}
+          path: backup
+
+      - name: PostgreSQLクライアント(サーバーと同メジャー版)を用意
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          # ⚠️ Supabase側のPostgresメジャーバージョン(17)に合わせる(ずれると
+          # "aborting because of server version mismatch" で失敗する)
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       # 認証が通るかどうかを最初に確かめる。ここで失敗するなら資格情報の問題、
       # 通るのにダンプで失敗するならダンプ側の問題、と切り分けられる。
@@ -258,14 +260,22 @@ jobs:
 
       # バックアップ用トークンの有効期限を確認する。期限切れに気づかず
       # バックアップが止まるのを防ぐため、残り30日を切ったら警告する。
+      # 失敗した日も動かす（if: always()）: トークンが無効・期限切れならその旨を失敗の記録に添える。
       - name: トークンの有効期限を確認
+        if: always()
         continue-on-error: true
         env:
           TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
         run: |
           set -uo pipefail
-          EXP=$(curl -sI -H "Authorization: Bearer $TOKEN" https://api.github.com/user \
-            | tr -d '\r' \
+          HEADERS=$(curl -sI -H "Authorization: Bearer $TOKEN" https://api.github.com/user | tr -d '\r')
+          STATUS=$(printf '%s\n' "$HEADERS" | awk 'NR==1{print $2}')
+          if [ "$STATUS" = "401" ]; then
+            echo "::error::バックアップ用トークン（BACKUP_REPO_TOKEN）が無効または期限切れです"
+            echo "TOKEN_INVALID=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          EXP=$(printf '%s\n' "$HEADERS" \
             | awk -F': ' 'tolower($1)=="github-authentication-token-expiration"{print $2}')
           if [ -z "$EXP" ]; then
             echo "有効期限を取得できませんでした（無期限のトークンの可能性）"
@@ -274,6 +284,7 @@ jobs:
           DAYS=$(( ( $(date -d "$EXP" +%s) - $(date +%s) ) / 86400 ))
           echo "トークンの有効期限: $EXP （残り ${DAYS} 日）"
           echo "TOKEN_DAYS_LEFT=$DAYS" >> "$GITHUB_ENV"
+          echo "TOKEN_EXPIRES=$(date -d "$EXP" +%Y-%m-%d)" >> "$GITHUB_ENV"
           if [ "$DAYS" -le 30 ]; then
             echo "::warning::バックアップ用トークンの期限まで残り ${DAYS} 日です。再発行してください"
             echo "⚠️ バックアップ用トークンの期限まで残り **${DAYS} 日**。再発行してください。" >> "$GITHUB_STEP_SUMMARY"
@@ -289,16 +300,26 @@ jobs:
       # ワークフロー全体は緑のまま失敗が握りつぶされ、何ヶ月も気づけないことがあるため、
       # 必ずヒアストリングでSQLを渡す（下記参照）。導入後に一度 workflow_dispatch で手動実行し、
       # /logs 画面に実際に「バックアップ」種別の行が増えているかまで確認すること。
+      # ステータス（level）: 成功 = I、トークン期限の接近 = W、失敗 = E（2026-11-25〜）。
+      # W/E はアプリの Worker が5分ごとの巡回で拾い、管理者の端末へ通知する（worker/lib/alerts.js）。
+      # トークン期限の W は処理ログには毎日残すが、通知は残り30・14・7・3・1・0日の日だけにする
+      # （それ以外の日は notified_at を入れて書き、巡回で鳴らさない）。
       - name: 操作ログに記録
         continue-on-error: true
         run: |
           set -uo pipefail
           DETAIL="${BACKUP_RESULT:-不明} / ${BACKUP_SIZES:-}"
-          if [ -n "${TOKEN_DAYS_LEFT:-}" ] && [ "${TOKEN_DAYS_LEFT}" -le 30 ]; then
-            DETAIL="$DETAIL / ⚠️トークンの期限まで残り${TOKEN_DAYS_LEFT}日。再発行が必要です"
-          fi
-          SQL_TEXT="insert into public.activity_logs (log_type, actor, message) values ('backup', 'システム（自動バックアップ）', :'detail');"
+          SQL_TEXT="insert into public.activity_logs (log_type, level, actor, message) values ('backup', 'I', 'システム（自動バックアップ）', :'detail');"
           psql "$DB_URL" -v ON_ERROR_STOP=1 -v detail="$DETAIL" <<< "$SQL_TEXT"
+          if [ -n "${TOKEN_DAYS_LEFT:-}" ] && [ "${TOKEN_DAYS_LEFT}" -le 30 ]; then
+            case "${TOKEN_DAYS_LEFT}" in
+              30|14|7|3|1|0) NOTIFIED="null" ;;
+              *) NOTIFIED="now()" ;;
+            esac
+            WARN="バックアップ用トークン（BACKUP_REPO_TOKEN）の期限まで残り${TOKEN_DAYS_LEFT}日（${TOKEN_EXPIRES:-}まで）。期限が切れると自動バックアップが止まります。GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で再発行し、このリポジトリの Settings → Secrets and variables → Actions の BACKUP_REPO_TOKEN を更新してください"
+            SQL_TEXT="insert into public.activity_logs (log_type, level, actor, message, notified_at) values ('backup', 'W', 'システム（自動バックアップ）', :'detail', ${NOTIFIED});"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -v detail="$WARN" <<< "$SQL_TEXT"
+          fi
 
       - name: 失敗を操作ログに記録
         if: failure()
@@ -306,6 +327,10 @@ jobs:
         run: |
           set -uo pipefail
           [ -n "${DB_URL:-}" ] || exit 0
-          SQL_TEXT="insert into public.activity_logs (log_type, actor, message) values ('backup', 'システム（自動バックアップ）', :'detail');"
+          REASON=""
+          if [ "${TOKEN_INVALID:-}" = "1" ]; then
+            REASON="バックアップ用トークン（BACKUP_REPO_TOKEN）が無効または期限切れです。再発行して Secrets を更新してください。"
+          fi
+          SQL_TEXT="insert into public.activity_logs (log_type, level, actor, message) values ('backup', 'E', 'システム（自動バックアップ）', :'detail');"
           psql "$DB_URL" -v ON_ERROR_STOP=1 \
-            -v detail="自動バックアップに失敗しました。GitHub Actions のログを確認してください: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" <<< "$SQL_TEXT"
+            -v detail="自動バックアップに失敗しました。${REASON}GitHub Actions のログを確認してください: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" <<< "$SQL_TEXT"

@@ -327,7 +327,8 @@ async function recordWastePhotoUsage(supabase, usage) {
   if (usageErr) {
     console.error('waste-photo(usage):', usageErr.message)
     await supabase.from('activity_logs').insert({
-      log_type: 'error',
+      log_type: 'system',
+      level: 'E',
       actor: 'システム（自動）',
       message: `廃棄物の手書き表のAI読み取りの利用量記録に失敗しました（${usageErr.message}）。実際のAPI利用は発生しているため、従量課金事項の表示が実額より少なくなります。`,
     })

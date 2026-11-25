@@ -3,6 +3,15 @@ import { runPipeline } from './lib/pipeline.js'
 import { json, verifyRequestAuth, withSecurityHeaders } from './lib/http.js'
 import { signJwt, verifyJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
+import {
+  ADMIN_ALERT_SEEN_KEY,
+  ADMIN_ALERT_USERS_KEY,
+  checkBackupFreshness,
+  countUnseenAlerts,
+  notifyPendingAlerts,
+  parseUserIds,
+} from './lib/alerts.js'
+import { sendPush } from './lib/push.js'
 import { getAccessToken, getMessageAttachments, getThreadAttachments, getThreadMessages, getAttachmentData } from './lib/gmail.js'
 import { makeIsCompanyAddress, parseCompanyDomains, resolveCounterpart } from './lib/mail-utils.js'
 import {
@@ -401,7 +410,7 @@ async function handleLogs(req) {
     const supabase = getAdminClient()
     const { data, error } = await supabase
       .from('activity_logs')
-      .select('id, log_type, actor, message, created_at')
+      .select('id, log_type, level, actor, message, created_at')
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) {
@@ -463,6 +472,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'archive_after_days',
   // AI利用の1日あたり上限（USD）。サーキットブレーカーの閾値（2026-09-04）
   'daily_api_cost_limit_usd',
+  // 警告・エラーの通知を受け取る管理者（users.id の JSON 配列。2026-11-25〜）
+  ADMIN_ALERT_USERS_KEY,
 ])
 
 async function handleSettings(req) {
@@ -1015,6 +1026,76 @@ async function handlePushUnsubscribe(req) {
   }
 }
 
+// 管理者通知（警告・エラー。2026-11-25〜。worker/lib/alerts.js）
+// 未設定（空）のときは全員を管理者として扱う（通知も購読中の全端末へ送る）
+async function loadAdminSelection(supabase) {
+  const { data } = await supabase.from('settings').select('value').eq('key', ADMIN_ALERT_USERS_KEY).maybeSingle()
+  return parseUserIds(data?.value)
+}
+
+// GET /api/admin-alerts — 未確認の警告・エラー件数と、通知先の候補（設定画面用）
+async function handleAdminAlerts(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const supabase = getAdminClient()
+    const selected = await loadAdminSelection(supabase)
+    const isAdmin = selected.length === 0 || selected.includes(auth.sub)
+    const unseen = await countUnseenAlerts(supabase)
+    const result = { isAdmin, selected, unseen }
+    if (new URL(req.url).searchParams.get('users') === '1') {
+      const [{ data: users }, { data: subs }] = await Promise.all([
+        supabase.from('users').select('id, display_name, role').order('created_at'),
+        supabase.from('push_subscriptions').select('user_id'),
+      ])
+      const deviceCount = {}
+      for (const s of subs || []) deviceCount[s.user_id] = (deviceCount[s.user_id] || 0) + 1
+      result.users = (users || []).map((u) => ({
+        id: u.id,
+        display_name: u.display_name,
+        role: u.role,
+        devices: deviceCount[u.id] || 0,
+      }))
+    }
+    return json(result)
+  } catch (err) {
+    console.error('admin-alerts 失敗:', err)
+    return json({ error: '警告・エラーの件数の取得に失敗しました' }, 500)
+  }
+}
+
+// POST /api/admin-alerts/seen — 処理ログ画面の「確認済みにする」
+async function handleAdminAlertsSeen(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  const supabase = getAdminClient()
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key: ADMIN_ALERT_SEEN_KEY, value: new Date().toISOString() }, { onConflict: 'key' })
+  if (error) return json({ error: '保存に失敗しました' }, 500)
+  return json({ ok: true })
+}
+
+// POST /api/admin-alerts/test — 設定画面の「テスト通知を送る」（保存済みの通知先へ送る）
+async function handleAdminAlertsTest(req) {
+  const auth = await verifyRequestAuth(req)
+  if (!auth) return json({ error: '認証が必要です' }, 401)
+  try {
+    const supabase = getAdminClient()
+    const userIds = await loadAdminSelection(supabase)
+    const sent = await sendPush({
+      title: '【テスト】管理者通知',
+      body: '警告・エラーが記録されると、この端末にこのように通知されます。',
+      url: '/logs',
+      userIds,
+    })
+    return json({ ok: true, sent: sent || 0 })
+  } catch (err) {
+    console.error('admin-alerts-test 失敗:', err)
+    return json({ error: 'テスト通知の送信に失敗しました' }, 500)
+  }
+}
+
 // パスと静的アセットへのルーティング本体。戻り値は fetch() で
 // withSecurityHeaders を通してから返す（API・静的アセットの両方に一律適用するため）。
 async function route(req, env) {
@@ -1042,6 +1123,15 @@ async function route(req, env) {
   }
   if (pathname === '/api/logs') {
     return req.method === 'GET' ? handleLogs(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/admin-alerts') {
+    return req.method === 'GET' ? handleAdminAlerts(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/admin-alerts/seen') {
+    return req.method === 'POST' ? handleAdminAlertsSeen(req) : json({ error: 'Method Not Allowed' }, 405)
+  }
+  if (pathname === '/api/admin-alerts/test') {
+    return req.method === 'POST' ? handleAdminAlertsTest(req) : json({ error: 'Method Not Allowed' }, 405)
   }
   if (pathname === '/api/usage') {
     return req.method === 'GET' ? handleUsage(req) : json({ error: 'Method Not Allowed' }, 405)
@@ -1521,6 +1611,19 @@ async function runDailyJobs() {
   }
 }
 
+// 警告・エラー（ステータス W/E の処理ログ）の管理者通知（2026-11-25〜。cronの5分刻みで毎回呼ぶ）。
+// 日本時間17:00〜17:04の巡回では、自動バックアップが届いているかも確かめる
+// （バックアップは JST 3時予定だが GitHub の混雑で昼過ぎにずれる日があるため、夕方に見る）。
+async function runAlertJobs() {
+  try {
+    const jst = new Date(Date.now() + 9 * 3600 * 1000)
+    if (jst.getUTCHours() === 17 && jst.getUTCMinutes() < 5) await checkBackupFreshness()
+    await notifyPendingAlerts()
+  } catch (err) {
+    console.error('alert-jobs 失敗:', err)
+  }
+}
+
 export default {
   async fetch(req, env) {
     const res = await route(req, env)
@@ -1537,5 +1640,6 @@ export default {
     // 対象のため、メールの稼働設定に引きずられるべきではない）
     ctx.waitUntil(runReminderCheck())
     ctx.waitUntil(runDailyJobs())
+    ctx.waitUntil(runAlertJobs())
   },
 }

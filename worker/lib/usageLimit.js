@@ -9,6 +9,7 @@
 // 1件あたりのトークン数が2桁変わるため、件数上限では歯止めにならないから。
 
 import { notifyApiAlert } from './push.js'
+import { writeLog } from './alerts.js'
 import { estimateCostUSD as estimateProviderCostUSD, DEFAULT_PROVIDER } from './ai/pricing.js'
 
 // 上限の既定値。実績は平常0.06〜0.08ドル/日のため、通常運用では絶対に当たらない値にしてある
@@ -124,6 +125,13 @@ export async function setLimitAlert(supabase, message) {
       title: 'AI利用が1日の上限に達しました',
       body: `${message} 業務メールの自動分類も停止しています。`,
       url: '/usage',
+    })
+    // 処理ログにも警告として残す（通知は上で送ったので巡回では鳴らさない。2026-11-25〜）
+    await writeLog(supabase, {
+      logType: 'system',
+      level: 'W',
+      message: `AI利用が1日の上限に達しました。${message} 業務メールの自動分類も停止しています。`,
+      notified: true,
     })
   }
 }

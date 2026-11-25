@@ -8,6 +8,7 @@ import { json, verifyRequestAuth, canWrite, isEquipmentOutStaff } from './http.j
 import { getAdminClient } from './supabase-admin.js'
 import { putObject, getObject, deleteObject } from './storage.js'
 import { notifyStockWarning } from './push.js'
+import { writeLog } from './alerts.js'
 import { actorOf, applyTenantMoveOuts, withRoomNumbers } from './meter.js'
 
 const ITEM_COLUMNS =
@@ -775,6 +776,14 @@ async function refreshWarning(supabase, itemId) {
         .select('id')
       if (marked && marked.length > 0) {
         await notifyStockWarning({ name: item.name, qty, warnQty: item.warn_qty })
+        // 処理ログにも警告として残す（通知は上で送ったので巡回では鳴らさない。2026-11-25〜）
+        await writeLog(supabase, {
+          logType: 'system',
+          level: 'W',
+          actor: '備品',
+          message: `在庫警告: ${item.name} の在庫が ${qty} になりました（警告数量 ${item.warn_qty}）。`,
+          notified: true,
+        })
       }
     } else if (qty > item.warn_qty && item.warned_at) {
       await supabase.from('equipment_items').update({ warned_at: null }).eq('id', itemId)

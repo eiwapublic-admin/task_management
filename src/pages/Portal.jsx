@@ -42,6 +42,7 @@ import {
   todayJST,
 } from '../lib/reports'
 import { dueStatus } from '../lib/format'
+import { fetchAdminAlerts } from '../lib/alerts'
 import { STATUS_DONE } from '../lib/status'
 import './Dashboard.css'
 import './Portal.css'
@@ -124,6 +125,20 @@ export default function Portal() {
   const isOwner = isLimitedRole(user)
 
   const [stats, setStats] = useState(null)
+  // 未確認の警告・エラー（管理者通知の通知先の人にだけ出す。2026-11-25〜）
+  const [alerts, setAlerts] = useState(null)
+  useEffect(() => {
+    if (isOwner) return
+    let alive = true
+    fetchAdminAlerts()
+      .then((r) => {
+        if (alive && r.isAdmin) setAlerts(r.unseen)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [isOwner])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -415,6 +430,21 @@ export default function Portal() {
         {error && (
           <p className="dashboard-banner dashboard-error" role="alert">
             {error}
+          </p>
+        )}
+
+        {alerts && alerts.errors + alerts.warnings > 0 && (
+          <p className={`dashboard-banner portal-alert ${alerts.errors > 0 ? 'is-error' : 'is-warn'}`} role="alert">
+            <span>
+              処理ログに未確認の
+              {[alerts.errors > 0 && `エラー ${alerts.errors} 件`, alerts.warnings > 0 && `警告 ${alerts.warnings} 件`]
+                .filter(Boolean)
+                .join('・')}
+              があります。
+            </span>
+            <button type="button" className="portal-alert-button" onClick={() => navigate('/logs')}>
+              処理ログを見る
+            </button>
           </p>
         )}
 
