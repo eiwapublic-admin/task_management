@@ -1055,3 +1055,144 @@
   margin-top: 4px;
   padding-top: 4px;
 }
+
+/* 見出しの「?」と説明の吹き出し（components/HelpTip.jsx。2026-11-25） */
+.works-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid var(--works-accent);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--works-accent-deep);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 1px;
+  cursor: help;
+}
+.works-help-pop {
+  position: fixed;
+  z-index: 1000;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2f2547;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 出勤簿の印刷（プリンタのアイコンだけの目立つボタン）と「予定再作成」（青い文字）。2026-11-25 */
+.works-print-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.works-link-blue {
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  font: inherit;
+  color: #1a5fc7;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.works-link-blue:hover:not(:disabled) { text-decoration: underline; }
+.works-link-blue:disabled { color: var(--text-muted); cursor: default; }
+.works-row-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* 日の詳細: 見出しの右の「休暇を申請する」、予定の行の右端の「変更」「削除」 */
+.works-modal-head-extra { margin-left: auto; }
+.works-modal-head-extra + .icon-btn-close { margin-left: 0; }
+.works-leave-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.works-plan-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.works-plan-tools {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+  font-weight: 400;
+}
+.works-plan-tools .btn-plain { padding: 2px 10px; }
+
+/* 実績の入力: 出勤〜退勤と「←予定通り」を 1 行に（折り返さない）、保存は枠の右下 */
+.works-actual-row { flex-wrap: nowrap; }
+.works-actual-row .ui-input {
+  width: 5.2em;
+  text-align: center;
+}
+.works-asplan {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.works-actual-reason { margin: 0; }
+.works-actual-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* スタッフ一覧のフリー検索 */
+.works-search {
+  width: 16em;
+  max-width: 100%;
+}
+
+/* 有給休暇の詳細: 期間ごとの履歴と取得履歴を横に並べる。取得〜（付与）の 3 列は縦罫線で囲む */
+.works-leave-history {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.works-leave-history > .ui-table-wrap { flex: 1 1 520px; min-width: 0; }
+.ui-table .works-vl { border-left: 1.5px solid var(--text-muted); }
+.ui-table .works-vr { border-right: 1.5px solid var(--text-muted); }
+.works-leave-taken { flex: 0 0 auto; }
+.works-leave-taken-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.works-leave-taken-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.works-leave-taken tr.is-period-start:not(:first-child) td { border-top: 3px solid var(--text-strong); }
+.works-special-mark {
+  color: #b5473a;
+  font-weight: 700;
+}
+.works-actual-reason > span { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.works-phone-only { display: none; }
+@media (max-width: 640px) {
+  .works-pc-only { display: none; }
+  .works-phone-only { display: inline; }
+  .works-leave-btn { padding-left: 10px; padding-right: 10px; }
+}

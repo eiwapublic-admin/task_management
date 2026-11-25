@@ -10,6 +10,8 @@ import LeaveSheet from '../components/LeaveSheet.jsx'
 import KeyCell from '../components/KeyCell.jsx'
 
 const ymdLabel = (d) => (d ? d.replaceAll('-', '/') : '')
+// 取得の日数はマイナスで見せる（0 はそのまま）
+const neg = (n) => (n ? `−${n}` : 0)
 const withDow = (d) => `${ymdLabel(d)}（${WEEKDAYS[new Date(`${d}T00:00:00Z`).getUTCDay()]}）`
 
 export default function Leave() {
@@ -113,7 +115,7 @@ export default function Leave() {
                 <th className="num">付与</th>
                 <th className="num">取得</th>
                 <th className="num">残日数</th>
-                <th className="num">期間末に消える</th>
+                <th className="num">期末で消滅</th>
                 <th className="center">年5日</th>
                 <th className="num">特別休暇</th>
                 <th className="num">当月の取得</th>
@@ -270,42 +272,78 @@ function LeaveDetail({ row, at, onClose, onChanged }) {
             {data.periods.length === 0 ? (
               <p className="works-muted" style={{ margin: 0 }}>まだ付与がありません{row.first_grant ? `（最初の付与は ${ymdLabel(row.first_grant)}）` : ''}</p>
             ) : (
-              <div className="ui-table-wrap">
-                <table className="ui-table works-monthly">
-                  <thead>
-                    <tr>
-                      <th className="works-key">期間</th>
-                      <th className="num">繰越</th>
-                      <th className="num">付与</th>
-                      <th className="num">取得</th>
-                      <th className="num">繰越から</th>
-                      <th className="num">付与から</th>
-                      <th className="num">残日数</th>
-                      <th className="num">期間末に消える</th>
-                      <th className="num">特別休暇</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.periods.map((p) => (
-                      <tr key={p.start}>
-                        <td className="works-key">{ymdLabel(p.start)}〜{ymdLabel(p.end)}</td>
-                        <td className="num">{p.carry}</td>
-                        <td className="num">{p.grant}</td>
-                        <td className="num">{p.taken}</td>
-                        <td className="num">{p.from_carry}</td>
-                        <td className="num">{p.from_grant}</td>
-                        <td className="num"><strong>{p.remain}</strong></td>
-                        <td className="num">{p.expire}</td>
-                        <td className="num">{p.special_taken}/{p.special_grant}</td>
+              <div className="works-leave-history">
+                <div className="ui-table-wrap">
+                  <table className="ui-table works-monthly works-leave-periods">
+                    <thead>
+                      <tr>
+                        <th className="works-key">期間</th>
+                        <th className="num">繰越</th>
+                        <th className="num">付与</th>
+                        <th className="num works-vl">取得</th>
+                        <th className="num">（繰越）</th>
+                        <th className="num works-vr">（付与）</th>
+                        <th className="num">残日数</th>
+                        <th className="num">期末で消滅</th>
+                        <th className="num">特別休暇</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.periods.map((p) => (
+                        <tr key={p.start}>
+                          <td className="works-key">{ymdLabel(p.start)}〜</td>
+                          <td className="num">{p.carry}</td>
+                          <td className="num">{p.grant}</td>
+                          <td className="num works-vl"><strong>{neg(p.taken)}</strong></td>
+                          <td className="num">{neg(p.from_carry)}</td>
+                          <td className="num works-vr">{neg(p.from_grant)}</td>
+                          <td className="num"><strong>{p.remain}</strong></td>
+                          <td className="num">{p.expire}</td>
+                          <td className="num">{p.special_taken}/{p.special_grant}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TakenDays periods={data.periods} />
               </div>
             )}
           </section>
         </>
       )}
     </Modal>
+  )
+}
+
+// 有給休暇取得履歴（これまでに取った日の一覧。2026-11-25 依頼元の要望）。
+//   新しい期間から順に、期間の区切りは太線。特別休暇の日は右に（特）
+function TakenDays({ periods }) {
+  const rows = periods.flatMap((p) => {
+    const special = new Set(p.special_days || [])
+    const days = [...new Set([...(p.paid_days || []), ...special])].sort().reverse()
+    return days.map((d, i) => ({ d, special: special.has(d), periodStart: p.start, first: i === 0 }))
+  })
+  return (
+    <div className="works-leave-taken">
+      <div className="works-leave-taken-title">有給休暇取得履歴（{rows.length}日）</div>
+      {rows.length === 0 ? (
+        <p className="works-muted" style={{ margin: 0 }}>まだありません</p>
+      ) : (
+        <div className="ui-table-wrap works-leave-taken-scroll">
+          <table className="ui-table">
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.periodStart}-${r.d}`} className={r.first ? 'is-period-start' : ''}>
+                  <td className="works-nowrap">
+                    {withDow(r.d)}
+                    {r.special && <span className="works-special-mark">（特）</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 }

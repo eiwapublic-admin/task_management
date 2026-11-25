@@ -12,13 +12,15 @@ export function ModalFoot({ children }) {
   return el ? createPortal(children, el) : null
 }
 
-export default function Modal({ title, onClose, children, foot, size = 'sm' }) {
+// headExtra: 見出しの右（閉じるの左）に置くボタンなど（例: 日の詳細の「休暇を申請する」）
+export default function Modal({ title, onClose, children, foot, headExtra = null, size = 'sm' }) {
   const [footEl, setFootEl] = useState(null)
   return (
     <div className="ui-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`ui-modal is-${size}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="ui-modal-head">
           <h2 className="ui-modal-title">{title}</h2>
+          {headExtra && <div className="works-modal-head-extra">{headExtra}</div>}
           <button type="button" className="icon-btn-close" aria-label="閉じる" onClick={onClose}>×</button>
         </div>
         <FootContext.Provider value={footEl}>

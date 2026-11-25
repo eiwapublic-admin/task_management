@@ -1,7 +1,8 @@
 // 出退勤の実績の直接入力（2026-11-20 依頼元の要望）。
 //   スタッフごとの入力方法（works_staff.punch_method）: qr＝本人が QR をかざす／self＝本人が時刻を入力／proxy＝管理者が代理入力
-//   POST /api/works/actuals        { shift_id, start, end }          … 1 件の勤務の出勤・退勤の時刻（'HH:MM'。空文字で消す）
-//   POST /api/works/actuals/plan   { shift_id } | { staff_id, month } … 予定どおりの時刻を入れる（1 件／1 か月分の未入力の日）
+//   POST /api/works/actuals        { shift_id, start, end, note? }   … 1 件の勤務の出勤・退勤の時刻（'HH:MM'。空文字で消す）
+//   POST /api/works/actuals/plan   { shift_id, note? } | { staff_id, month } … 予定どおりの時刻を入れる（1 件／1 か月分の未入力の日）
+//   note は管理者の代理入力理由（2026-11-25）。打刻の記録の備考に「代理入力（理由）」として残す
 // 管理者は誰の分でも、入力方法が self の本人は自分の分だけ入力できる。入力は打刻の記録（works_punches）にも残す。
 // 日報（タスク管理）を保存すると、日報の担当名（works_staff.report_name）のスタッフのその日の勤務に時刻を写す（syncFromReport）。
 import { json } from '../http.js'
@@ -14,6 +15,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 const MONTH_RE = /^\d{4}-\d{2}$/
 const hm = (t) => (t ? String(t).slice(0, 5) : null)
+
+// 打刻の記録に残す備考。管理者がほかのスタッフの分を入れたときは「代理入力」と理由
+function proxyNote(ctx, shift, reason, base = null) {
+  const r = String(reason || '').trim().slice(0, 200)
+  if (ctx.isAdmin && ctx.staff?.id !== shift.staff_id) return [base, `代理入力${r ? `（${r}）` : ''}`].filter(Boolean).join('・')
+  return base
+}
 
 // 入力してよい人か（管理者、または入力方法が self の本人）
 async function canInput(supabase, ctx, staffId) {
@@ -74,7 +82,7 @@ export async function handleActuals(req) {
     const s = start === undefined ? hm(shift.actual_start) : start
     const e = end === undefined ? hm(shift.actual_end) : end
     if (s && e && e <= s) return json({ error: '退勤は出勤より後の時刻にしてください' }, 400)
-    const note = ctx.isAdmin && ctx.staff?.id !== shift.staff_id ? '代理入力' : null
+    const note = proxyNote(ctx, shift, b.note)
     await writeActual(supabase, shift, { start, end }, { method: 'manual', actorId: ctx.user.id, note })
     return json({ ok: true })
   } catch (err) {
@@ -116,7 +124,8 @@ export async function handleActualsPlan(req) {
       // 入っている方はそのまま、空いている方だけ予定の時刻を入れる（1 件指定のときは両方を予定どおりにする）
       const start = b.shift_id || !s.actual_start ? hm(s.plan_start) : undefined
       const end = b.shift_id || !s.actual_end ? hm(s.plan_end) : undefined
-      if (await writeActual(supabase, s, { start, end }, { method: 'manual', actorId: ctx.user.id, note: '予定通り' })) count++
+      const note = b.shift_id ? proxyNote(ctx, s, b.note, '予定通り') : '予定通り'
+      if (await writeActual(supabase, s, { start, end }, { method: 'manual', actorId: ctx.user.id, note })) count++
     }
     if (!b.shift_id) {
       const { data: st } = await supabase.from('works_staff').select('code').eq('id', shifts[0].staff_id).maybeSingle()

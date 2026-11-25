@@ -5,6 +5,7 @@ import KeyCell from '../components/KeyCell.jsx'
 import Modal, { ModalFoot } from '../components/Modal.jsx'
 import { useList } from '../components/useList.js'
 import { api, hhmm, STATUS_LABEL, WEEKDAYS } from '../lib/api.js'
+import { toHalfWidth } from '../../lib/halfWidthInput.js'
 
 const METHOD_LABEL = { qr: 'QR（現場の QR をかざす）', self: '本人が入力', proxy: '管理者が代理入力' }
 // 一覧での短い表記
@@ -20,8 +21,17 @@ export default function Staff() {
   const { items: patterns } = useList('/api/works/patterns')
   const { items: sites } = useList('/api/works/sites')
   const [filter, setFilter] = useState('current')
+  const [q, setQ] = useState('')
   const [open, setOpen] = useState(null)
-  const list = (items || []).filter((s) => filter === 'all' || s.status !== 'retired')
+  // フリー検索（2026-11-25）: 空白で区切った語がすべて、コード・氏名・ふりがな・所属・入力方法・日報の担当名・メモのどれかに含まれる人
+  const words = toHalfWidth(q).toLowerCase().split(/\s+/).filter(Boolean)
+  const list = (items || [])
+    .filter((s) => filter === 'all' || s.status !== 'retired')
+    .filter((s) => {
+      if (!words.length) return true
+      const hay = toHalfWidth([s.code, s.name, s.kana, s.dept, METHOD_SHORT[s.punch_method || 'qr'], s.report_name, s.note, STATUS_LABEL[s.status]].filter(Boolean).join(' ')).toLowerCase()
+      return words.every((w) => hay.includes(w))
+    })
 
   return (
     <>
@@ -35,6 +45,7 @@ export default function Staff() {
             <button type="button" className={`ui-segmented-btn ${filter === 'current' ? 'is-active' : ''}`} onClick={() => setFilter('current')}>在籍・休職</button>
             <button type="button" className={`ui-segmented-btn ${filter === 'all' ? 'is-active' : ''}`} onClick={() => setFilter('all')}>退職者も表示</button>
           </div>
+          <input className="ui-input works-search" type="search" placeholder="検索（氏名・コード・ふりがななど）" value={q} onChange={(e) => setQ(e.target.value)} aria-label="スタッフを検索" />
         </div>
       </div>
       {error && <p className="works-error">{error}</p>}
@@ -56,7 +67,7 @@ export default function Staff() {
             ))}
           </tbody>
         </table>
-        {items && list.length === 0 && <div className="ui-empty">スタッフがいません</div>}
+        {items && list.length === 0 && <div className="ui-empty">{words.length ? '検索に合うスタッフがいません' : 'スタッフがいません'}</div>}
       </div>
       {open && (
         <StaffDetail

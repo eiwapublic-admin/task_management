@@ -13,6 +13,8 @@ import DayAlerts from '../components/DayAlerts.jsx'
 import LeaveRequestForm from '../components/LeaveRequestForm.jsx'
 import StaffLeavePanel from '../components/StaffLeavePanel.jsx'
 import useAttendanceSheetPdf from '../components/useAttendanceSheetPdf.jsx'
+import TabIcon from '../components/TabIcons.jsx'
+import TimeInput from '../../components/TimeInput.jsx'
 
 const METHOD_LABEL = { qr: 'QR', self: '本人が入力', proxy: '管理者が代理入力' }
 
@@ -130,8 +132,10 @@ export default function Calendar() {
               </select>
               {current && (
                 <>
-                  <button type="button" className="btn-plain" disabled={busy} onClick={() => generate(true)}>{busy ? '作成中…' : '予定を再作成'}</button>
-                  <button type="button" className="btn-plain" disabled={busy || sheetPdf.busy} onClick={() => sheetPdf.open(month, current.id)}>出勤簿を印刷</button>
+                  <button type="button" className="btn-primary works-btn-accent works-print-btn" disabled={busy || sheetPdf.busy} onClick={() => sheetPdf.open(month, current.id)} title="出勤簿を印刷" aria-label="出勤簿を印刷">
+                    <TabIcon name="printer" size={20} />
+                  </button>
+                  <button type="button" className="works-link-blue" disabled={busy} onClick={() => generate(true)}>{busy ? '作成中…' : '予定再作成'}</button>
                 </>
               )}
             </>
@@ -328,6 +332,9 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
   const shifts = data.items.filter((s) => s.work_date === date)
   const [edit, setEdit] = useState(null)
   const [error, setError] = useState('')
+  const [logVersion, setLogVersion] = useState(0)
+  // 管理者がほかのスタッフの分を入れる＝代理入力（理由の欄を出す）
+  const proxy = !!(editable && staff && staff.id !== getUser()?.staff?.id)
   const title = `${Number(date.slice(5, 7))}月${Number(date.slice(8))}日（${WEEKDAYS[dow(date)]}）${staff ? ` ${staff.name}` : ''}`
 
   const save = async () => {
@@ -353,7 +360,19 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
   }
 
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal
+      title={title}
+      onClose={onClose}
+      headExtra={
+        editable && onLeave && !edit ? (
+          <button type="button" className="btn-primary works-btn-accent works-leave-btn" onClick={() => onLeave(date)}>
+            <TabIcon name="coffee" size={18} />
+            <span className="works-pc-only">休暇を申請する</span>
+            <span className="works-phone-only">休暇申請</span>
+          </button>
+        ) : null
+      }
+    >
       {(data.holidays[date] || data.company_holidays[date]) && (
         <p className="works-error" style={{ margin: 0 }}>{data.holidays[date] || data.company_holidays[date]}</p>
       )}
@@ -363,9 +382,17 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
       {shifts.length === 0 && !edit && <p className="works-muted" style={{ margin: 0 }}>予定はありません。</p>}
       {!edit && shifts.map((s) => (
         <div key={s.id} className="ui-card">
-          <div className="ui-card-title">
-            {s.plan_start}〜{s.plan_end}
-            <span className="works-muted" style={{ fontWeight: 400 }}>　{hoursLabel(s.minutes)} 時間{s.break_minutes ? `（休憩 ${s.break_minutes} 分）` : ''}</span>
+          <div className="ui-card-title works-plan-line">
+            <span>
+              予定 {s.plan_start}〜{s.plan_end}
+              <span className="works-muted" style={{ fontWeight: 400 }}>　{hoursLabel(s.minutes)} 時間{s.break_minutes ? `（休憩 ${s.break_minutes} 分）` : ''}</span>
+            </span>
+            {editable && (
+              <span className="works-plan-tools">
+                <button type="button" className="btn-plain" onClick={() => setEdit({ id: s.id, plan_start: s.plan_start, plan_end: s.plan_end, site_id: s.site_id || '', telework: !!s.telework, note: s.note || '' })}>変更</button>
+                <button type="button" className="btn-plain" onClick={() => remove(s)}>削除</button>
+              </span>
+            )}
           </div>
           <div>
             {s.telework && <span className="works-tw-badge" style={{ marginRight: 6 }}>テレワーク</span>}
@@ -383,33 +410,36 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
           </div>
           {actualEditable && (editable || date <= todayJst()) && (
             <div className="works-actual-box">
-              <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>出勤・退勤の時刻{editable && staff ? '（代理入力）' : ''}</div>
-              <ActualEditor shift={s} onSaved={onSaved} compact />
+              <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>実績（出勤・退勤の時刻）{proxy ? '（代理入力）' : ''}</div>
+              <ActualEditor
+                shift={s}
+                compact
+                proxy={proxy}
+                onSaved={() => {
+                  onSaved()
+                  setLogVersion((v) => v + 1)
+                }}
+              />
             </div>
           )}
           {s.warn_no_break && <div className="ui-note is-danger">6 時間を超える勤務で、休憩が 45 分未満です</div>}
           <div className="works-muted" style={{ fontSize: 'var(--fs-xs)' }}>{s.source === 'manual' ? '手で追加・変更した予定' : '勤務体系から自動作成'}</div>
-          {editable && (
-            <div className="works-row-actions" style={{ marginTop: 8, marginBottom: 0 }}>
-              <button type="button" className="btn-plain" onClick={() => setEdit({ id: s.id, plan_start: s.plan_start, plan_end: s.plan_end, site_id: s.site_id || '', telework: !!s.telework, note: s.note || '' })}>変更</button>
-              <button type="button" className="btn-plain" onClick={() => remove(s)}>削除</button>
-            </div>
-          )}
         </div>
       ))}
-      {editable && !edit && (
+      {/* 「＋ この日に予定を追加」は 2026-11-25 依頼元の要望で廃止。ただし予定の無い日（代勤など）に予定を入れる手段が
+          ほかに無いので、予定が 1 件も無い日だけ「＋ 予定を追加」を残す */}
+      {editable && !edit && shifts.length === 0 && (
         <div className="works-row-actions" style={{ marginBottom: 0 }}>
-          {onLeave && <button type="button" className="btn-plain" onClick={() => onLeave(date)}>＋ 休暇を申請する</button>}
-          <button type="button" className="btn-plain" onClick={() => setEdit({ plan_start: shifts[0]?.plan_start || '09:00', plan_end: shifts[0]?.plan_end || '17:00', site_id: shifts[0]?.site_id || '', telework: !!shifts[0]?.telework, note: '' })}>
-            ＋ この日に予定を追加
+          <button type="button" className="works-link-blue" onClick={() => setEdit({ plan_start: '09:00', plan_end: '17:00', site_id: '', telework: false, note: '' })}>
+            ＋ 予定を追加
           </button>
         </div>
       )}
       {edit && (
         <>
           <div className="ui-field-row">
-            <label className="ui-field"><span>開始</span><input className="ui-input" type="time" value={edit.plan_start} onChange={(e) => setEdit({ ...edit, plan_start: e.target.value })} /></label>
-            <label className="ui-field"><span>終了</span><input className="ui-input" type="time" value={edit.plan_end} onChange={(e) => setEdit({ ...edit, plan_end: e.target.value })} /></label>
+            <label className="ui-field"><span>開始</span><TimeInput className="ui-input" value={edit.plan_start} onChange={(v) => setEdit((x) => ({ ...x, plan_start: v }))} /></label>
+            <label className="ui-field"><span>終了</span><TimeInput className="ui-input" value={edit.plan_end} onChange={(v) => setEdit((x) => ({ ...x, plan_end: v }))} /></label>
           </div>
           <label className="ui-field">
             <span>現場</span>
@@ -428,16 +458,17 @@ export function DayModal({ date, data, staff, staffId, sites, editable, actualEd
           </ModalFoot>
         </>
       )}
-      {staffId && staffId !== 'all' && !edit && <PunchLog date={date} staffId={staffId} editable={editable} onSaved={onSaved} />}
+      {staffId && staffId !== 'all' && !edit && <PunchLog date={date} staffId={staffId} editable={editable} version={logVersion} />}
       {error && <div className="works-error">{error}</div>}
     </Modal>
   )
 }
 
-// その日の打刻の記録と、管理者の代理入力（スマートフォンを持たない方・打刻忘れの訂正。6-3）
-function PunchLog({ date, staffId, editable, onSaved }) {
+// その日の打刻の記録（QR・日報・手入力・代理入力の履歴。6-3）
+//   管理者の代理入力は、2026-11-25 から実績の時刻の欄に直接入れる（「代理入力理由」の欄つき）。
+//   それまでの「＋ 出勤・退勤を代理で入力」（打刻と同じく丸めて記録）は廃止。API /api/works/punch/proxy は残してある
+function PunchLog({ date, staffId, editable, version = 0 }) {
   const [items, setItems] = useState(null)
-  const [form, setForm] = useState(null)
   const [error, setError] = useState('')
   const load = useCallback(() => {
     if (date > todayJst()) return setItems([])
@@ -447,19 +478,8 @@ function PunchLog({ date, staffId, editable, onSaved }) {
   }, [date, staffId])
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, version])
   if (date > todayJst()) return null
-  const save = async () => {
-    setError('')
-    try {
-      await api('/api/works/punch/proxy', { method: 'POST', body: { staff_id: staffId, work_date: date, ...form } })
-      setForm(null)
-      load()
-      onSaved()
-    } catch (e) {
-      setError(e.message)
-    }
-  }
   return (
     <div className="works-punchlog">
       <strong>打刻の記録</strong>
@@ -489,30 +509,6 @@ function PunchLog({ date, staffId, editable, onSaved }) {
             ))}
           </tbody>
         </table>
-      )}
-      {editable && !form && (
-        <button type="button" className="btn-plain" style={{ marginTop: 6 }} onClick={() => setForm({ kind: 'in', time: '', note: '' })}>
-          ＋ 出勤・退勤を代理で入力
-        </button>
-      )}
-      {editable && form && (
-        <>
-          <div className="ui-field-row">
-            <label className="ui-field">
-              <span>種類</span>
-              <select className="ui-select" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-                <option value="in">出勤</option>
-                <option value="out">退勤</option>
-              </select>
-            </label>
-            <label className="ui-field"><span>時刻</span><input className="ui-input" type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></label>
-          </div>
-          <label className="ui-field"><span>理由（スマートフォンなし・打刻忘れなど）</span><input className="ui-input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-          <p className="ui-note" style={{ margin: 0 }}>打刻と同じく 30 分単位に丸め、予定の時刻にそろえて勤務表に記録します。すでに記録があれば置き換えます。</p>
-          <div className="works-row-actions">
-            <button type="button" className="btn-primary works-btn-accent" disabled={!form.time} onClick={save}>記録する</button>
-          </div>
-        </>
       )}
       {error && <div className="works-error">{error}</div>}
     </div>
