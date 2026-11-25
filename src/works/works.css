@@ -1171,15 +1171,13 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.works-leave-history > .ui-table-wrap { flex: 1 1 520px; min-width: 0; }
-.ui-table .works-vl { border-left: 1.5px solid var(--text-muted); }
-.ui-table .works-vr { border-right: 1.5px solid var(--text-muted); }
+.works-leave-history-main { flex: 1 1 520px; min-width: 0; }
+/* 取得〜（付与）の 3 列を囲む縦罫線。期間（キー列）の右の線と同じ書式 */
+.ui-table .works-vl { box-shadow: inset 1px 0 0 var(--border); }
+.ui-table .works-vr { box-shadow: inset -1px 0 0 var(--border); }
 .works-leave-taken { flex: 0 0 auto; }
-.works-leave-taken-title {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
+.works-leave-taken-total { font-weight: 400; color: var(--text-muted); }
+.works-leave-taken-scroll thead th { position: sticky; top: 0; z-index: 1; }
 .works-leave-taken-scroll {
   max-height: 420px;
   overflow-y: auto;
@@ -1196,3 +1194,11 @@
   .works-phone-only { display: inline; }
   .works-leave-btn { padding-left: 10px; padding-right: 10px; }
 }
+.works-leave-history-main,
+.works-leave-taken {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.works-leave-history-main > .works-section-title,
+.works-leave-taken-total { line-height: 1.5; }

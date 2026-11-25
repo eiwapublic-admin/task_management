@@ -96,7 +96,7 @@ export default function LeaveRequestForm({ staffList = null, staff = null, date 
 
   return (
     <Modal
-      title={staff ? `${staff.name} さんの休暇を登録（承認済み）` : proxy ? '紙の申請書を入力（承認済みで登録）' : '休暇を申請する'}
+      title={staff ? `${staff.name} さんの休暇を登録（承認済み）` : proxy ? '申請書から転記（承認済みで登録）' : '休暇を申請する'}
       onClose={onClose}
       size="lg"
       foot={
