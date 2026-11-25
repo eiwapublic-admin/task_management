@@ -77,7 +77,7 @@ export default function Leave() {
             </>
           ) : (
             <>
-              <button type="button" className="btn-primary works-btn-accent" onClick={() => setForm(true)} disabled={!data}>＋ 紙の申請書を入力</button>
+              <button type="button" className="btn-primary works-btn-accent" onClick={() => setForm(true)} disabled={!data}>＋ 申請書から転記</button>
               <button type="button" className="btn-plain" onClick={() => setPrint({ request: null })}>空欄の申請書を印刷</button>
             </>
           )}
@@ -92,7 +92,7 @@ export default function Leave() {
             </div>
           </div>
           {reqs ? <LeaveRequestList items={reqs} admin onChanged={changed} onPrint={(r) => setPrint({ request: r, name: r.staff?.name })} /> : <p className="works-muted">読み込み中…</p>}
-          <p className="ui-note">承認すると取得日に入ります。紙の申請書で受け付けた分は「紙の申請書を入力」から登録してください（承認済みで入ります）。</p>
+          <p className="ui-note">承認すると取得日に入ります。紙の申請書で受け付けた分は「申請書から転記」から登録してください（承認済みで入ります）。</p>
         </>
       )}
       {tab === 'list' && (
@@ -114,16 +114,18 @@ export default function Leave() {
                 <th className="num">繰越</th>
                 <th className="num">付与</th>
                 <th className="num">取得</th>
+                <th className="num">（特別）</th>
+                <th className="num">（今月）</th>
                 <th className="num">残日数</th>
                 <th className="num">期末で消滅</th>
-                <th className="center">年5日</th>
-                <th className="num">特別休暇</th>
-                <th className="num">当月の取得</th>
+                <th className="center">年5日義務</th>
               </tr>
             </thead>
             <tbody>
               {items.map((r) => {
                 const p = r.period
+                // 今月の取得（有休の日数。うち特別休暇があれば「（特n）」）
+                const month = r.month_paid || r.month_special ? `${r.month_paid}${r.month_special ? `（特${r.month_special}）` : ''}` : ''
                 return (
                   <tr key={r.staff_id} onClick={() => setOpen(r)}>
                     <KeyCell name={r.name} code={r.code}>
@@ -131,23 +133,23 @@ export default function Leave() {
                     </KeyCell>
                     {p ? (
                       <>
-                        <td style={{ whiteSpace: 'nowrap' }}>{ymdLabel(p.start)}〜{ymdLabel(p.end)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{ymdLabel(p.start)}〜</td>
                         <td className="num">{p.carry}</td>
                         <td className="num">{p.grant}</td>
                         <td className="num">{p.taken}</td>
+                        <td className="num">{p.special_taken}/{p.special_grant}</td>
+                        <td className="num">{month}</td>
                         <td className="num"><strong>{p.remain}</strong></td>
                         <td className="num">{p.expire ? <span className="works-warn-text">{p.expire}</span> : 0}</td>
                         <td className="center">
                           {p.five_day_short == null ? <span className="works-muted">—</span> : p.five_day_short > 0 ? <span className="works-none">あと{p.five_day_short}日</span> : '達成'}
                         </td>
-                        <td className="num">{p.special_taken}/{p.special_grant}</td>
                       </>
                     ) : (
-                      <td colSpan={8} className="works-muted">
+                      <td colSpan={9} className="works-muted">
                         {r.hired_on ? `最初の付与は ${ymdLabel(r.first_grant)}` : '入社日が未登録'}
                       </td>
                     )}
-                    <td className="num">{r.month_paid || r.month_special ? `有休${r.month_paid}・特休${r.month_special}` : ''}</td>
                   </tr>
                 )
               })}
@@ -268,42 +270,47 @@ function LeaveDetail({ row, at, onClose, onChanged }) {
           )}
 
           <section className="works-section">
-            <h3 className="works-section-title">期間ごとの履歴</h3>
             {data.periods.length === 0 ? (
-              <p className="works-muted" style={{ margin: 0 }}>まだ付与がありません{row.first_grant ? `（最初の付与は ${ymdLabel(row.first_grant)}）` : ''}</p>
+              <>
+                <h3 className="works-section-title">期間ごとの履歴</h3>
+                <p className="works-muted" style={{ margin: 0 }}>まだ付与がありません{row.first_grant ? `（最初の付与は ${ymdLabel(row.first_grant)}）` : ''}</p>
+              </>
             ) : (
               <div className="works-leave-history">
-                <div className="ui-table-wrap">
-                  <table className="ui-table works-monthly works-leave-periods">
-                    <thead>
-                      <tr>
-                        <th className="works-key">期間</th>
-                        <th className="num">繰越</th>
-                        <th className="num">付与</th>
-                        <th className="num works-vl">取得</th>
-                        <th className="num">（繰越）</th>
-                        <th className="num works-vr">（付与）</th>
-                        <th className="num">残日数</th>
-                        <th className="num">期末で消滅</th>
-                        <th className="num">特別休暇</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.periods.map((p) => (
-                        <tr key={p.start}>
-                          <td className="works-key">{ymdLabel(p.start)}〜</td>
-                          <td className="num">{p.carry}</td>
-                          <td className="num">{p.grant}</td>
-                          <td className="num works-vl"><strong>{neg(p.taken)}</strong></td>
-                          <td className="num">{neg(p.from_carry)}</td>
-                          <td className="num works-vr">{neg(p.from_grant)}</td>
-                          <td className="num"><strong>{p.remain}</strong></td>
-                          <td className="num">{p.expire}</td>
-                          <td className="num">{p.special_taken}/{p.special_grant}</td>
+                <div className="works-leave-history-main">
+                  <h3 className="works-section-title">期間ごとの履歴</h3>
+                  <div className="ui-table-wrap">
+                    <table className="ui-table works-monthly works-leave-periods">
+                      <thead>
+                        <tr>
+                          <th className="works-key">期間</th>
+                          <th className="num">繰越</th>
+                          <th className="num">付与</th>
+                          <th className="num works-vl">取得</th>
+                          <th className="num">（繰越）</th>
+                          <th className="num works-vr">（付与）</th>
+                          <th className="num">残日数</th>
+                          <th className="num">期末で消滅</th>
+                          <th className="num">特別休暇</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {data.periods.map((p) => (
+                          <tr key={p.start}>
+                            <td className="works-key">{ymdLabel(p.start)}〜</td>
+                            <td className="num">{p.carry}</td>
+                            <td className="num">{p.grant}</td>
+                            <td className="num works-vl"><strong>{neg(p.taken)}</strong></td>
+                            <td className="num">{neg(p.from_carry)}</td>
+                            <td className="num works-vr">{neg(p.from_grant)}</td>
+                            <td className="num"><strong>{p.remain}</strong></td>
+                            <td className="num">{p.expire}</td>
+                            <td className="num">{p.special_taken}/{p.special_grant}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
                 <TakenDays periods={data.periods} />
               </div>
@@ -315,8 +322,8 @@ function LeaveDetail({ row, at, onClose, onChanged }) {
   )
 }
 
-// 有給休暇取得履歴（これまでに取った日の一覧。2026-11-25 依頼元の要望）。
-//   新しい期間から順に、期間の区切りは太線。特別休暇の日は右に（特）
+// 取得日一覧（これまでに取った日。2026-11-25 依頼元の要望）。
+//   新しい期間から順に、期間の区切りは太線。特別休暇の日は右に（特）。左の「期間ごとの履歴」と上端をそろえる
 function TakenDays({ periods }) {
   const rows = periods.flatMap((p) => {
     const special = new Set(p.special_days || [])
@@ -325,25 +332,31 @@ function TakenDays({ periods }) {
   })
   return (
     <div className="works-leave-taken">
-      <div className="works-leave-taken-title">有給休暇取得履歴（{rows.length}日）</div>
-      {rows.length === 0 ? (
-        <p className="works-muted" style={{ margin: 0 }}>まだありません</p>
-      ) : (
-        <div className="ui-table-wrap works-leave-taken-scroll">
-          <table className="ui-table">
-            <tbody>
-              {rows.map((r) => (
-                <tr key={`${r.periodStart}-${r.d}`} className={r.first ? 'is-period-start' : ''}>
-                  <td className="works-nowrap">
-                    {withDow(r.d)}
-                    {r.special && <span className="works-special-mark">（特）</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="works-section-title works-leave-taken-total">（取得計：{rows.length}日）</div>
+      <div className="ui-table-wrap works-leave-taken-scroll">
+        <table className="ui-table works-monthly">
+          <thead>
+            <tr>
+              <th>取得日一覧</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td className="works-muted">まだありません</td>
+              </tr>
+            )}
+            {rows.map((r) => (
+              <tr key={`${r.periodStart}-${r.d}`} className={r.first ? 'is-period-start' : ''}>
+                <td className="works-nowrap">
+                  {withDow(r.d)}
+                  {r.special && <span className="works-special-mark">（特）</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
