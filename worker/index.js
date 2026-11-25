@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { runPipeline } from './lib/pipeline.js'
+import { runPipeline, cleanupOldRecords } from './lib/pipeline.js'
 import { json, verifyRequestAuth, withSecurityHeaders } from './lib/http.js'
 import { signJwt, verifyJwt } from './lib/jwt.js'
 import { getAdminClient } from './lib/supabase-admin.js'
@@ -1588,9 +1588,16 @@ async function runReminderCheck() {
 //   ・退去日を過ぎたテナントを退去済みにする
 //   ・2年を過ぎた検針写真の削除（docs/meter-plan.md 7章）
 //   ・期限切れ・取り消し・回数を使い切った共有リンクの PDF の削除（2026-10-26〜）
+//   ・60日を過ぎた処理ログ・業務外判定の記録の削除（2026-11-25〜。以前はその日最初の
+//     メール取得〔8時〕の末尾で行っていて、取得位置の更新が上限で失敗する一因だった）
 async function runDailyJobs() {
   const jst = new Date(Date.now() + 9 * 3600 * 1000)
   if (jst.getUTCHours() !== 3 || jst.getUTCMinutes() >= 5) return
+  try {
+    await cleanupOldRecords()
+  } catch (err) {
+    console.error('old-records-cleanup 失敗:', err)
+  }
   try {
     const movedOut = await applyTenantMoveOuts()
     if (movedOut) console.log(`tenant-move-out: ${movedOut}件を退去済みに`)

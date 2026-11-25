@@ -279,7 +279,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   //   last_run_at   … 実行間隔の抑制のみに使う。**Claude を呼ぶ前に必ず記録する**ので、
   //                    実行が途中で落ちても次の cron 刻みはゲートで止まる。
   // 両者を分けた経緯は 9/3 の課金事故（docs/ai-cost-and-alternatives.md 9章「原因B」）。
-  // 当時はゲートも last_fetch_at を見ていたため、手順7に到達できない実行が続くと
+  // 当時はゲートも last_fetch_at を見ていたため、手順6に到達できない実行が続くと
   // 経過時間が常に間隔を超え、ゲートが素通りして cron の 5 分間隔がそのまま実行間隔に
   // なっていた（1日19回 → 約120回）。
   const lastRunAt = settings.last_run_at ? new Date(settings.last_run_at) : null
@@ -370,7 +370,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // Claude呼び出しを繰り返す。9/3の課金事故はこれに丸一日気づけなかったことで
   // 被害が広がったので、赤字の error ログで画面に出す。
   //
-  // ログは logRows に積まずに**その場で書く**。logRows の挿入は手順6にあり、
+  // ログは logRows に積まずに**その場で書く**。logRows の挿入は手順7にあり、
   // ここで検知したいのは「手順6・7まで到達できていない」状態そのものなので、
   // 末尾にまとめて書く方式では肝心のときに残らない。
   // 連続実行のたびに赤い行が増えるのを避けるため、通知は1日1回に絞る
@@ -669,7 +669,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   // 2) 新規メッセージを分類してタスク化
   let mailTruncated = false
   // 処理を終えた最後のメールの受信時刻。予算切れで途中打ち切りになったとき、
-  // 取得窓（last_fetch_at）をここまで進めて残りを次の巡回に回す（手順7）。
+  // 取得窓（last_fetch_at）をここまで進めて残りを次の巡回に回す（手順6）。
   let lastProcessedReceivedAt = null
   for (const [refIndex, ref] of messageRefs.entries()) {
     try {
@@ -1379,7 +1379,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
 
   // 積み残し・サブリクエストの使用状況を残す（処理ログの詳細から追えるようにする）
   if (mailTruncated) {
-    // 取りこぼし防止のため、この回は last_fetch_at を進めない（手順7参照）。
+    // 取りこぼし防止のため、この回は last_fetch_at を進めない（手順6参照）。
     // 「取得はしたが処理していないメールがある」ことを画面に赤字で出したいので errors に積む。
     summary.errors.push(
       `メールを ${deferred.mail} 件、次回の巡回に繰り越しました（Workerの外部リクエスト上限の保護）。` +
@@ -1440,7 +1440,48 @@ export async function runPipeline({ force = false, actor = 'システム（自�
     }
   }
 
-  // 6) 操作ログの書き込み（取得サマリー + 自動ステータス変更）と古いログの削除
+  // 6) last_fetch_at（取得位置）を更新する。**操作ログの書き込みより前**に置く（2026-11-25）。
+  // 以前はログの insert・古い記録の delete のあと、関数の一番最後に更新していた。
+  // その日最初の巡回（8:00）は夜間のメールが溜まっていて外部リクエストを多く使ううえ、
+  // 1日1回の掃除（delete 2回＋upsert）も同じ巡回に乗るため、最後のこの更新だけが
+  // Cloudflare の上限（無料プランは1回50件）を越えて黙って失敗していた。ログは「I」で
+  // 残るのに取得位置が前日夕方のまま止まり、次の巡回で「メール取得が最後まで完了して
+  // いません」の赤字が出る（10/2〜11/21 に10回。いずれも 8:30〜9:05）。
+  // 取りこぼし防止にいちばん大事な記録なので先に書き、失敗したらログに残す。
+  // 掃除は日本時間3時の巡回（cleanupOldRecords）へ移した。
+  let fetchMarkError = null
+  // **予算切れでメールを積み残した回は前進させない**（2026-09-04）。取得窓を進めると、
+  // まだ本文も見ていないメールが次回の対象から外れて永久に取りこぼされるため。
+  // 積み残しがある間は同じ窓を再取得することになるが、処理済み・業務外判定済みの
+  // メッセージは本文取得より前にスキップするので、Claude課金もGmailの通信も増えない。
+  if (mailTruncated) {
+    // 予算切れで積み残した回は「現在時刻」まで進めてはいけない（まだ本文も見ていない
+    // メールが次回の対象から外れ、永久に取りこぼす）。処理を終えた最後のメールの
+    // 受信時刻まで進め、残りは次の巡回で続きから拾う。同じ秒に届いた別のメールを
+    // 落とさないよう1秒戻す（重複は既存の重複判定で弾かれるだけなので害はない）。
+    // 受信時刻が1件も取れていない（＝1通も処理できなかった）ときは進めない。
+    const base = lastProcessedReceivedAt ? new Date(lastProcessedReceivedAt).getTime() : NaN
+    if (Number.isFinite(base)) {
+      const { error } = await supabase
+        .from('settings')
+        .update({ value: new Date(base - 1000).toISOString() })
+        .eq('key', 'last_fetch_at')
+      fetchMarkError = error
+    }
+  } else {
+    const { error } = await supabase
+      .from('settings')
+      .update({ value: new Date().toISOString() })
+      .eq('key', 'last_fetch_at')
+    fetchMarkError = error
+  }
+
+  if (fetchMarkError) {
+    console.error('last_fetch_at の更新に失敗:', fetchMarkError.message)
+    summary.errors.push(`取得位置（last_fetch_at）の保存に失敗しました: ${fetchMarkError.message}`)
+  }
+
+  // 7) 操作ログの書き込み（取得サマリー + 自動ステータス変更）
   // エラーが1件でもあれば 'error' 種別（画面では赤いバッジ）にする。2026-09-04:
   // クレジット不足などの失敗が「メール取得」という平常時と同じ見た目で流れてしまい、
   // 一覧を眺めても異常だと気づけなかったため（依頼）。
@@ -1476,46 +1517,18 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   logRows.unshift({ log_type: 'fetch', level: fetchLevel, actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)
   if (logError) console.error('操作ログの書き込みに失敗:', logError.message)
-  // 古い記録の掃除は**1日1回だけ**行う（2026-09-05）。
-  // 巡回のたびに delete を2回出すと、それだけで1日100回ぶんのサブリクエストになる。
-  // 保持期間は日単位なので、実行が1日1回でも結果は変わらない。
-  //   - activity_logs … 処理ログ
-  //   - processed_messages … 業務外判定の記録。取得クエリは last_fetch_at 以降しか
-  //     見ないため、古い記録を残し続ける必要はない（残すと照合対象が無限に増える）
-  const cleanupDay = todayJST()
-  if (settings.cleanup_done_on !== cleanupDay) {
-    const retentionCutoff = new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString()
-    await supabase.from('activity_logs').delete().lt('created_at', retentionCutoff)
-    await supabase.from('processed_messages').delete().lt('judged_at', retentionCutoff)
-    await supabase
-      .from('settings')
-      .upsert({ key: 'cleanup_done_on', value: cleanupDay }, { onConflict: 'key' })
-  }
-
-  // 7) last_fetch_at を更新
-  // **予算切れでメールを積み残した回は前進させない**（2026-09-04）。取得窓を進めると、
-  // まだ本文も見ていないメールが次回の対象から外れて永久に取りこぼされるため。
-  // 積み残しがある間は同じ窓を再取得することになるが、処理済み・業務外判定済みの
-  // メッセージは本文取得より前にスキップするので、Claude課金もGmailの通信も増えない。
-  if (mailTruncated) {
-    // 予算切れで積み残した回は「現在時刻」まで進めてはいけない（まだ本文も見ていない
-    // メールが次回の対象から外れ、永久に取りこぼす）。処理を終えた最後のメールの
-    // 受信時刻まで進め、残りは次の巡回で続きから拾う。同じ秒に届いた別のメールを
-    // 落とさないよう1秒戻す（重複は既存の重複判定で弾かれるだけなので害はない）。
-    // 受信時刻が1件も取れていない（＝1通も処理できなかった）ときは進めない。
-    const base = lastProcessedReceivedAt ? new Date(lastProcessedReceivedAt).getTime() : NaN
-    if (Number.isFinite(base)) {
-      await supabase
-        .from('settings')
-        .update({ value: new Date(base - 1000).toISOString() })
-        .eq('key', 'last_fetch_at')
-    }
-  } else {
-    await supabase
-      .from('settings')
-      .update({ value: new Date().toISOString() })
-      .eq('key', 'last_fetch_at')
-  }
-
   return summary
+}
+
+// 古い記録の掃除（1日1回。2026-11-25 に runPipeline の末尾から日本時間3時の巡回へ移した）。
+// メール取得が止まっている深夜なら、Workers の1回あたりの外部リクエスト数に余裕がある。
+//   - activity_logs … 処理ログ
+//   - processed_messages … 業務外判定の記録。取得クエリは last_fetch_at 以降しか
+//     見ないため、古い記録を残し続ける必要はない（残すと照合対象が無限に増える）
+export async function cleanupOldRecords(supabase = getAdminClient()) {
+  const retentionCutoff = new Date(Date.now() - LOG_RETENTION_DAYS * 86400000).toISOString()
+  const { error: logError } = await supabase.from('activity_logs').delete().lt('created_at', retentionCutoff)
+  if (logError) throw new Error(`activity_logs: ${logError.message}`)
+  const { error: pmError } = await supabase.from('processed_messages').delete().lt('judged_at', retentionCutoff)
+  if (pmError) throw new Error(`processed_messages: ${pmError.message}`)
 }
