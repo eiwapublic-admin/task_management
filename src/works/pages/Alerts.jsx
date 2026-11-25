@@ -32,7 +32,8 @@ export default function Alerts() {
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') === 'requests' ? 'requests' : 'alerts'
   const setTab = (t) => setParams(t === 'requests' ? { tab: t } : {}, { replace: true })
-  const [period, setPeriod] = useState('recent') // recent = 先月から今日まで / YYYY-MM
+  // recent = 先月から今日まで / YYYY-MM。既定は前月（月締めの前の確認に使うので。2026-11-25 依頼元の要望）
+  const [period, setPeriod] = useState(() => addMonths(todayJst().slice(0, 7), -1))
   const [status, setStatus] = useState('open')
   const [staffId, setStaffId] = useState('')
   const [kind, setKind] = useState('')
