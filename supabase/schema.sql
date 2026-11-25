@@ -213,6 +213,25 @@ alter table activity_logs add constraint activity_logs_log_type_check check (log
 -- log_type に 'error' を追加（マイグレーション allow_error_activity_log_type 適用済み。2026-09-04）
 -- 違反車両・廃棄物のAI読み取りの利用量記録が失敗しても画面から気づけなかったため。
 
+-- ステータス（level: I=情報 / W=警告 / E=エラー）と管理者通知の送信済み日時（notified_at）、
+-- 種目 'system' を追加（2026-11-25。/mnt/project-files/logs/add_activity_log_level.sql を SQL Editor で実行）。
+-- 旧 'error' 種目は level='E' で表すようにし、既存行は fetch / system へ移した（'error' は互換のため許可のまま）。
+alter table activity_logs add column if not exists level text not null default 'I';
+alter table activity_logs add column if not exists notified_at timestamptz;
+alter table activity_logs drop constraint if exists activity_logs_level_check;
+alter table activity_logs add constraint activity_logs_level_check check (level in ('I', 'W', 'E'));
+alter table activity_logs drop constraint if exists activity_logs_log_type_check;
+alter table activity_logs add constraint activity_logs_log_type_check check (log_type in ('fetch', 'status_change', 'backup', 'system', 'error'));
+create or replace function activity_logs_default_level() returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.log_type = 'error' then new.level := 'E'; end if;
+  return new;
+end;
+$$;
+drop trigger if exists activity_logs_default_level on activity_logs;
+create trigger activity_logs_default_level before insert on activity_logs for each row execute function activity_logs_default_level();
+create index if not exists idx_activity_logs_alerts on activity_logs (created_at) where level <> 'I' and notified_at is null;
+
 -- processed_messages: 業務外（スパム含む）と判定したメールの記録
 -- （マイグレーション add_processed_messages 適用済み。2026-09-04）
 -- タスクを作らないメールは tasks に gmail_message_id が残らないため、これが無いと

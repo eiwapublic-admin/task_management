@@ -723,10 +723,67 @@
   color: var(--color-warn);
 }
 
-/* エラー種別（2026-09-04）。見落とすと課金に直結するため危険色で示す */
+/* 種目「システム」（2026-11-25。旧「エラー」種目の行もここに入る） */
+.logs-type-system,
 .logs-type-error {
+  background: color-mix(in srgb, var(--text-muted, #6b7280) 14%, var(--bg-surface));
+  color: var(--text-base);
+}
+
+/* ステータス（2026-11-25）。I=情報は控えめ、W=警告は黄、E=エラーは赤 */
+.logs-level {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.logs-level-I {
+  color: var(--text-muted, #6b7280);
+  border-color: var(--border);
+}
+.logs-level-W {
+  background: var(--color-warn-surface);
+  border-color: var(--color-warn-border);
+  color: var(--color-warn-ink);
+}
+.logs-level-E {
+  background: var(--color-danger);
+  color: #fff;
+}
+.logs-row-W td {
+  background: color-mix(in srgb, var(--color-warn-surface) 45%, transparent);
+}
+.logs-row-E td {
   background: var(--color-danger-surface);
+}
+
+/* 未確認の警告・エラーの案内（処理ログ画面の上） */
+.logs-unseen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warn-border);
+  background: var(--color-warn-surface);
+  border-radius: var(--radius-sm);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+.logs-unseen-e {
   color: var(--color-danger);
+}
+.logs-unseen-w {
+  color: var(--color-warn-ink);
+}
+.logs-unseen-actions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .logs-note {

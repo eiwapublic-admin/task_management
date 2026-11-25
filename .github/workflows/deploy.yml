@@ -170,3 +170,26 @@ jobs:
       - name: Remove secrets file (on failure)
         if: always()
         run: rm -f "$RUNNER_TEMP/worker-secrets.json" "$RUNNER_TEMP/eworks-secrets.json"
+
+      # デプロイの失敗をアプリの処理ログに E（エラー）として残す（2026-11-25〜）。
+      # Worker の5分ごとの巡回が拾って管理者の端末へ通知する（worker/lib/alerts.js）。
+      # DB パスワードは不要: Supabase の REST API に service キーで1行 insert する。
+      - name: 失敗を操作ログに記録
+        if: failure()
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SERVICE_KEY:-}" ] || exit 0
+          KEY_HEADERS=(-H "apikey: ${SUPABASE_SERVICE_KEY}")
+          case "$SUPABASE_SERVICE_KEY" in
+            sb_secret_*|sb_publishable_*) ;;
+            *) KEY_HEADERS+=(-H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}") ;;
+          esac
+          BODY=$(jq -n --arg msg "アプリの本番反映（デプロイ）に失敗しました。直前の変更は本番に反映されていません。GitHub Actions のログを確認してください: ${RUN_URL}" \
+            '{log_type: "system", level: "E", actor: "システム（自動デプロイ）", message: $msg}')
+          curl -fsS "${KEY_HEADERS[@]}" -H "Content-Type: application/json" -H "Prefer: return=minimal" \
+            -X POST "${SUPABASE_URL%/}/rest/v1/activity_logs" -d "$BODY"

@@ -390,7 +390,7 @@ export async function runPipeline({ force = false, actor = 'システム（自�
       summary.errors.push(message)
       const today = todayJST()
       if (settings.fetch_stall_alert_on !== today) {
-        await supabase.from('activity_logs').insert({ log_type: 'error', actor, message })
+        await supabase.from('activity_logs').insert({ log_type: 'fetch', level: 'E', actor, message })
         await supabase
           .from('settings')
           .upsert({ key: 'fetch_stall_alert_on', value: today }, { onConflict: 'key' })
@@ -1460,13 +1460,20 @@ export async function runPipeline({ force = false, actor = 'システム（自�
   if (deferred.mail > 0) deferredParts.push(`メール ${deferred.mail} 件`)
   if (deferred.replyCheck > 0) deferredParts.push(`返信検知 ${deferred.replyCheck} 件`)
   if (deferred.calendar) deferredParts.push('カレンダー')
+  // ステータス（2026-11-25〜）: 失敗があれば E。ただし「上限保護でメールを次回へ繰り越した」
+  // 「外部リクエストが上限に近づいている」だけなら処理は続いているので W（取りこぼしではない）
+  const WARNING_ONLY = [/^メールを .*次回の巡回に繰り越しました/, /^1回の巡回で使う外部リクエストが上限に近づいています/]
+  const onlyWarnings = hasErrors && summary.errors.every((e) => WARNING_ONLY.some((re) => re.test(String(e))))
+  const fetchLevel = !hasErrors ? 'I' : onlyWarnings ? 'W' : 'E'
   const fetchMessage =
-    `${hasErrors ? 'メール取得エラー' : 'メール取得'}: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
+    `${fetchLevel === 'E' ? 'メール取得エラー' : 'メール取得'}: 取得 ${summary.fetched} 件 / 新規タスク ${summary.created} 件 / ` +
     `返信検知 ${summary.replied} 件 / 返信更新 ${summary.updated} 件 / 業務外 ${summary.nonBusiness} 件 / ` +
     `カレンダー登録 ${summary.calendarCreated} 件 / アーカイブ ${summary.archived} 件` +
     (deferredParts.length ? ` / 次回へ繰り越し（${deferredParts.join('・')}）` : '') +
-    (hasErrors ? ` / エラー ${summary.errors.length} 件（${summary.errors[0]}）` : '')
-  logRows.unshift({ log_type: hasErrors ? 'error' : 'fetch', actor, message: fetchMessage, detail: summary })
+    (hasErrors
+      ? ` / ${fetchLevel === 'E' ? 'エラー' : '注意'} ${summary.errors.length} 件（${summary.errors[0]}）`
+      : '')
+  logRows.unshift({ log_type: 'fetch', level: fetchLevel, actor, message: fetchMessage, detail: summary })
   const { error: logError } = await supabase.from('activity_logs').insert(logRows)
   if (logError) console.error('操作ログの書き込みに失敗:', logError.message)
   // 古い記録の掃除は**1日1回だけ**行う（2026-09-05）。

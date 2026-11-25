@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AdminAlertSettings from './AdminAlertSettings'
 import './SettingsPanel.css'
 
 export default function SettingsPanel({ settings, onSave }) {
@@ -125,6 +126,8 @@ export default function SettingsPanel({ settings, onSave }) {
             rows={4}
           />
         </section>
+
+        <AdminAlertSettings />
       </div>
 
       <section className="settings-org">

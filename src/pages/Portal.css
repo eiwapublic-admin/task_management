@@ -279,3 +279,37 @@
   .portal-card { padding: var(--space-3) var(--space-4); }
   .portal-card-caption { margin-left: 0; flex-basis: 100%; }
 }
+
+/* 未確認の警告・エラーの案内（管理者通知の通知先の人にだけ出す。2026-11-25） */
+.portal-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-3);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.portal-alert.is-error {
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger);
+}
+.portal-alert.is-warn {
+  background: var(--color-warn-surface);
+  border: 1px solid var(--color-warn-border);
+}
+.portal-alert-button {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--text-strong);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.portal-alert.is-error .portal-alert-button {
+  background: var(--color-danger);
+}

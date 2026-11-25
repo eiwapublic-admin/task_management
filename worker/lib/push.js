@@ -4,21 +4,25 @@ import { getAdminClient } from './supabase-admin.js'
 // 購読済みの全端末へWeb Push通知を送る汎用の送信関数（2026-09-04に切り出し。
 // 従来は新規タスク通知専用だったが、APIクレジット不足・利用上限到達の通知でも使うため）。
 // VAPID鍵（Secrets）が未設定の間は機能オフとして何もしない（デプロイ自体は壊さない）。
-export async function sendPush({ title, body, url = '/' }) {
+// userIds を渡すと、その利用者の端末だけへ送る（管理者向けの警告・エラー通知。2026-11-25〜）。
+// 空配列・未指定なら従来どおり購読中の全端末へ送る。
+export async function sendPush({ title, body, url = '/', userIds = null }) {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return
 
   const supabase = getAdminClient()
   let subs
   try {
-    const { data, error } = await supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth')
+    let query = supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth')
+    if (Array.isArray(userIds) && userIds.length > 0) query = query.in('user_id', userIds)
+    const { data, error } = await query
     if (error) throw error
     subs = data || []
   } catch (err) {
     console.error('push: 購読一覧の取得に失敗', err)
     return
   }
-  if (subs.length === 0) return
+  if (subs.length === 0) return 0
 
   let vapidKeys
   try {
@@ -34,6 +38,7 @@ export async function sendPush({ title, body, url = '/' }) {
     url,
   })
 
+  let sent = 0
   await Promise.all(
     subs.map(async (sub) => {
       try {
@@ -46,12 +51,15 @@ export async function sendPush({ title, body, url = '/' }) {
         // 404/410 = 購読が失効（ブラウザ側で解除・端末削除・権限取消など）。DBからも削除する。
         if (res.status === 404 || res.status === 410) {
           await supabase.from('push_subscriptions').delete().eq('id', sub.id)
+        } else if (res.ok) {
+          sent += 1
         }
       } catch (err) {
         console.error('push 送信失敗:', err)
       }
     })
   )
+  return sent
 }
 
 // 新しいタスクが自動登録された（メール/フォーム/FAX/カレンダー取り込み）際の通知
