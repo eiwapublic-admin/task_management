@@ -24,14 +24,14 @@ const PunchLink = lazy(() => import('./pages/PunchLink.jsx'))
 // 管理者の PC のメニュー（2026-11-24 依頼元の要望）。「ホーム」「休暇」は廃止し、グループに分ける。
 //   勤務管理: 勤務一覧・スタッフ別・要確認・有給休暇の管理 ／ マスター: スタッフ・出勤パターン・現場 ／ 設定
 // 管理者自身の勤務は「スタッフ別」で自分を選んで入力し、休暇の申請も「スタッフ別」の日の詳細から行う
-const adminGroups = (alertTotal) => [
+const adminGroups = (alertTotal, leaveTotal = 0) => [
   {
     label: '勤務管理',
     items: [
       { to: '/monthly', label: '勤務一覧', icon: 'list', short: '一覧' },
       { to: '/calendar', label: 'スタッフ別', icon: 'calendar' },
       { to: '/alerts', label: '要確認', icon: 'alert', badge: alertTotal },
-      { to: '/leave', label: '有給休暇の管理', icon: 'leave', short: '有給' },
+      { to: '/leave', label: '有給休暇の管理', icon: 'leave', short: '有給', badge: leaveTotal },
     ],
   },
   {
@@ -86,7 +86,7 @@ function Shell({ children }) {
   }, [])
   const isAdmin = !!user?.works_admin
   const groups = isAdmin
-    ? adminGroups(alertTotal)
+    ? adminGroups(alertTotal, alertCount?.leave_requests || 0)
     : [
         {
           items: [

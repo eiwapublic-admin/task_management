@@ -461,3 +461,10 @@ begin
     execute format('revoke all on %I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- =============================================================================
+-- 労務管理者（2026-11-25 依頼元の要望）
+--   設定でスタッフから複数名を選ぶ（works_staff.id の配列）。休暇申請を承認できるのは労務管理者だけ
+--   （空のときは eWorks 管理者全員）。申請が来たら労務管理者へ、承認・却下は本人へプッシュ通知する
+-- =============================================================================
+alter table works_settings add column if not exists labor_manager_ids uuid[] not null default '{}';

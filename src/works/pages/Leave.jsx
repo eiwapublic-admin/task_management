@@ -19,7 +19,8 @@ export default function Leave() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(null)
-  const [tab, setTab] = useState('list')
+  // 通知から開いたときは ?tab=requests で「申請」タブを開く
+  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'requests' ? 'requests' : 'list'))
   const [reqStatus, setReqStatus] = useState('pending')
   const [reqs, setReqs] = useState(null)
   const [pending, setPending] = useState(0)
@@ -92,7 +93,7 @@ export default function Leave() {
             </div>
           </div>
           {reqs ? <LeaveRequestList items={reqs} admin onChanged={changed} onPrint={(r) => setPrint({ request: r, name: r.staff?.name })} /> : <p className="works-muted">読み込み中…</p>}
-          <p className="ui-note">承認すると取得日に入ります。紙の申請書で受け付けた分は「申請書から転記」から登録してください（承認済みで入ります）。</p>
+          <p className="ui-note">承認・却下は、設定で指定した労務管理者ができます（自分の申請はほかの労務管理者が承認）。承認すると取得日に入り、本人に通知します。紙の申請書で受け付けた分は「申請書から転記」から登録してください（承認済みで入ります）。</p>
         </>
       )}
       {tab === 'list' && (

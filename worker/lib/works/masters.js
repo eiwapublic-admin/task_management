@@ -207,7 +207,11 @@ export async function handleSettings(req) {
       rules[k] = v
     }
     if (b.alerts_from && !DATE_RE.test(String(b.alerts_from))) return json({ error: '要確認を出し始める日が正しくありません' }, 400)
+    // 労務管理者（スタッフの id。2026-11-25）
+    const managers = [...new Set((Array.isArray(b.labor_manager_ids) ? b.labor_manager_ids : []).map(String))]
+    if (managers.length > 20 || managers.some((id) => !UUID_RE.test(id))) return json({ error: '労務管理者の指定が正しくありません' }, 400)
     const row = {
+      labor_manager_ids: managers,
       alert_rules: rules,
       alerts_from: b.alerts_from || null,
       break_windows: windows.map((w) => ({ start: w.start.slice(0, 5), end: w.end.slice(0, 5) })),

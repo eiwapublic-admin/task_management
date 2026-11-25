@@ -10,6 +10,7 @@ import { requireWorks } from './auth.js'
 import { log } from './masters.js'
 import { fetchHolidays } from '../holidays.js'
 import { todayJst } from './time.js'
+import { pushToStaff, sendWorksPush } from './push.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -209,6 +210,63 @@ export async function handleLeave(req) {
 // ---------------------------------------------------------------------------
 // 有給休暇の申請（本人が申請 → 労務担当＝eWorks 管理者が承認。紙の申請書は管理者が代理入力して承認済みにする）
 // ---------------------------------------------------------------------------
+// 労務管理者（2026-11-25）。休暇申請を承認でき、申請が来たら通知を受ける。
+//   works_settings.labor_manager_ids（スタッフの id）。空なら eWorks 管理者全員が労務管理者の扱い
+export async function laborManagers(supabase) {
+  const { data } = await supabase.from('works_settings').select('labor_manager_ids').eq('id', 1).maybeSingle()
+  const ids = data?.labor_manager_ids || []
+  if (!ids.length) return []
+  const { data: staff } = await supabase.from('works_staff').select('id, user_id').in('id', ids)
+  return (staff || []).map((s) => ({ staffId: s.id, userId: s.user_id }))
+}
+
+// この申請を承認・却下できるか。管理者で、労務管理者（未設定なら管理者全員）。自分の申請はほかの人が決める。
+//   ほかに労務管理者がいないときは、ほかの管理者が決める
+export function canDecide(ctx, r, managers) {
+  if (!ctx.isAdmin) return false
+  const mine = ctx.staff && ctx.staff.id === r.staff_id
+  if (mine) return false
+  if (!managers.length) return true
+  if (managers.some((m) => m.staffId === ctx.staff?.id)) return true
+  return !managers.some((m) => m.staffId !== r.staff_id)
+}
+
+// 申請が来たことを労務管理者へ（いなければ管理者全員へ）。申請した本人には送らない
+async function notifyNewRequest(supabase, r, staffName) {
+  try {
+    const managers = (await laborManagers(supabase)).filter((m) => m.staffId !== r.staff_id && m.userId)
+    let userIds = managers.map((m) => m.userId)
+    if (!userIds.length) {
+      const { data } = await supabase.from('users').select('id').eq('works_admin', true)
+      userIds = (data || []).map((u) => u.id).filter((id) => id !== r.applied_by)
+    }
+    await sendWorksPush(supabase, userIds, {
+      title: `${r.kind === 'special' ? '特別休暇' : '有給休暇'}の申請`,
+      body: `${staffName} さん　${datesLabel(r.dates)}`,
+      url: '/leave?tab=requests',
+    })
+  } catch (err) {
+    console.error('works 休暇申請の通知に失敗:', err)
+  }
+}
+
+// 承認・却下・取り消しを本人へ
+async function notifyDecision(supabase, r, status, note) {
+  try {
+    const label = r.kind === 'special' ? '特別休暇' : '有給休暇'
+    const word = { approved: '承認されました', rejected: '却下されました', cancelled: '取り消されました' }[status]
+    if (!word) return
+    await pushToStaff(supabase, r.staff_id, { title: `${label}の申請が${word}`, body: `${datesLabel(r.dates)}${note ? `　${note}` : ''}`, url: '/vacation' })
+  } catch (err) {
+    console.error('works 休暇申請の結果の通知に失敗:', err)
+  }
+}
+
+const datesLabel = (dates) => {
+  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`
+  return dates.length > 3 ? `${dates.slice(0, 3).map(md).join('、')} ほか ${dates.length - 3} 日` : dates.map(md).join('、')
+}
+
 const REQ_COLS = 'id, staff_id, kind, dates, reason, status, proxy, applied_at, decided_at, decision_note, applied_by, decided_by'
 export const REQUEST_STATUS = { pending: '承認待ち', approved: '承認済み', rejected: '却下', cancelled: '取り下げ' }
 
@@ -314,7 +372,10 @@ export async function handleLeaveRequests(req) {
       const { data, error: e } = await q
       if (e) throw e
       const { count } = await supabase.from('works_leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')
-      return json({ items: await withNames(supabase, data || []), pending: count || 0 })
+      // 画面で「承認」「却下」を出すかどうか（労務管理者だけ。2026-11-25）
+      const managers = await laborManagers(supabase)
+      const items = (await withNames(supabase, data || [])).map((r) => ({ ...r, can_decide: r.status === 'pending' && canDecide(ctx, r, managers) }))
+      return json({ items, pending: count || 0, is_labor_manager: !managers.length || managers.some((m) => m.staffId === ctx.staff?.id) })
     }
     if (req.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405)
     const body = await req.json().catch(() => ({}))
@@ -352,6 +413,7 @@ export async function handleLeaveRequests(req) {
     const { data: s } = await supabase.from('works_staff').select('code').eq('id', staffId).maybeSingle()
     const label = kind === 'special' ? '特別休暇' : '有給休暇'
     await log(supabase, ctx, `${label}の${proxy ? '申請を代理入力（承認済み）' : '申請'}: ${s?.code || ''} ${dates.join('、')}`)
+    if (!proxy) await notifyNewRequest(supabase, data, ctx.staff?.name || '')
     return json({ item: (await withNames(supabase, [data]))[0] })
   } catch (err) {
     console.error('works leave requests 失敗:', err)
@@ -375,7 +437,10 @@ export async function handleLeaveDecide(req) {
     const note = String(body.note || '').trim().slice(0, 300) || null
     let status
     if (action === 'approve' || action === 'reject') {
-      if (!ctx.isAdmin) return json({ error: '承認は労務担当（eWorks 管理者）だけができます' }, 403)
+      if (!ctx.isAdmin) return json({ error: '承認は労務管理者だけができます' }, 403)
+      if (!canDecide(ctx, r, await laborManagers(supabase))) {
+        return json({ error: mine ? '自分の申請は、ほかの労務管理者が承認します' : '承認・却下は労務管理者だけができます（設定画面で指定）' }, 403)
+      }
       if (r.status !== 'pending') return json({ error: 'この申請はすでに処理されています' }, 409)
       if (action === 'approve') {
         const bad = await checkSpecial(r.kind, r.dates)
@@ -404,6 +469,8 @@ export async function handleLeaveDecide(req) {
       const { error: e2 } = await supabase.from('works_leaves').delete().eq('request_id', r.id)
       if (e2) throw e2
     }
+    // 本人へ結果を通知（本人が自分で取り下げたときは送らない）
+    if (!mine) await notifyDecision(supabase, r, status, note)
     const { data: s } = await supabase.from('works_staff').select('code').eq('id', r.staff_id).maybeSingle()
     await log(supabase, ctx, `${r.kind === 'special' ? '特別休暇' : '有給休暇'}の申請を${REQUEST_STATUS[status]}: ${s?.code || ''} ${r.dates.join('、')}`)
     return json({ item: (await withNames(supabase, upd))[0] })
