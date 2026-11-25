@@ -1202,3 +1202,25 @@
 }
 .works-leave-history-main > .works-section-title,
 .works-leave-taken-total { line-height: 1.5; }
+
+/* 設定: 労務管理者の選択（スタッフのチェック。2026-11-25） */
+.works-check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.works-check-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.works-check-item.is-on {
+  border-color: var(--works-accent);
+  background: var(--works-accent-soft);
+}
+.works-check-item .works-muted { font-size: 12px; }

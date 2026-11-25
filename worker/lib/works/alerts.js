@@ -1,7 +1,7 @@
 // 勤怠管理（eWorks）Phase 4: 要確認（予定と実績の相違）の判定・一覧・通知（docs/eworks-plan.md 8章・13-1）
 //
 //   GET  /api/works/alerts?from&to&staff_id&status=open|resolved|all … 要確認の一覧（本人は自分の分だけ）
-//   GET  /api/works/alerts/count                                     … 未確認の件数と承認待ちの修正申請の件数（管理者）
+//   GET  /api/works/alerts/count                                     … 未確認の件数と承認待ちの修正申請・休暇申請の件数（管理者）
 //   POST /api/works/alerts/resolve { keys, note, undo }              … 確認済みにする／確認済みを取り消す（管理者）
 //
 // 判定は予定（works_shifts）・打刻（works_punches）・休暇（works_leaves）から毎回計算する（8-3。画面ごとに判定を書かない）。
@@ -244,12 +244,14 @@ export async function handleAlertCount(req) {
   if (error) return error
   const supabase = getAdminClient()
   const range = await countRange(supabase)
-  const [{ items }, { count }] = await Promise.all([
+  const [{ items }, { count }, { count: leave }] = await Promise.all([
     range.from <= range.to ? loadAlerts(supabase, range) : { items: [] },
     supabase.from('works_punch_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    // 承認待ちの休暇申請（左メニューの「有給休暇の管理」に件数を出す。2026-11-25）
+    supabase.from('works_leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
   const open = items.filter((a) => !a.resolved_at)
-  return json({ ...range, open: open.length, high: open.filter((a) => a.level === 'high').length, requests: count || 0 })
+  return json({ ...range, open: open.length, high: open.filter((a) => a.level === 'high').length, requests: count || 0, leave_requests: leave || 0 })
 }
 
 export async function handleAlertResolve(req) {

@@ -21,6 +21,7 @@ export default function LeaveRequestList({ items, admin = false, onChanged, onPr
     try {
       await api('/api/works/leave/requests/decide', { method: 'POST', body: { id: r.id, action, note } })
       onChanged()
+      window.dispatchEvent(new Event('works-alerts-changed')) // 左メニューの件数を取り直す
     } catch (e) {
       setError(e.message)
     } finally {
@@ -52,7 +53,8 @@ export default function LeaveRequestList({ items, admin = false, onChanged, onPr
             )}
             <div className="works-row-actions">
               <button type="button" className="btn-plain" onClick={() => onPrint(r)}>申請書を印刷</button>
-              {admin && r.status === 'pending' && (
+              {admin && r.status === 'pending' && !r.can_decide && <span className="works-muted">労務管理者の承認待ち</span>}
+              {admin && r.status === 'pending' && r.can_decide && (
                 <>
                   <button type="button" className="btn-primary works-btn-accent" disabled={busy === r.id} onClick={() => act(r, 'approve')}>承認</button>
                   <button type="button" className="btn-plain" disabled={busy === r.id} onClick={() => act(r, 'reject')}>却下</button>

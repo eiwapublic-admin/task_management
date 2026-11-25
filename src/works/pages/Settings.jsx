@@ -19,6 +19,12 @@ export default function Settings() {
   const [holidayText, setHolidayText] = useState('')
   const [error, setError] = useState('')
   const [msg, setMsg] = useState('')
+  const [staff, setStaff] = useState([])
+  useEffect(() => {
+    api('/api/works/staff')
+      .then((d) => setStaff(d.items.filter((s) => s.status !== 'retired')))
+      .catch(() => {})
+  }, [])
   useEffect(() => {
     api('/api/works/settings')
       .then(({ settings }) => {
@@ -49,6 +55,30 @@ export default function Settings() {
     <>
       <h1 className="works-title">設定</h1>
       <div className="ui-card">
+        <div className="ui-card-title">労務管理者</div>
+        <p className="ui-note" style={{ marginTop: 0 }}>
+          休暇の申請を承認・却下できる人です（複数名可）。申請が来るとこの人たちに通知します。自分の申請は、ほかの労務管理者が承認します。だれも選ばないときは、eWorks の管理者全員が承認できます。※ アプリの管理者（ログインして管理画面を使える人）である必要があります。
+        </p>
+        <div className="works-check-list">
+          {staff.map((s) => {
+            const ids = v.labor_manager_ids || []
+            const on = ids.includes(s.id)
+            return (
+              <label key={s.id} className={`works-check-item ${on ? 'is-on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => setV({ ...v, labor_manager_ids: on ? ids.filter((x) => x !== s.id) : [...ids, s.id] })}
+                />
+                <strong>{s.name}</strong>
+                <span className="works-muted">{s.code}</span>
+                {!s.user_id && <span className="works-muted">（アプリ未登録）</span>}
+              </label>
+            )
+          })}
+        </div>
+      </div>
+      <div className="ui-card" style={{ marginTop: 12 }}>
         <div className="ui-card-title">休憩</div>
         <p className="ui-note" style={{ marginTop: 0 }}>勤務がこの時間帯をまたぐとき（開始より前に始まり、終了より後に終わる）だけ休憩を差し引きます。スタッフごとの例外は勤務体系で設定します。</p>
         {v.break_windows.map((w, i) => (
