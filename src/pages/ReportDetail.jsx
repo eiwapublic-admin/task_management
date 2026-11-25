@@ -21,7 +21,6 @@ import {
   fetchParkingViolations,
   fetchInspections,
   fetchClosedDays,
-  fetchHolidays,
   deleteInspection,
   markClosedDay,
   INSPECTION_BUILDINGS,
@@ -30,7 +29,6 @@ import {
   nowHHMMFloor5,
   toHHMM,
   sortEntriesByTime,
-  weekdayInfo,
 } from '../lib/reports'
 import './Dashboard.css'
 
@@ -63,8 +61,6 @@ export default function ReportDetail({ date, onClose }) {
   const [inspectionStatus, setInspectionStatus] = useState({ existing: null, closed: false })
   const [loadingInspectionStatus, setLoadingInspectionStatus] = useState(true)
   const [editingInspection, setEditingInspection] = useState(false)
-  // 日曜・祝日は休館日スイッチの既定値に使う（2026-09-01。InspectionForm参照）
-  const [holidays, setHolidays] = useState({})
 
   // 明細の自動保存タイマー（明細IDごと）
   const timers = useRef(new Map())
@@ -127,12 +123,6 @@ export default function ReportDetail({ date, onClose }) {
     fetchTemplates()
       .then(setTemplates)
       .catch(() => setTemplates([])) // 定型文が取れなくても入力自体はできるようにする
-  }, [])
-
-  useEffect(() => {
-    fetchHolidays()
-      .then(setHolidays)
-      .catch(() => setHolidays({}))
   }, [])
 
   // 画面を離れる時に保留中の保存を流し切る
@@ -492,7 +482,6 @@ export default function ReportDetail({ date, onClose }) {
           building={INSPECTION_BUILDING}
           existing={inspectionStatus.existing}
           initialClosed={inspectionStatus.closed}
-          isSundayOrHoliday={weekdayInfo(date, holidays).isRed}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditingInspection(false)}
           onSaved={() => {

@@ -899,7 +899,6 @@ export default function ReportList() {
           building={building}
           existing={inspectionsByDate.get(editingInspection) || null}
           initialClosed={closedDays.has(editingInspection)}
-          isSundayOrHoliday={weekdayInfo(editingInspection, holidays).isRed}
           defaultInspector={user?.display_name || ''}
           onClose={() => setEditingInspection(null)}
           onSaved={handleInspectionSaved}

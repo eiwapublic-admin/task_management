@@ -20,16 +20,15 @@ import {
 // （/api/report/closed-days。日報一覧側でも同じ休館日情報を参照する）。
 //
 // initialClosed: 開いた時点でその日が既に休館日かどうか（呼び出し側が別途取得して渡す）。
-// isSundayOrHoliday: その日が日曜・祝日か（呼び出し側が weekdayInfo().isRed を渡す）。
-// 既存の点検記録・休館日登録のどちらも無い（＝まだ何も決まっていない）日曜・祝日は、
-// 休館日スイッチを既定でオンにする（2026-09-01。毎回手動でオンにする手間を省く。
-// 実際に営業した場合はスイッチをオフに戻せば通常どおり記録できる）
+// 日曜・祝日は休館日の一覧そのものが自動で休館日になっている（2026-11-25。
+// worker/lib/closedDays.js）ため initialClosed がオンで開く。以前ここで持っていた
+// 「日曜・祝日なら既定でオン」は、解除して開館にした日まで再びオンにしてしまうので外した。
+// 実際に営業した場合はスイッチをオフにして保存すれば、その日は開館の日として残る
 export default function InspectionForm({
   date,
   building,
   existing,
   initialClosed,
-  isSundayOrHoliday,
   defaultInspector,
   onClose,
   onSaved,
@@ -42,7 +41,7 @@ export default function InspectionForm({
   const [items, setItems] = useState(existing?.items || {})
   const [note, setNote] = useState(existing?.note || '')
   const [periodic, setPeriodic] = useState(existing?.periodic_result || '')
-  const [closed, setClosed] = useState(Boolean(initialClosed) || (!existing && Boolean(isSundayOrHoliday)))
+  const [closed, setClosed] = useState(Boolean(initialClosed))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
